@@ -1,3 +1,5 @@
+import { useAuthStore } from "~/stores/auth"
+
 export default defineNuxtRouteMiddleware((to) => {
     const token = useCookie<string | null>('auth_token')
     const authStore = useAuthStore()

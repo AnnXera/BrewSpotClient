@@ -31,7 +31,7 @@ export const useAuthStore = defineStore('auth', {
         async verifyLoginCode(email: string, code: string) {
             const api = useApi()
             const token = useCookie<string | null>('auth_token', {
-                maxAge: 60 * 60 * 24 * 7,
+                maxAge: 60 * 60 * 24 * 7, // 7 days
             })
 
             const res = await api<{
