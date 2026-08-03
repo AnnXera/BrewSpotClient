@@ -1,3 +1,4 @@
+//auth.ts
 import { defineStore } from 'pinia'
 
 interface User {
@@ -11,69 +12,25 @@ interface User {
 export const useAuthStore = defineStore('auth', {
     state: () => ({
         user: null as User | null,
-        role: null as string | null,
+        role: (useCookie<string | null>('user_role').value) ?? null,
     }),
 
+    getters: {
+        isAuthenticated: (state) => !!state.user || !!state.role,
+    },
+
     actions: {
-        async login(email: string, password: string) {
-            const api = useApi()
-            return await api<{
-                success: boolean
-                message: string
-                requires_2fa?: boolean
-                user_uuid?: string
-            }>('/auth/login', {
-                method: 'POST',
-                body: { email, password },
-            })
+        setSession(user: User, role: string) {
+            this.user = user
+            this.role = role
+            const userRole = useCookie<string | null>('user_role', { maxAge: 60 * 60 * 24 * 7 })
+            userRole.value = role
         },
-
-        async verifyLoginCode(email: string, code: string) {
-            const api = useApi()
-            const token = useCookie<string | null>('auth_token', {
-                maxAge: 60 * 60 * 24 * 7, // 7 days
-            })
-
-            const res = await api<{
-                success: boolean
-                message: string
-                token?: string
-                role?: string
-                redirect?: string
-                user?: User
-            }>('/auth/verify-login-code', {
-                method: 'POST',
-                body: { email, code },
-            })
-
-            if (res.success && res.token) {
-                token.value = res.token
-                this.user = res.user ?? null
-                this.role = res.role ?? null
-            }
-
-            return res
-        },
-
-        async resendLoginCode(email: string) {
-            const api = useApi()
-            return await api('/auth/resend-login-code', {
-                method: 'POST',
-                body: { email },
-            })
-        },
-
-        async logout() {
-            const api = useApi()
-            const token = useCookie('auth_token')
-            try {
-                await api('/auth/logout', { method: 'POST' })
-            } finally {
-                token.value = null
-                this.user = null
-                this.role = null
-                navigateTo('/login')
-            }
+        clear() {
+            this.user = null
+            this.role = null
+            const userRole = useCookie<string | null>('user_role')
+            userRole.value = null
         },
     },
 })
