@@ -3,9 +3,13 @@
 import { getRedirectForRole } from '~/utils/roleRedirects';
 
 const authStore = useAuthStore()
+const userRole = useCookie<string | null>('user_role')
+const role = authStore.role || userRole.value
 
-if (authStore.role) {
-  await navigateTo(getRedirectForRole(authStore.role))
+if (role) {
+  await navigateTo(getRedirectForRole(role))
+} else {
+  await navigateTo('/login')
 }
 </script>
 

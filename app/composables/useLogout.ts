@@ -5,6 +5,7 @@ export function useLogout() {
 
     return async function logout() {
         const token = useCookie<string | null>('auth_token')
+        const userRole = useCookie<string | null>('user_role')
 
         try {
             await authService.logout()
@@ -12,6 +13,7 @@ export function useLogout() {
             // clear local state regardless of API outcome
         } finally {
             token.value = null
+            userRole.value = null
             authStore.clear()
             await navigateTo('/login')
         }
