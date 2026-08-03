@@ -1,10 +1,14 @@
+<!--Verify login code page-->
 <script setup lang="ts">
+import { getRedirectForRole } from '~/utils/roleRedirects'
+
 const route = useRoute()
 const email = ref((route.query.email as string) || '')
 const error = ref('')
 const loading = ref(false)
 const cooldown = ref(0)
 
+const authService = useAuthService()
 const authStore = useAuthStore()
 
 const digits = ref(['', '', '', '', '', ''])
@@ -32,9 +36,16 @@ async function handleVerify() {
   error.value = ''
   loading.value = true
   try {
-    const res = await authStore.verifyLoginCode(email.value, code.value)
-    if (res.success) {
-      navigateTo(res.redirect || '/')
+    const res = await authService.verifyLoginCode(email.value, code.value)
+
+    if (res.success && res.token && res.user && res.role) {
+      const token = useCookie<string | null>('auth_token', {
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+      })
+      token.value = res.token
+      authStore.setSession(res.user, res.role)
+
+      navigateTo(getRedirectForRole(res.role))
     } else {
       error.value = res.message
     }
@@ -48,7 +59,7 @@ async function handleVerify() {
 async function handleResend() {
   if (cooldown.value > 0) return
   try {
-    const res = await authStore.resendLoginCode(email.value)
+    const res = await authService.resendLoginCode(email.value)
     if (!res.success && res.retry_after_seconds) {
       cooldown.value = res.retry_after_seconds
       const interval = setInterval(() => {
