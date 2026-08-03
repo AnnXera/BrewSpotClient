@@ -73,7 +73,7 @@ async function handleLogin() {
             />
           </div>
 
-          <p v-if="error" class="text-red-600 text-sm">{{ error }}</p>
+          <p v-if="error" class="text-red-[#e05252] text-sm">{{ error }}</p>
 
           <button
             type="submit"
