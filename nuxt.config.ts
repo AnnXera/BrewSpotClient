@@ -2,10 +2,14 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-07-01',
   devtools: { enabled: true },
 
-  modules: [
-    '@pinia/nuxt',
-    '@nuxtjs/tailwindcss',
-  ],
+  modules: ['@pinia/nuxt', '@nuxtjs/tailwindcss', '@nuxt/fonts', '@nuxt/icon'],
+
+  fonts: {
+    families: [
+      { name: 'Inter', provider: 'google' },
+      { name: 'Outfit', provider: 'google' },
+    ],
+  },
 
   runtimeConfig: {
     public: {
