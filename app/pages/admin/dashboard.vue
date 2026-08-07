@@ -1,22 +1,23 @@
-<!--admin dashboard-->
+<!--dashboard.vue-->
 <script setup lang="ts">
 definePageMeta({
   role: 'Admin',
 })
 
 const links = [
-  { label: 'Dashboard', to: '/admin/dashboard' },
-  { label: 'Owners', to: '/admin/owners' },
-  { label: 'Plans', to: '/admin/plans' },
+  { label: 'Dashboard', to: '/admin/dashboard', icon: 'squares-2x2' },
+  { label: 'Owner Management', to: '/admin/ownermanagement', icon: 'users' },
+  { label: 'Approval List', to: '/admin/approvals', icon: 'check-circle' },
+  { label: 'Subscriptions', to: '/admin/subscriptions', icon: 'credit-card' },
+  { label: 'Payment History', to: '/admin/payments', icon: 'clipboard' },
 ]
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#fdf3e7]">
-    <NavBar title="BrewSpot Admin" :links="links" />
-    <main class="p-8">
-      <h1 class="text-2xl font-semibold text-[#3b1f0e]">Admin Dashboard</h1>
-      <p class="text-sm text-[#3b1f0e]/60 mt-2">Overview of owners, approvals, and plans.</p>
+  <div class="flex min-h-screen bg-[#fdf3e7]">
+    <NavBar :links="links" />
+    <main class="flex-1 p-8">
+      <h1 class="font-display text-2xl font-semibold text-[#3b1f0e]">Admin Dashboard</h1>
     </main>
   </div>
 </template>
