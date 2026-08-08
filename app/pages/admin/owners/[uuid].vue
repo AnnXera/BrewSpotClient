@@ -81,6 +81,19 @@ const links = [
 
 const ownerService = useOwnerManagementService()
 
+// Resolve media paths returned by the backend. Laravel often returns 
+// "/storage/..." or "storage/..."; convert to absolute URL using the
+// apiBase runtime config (strip any trailing /api).
+const runtime = useRuntimeConfig()
+function resolveMediaUrl(p: string | null) {
+  if (!p) return ''
+  if (p.startsWith('http')) return p
+  const apiBase = (runtime.public.apiBase || '').replace(/\/api\/?$/i, '')
+  if (!apiBase) return p
+  if (p.startsWith('/')) return apiBase + p
+  return apiBase + '/' + p
+}
+
 const loading = ref(true)
 const errorMessage = ref('')
 const statusChangeLoading = ref(false)
@@ -372,7 +385,7 @@ onMounted(() => {
               <div class="flex items-center gap-3 pb-4 border-b border-[#F3E7D2]">
                 <img
                   v-if="primaryBranch?.cafe_picture"
-                  :src="primaryBranch.cafe_picture"
+                                    :src="resolveMediaUrl(primaryBranch.cafe_picture)"
                   alt=""
                   class="w-12 h-12 rounded-xl object-cover shrink-0"
                 />
@@ -583,7 +596,7 @@ onMounted(() => {
                 <div class="flex items-center gap-3">
                   <img
                     v-if="branch.cafe_picture"
-                    :src="branch.cafe_picture"
+                    :src="resolveMediaUrl(branch.cafe_picture)"
                     alt=""
                     class="w-12 h-12 rounded-xl object-cover shrink-0"
                   />
