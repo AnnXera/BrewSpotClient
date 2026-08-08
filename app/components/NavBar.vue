@@ -18,6 +18,8 @@ const authStore = useAuthStore()
 const logout = useLogout()
 
 const isExpanded = ref(false)
+const dropdownOpen = ref(false)
+const profileRef = ref<HTMLElement | null>(null)
 
 function isActive(link: NavLink) {
   return route.path === link.to
@@ -27,8 +29,6 @@ function iconName(link: NavLink) {
   return isActive(link) ? `heroicons:${link.icon}-solid` : `heroicons:${link.icon}`
 }
 
-const dropdownOpen = ref(false)
-
 const initials = computed(() => {
   const name = authStore.user?.firstname ?? 'N'
   return name.charAt(0).toUpperCase()
@@ -36,6 +36,25 @@ const initials = computed(() => {
 
 const displayName = computed(() => authStore.user?.firstname ?? 'Name')
 const displayRole = computed(() => authStore.role ?? 'Super Admin')
+
+function closeDropdown(event: MouseEvent) {
+  if (profileRef.value && !profileRef.value.contains(event.target as Node)) {
+    dropdownOpen.value = false
+  }
+}
+
+async function handleLogout() {
+  dropdownOpen.value = false
+  await logout()
+}
+
+onMounted(() => {
+  document.addEventListener('click', closeDropdown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeDropdown)
+})
 </script>
 
 <template>
@@ -84,29 +103,50 @@ const displayRole = computed(() => authStore.role ?? 'Super Admin')
     <div class="h-px bg-[#B4846C] mb-6" />
 
     <!-- Profile -->
-    <button
-      class="flex items-center w-full"
-      :class="isExpanded ? 'gap-3' : 'justify-center'"
-      @click="dropdownOpen = !dropdownOpen"
-    >
-      <div class="w-12 h-12 rounded-full bg-[#3B1F0E] flex items-center justify-center shrink-0">
-        <span class="font-display font-semibold text-[#FFF0D1]" style="font-size: 19.69px">
-          {{ initials }}
-        </span>
+    <div ref="profileRef" class="relative">
+      <!-- Dropdown -->
+      <div
+        v-if="dropdownOpen"
+        class="absolute bottom-[calc(100%+8px)] left-0 w-[200px] bg-[#FFFDF9] rounded-xl shadow-lg border border-[#EEDFC4] overflow-hidden py-1 z-50"
+        :class="isExpanded ? '' : '-left-2'"
+      >
+        <button
+          class="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FBF2E1] transition-colors text-left"
+          @click="handleLogout"
+        >
+          <Icon name="heroicons:arrow-right-start-on-rectangle" class="w-5 h-5 text-[#D9534F] shrink-0" />
+          <span class="font-sans text-sm font-medium text-[#D9534F]">Logout</span>
+        </button>
       </div>
 
-      <template v-if="isExpanded">
-        <div class="flex flex-col items-start min-w-0">
-          <span class="font-display font-semibold text-base text-[#FFF0D1] truncate">
-            {{ displayName }}
-          </span>
-          <span class="font-sans font-normal text-xs text-[#FFF0D1] truncate">
-            {{ displayRole }}
+      <button
+        class="flex items-center w-full"
+        :class="isExpanded ? 'gap-3' : 'justify-center'"
+        @click="dropdownOpen = !dropdownOpen"
+      >
+        <div class="w-12 h-12 rounded-full bg-[#3B1F0E] flex items-center justify-center shrink-0">
+          <span class="font-display font-semibold text-[#FFF0D1]" style="font-size: 19.69px">
+            {{ initials }}
           </span>
         </div>
 
-        <Icon name="heroicons:chevron-down" class="w-6 h-6 text-[#B4846C] ml-auto shrink-0" />
-      </template>
-    </button>
+        <template v-if="isExpanded">
+          <div class="flex flex-col items-start min-w-0">
+            <span class="font-display font-semibold text-base text-[#FFF0D1] truncate">
+              {{ displayName }}
+            </span>
+            <span class="font-sans font-normal text-xs text-[#FFF0D1] truncate">
+              {{ displayRole }}
+            </span>
+          </div>
+
+          <Icon
+            name="heroicons:chevron-down"
+            class="w-6 h-6 text-[#B4846C] ml-auto shrink-0 transition-transform"
+            :class="dropdownOpen ? 'rotate-180' : ''"
+          />
+        </template>
+      </button>
+    </div>
   </aside>
 </template>

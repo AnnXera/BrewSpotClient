@@ -76,26 +76,6 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value))
 }
 
-function statusLabel(s: string) {
-  return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-}
-
-function statusBadgeClasses(s: string) {
-  switch (s) {
-    case 'active':
-      return 'bg-[#E3F3E7] text-[#1F8A4C]'
-    case 'suspended':
-    case 'rejected':
-      return 'bg-[#FCE4E4] text-[#D9534F]'
-    case 'approved':
-      return 'bg-[#E3EEFB] text-[#2F6FB0]'
-    case 'pending_approval':
-      return 'bg-[#FBF0D9] text-[#B4842A]'
-    default: // inactive, and anything else
-      return 'bg-[#F0E3CE] text-[#8B6656]'
-  }
-}
-
 async function fetchStats() {
   if (USE_MOCK_DATA) {
     stats.value = mockOwnerStats
@@ -202,6 +182,69 @@ const pageNumbers = computed(() => {
 
 function viewOwner(owner: OwnerListItem) {
   navigateTo(`/admin/owners/${owner.uuid}`)
+}
+
+const confirmDialog = ref<{ owner: OwnerListItem; newStatus: 'active' | 'suspended' } | null>(null)
+
+function requestStatusChange(owner: OwnerListItem, newStatus: 'active' | 'suspended') {
+  confirmDialog.value = { owner, newStatus }
+}
+
+function cancelStatusChange() {
+  confirmDialog.value = null
+}
+
+async function confirmStatusChange() {
+  if (!confirmDialog.value) return
+  const { owner, newStatus } = confirmDialog.value
+  confirmDialog.value = null
+  await changeStatus(owner, newStatus)
+}
+
+// Admin can only ever move an owner between 'active' and 'suspended'.
+// 'inactive' (owner self-deactivated) has no admin-facing reactivate action —
+// see OwnerManagementService::ALLOWED_TRANSITIONS on the backend.
+const statusChangeLoading = ref<string | null>(null)
+
+async function changeStatus(owner: OwnerListItem, newStatus: 'active' | 'suspended') {
+  const previousStatus = owner.status
+  statusChangeLoading.value = owner.uuid
+
+  // Optimistic update — reflect the change immediately in the UI
+  owner.status = newStatus
+
+  // DEV/DEMO MODE — mutate the mock array directly, never touch the real API.
+  if (USE_MOCK_DATA) {
+    await new Promise((resolve) => setTimeout(resolve, 200)) // fake latency
+
+    const mockOwner = mockOwners.find((o) => o.uuid === owner.uuid)
+    if (mockOwner) mockOwner.status = newStatus
+
+    stats.value = {
+      total_owners: mockOwners.length,
+      active: mockOwners.filter((o) => o.status === 'active').length,
+      suspended: mockOwners.filter((o) => o.status === 'suspended').length,
+      inactive: mockOwners.filter((o) => o.status === 'inactive').length,
+      inactive_or_suspended: mockOwners.filter((o) => ['inactive', 'suspended'].includes(o.status)).length,
+    }
+
+    statusChangeLoading.value = null
+    return
+  }
+
+  try {
+    const res = await ownerService.updateStatus(owner.uuid, newStatus)
+    if (!res.success) {
+      owner.status = previousStatus // revert on failure
+    } else {
+      await fetchStats()
+    }
+  } catch (e: any) {
+    owner.status = previousStatus // revert on error
+    console.error(`Failed to update status for ${owner.uuid}:`, JSON.stringify(e?.data, null, 2))
+  } finally {
+    statusChangeLoading.value = null
+  }
 }
 
 onMounted(() => {
@@ -338,24 +381,48 @@ onMounted(() => {
                     <p class="text-[#3B1F0E]/60">{{ owner.email }}</p>
                   </div>
                 </td>
+                
                 <td class="px-6 py-4">
-                  <span
-                    class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
-                    :class="statusBadgeClasses(owner.status)"
-                  >
-                    <span class="w-1.5 h-1.5 rounded-full bg-current" />
-                    {{ statusLabel(owner.status) }}
-                  </span>
+                  <StatusBadge :status="owner.status" />
                 </td>
+
                 <td class="px-6 py-4 font-sans text-base text-[#3B1F0E]">{{ formatDate(owner.date_joined) }}</td>
+                
                 <td class="px-6 py-4">
-                  <button
-                    class="rounded-lg bg-[#3B1F0E] text-[#FDF3E7] text-xs font-semibold px-4 py-2 hover:bg-[#2C1609] transition-colors"
-                    @click="viewOwner(owner)"
-                  >
-                    View
-                  </button>
+                  <div class="flex items-center gap-6">
+                    <button
+                      type="button"
+                      class="hover:opacity-70 transition-opacity"
+                      title="View"
+                      @click="viewOwner(owner)"
+                    >
+                      <Icon name="heroicons:eye" class="w-6 h-6 text-[#9E7060]" />
+                    </button>
+
+                    <button
+                      v-if="owner.status === 'active'"
+                      type="button"
+                      class="hover:opacity-70 transition-opacity disabled:opacity-40"
+                      :disabled="statusChangeLoading === owner.uuid"
+                      title="Suspend"
+                      @click="requestStatusChange(owner, 'suspended')"
+                    >
+                      <Icon name="heroicons:no-symbol" class="w-6 h-6 text-[#9E7060]" />
+                    </button>
+
+                    <button
+                      v-else-if="owner.status === 'suspended'"
+                      type="button"
+                      class="hover:opacity-70 transition-opacity disabled:opacity-40"
+                      :disabled="statusChangeLoading === owner.uuid"
+                      title="Reactivate"
+                      @click="requestStatusChange(owner, 'active')"
+                    >
+                      <Icon name="heroicons:check-circle" class="w-6 h-6 text-[#9E7060]" />
+                    </button>
+                  </div>
                 </td>
+                
               </tr>
             </tbody>
           </table>
@@ -392,6 +459,19 @@ onMounted(() => {
       </div>
     </main>
   </div>
+
+  <ConfirmDialog
+    :open="!!confirmDialog"
+    :title="confirmDialog?.newStatus === 'suspended' ? 'Suspend this owner?' : 'Reactivate this owner?'"
+    :message="confirmDialog?.newStatus === 'suspended'
+      ? `This will suspend ${confirmDialog?.owner.name}, deactivate their branches, and cancel their active subscription. This action can be reversed later.`
+      : `This will reactivate ${confirmDialog?.owner.name} and restore their branches.`"
+    :confirm-label="confirmDialog?.newStatus === 'suspended' ? 'Suspend' : 'Reactivate'"
+    :danger="confirmDialog?.newStatus === 'suspended'"
+    @confirm="confirmStatusChange"
+    @cancel="cancelStatusChange"
+  />
+
 </template>
 
 <style scoped>
