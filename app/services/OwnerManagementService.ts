@@ -47,7 +47,14 @@ export class OwnerManagementService extends BaseService {
     }
 
     show(uuid: string) {
-        return this.get<{ success: boolean; owner: any; cafes: any[] }>(`/admin/owners/${uuid}`)
+        return this.get<{
+            success: boolean
+            owner: any
+            owner_documents: any[]
+            cafes: any[]
+            subscription: any | null
+            payment_history: any[]
+        }>(`/admin/owners/${uuid}`)
     }
 
     updateStatus(uuid: string, status: string) {
