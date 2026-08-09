@@ -1,4 +1,4 @@
-//BaseService
+//app/services/BaseService.ts
 import type { $Fetch } from 'ofetch'
 
 export abstract class BaseService {

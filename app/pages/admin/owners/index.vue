@@ -14,7 +14,7 @@ const USE_MOCK_DATA = false
 
 const links = [
   { label: 'Dashboard', to: '/admin/dashboard', icon: 'squares-2x2' },
-  { label: 'Owner Management', to: '/admin/ownermanagement', icon: 'users' },
+  { label: 'Owner Management', to: '/admin/owners', icon: 'users' },
   { label: 'Approval List', to: '/admin/approvals', icon: 'check-circle' },
   { label: 'Subscriptions', to: '/admin/subscriptions', icon: 'credit-card' },
   { label: 'Payment History', to: '/admin/payments', icon: 'clipboard' },

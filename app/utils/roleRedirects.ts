@@ -1,4 +1,4 @@
-//roleRedirects
+//app/utils/roleRedirects.ts
 export const roleRedirects: Record<string, string> = {
     'Admin': '/admin/dashboard',
     'Cafe Owner': '/owner/dashboard',

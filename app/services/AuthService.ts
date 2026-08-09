@@ -1,4 +1,4 @@
-//AuthService
+//app/services/AuthService.ts
 import { BaseService } from './BaseService'
 
 interface User {
