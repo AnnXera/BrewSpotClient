@@ -1,13 +1,13 @@
 <!-- components/owner-detail/PaymentHistoryTable.vue -->
 <template>
   <h2 class="font-display text-[20px] font-bold text-[#3D2B24] mb-[16px]">Recent Activity &amp; Payment History</h2>
-  
+
   <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden">
-    
+
     <div class="overflow-x-auto">
-      
+
       <table class="w-full text-left">
-        
+
         <thead>
           <tr class="bg-[#FBF0D9] border-b border-[#F3E7D2]">
             <th class="font-sans text-[12px] font-semibold tracking-wide text-[#9E7060] uppercase px-6 py-4">Transaction ID</th>
@@ -19,7 +19,7 @@
         </thead>
 
         <tbody>
-          
+
           <tr v-if="!paginated.length">
             <td colspan="5" class="px-6 py-10 text-center font-sans text-sm text-[#3B1F0E]/50">
               No transactions found.
@@ -43,26 +43,10 @@
         </tbody>
 
       </table>
-      
+
     </div>
 
-    <div class="flex items-center justify-center gap-4 p-5">
-      <button
-        class="p-2 text-[#9E7060] disabled:opacity-30 hover:text-[#3B1F0E] transition-colors"
-        :disabled="page === 1"
-        @click="page--"
-      >
-        <Icon name="heroicons:chevron-left-20-solid" class="w-6 h-6" />
-      </button>
-      <span class="font-sans text-sm font-medium text-[#3B1F0E]">Page {{ page }} of {{ lastPage }}</span>
-      <button
-        class="p-2 text-[#9E7060] disabled:opacity-30 hover:text-[#3B1F0E] transition-colors"
-        :disabled="page === lastPage"
-        @click="page++"
-      >
-        <Icon name="heroicons:chevron-right-20-solid" class="w-6 h-6" />
-      </button>
-    </div>
+    <CommonPagination :page="page" :last-page="lastPage" @change="(p) => (page = p)" />
   </div>
 </template>
 

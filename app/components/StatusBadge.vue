@@ -1,7 +1,7 @@
 <!-- components/StatusBadge.vue -->
 <template>
   <span
-    class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-sans font-semibold text-[14px]"
+    class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-display font-semibold text-[14px]"
     :class="classes"
   >
     {{ label }}
@@ -33,7 +33,7 @@ const classes = computed(() => {
       return 'bg-[#FDE8E8] text-[#DC3545]'
     case 'pending_approval':
     case 'pending':
-      return 'bg-[#FBF0D9] text-[#B4842A]'
+      return 'bg-[#F0E8E5] text-[#B4846C]'
     default: // inactive, expired, and anything else
       return 'bg-[#F0E3CE] text-[#8B6656]'
   }

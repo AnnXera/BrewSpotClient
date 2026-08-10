@@ -1,19 +1,4 @@
-<!-- components/owner-detail/BranchCard.vue -->
 <!-- app/components/owner-detail/BranchCard.vue -->
-<script setup lang="ts">
-interface Branch {
-  uuid: string
-  branch_name: string
-  status: string
-  address: string | null
-  cafe_phonenumber: string | null
-  cafe_email: string | null
-}
-
-defineProps<{
-  branch: Branch
-}>()
-</script>
 
 <template>
   <div class="bg-white border border-[#EEDFC4] rounded-2xl p-6">
@@ -28,3 +13,18 @@ defineProps<{
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+interface Branch {
+  uuid: string
+  branch_name: string
+  status: string
+  address: string | null
+  cafe_phonenumber: string | null
+  cafe_email: string | null
+}
+
+defineProps<{
+  branch: Branch
+}>()
+</script>

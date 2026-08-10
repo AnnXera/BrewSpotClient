@@ -38,6 +38,53 @@ interface ListOwnersParams {
     date?: string
 }
 
+export interface ApprovalUser {
+    uuid: string
+    firstname: string
+    lastname: string
+    email: string
+    phone_number: string | null
+}
+
+export interface ApprovalCafe {
+    uuid: string
+    cafe_name: string
+}
+
+export interface ApprovalBranch {
+    uuid: string
+    branch_name: string
+    branch_type: string
+    status: string
+    cafe_picture: string | null
+    cafe_email: string | null
+    cafe_phonenumber: string | null
+    address: string | null
+}
+
+export interface ApprovalListItem {
+    uuid: string
+    status: string
+    reviewed_at: string | null
+    user: ApprovalUser | null
+    cafe: ApprovalCafe | null
+    branch: ApprovalBranch | null
+    created_at: string | null
+}
+
+export interface ApprovalStats {
+    pending_approval: number
+    approved: number
+    rejected: number
+}
+
+interface ListApprovalsParams {
+    per_page?: number
+    page?: number
+    status?: string
+    type?: 'owner' | 'branch'
+}
+
 export class OwnerManagementService extends BaseService {
     stats() {
         return this.get<{ success: boolean; stats: OwnerStats }>('/admin/owners/stats')
@@ -60,5 +107,17 @@ export class OwnerManagementService extends BaseService {
 
     updateStatus(uuid: string, status: string) {
         return this.patch<{ success: boolean; message: string }>(`/admin/owners/${uuid}/status`, { status })
+    }
+
+    approvals(params: ListApprovalsParams = {}) {
+        return this.get<{ success: boolean; approvals: Paginated<ApprovalListItem> }>('/admin/approvals', params)
+    }
+
+    approvalStats(type?: 'owner' | 'branch') {
+        return this.get<{ success: boolean; stats: ApprovalStats }>('/admin/approvals/stats', type ? { type } : {})
+    }
+
+    updateBranchStatus(uuid: string, status: 'approved' | 'rejected') {
+        return this.patch<{ success: boolean; message: string }>(`/admin/branches/${uuid}/status`, { status })
     }
 }

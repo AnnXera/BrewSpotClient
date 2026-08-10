@@ -1,3 +1,4 @@
+<!-- app/components/owner-detail/DocumentsPanel.vue -->
 <template>
   <h2 class="font-display text-[20px] font-bold text-[#3D2B24] mb-[16px]">Documents</h2>
 
@@ -18,7 +19,7 @@
         <div class="flex items-center gap-3 font-display">
 
           <div class="w-[56px] h-[56px] rounded-lg bg-[#FFF0D1] flex items-center justify-center shrink-0">
-            <Icon name="heroicons:document-text" class="w-[24px] h-[24px] text-[#7D5A50]" />
+            <Icon name="heroicons:identification" class="w-[24px] h-[24px] text-[#7D5A50]" />
           </div>
 
           <div>
