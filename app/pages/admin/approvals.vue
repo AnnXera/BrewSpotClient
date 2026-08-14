@@ -21,6 +21,7 @@ type StatusTab = 'general' | 'pending_approval' | 'approved' | 'rejected'
 
 const registrationTab = ref<RegistrationTab>('owner')
 const statusTab = ref<StatusTab>('general')
+const search = ref('')
 
 const stats = ref<ApprovalStats | null>(null)
 const approvals = ref<ApprovalListItem[]>([])
@@ -48,6 +49,7 @@ async function fetchApprovals() {
       page: currentPage.value,
       type: registrationTab.value,
       status: statusTab.value === 'general' ? undefined : statusTab.value,
+      search: search.value || undefined,
     })
 
     if (res.success) {
@@ -67,6 +69,7 @@ function switchRegistrationTab(tab: RegistrationTab) {
   if (tab === registrationTab.value) return
   registrationTab.value = tab
   statusTab.value = 'general'
+  search.value = ''
   currentPage.value = 1
   fetchStats()
   fetchApprovals()
@@ -78,6 +81,15 @@ function switchStatusTab(tab: StatusTab) {
   currentPage.value = 1
   fetchApprovals()
 }
+
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
+watch(search, () => {
+  if (searchTimeout) clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    currentPage.value = 1
+    fetchApprovals()
+  }, 400)
+})
 
 function goToPage(page: number) {
   if (page < 1 || page > lastPage.value || page === currentPage.value) return
@@ -197,6 +209,20 @@ onMounted(() => {
           Branch Registration
           <span v-if="registrationTab === 'branch'" class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full" />
         </button>
+      </div>
+
+      <!-- Search -->
+      <div class="relative mb-6 max-w-sm">
+        <Icon
+          name="heroicons:magnifying-glass"
+          class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#9E7060]"
+        />
+        <input
+          v-model="search"
+          type="text"
+          placeholder="Search owner or cafe"
+          class="w-full rounded-full border border-[#EEDFC4] bg-white pl-11 pr-4 py-3 font-sans text-sm text-[#3B1F0E] placeholder:text-[#9E7060] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
+        />
       </div>
 
       <!-- General / Pending / Approved / Rejected -->

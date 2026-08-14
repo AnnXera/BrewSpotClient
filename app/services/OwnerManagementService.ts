@@ -91,6 +91,7 @@ interface ListApprovalsParams {
     page?: number
     status?: string
     type?: 'owner' | 'branch'
+    search?: string
 }
 
 export interface ApprovalSnapshotResponse {
@@ -123,6 +124,19 @@ export interface ApprovalSnapshotResponse {
         reviewer: string | null
         submitted_at: string | null
     }
+}
+
+export interface ApplicationHistoryEntry {
+    approval_uuid: string
+    status: string
+    reason: string | null
+    reviewed_at: string | null
+    reviewer: string | null
+    cafe_name: string | null
+    branch_name: string | null
+    branch_type: string | null
+    is_archived: boolean
+    submitted_at: string | null
 }
 
 export class OwnerManagementService extends BaseService {
@@ -159,6 +173,10 @@ export class OwnerManagementService extends BaseService {
 
     approvalSnapshot(approvalUuid: string) {
         return this.get<ApprovalSnapshotResponse>(`/admin/approvals/${approvalUuid}/snapshot`)
+    }
+
+    applicationHistory(uuid: string) {
+        return this.get<{ success: boolean; history: ApplicationHistoryEntry[] }>(`/admin/owners/${uuid}/application-history`)
     }
 
     updateBranchStatus(uuid: string, status: 'approved' | 'rejected', reason?: string) {
