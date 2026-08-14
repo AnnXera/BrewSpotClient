@@ -17,15 +17,12 @@ const emit = defineEmits<{
   reject: []
 }>()
 
-const primaryCafe = computed(() => props.ownerDetails?.cafes?.[0] ?? null)
+// Snapshot payload returns a single cafe/branch scoped to this approval
+// row (including archived data), not an array of the owner's current
+// cafes — so no searching/first-of-array here.
+const primaryCafe = computed(() => props.ownerDetails?.cafe ?? null)
 
-const relevantBranch = computed(() => {
-  const branches = primaryCafe.value?.branches ?? []
-  if (props.registrationType === 'branch' && props.approval?.branch?.uuid) {
-    return branches.find((b: any) => b.uuid === props.approval?.branch?.uuid) ?? null
-  }
-  return branches.find((b: any) => b.branch_type === 'main') ?? branches[0] ?? null
-})
+const relevantBranch = computed(() => props.ownerDetails?.branch ?? null)
 
 function formatDate(value?: string | null) {
   if (!value) return '—'
@@ -198,13 +195,17 @@ function viewCafePicture() {
                         </div>
 
                         <!-- Cafe Details -->
-                        <h3 class="font-display text-[18px] font-bold text-[#3D2B24] mb-[16px]">
+                        <h3 class="font-display text-[18px] font-bold text-[#3D2B24] mb-[16px] flex items-center gap-2">
                             Cafe Details
                             {{
                             relevantBranch?.branch_type === 'main'
                                 ? '- Main Branch'
                                 : `- ${relevantBranch?.branch_name ?? 'Branch'}`
                             }}
+                            <span
+                                v-if="primaryCafe?.is_archived"
+                                class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#F0E3CE] text-[#8B6656]"
+                            >Archived</span>
                         </h3>
 
                         <div class="font-display text-[14px] rounded-xl overflow-hidden border border-[#EDD8CC] mb-[24px]">
@@ -401,6 +402,35 @@ function viewCafePicture() {
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Review Info — only meaningful once a decision has been made -->
+                        <template v-if="approval.status !== 'pending_approval'">
+                            <h3 class="font-display text-[18px] font-bold text-[#3D2B24] mb-[16px] mt-[24px]">
+                                Review Information
+                            </h3>
+
+                            <div class="rounded-xl overflow-hidden border border-[#EDD8CC] font-display text-[14px]">
+                                <div class="grid grid-cols-[35%_65%] bg-[#FFF8EA] px-[20px] py-[10px]">
+                                    <p class="font-semibold text-[#7D5A50]">Reviewed By</p>
+                                    <p class="text-[#3B1F0E]">
+                                        {{ approval.reviewer ? `${approval.reviewer.firstname} ${approval.reviewer.lastname}` : '—' }}
+                                    </p>
+                                </div>
+
+                                <div class="grid grid-cols-[35%_65%] bg-[#FFF8EA] px-[20px] py-[10px] border-t border-[#EDD8CC]">
+                                    <p class="font-semibold text-[#7D5A50]">Reviewed At</p>
+                                    <p class="text-[#3B1F0E]">{{ formatDate(approval.reviewed_at) }}</p>
+                                </div>
+
+                                <div
+                                    v-if="approval.status === 'rejected' && approval.reason"
+                                    class="grid grid-cols-[35%_65%] bg-[#FFF8EA] px-[20px] py-[10px] border-t border-[#EDD8CC]"
+                                >
+                                    <p class="font-semibold text-[#7D5A50]">Reason</p>
+                                    <p class="text-[#DC3545]">{{ approval.reason }}</p>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </template>
             </div>

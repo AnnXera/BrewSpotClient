@@ -96,15 +96,12 @@ async function openDetails(approval: ApprovalListItem) {
   modalOwnerDetails.value = null
   modalOpen.value = true
 
-  const ownerUuid = approval.user?.uuid
-  if (!ownerUuid) return
-
   modalLoading.value = true
   try {
-    const res = await ownerService.show(ownerUuid)
+    const res = await ownerService.approvalSnapshot(approval.uuid)
     if (res.success) modalOwnerDetails.value = res
   } catch (e) {
-    console.error('Failed to load owner details', e)
+    console.error('Failed to load approval snapshot', e)
   } finally {
     modalLoading.value = false
   }
@@ -118,7 +115,7 @@ function closeModal() {
 
 const decisionLoading = ref(false)
 
-async function handleDecision(status: 'approved' | 'rejected') {
+async function handleDecision(status: 'approved' | 'rejected', reason?: string) {
   if (!modalApproval.value) return
   decisionLoading.value = true
 
@@ -126,11 +123,11 @@ async function handleDecision(status: 'approved' | 'rejected') {
     if (registrationTab.value === 'owner') {
       const ownerUuid = modalApproval.value.user?.uuid
       if (!ownerUuid) return
-      await ownerService.updateStatus(ownerUuid, status)
+      await ownerService.updateStatus(ownerUuid, status, reason)
     } else {
       const branchUuid = modalApproval.value.branch?.uuid
       if (!branchUuid) return
-      await ownerService.updateBranchStatus(branchUuid, status)
+      await ownerService.updateBranchStatus(branchUuid, status, reason)
     }
 
     closeModal()
@@ -140,6 +137,25 @@ async function handleDecision(status: 'approved' | 'rejected') {
   } finally {
     decisionLoading.value = false
   }
+}
+
+// Rejection reason prompt — collected before calling handleDecision('rejected', reason)
+const rejectReasonPrompt = ref(false)
+const rejectReason = ref('')
+
+function requestReject() {
+  rejectReason.value = ''
+  rejectReasonPrompt.value = true
+}
+
+function cancelReject() {
+  rejectReasonPrompt.value = false
+  rejectReason.value = ''
+}
+
+async function confirmReject() {
+  rejectReasonPrompt.value = false
+  await handleDecision('rejected', rejectReason.value)
 }
 
 onMounted(() => {
@@ -316,7 +332,7 @@ onMounted(() => {
     :decision-loading="decisionLoading"
     @close="closeModal"
     @approve="handleDecision('approved')"
-    @reject="handleDecision('rejected')"
+    @reject="requestReject"
   />
 
   <!-- NOTE: same auto-import naming rule — app/components/approval/BranchDetailsModal.vue
@@ -330,6 +346,47 @@ onMounted(() => {
     :decision-loading="decisionLoading"
     @close="closeModal"
     @approve="handleDecision('approved')"
-    @reject="handleDecision('rejected')"
+    @reject="requestReject"
   />
+
+  <!-- Rejection reason prompt -->
+  <Teleport to="body">
+    <div
+      v-if="rejectReasonPrompt"
+      class="fixed inset-0 z-[60] flex items-center justify-center bg-[#3B1F0E]/40 backdrop-blur-sm p-4"
+      @click.self="cancelReject"
+    >
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+        <h2 class="font-display text-lg font-semibold text-[#3B1F0E] mb-2">Reason for rejection</h2>
+        <p class="font-sans text-sm text-[#3B1F0E]/70 mb-4">
+          This reason will be included in the email sent to the owner.
+        </p>
+
+        <textarea
+          v-model="rejectReason"
+          rows="4"
+          placeholder="e.g. Submitted documents are unclear or expired."
+          class="w-full rounded-xl border border-[#EDD8CC] px-4 py-3 font-sans text-sm text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30 resize-none"
+        />
+
+        <div class="flex items-center justify-end gap-3 mt-6">
+          <button
+            type="button"
+            class="rounded-lg px-4 py-2 font-sans text-sm font-medium text-[#3B1F0E]/70 hover:bg-[#F3E7D2] transition-colors"
+            @click="cancelReject"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            :disabled="!rejectReason.trim()"
+            class="rounded-lg px-4 py-2 font-sans text-sm font-semibold bg-[#D9534F] text-white hover:bg-[#C24541] transition-colors disabled:opacity-50"
+            @click="confirmReject"
+          >
+            Reject &amp; Notify Owner
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>

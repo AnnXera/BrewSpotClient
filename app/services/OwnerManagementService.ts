@@ -62,10 +62,18 @@ export interface ApprovalBranch {
     address: string | null
 }
 
+export interface ApprovalReviewer {
+    uuid: string
+    firstname: string
+    lastname: string
+}
+
 export interface ApprovalListItem {
     uuid: string
     status: string
+    reason: string | null
     reviewed_at: string | null
+    reviewer: ApprovalReviewer | null
     user: ApprovalUser | null
     cafe: ApprovalCafe | null
     branch: ApprovalBranch | null
@@ -83,6 +91,38 @@ interface ListApprovalsParams {
     page?: number
     status?: string
     type?: 'owner' | 'branch'
+}
+
+export interface ApprovalSnapshotResponse {
+    success: boolean
+    owner: any
+    owner_documents: any[]
+    cafe: {
+        uuid: string
+        cafe_name: string
+        is_archived: boolean
+        documents: any[]
+    } | null
+    branch: {
+        uuid: string
+        branch_name: string
+        branch_type: string
+        status: string
+        is_archived: boolean
+        cafe_picture: string | null
+        cafe_email: string | null
+        cafe_phonenumber: string | null
+        address: string | null
+        documents: any[]
+    } | null
+    approval: {
+        uuid: string
+        status: string
+        reason: string | null
+        reviewed_at: string | null
+        reviewer: string | null
+        submitted_at: string | null
+    }
 }
 
 export class OwnerManagementService extends BaseService {
@@ -105,8 +145,8 @@ export class OwnerManagementService extends BaseService {
         }>(`/admin/owners/${uuid}`)
     }
 
-    updateStatus(uuid: string, status: string) {
-        return this.patch<{ success: boolean; message: string }>(`/admin/owners/${uuid}/status`, { status })
+    updateStatus(uuid: string, status: string, reason?: string) {
+        return this.patch<{ success: boolean; message: string }>(`/admin/owners/${uuid}/status`, { status, reason })
     }
 
     approvals(params: ListApprovalsParams = {}) {
@@ -117,7 +157,11 @@ export class OwnerManagementService extends BaseService {
         return this.get<{ success: boolean; stats: ApprovalStats }>('/admin/approvals/stats', type ? { type } : {})
     }
 
-    updateBranchStatus(uuid: string, status: 'approved' | 'rejected') {
-        return this.patch<{ success: boolean; message: string }>(`/admin/branches/${uuid}/status`, { status })
+    approvalSnapshot(approvalUuid: string) {
+        return this.get<ApprovalSnapshotResponse>(`/admin/approvals/${approvalUuid}/snapshot`)
+    }
+
+    updateBranchStatus(uuid: string, status: 'approved' | 'rejected', reason?: string) {
+        return this.patch<{ success: boolean; message: string }>(`/admin/branches/${uuid}/status`, { status, reason })
     }
 }
