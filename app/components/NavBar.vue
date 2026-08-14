@@ -1,4 +1,4 @@
-<!--NavBar.vue-->
+<!--app/components/NavBar.vue-->
 <script setup lang="ts">
 import logoFull from '~/assets/images/logo.svg'
 import logoIcon from '~/assets/images/logo-icon.svg'
@@ -22,7 +22,7 @@ const dropdownOpen = ref(false)
 const profileRef = ref<HTMLElement | null>(null)
 
 function isActive(link: NavLink) {
-  return route.path === link.to
+  return route.path === link.to || route.path.startsWith(link.to + '/')
 }
 
 function iconName(link: NavLink) {

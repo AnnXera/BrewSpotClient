@@ -1,4 +1,4 @@
-<!--dashboard.vue-->
+<!--app/pages/admin/dashboard.vue-->
 <script setup lang="ts">
 definePageMeta({
   role: 'Admin',
@@ -6,8 +6,8 @@ definePageMeta({
 
 const links = [
   { label: 'Dashboard', to: '/admin/dashboard', icon: 'squares-2x2' },
-  { label: 'Owner Management', to: '/admin/ownermanagement', icon: 'users' },
-  { label: 'Approval List', to: '/admin/approvals', icon: 'check-circle' },
+  { label: 'Owner Management', to: '/admin/owners', icon: 'users' },
+  { label: 'Approval Status', to: '/admin/approvals', icon: 'check-circle' },
   { label: 'Subscriptions', to: '/admin/subscriptions', icon: 'credit-card' },
   { label: 'Payment History', to: '/admin/payments', icon: 'clipboard' },
 ]

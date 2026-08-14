@@ -1,4 +1,13 @@
 <!-- components/StatusBadge.vue -->
+<template>
+  <span
+    class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-display font-semibold text-[14px]"
+    :class="classes"
+  >
+    {{ label }}
+  </span>
+</template>
+
 <script setup lang="ts">
 interface Props {
   status: string
@@ -14,27 +23,19 @@ const classes = computed(() => {
   switch (props.status) {
     case 'active':
     case 'approved':
-      return 'bg-[#E3F3E7] text-[#1F8A4C]'
+    case 'succeeded':
+    case 'success':
+      return 'bg-[#D4EDDA] text-[#28A745]'
     case 'suspended':
     case 'rejected':
     case 'cancelled':
     case 'failed':
-      return 'bg-[#FCE4E4] text-[#D9534F]'
+      return 'bg-[#FDE8E8] text-[#DC3545]'
     case 'pending_approval':
     case 'pending':
-      return 'bg-[#FBF0D9] text-[#B4842A]'
+      return 'bg-[#F0E8E5] text-[#B4846C]'
     default: // inactive, expired, and anything else
       return 'bg-[#F0E3CE] text-[#8B6656]'
   }
 })
 </script>
-
-<template>
-  <span
-    class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
-    :class="classes"
-  >
-    <span class="w-1.5 h-1.5 rounded-full bg-current" />
-    {{ label }}
-  </span>
-</template>
