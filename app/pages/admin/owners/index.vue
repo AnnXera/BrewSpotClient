@@ -37,12 +37,9 @@ const date = ref('')
 
 const statusOptions = [
   { value: '', label: 'Status' },
-  { value: 'pending_approval', label: 'Pending Approval' },
-  { value: 'approved', label: 'Approved' },
   { value: 'active', label: 'Active' },
   { value: 'suspended', label: 'Suspended' },
   { value: 'inactive', label: 'Inactive' },
-  { value: 'rejected', label: 'Rejected' },
 ]
 
 async function fetchStats() {
