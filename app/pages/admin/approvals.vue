@@ -211,73 +211,81 @@ onMounted(() => {
         </button>
       </div>
 
-      <!-- Search -->
-      <div class="relative mb-6 max-w-sm">
-        <Icon
-          name="heroicons:magnifying-glass"
-          class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#9E7060]"
-        />
-        <input
-          v-model="search"
-          type="text"
-          placeholder="Search owner or cafe"
-          class="w-full rounded-full border border-[#EEDFC4] bg-white pl-11 pr-4 py-3 font-sans text-sm text-[#3B1F0E] placeholder:text-[#9E7060] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
-        />
-      </div>
-
-      <!-- General / Pending / Approved / Rejected -->
-      <div class="inline-flex items-center gap-1 font-display font-medium text-[16px] bg-white border border-[#EDD8CC] rounded-[16px] p-[8px] mb-6">
-        <button
-          type="button"
-          class="px-[20px] py-[8px] rounded-[8px] transition-colors"
-          :class="statusTab === 'general' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
-          @click="switchStatusTab('general')"
-        >
-          General
-        </button>
-
-        <button
-          type="button"
-          class="flex items-center gap-2 px-[20px] py-[8px] rounded-[8px] transition-colors"
-          :class="statusTab === 'pending_approval' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
-          @click="switchStatusTab('pending_approval')"
-        >
-          Pending
-          <span
-            class="rounded-full px-2 py-0.5 text-[11px] font-bold"
-            :class="statusTab === 'pending_approval' ? 'bg-[#FDF3E7]/20 text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
-          >{{ stats?.pending_approval ?? 0 }}</span>
-        </button>
-
-        <button
-          type="button"
-          class="flex items-center gap-2 px-[20px] py-[8px] rounded-[8px] transition-colors"
-          :class="statusTab === 'approved' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
-          @click="switchStatusTab('approved')"
-        >
-          Approved
-          <span
-            class="rounded-full px-2 py-0.5 text-[11px] font-bold"
-            :class="statusTab === 'approved' ? 'bg-[#FDF3E7]/20 text-[#FDF3E7]' : 'bg-[#D4EDDA] text-[#28A745]'"
-          >{{ stats?.approved ?? 0 }}</span>
-        </button>
-
-        <button
-          type="button"
-          class="flex items-center gap-2 px-[20px] py-[8px] rounded-[8px] transition-colors"
-          :class="statusTab === 'rejected' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
-          @click="switchStatusTab('rejected')"
-        >
-          Rejected
-          <span
-            class="rounded-full px-2 py-0.5 text-[11px] font-bold"
-            :class="statusTab === 'rejected' ? 'bg-[#FDF3E7]/20 text-[#FDF3E7]' : 'bg-[#FDE8E8] text-[#DC3545]'"
-          >{{ stats?.rejected ?? 0 }}</span>
-        </button>
-      </div>
-
-      <!-- Table card -->
+      <!-- Combined Search/Tabs + Table Card -->
       <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden">
+
+        <!-- Search + Status Tabs Bar -->
+        <div class="flex items-center gap-[24px] px-[20px] py-[18px] border-b border-[#F3E7D2]">
+          <!-- Search -->
+          <div class="relative flex-1 min-w-[220px] max-h-full">
+            <Icon
+              name="heroicons:magnifying-glass"
+              class="absolute left-[12px] top-1/2 -translate-y-1/2 w-[24px] h-[24px] text-[#9E7060]"
+            />
+            <input
+              v-model="search"
+              type="text"
+              placeholder="Search owner"
+              class="w-full rounded-[12px] border border-[#EEDFC4] bg-[#FFFBF3] pl-[48px] py-[12px] font-sans text-[14px] text-[#3B1F0E] placeholder:text-[#B4846C] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
+            />
+          </div>
+
+          <!-- General / Pending / Approved / Rejected -->
+          <div class="inline-flex items-center bg-white border border-[#EDD8CC] rounded-xl gap-1 p-[8px] font-display font-medium text-[16px]">
+            <button
+              type="button"
+              class="px-[20px] py-[8px] rounded-[8px] transition-colors"
+              :class="statusTab === 'general' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
+              @click="switchStatusTab('general')"
+            >
+              General
+            </button>
+
+            <button
+              type="button"
+              class="flex items-center gap-2 px-[20px] py-[8px] rounded-[8px] transition-colors"
+              :class="statusTab === 'pending_approval' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
+              @click="switchStatusTab('pending_approval')"
+            >
+              Pending
+              <span
+                class="rounded-full px-2 py-0.5 text-[11px] font-bold"
+                :class="statusTab === 'pending_approval' ? 'bg-[#FDF3E7]/20 text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+              >{{ stats?.pending_approval ?? 0 }}</span>
+            </button>
+
+            <button
+              type="button"
+              class="flex items-center gap-2 px-[20px] py-[8px] rounded-[8px] transition-colors"
+              :class="statusTab === 'approved' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
+              @click="switchStatusTab('approved')"
+            >
+              Approved
+              <span
+                class="rounded-full px-2 py-0.5 text-[11px] font-bold"
+                :class="statusTab === 'approved' ? 'bg-[#FDF3E7]/20 text-[#FDF3E7]' : 'bg-[#D4EDDA] text-[#28A745]'"
+              >{{ stats?.approved ?? 0 }}</span>
+            </button>
+
+            <button
+              type="button"
+              class="flex items-center gap-2 px-[20px] py-[8px] rounded-[8px] transition-colors"
+              :class="statusTab === 'rejected' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
+              @click="switchStatusTab('rejected')"
+            >
+              Rejected
+              <span
+                class="rounded-full px-2 py-0.5 text-[11px] font-bold"
+                :class="statusTab === 'rejected' ? 'bg-[#FDF3E7]/20 text-[#FDF3E7]' : 'bg-[#FDE8E8] text-[#DC3545]'"
+              >{{ stats?.rejected ?? 0 }}</span>
+            </button>
+          </div>
+
+          <!-- Record count -->
+          <span class="ml-auto font-sans text-sm text-[#9E7060] whitespace-nowrap">{{ total }} record{{ total === 1 ? '' : 's' }}</span>
+        </div>
+
+        <!-- Table -->
         <div class="overflow-x-auto">
           <table class="w-full text-left">
             <!-- Owner Registration columns -->
@@ -326,10 +334,6 @@ onMounted(() => {
                 />
               </template>
 
-              <!-- NOTE: Nuxt auto-import name for app/components/approval/BranchApprovalTableRow.vue
-                   is <ApprovalBranchApprovalTableRow> — the folder "approval" only dedupes
-                   against a filename that STARTS with "Approval", not one that starts with
-                   "Branch". Using <BranchApprovalTableRow> here silently fails to resolve. -->
               <template v-else>
                 <ApprovalBranchApprovalTableRow
                   v-for="(approval, index) in approvals"
