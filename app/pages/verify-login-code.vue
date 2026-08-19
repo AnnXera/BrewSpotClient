@@ -1,5 +1,6 @@
 <!--Verify login code page-->
 <script setup lang="ts">
+import logoFull from '~/assets/images/logo-with-tag.svg'
 import { getRedirectForRole } from '~/utils/roleRedirects'
 
 const route = useRoute()
@@ -77,60 +78,87 @@ async function handleResend() {
     error.value = e?.data?.message ?? 'Could not resend code.'
   }
 }
+
+function changeEmail() {
+  navigateTo('/login')
+}
 </script>
 
 <template>
-  <div class="min-h-screen w-full flex items-center justify-center bg-[#f2e9de] overflow-hidden" style="font-family: 'Poppins', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-    <div class="w-full max-w-[940px] h-[620px] rounded-[36px] overflow-hidden shadow-2xl flex flex-col md:flex-row">
-      <div class="relative w-full md:w-7/12 bg-[#6f4227] p-6 md:p-8 text-[#f5eddc] flex flex-col justify-between min-h-full">
+  <div class="min-h-screen grid lg:grid-cols-2">
+    <!-- Left Hero Section -->
+    <section class="hidden lg:flex flex-col justify-center bg-[#7B5A50] font-display text-white px-16 py-12">
+      <div class="max-w-lg mx-auto text-center space-y-12">
+        <!-- Brand Header -->
         <div>
-          <span class="text-2xl font-semibold tracking-[0.24em] uppercase">BrewSpot</span>
-          <div class="mt-10">
-            <h2 class="text-3xl md:text-3xl font-semibold leading-tight">
-              Every great cup starts<br />with great management.
-            </h2>
-            <p class="mt-3 max-w-[16rem] text-sm text-[#f5eddc]/80">
-              BrewSpot · Café Management System · Davao City
-            </p>
-          </div>
+          <img :src="logoFull" alt="BrewSpot" class="h-16 mx-auto" />
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
-          <div class="rounded-3xl border border-[#f5eddc]/15 bg-[#7b4d36]/70 p-3 text-center">
-            <p class="text-[0.65rem] uppercase tracking-[0.18em] text-[#f5eddc]/80">Today’s Sales</p>
-            <p class="mt-2 text-xl font-semibold">₱9,240</p>
+        <!-- Tagline -->
+        <div class="space-y-3">
+          <h2 class="text-3xl font-bold leading-tight">
+            Every great cup starts with great management.
+          </h2>
+          <p class="text-sm text-[#e5d9d4] leading-relaxed">
+            Streamline your daily orders, table reservations, and cafe sales with ease.
+          </p>
+        </div>
+
+        <!-- System Features Highlight -->
+        <div class="grid grid-cols-3 gap-3 pt-4">
+          <div class="rounded-lg border border-[#9a776c]/60 bg-[#65463d]/30 p-4 text-center">
+            <Icon name="heroicons:shopping-bag" class="w-6 h-6 mx-auto text-white" />
+            <p class="text-xs font-semibold mt-2 text-white">POS & Inventory</p>
           </div>
-          <div class="rounded-3xl border border-[#f5eddc]/15 bg-[#7b4d36]/70 p-3 text-center">
-            <p class="text-[0.65rem] uppercase tracking-[0.18em] text-[#f5eddc]/80">Reservation</p>
-            <p class="mt-2 text-xl font-semibold">14</p>
+
+          <div class="rounded-lg border border-[#9a776c]/60 bg-[#65463d]/30 p-4 text-center">
+            <Icon name="heroicons:calendar-days" class="w-6 h-6 mx-auto text-white" />
+            <p class="text-xs font-semibold mt-2 text-white">Reservations</p>
           </div>
-          <div class="rounded-3xl border border-[#f5eddc]/15 bg-[#7b4d36]/70 p-3 text-center">
-            <p class="text-[0.65rem] uppercase tracking-[0.18em] text-[#f5eddc]/80">Table Turnover</p>
-            <p class="mt-2 text-xl font-semibold">2.4×</p>
+
+          <div class="rounded-lg border border-[#9a776c]/60 bg-[#65463d]/30 p-4 text-center">
+            <Icon name="heroicons:chart-bar" class="w-6 h-6 mx-auto text-white" />
+            <p class="text-xs font-semibold mt-2 text-white">Sales Analytics</p>
           </div>
         </div>
       </div>
+    </section>
 
-      <div class="w-full md:w-5/12 bg-[#fdf3e7] flex items-center justify-center p-6 md:p-8">
-        <form class="w-full max-w-[300px] space-y-5" @submit.prevent="handleVerify">
-          <div class="space-y-4">
-            <button
-              type="button"
-              class="text-xs text-[#6f4227]/70 hover:text-[#6f4227] focus:outline-none"
-              @click="navigateTo('/login')"
-            >
-              &lsaquo; Change Email
-            </button>
-            <div>
-              <p class="text-sm uppercase tracking-[0.24em] text-[#6f4227]/80">Welcome back</p>
-              <h1 class="mt-2 text-2xl font-semibold text-[#3b1f0e]">Check your inbox</h1>
-              <p class="mt-2 text-sm text-[#3b1f0e]/60">
-                We sent a 6-digit code to <span class="font-medium">{{ email }}</span>. Enter it below to continue.
-              </p>
-            </div>
-          </div>
+    <!-- Right Verification Section -->
+    <section class="flex items-center justify-center bg-[#F8E9BE] px-8 py-12">
+      <div class="w-full max-w-sm">
+        <!-- Change Email -->
+        <button
+          type="button"
+          class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity mb-10"
+          @click="changeEmail"
+        >
+          <Icon name="heroicons:chevron-left" class="w-4 h-4" />
+          Change Email
+        </button>
 
-          <div class="grid grid-cols-6 gap-2">
+        <!-- Header -->
+        <div class="mb-8">
+          <h1 class="text-2xl font-bold text-[#2d201b]">Check your inbox</h1>
+          <p class="text-gray-600 text-sm mt-2 leading-relaxed">
+            We sent a 6-digit code to <span class="font-semibold text-[#2d201b]">{{ email }}</span>.
+            Enter it below to continue.
+          </p>
+        </div>
+
+        <!-- Auth Error Banner -->
+        <div
+          v-if="error"
+          class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3 mb-6"
+        >
+          <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
+          <span class="font-medium">{{ error }}</span>
+        </div>
+
+        <!-- Form -->
+        <form @submit.prevent="handleVerify" class="space-y-6">
+          <!-- Digit Inputs -->
+          <div class="flex justify-between gap-2">
             <input
               v-for="(digit, index) in digits"
               :key="index"
@@ -139,28 +167,36 @@ async function handleResend() {
               type="text"
               inputmode="numeric"
               maxlength="1"
-              class="w-full h-14 text-center text-lg rounded-xl border border-[#3b1f0e]/15 bg-[#fffdf9] text-[#3b1f0e] focus:outline-none focus:ring-2 focus:ring-[#3b1f0e]/30"
+              class="w-full h-14 text-center text-lg font-semibold rounded-lg border border-gray-300 bg-white text-[#2d201b] outline-none focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20 transition"
               @input="onDigitInput(index, $event)"
               @keydown="onDigitKeydown(index, $event)"
             />
           </div>
 
+          <!-- Submit Button -->
           <button
             type="submit"
             :disabled="loading || code.length < 6"
-            class="w-full rounded-full bg-[#6f4227] text-[#fdf3e7] py-3 text-sm font-medium hover:bg-[#5c3622] transition disabled:opacity-60"
+            class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-semibold hover:bg-[#65463d] transition disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {{ loading ? 'Verifying...' : 'Verify and Continue' }}
+            <span v-if="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            {{ loading ? "Verifying..." : "Verify and Continue" }}
           </button>
 
-          <p class="text-center text-sm text-[#3b1f0e]/60">
-            Didn't receive it? <button type="button" class="font-semibold text-[#6f4227] hover:text-[#59311f]" @click="handleResend">Resend OTP</button>
+          <!-- Resend -->
+          <p class="text-sm text-gray-600 text-center">
+            Didn't receive it?
+            <button
+              type="button"
+              :disabled="cooldown > 0"
+              class="font-semibold text-[#7B5A50] hover:underline disabled:opacity-50 disabled:no-underline"
+              @click="handleResend"
+            >
+              {{ cooldown > 0 ? `Resend OTP (${cooldown}s)` : 'Resend OTP' }}
+            </button>
           </p>
-
-          <p v-if="error" class="text-red-600 text-sm text-center">{{ error }}</p>
         </form>
       </div>
-    </div>
+    </section>
   </div>
 </template>
-

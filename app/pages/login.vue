@@ -1,27 +1,45 @@
 <!--Login page-->
 <script setup lang="ts">
-const email = ref('')
-const password = ref('')
+import logoFull from '~/assets/images/logo-with-tag.svg'
+
+const form = reactive({
+  email: '',
+  password: '',
+})
+
+const errors = reactive({
+  auth: '',
+  email: '',
+  password: '',
+})
+
 const showPassword = ref(false)
-const error = ref('')
-const loading = ref(false)
+const isLoading = ref(false)
 
 const authService = useAuthService()
 
+function clearErrors() {
+  errors.auth = ''
+  errors.email = ''
+  errors.password = ''
+}
+
 async function handleLogin() {
-  error.value = ''
-  loading.value = true
+  clearErrors()
+  isLoading.value = true
+
   try {
-    const res = await authService.login(email.value, password.value)
+    const res = await authService.login(form.email, form.password)
+
     if (res.success && res.requires_2fa) {
-      navigateTo({ path: '/verify-login-code', query: { email: email.value } })
+      navigateTo({ path: '/verify-login-code', query: { email: form.email } })
     } else {
-      error.value = res.message
+      errors.auth = res.message
     }
   } catch (e: any) {
-    error.value = e?.data?.message ?? 'Login failed.'
+    errors.auth = e?.data?.message ?? 'Login failed.'
   } finally {
-    loading.value = false
+    isLoading.value = false
   }
 }
 
@@ -35,110 +53,120 @@ function goRegister() {
 </script>
 
 <template>
-  <div class="h-screen w-full flex items-center justify-center bg-[#f2e9de] overflow-hidden" style="font-family: 'Poppins', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-    <div class="w-full max-w-6xl h-full max-h-[calc(100vh-2rem)] rounded-[40px] overflow-hidden shadow-2xl flex flex-col md:flex-row">
-      <div class="relative w-full md:w-1/2 bg-[#6f4227] p-6 md:p-10 text-[#f5eddc] flex flex-col justify-between min-h-full">
+  <div class="min-h-screen grid lg:grid-cols-2">
+    <!-- Left Hero Section -->
+    <section class="hidden lg:flex flex-col justify-center bg-[#7B5A50] font-display text-white px-16 py-12">
+      <div class="max-w-lg mx-auto text-center space-y-12">
+        <!-- Brand Header -->
         <div>
-          <span class="text-2xl font-semibold tracking-[0.24em] uppercase">BrewSpot</span>
-          <div class="mt-14">
-            <h2 class="text-3xl md:text-4xl font-semibold leading-tight">
-              Every great cup starts<br />with great management.
-            </h2>
-            <p class="mt-4 max-w-xs text-sm text-[#f5eddc]/80">
-              BrewSpot · Café Management System · Davao City
-            </p>
-          </div>
+          <img :src="logoFull" alt="BrewSpot" class="h-16 mx-auto" />
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
-          <div class="rounded-3xl border border-[#f5eddc]/15 bg-[#7b4d36]/70 p-4 text-center">
-            <p class="text-xs uppercase tracking-[0.18em] text-[#f5eddc]/80">Today’s Sales</p>
-            <p class="mt-3 text-2xl font-semibold">₱9,240</p>
+        <!-- Tagline -->
+        <div class="space-y-3">
+          <h2 class="text-3xl font-bold leading-tight">
+            Every great cup starts with great management.
+          </h2>
+          <p class="text-sm text-[#e5d9d4] leading-relaxed">
+            Streamline your daily orders, table reservations, and cafe sales with ease.
+          </p>
+        </div>
+
+        <!-- System Features Highlight -->
+        <div class="grid grid-cols-3 gap-3 pt-4">
+          <div class="rounded-lg border border-[#9a776c]/60 bg-[#65463d]/30 p-4 text-center">
+            <Icon name="heroicons:shopping-bag" class="w-6 h-6 mx-auto text-white" />
+            <p class="text-xs font-semibold mt-2 text-white">POS & Inventory</p>
           </div>
-          <div class="rounded-3xl border border-[#f5eddc]/15 bg-[#7b4d36]/70 p-4 text-center">
-            <p class="text-xs uppercase tracking-[0.18em] text-[#f5eddc]/80">Reservation</p>
-            <p class="mt-3 text-2xl font-semibold">14</p>
+
+          <div class="rounded-lg border border-[#9a776c]/60 bg-[#65463d]/30 p-4 text-center">
+            <Icon name="heroicons:calendar-days" class="w-6 h-6 mx-auto text-white" />
+            <p class="text-xs font-semibold mt-2 text-white">Reservations</p>
           </div>
-          <div class="rounded-3xl border border-[#f5eddc]/15 bg-[#7b4d36]/70 p-4 text-center">
-            <p class="text-xs uppercase tracking-[0.18em] text-[#f5eddc]/80">Table Turnover</p>
-            <p class="mt-3 text-2xl font-semibold">2.4×</p>
+
+          <div class="rounded-lg border border-[#9a776c]/60 bg-[#65463d]/30 p-4 text-center">
+            <Icon name="heroicons:chart-bar" class="w-6 h-6 mx-auto text-white" />
+            <p class="text-xs font-semibold mt-2 text-white">Sales Analytics</p>
           </div>
         </div>
       </div>
+    </section>
 
-      <div class="w-full md:w-1/2 bg-[#fdf3e7] flex items-center justify-center p-6 md:p-10">
-        <form class="w-full max-w-[360px] space-y-5" @submit.prevent="handleLogin">
+    <!-- Right Login Form Section -->
+    <section class="flex items-center justify-center bg-[#FFF8EA] px-8 py-12">
+      <div class="w-full max-w-sm space-y-6">
+        <!-- Form Header -->
+        <div>
+          <h1 class="text-3xl font-bold text-[#2d201b]">Welcome back</h1>
+          <p class="text-gray-600 text-sm mt-1">Sign in to your account</p>
+        </div>
+
+        <!-- Auth Error Banner -->
+        <div
+          v-if="errors.auth"
+          class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
+        >
+          <svg class="w-5 h-5 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span class="font-medium">{{ errors.auth }}</span>
+        </div>
+
+        <!-- Form -->
+        <form @submit.prevent="handleLogin" class="space-y-4">
+          <!-- Email Input -->
           <div>
-            <p class="text-sm uppercase tracking-[0.24em] text-[#6f4227]/80">Welcome back</p>
-            <h1 class="mt-4 text-3xl font-semibold text-[#3b1f0e]">Sign in</h1>
-            <p class="mt-2 text-sm text-[#3b1f0e]/60">
-              Use your email and password to access the BrewSpot dashboard.
-            </p>
-          </div>
-
-          <div class="space-y-4">
-            <label class="block text-sm font-medium text-[#3b1f0e]/80">Email</label>
+            <label class="block text-sm font-medium mb-1.5 text-[#2d201b]">Email Address</label>
             <input
-              v-model="email"
+              v-model="form.email"
               type="email"
               placeholder="Enter your email"
-              class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-5 py-3 text-sm text-[#3b1f0e] placeholder:text-[#3b1f0e]/40 focus:outline-none focus:ring-2 focus:ring-[#3b1f0e]/25"
-              required
+              class="w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm"
+              :class="errors.email ? 'border-red-500 focus:ring-2 focus:ring-red-200' : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'"
             />
+            <p v-if="errors.email" class="text-red-500 text-xs mt-1">{{ errors.email }}</p>
           </div>
 
-          <div class="space-y-4">
-            <label class="block text-sm font-medium text-[#3b1f0e]/80">Password</label>
-            <div class="relative">
+          <!-- Password Input -->
+          <div>
+            <label class="block text-sm font-medium mb-1.5 text-[#2d201b]">Password</label>
+            <div class="relative flex items-center">
               <input
-                v-model="password"
+                v-model="form.password"
                 :type="showPassword ? 'text' : 'password'"
                 placeholder="Enter your password"
-                class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-5 py-3 pr-12 text-sm text-[#3b1f0e] placeholder:text-[#3b1f0e]/40 focus:outline-none focus:ring-2 focus:ring-[#3b1f0e]/25"
-                required
+                class="w-full h-11 rounded-md border pl-3 pr-10 outline-none transition bg-white text-sm"
+                :class="errors.password ? 'border-red-500 focus:ring-2 focus:ring-red-200' : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'"
               />
+
               <button
                 type="button"
-                @click="togglePassword"
-                class="absolute inset-y-0 right-3 flex items-center justify-center text-[#3b1f0e]/60 hover:text-[#3b1f0e] focus:outline-none"
-                aria-label="Toggle password visibility"
+                @click="showPassword = !showPassword"
+                class="absolute right-3 text-gray-500 hover:text-[#7B5A50] focus:outline-none transition-colors"
+                :aria-label="showPassword ? 'Hide password' : 'Show password'"
               >
-                <svg v-if="!showPassword" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-5 w-5">
-                  <path fill="none" d="M0 0h24v24H0z"/>
-                  <path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 13c-3.04 0-5.5-2.46-5.5-5.5S8.96 6.5 12 6.5s5.5 2.46 5.5 5.5S15.04 17.5 12 17.5zm0-9a3.5 3.5 0 100 7 3.5 3.5 0 000-7z"/>
-                </svg>
-                <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-5 w-5">
-                  <path fill="none" d="M0 0h24v24H0z"/>
-                  <path fill="currentColor" d="M12 6.5c-2.76 0-5 2.24-5 5 0 .82.22 1.59.6 2.26L4.1 17.2A11.94 11.94 0 011 12c1.73-4.39 6-7.5 11-7.5 2.65 0 5.13.88 7.16 2.36L16.76 8.6A4.994 4.994 0 0012 6.5zm9.19 3.81c-.85-1.94-2.16-3.63-3.76-4.89L16.5 6.8c1.15.7 2.11 1.68 2.78 2.87.91 1.64 1.34 3.43 1.34 5.33 0 .82-.1 1.64-.28 2.44l1.62 1.62c.75-1.58 1.15-3.28 1.15-5.06 0-1.81-.46-3.55-1.34-5.16zM3.5 5.27L2.27 6.5l3.2 3.2C4.13 11.05 3.2 9.58 3.2 8c0-.26.02-.52.05-.78L3.5 5.27zM1 12c0 1.46.35 2.84.98 4.09l1.65-1.65A7.835 7.835 0 012 12c0-1.01.16-1.99.45-2.91L1 7.01A9.98 9.98 0 001 12zm4.4 4.43l1.45-1.45A4.978 4.978 0 0012 16.5c1.15 0 2.21-.38 3.08-1.03l1.44 1.44A6.975 6.975 0 0112 18.5c-1.91 0-3.67-.69-5.11-1.82zm13.16.09l-1.45-1.45A4.978 4.978 0 0012 16.5c-1.15 0-2.21-.38-3.08-1.03l-1.44 1.44A6.975 6.975 0 0012 18.5c1.91 0 3.67-.69 5.11-1.82z"/>
-                </svg>
+                <Icon
+                  :name="showPassword ? 'heroicons:eye' : 'heroicons:eye-slash'"
+                  class="w-5 h-5"
+                />
               </button>
             </div>
+            <p v-if="errors.password" class="text-red-500 text-xs mt-1">{{ errors.password }}</p>
           </div>
 
-          <p v-if="error" class="text-red-600 text-sm">{{ error }}</p>
-
-          <div class="grid grid-cols-2 gap-4">
+          <!-- Submit Button -->
+          <div class="pt-2">
             <button
               type="submit"
-              :disabled="loading"
-              class="rounded-full bg-[#6f4227] text-[#fdf3e7] py-3 text-sm font-medium hover:bg-[#5c3622] transition disabled:opacity-60"
+              class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition disabled:opacity-50 flex items-center justify-center gap-2"
+              :disabled="isLoading"
             >
-              {{ loading ? 'Signing in...' : 'Sign in' }}
-            </button>
-            <button
-              type="button"
-              @click="goRegister"
-              class="rounded-full border border-[#6f4227] bg-transparent py-3 text-sm font-medium text-[#6f4227] hover:bg-[#6f4227]/10 transition"
-            >
-              Register
+              <span v-if="isLoading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              {{ isLoading ? "Signing In..." : "Sign In" }}
             </button>
           </div>
-
-          <p class="text-center text-sm text-[#3b1f0e]/60">
-            New café owner? Register your Business
-          </p>
         </form>
       </div>
-    </div>
+    </section>
   </div>
 </template>
