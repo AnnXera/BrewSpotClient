@@ -1,3 +1,4 @@
+//auth.global.ts
 import { useAuthStore } from "~/stores/auth"
 import { getRedirectForRole } from "~/utils/roleRedirects"
 
