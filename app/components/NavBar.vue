@@ -77,7 +77,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <!-- ============ DESKTOP SIDEBAR (md and up) ============ -->
+  <!-- ============ DESKTOP SIDEBAR (md) ============ -->
   <aside
     class="hidden md:flex h-screen sticky top-0 bg-[#7D5A50] flex-col p-6 transition-all duration-300 ease-in-out overflow-hidden"
     :class="isExpanded ? 'w-[289px]' : 'w-[88px]'"
