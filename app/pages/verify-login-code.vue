@@ -9,6 +9,12 @@ const error = ref('')
 const loading = ref(false)
 const cooldown = ref(0)
 
+onMounted(() => {
+  if (!email.value) {
+    navigateTo('/login')
+  }
+})
+
 const authService = useAuthService()
 const authStore = useAuthStore()
 

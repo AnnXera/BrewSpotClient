@@ -25,6 +25,13 @@ interface VerifyLoginCodeResponse {
     user?: User
 }
 
+interface VerificationResponse {
+    success: boolean
+    message: string
+    user_uuid?: string
+    retry_after_seconds?: number
+}
+
 interface SimpleResponse {
     success: boolean
     message: string
@@ -42,6 +49,22 @@ export class AuthService extends BaseService {
 
     resendLoginCode(email: string) {
         return this.post<SimpleResponse>('/auth/resend-login-code', { email })
+    }
+
+    sendRegistrationCode(email: string) {
+        return this.post<SimpleResponse>('/auth/send-code', { email })
+    }
+
+    verifyRegistrationCode(email: string, code: string) {
+        return this.post<VerificationResponse>('/auth/verify-code', { email, code })
+    }
+
+    resendRegistrationCode(email: string) {
+        return this.post<SimpleResponse>('/auth/resend-code', { email })
+    }
+
+    register(userUuid: string, payload: FormData) {
+        return this.post<SimpleResponse>(`/auth/register/${userUuid}`, payload)
     }
 
     logout() {
