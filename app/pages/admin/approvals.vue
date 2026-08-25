@@ -177,7 +177,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex min-h-screen bg-[#FDF3E7]">
+  <div class="flex flex-col md:flex-row min-h-screen bg-[#FDF3E7]">
     <NavBar :links="links" />
 
     <main class="flex-1 p-12">
