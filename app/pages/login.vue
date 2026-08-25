@@ -42,6 +42,14 @@ async function handleLogin() {
     isLoading.value = false
   }
 }
+
+function togglePassword() {
+  showPassword.value = !showPassword.value
+}
+
+function goRegister() {
+  navigateTo('/register')
+}
 </script>
 
 <template>
