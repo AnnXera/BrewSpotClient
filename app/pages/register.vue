@@ -32,7 +32,8 @@ const middlename = ref('')
 const lastname = ref('')
 const username = ref('')
 const phoneNumber = ref('')
-const idType = ref('Driver License')
+const ownerAddress = ref('')
+const idType = ref('drivers_license')
 const governmentIdFile = ref<File | null>(null)
 const governmentIdFileName = ref('')
 
@@ -99,7 +100,7 @@ async function handleSendCode() {
       error.value = 'Unable to send verification code.'
     }
   } catch (e: any) {
-    error.value = e?.data?.message ?? e?.message ?? 'Unable to send verification code.'
+    error.value = extractErrorMessage(e, 'Unable to send verification code.')
   } finally {
     loading.value = false
   }
@@ -133,7 +134,7 @@ async function handleVerifyOTP() {
       error.value = res.message || 'Invalid verification code.'
     }
   } catch (e: any) {
-    error.value = e?.data?.message ?? e?.message ?? 'Verification failed.'
+    error.value = extractErrorMessage(e, 'Verification failed.')
   } finally {
     loading.value = false
   }
@@ -160,15 +161,30 @@ async function handleResendOTP() {
       error.value = res.message || 'Unable to resend code.'
     }
   } catch (e: any) {
-    error.value = e?.data?.message ?? e?.message ?? 'Could not resend code.'
+    error.value = extractErrorMessage(e, 'Could not resend code.')
   }
+}
+
+function extractErrorMessage(e: any, defaultMsg: string): string {
+  const errs = e?.data?.errors || e?.response?._data?.errors
+  if (errs && typeof errs === 'object') {
+    const list = Object.values(errs).flat().filter(Boolean)
+    if (list.length > 0) return list.join('\n')
+  }
+  return e?.data?.message ?? e?.response?._data?.message ?? e?.message ?? defaultMsg
 }
 
 // Step 3: Personal Info
 function handleGovIdChange(event: Event) {
+  error.value = ''
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (file) {
+    if (file.size > 5 * 1024 * 1024) {
+      error.value = 'Government ID file size must not exceed 5MB.'
+      input.value = ''
+      return
+    }
     governmentIdFile.value = file
     governmentIdFileName.value = file.name
   }
@@ -176,7 +192,7 @@ function handleGovIdChange(event: Event) {
 
 function handleNextToBusiness() {
   error.value = ''
-  if (!firstname.value || !lastname.value || !username.value || !phoneNumber.value) {
+  if (!firstname.value || !lastname.value || !username.value || !phoneNumber.value || !ownerAddress.value) {
     error.value = 'Please complete all required personal fields.'
     return
   }
@@ -346,7 +362,8 @@ async function handleFinalSubmit() {
     payload.append('lastname', lastname.value)
     payload.append('username', username.value)
     payload.append('phone_number', phoneNumber.value)
-    payload.append('id_type', idType.value || 'Driver License')
+    payload.append('owner_address', ownerAddress.value)
+    payload.append('id_type', idType.value || 'drivers_license')
     payload.append('file', governmentIdFile.value)
 
     payload.append('cafe_name', cafeName.value)
@@ -368,7 +385,7 @@ async function handleFinalSubmit() {
       error.value = res.message || 'Registration failed.'
     }
   } catch (e: any) {
-    error.value = e?.data?.message ?? e?.message ?? 'Registration failed.'
+    error.value = extractErrorMessage(e, 'Registration failed.')
   } finally {
     loading.value = false
   }
@@ -547,11 +564,20 @@ async function handleFinalSubmit() {
             <div>
               <label class="block mb-1 font-medium text-[#3b1f0e]/80">ID Type *</label>
               <select v-model="idType" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2">
-                <option value="Driver License">Driver License</option>
-                <option value="Passport">Passport</option>
-                <option value="PRC ID">PRC ID</option>
+                <option value="drivers_license">Driver's License</option>
+                <option value="passport">Passport</option>
+                <option value="national_id">National ID</option>
+                <option value="sss">SSS ID</option>
+                <option value="philhealth">PhilHealth ID</option>
+                <option value="pagibig">Pag-IBIG ID</option>
+                <option value="voters_id">Voter's ID</option>
               </select>
             </div>
+          </div>
+
+          <div class="text-xs">
+            <label class="block mb-1 font-medium text-[#3b1f0e]/80">Personal Address *</label>
+            <input v-model="ownerAddress" type="text" placeholder="Street, Barangay, District, Davao City" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2" required />
           </div>
 
           <div class="text-xs">
