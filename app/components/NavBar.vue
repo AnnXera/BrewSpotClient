@@ -171,21 +171,21 @@ onBeforeUnmount(() => {
   </aside>
 
   <!-- ============ MOBILE TOP BAR (below md) ============ -->
-  <div class="md:hidden sticky top-0 z-30 flex items-center justify-between h-16 px-4 bg-[#7D5A50] shrink-0">
+  <div class="md:hidden sticky top-0 z-30 flex items-center justify-between h-[56px] px-4 bg-[#7D5A50] shrink-0">
     <button
       type="button"
-      class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-[#8B6656] transition-colors"
+      class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#8B6656] transition-colors"
       @click="mobileOpen = true"
     >
-      <Icon name="heroicons:bars-3" class="w-7 h-7 text-[#FFF0D1]" />
+      <Icon name="heroicons:bars-3" class="w-6 h-6 text-[#FFF0D1]" />
     </button>
 
-    <img :src="logoIcon" alt="Brewspot" class="w-9 h-9 shrink-0" />
+    <img :src="logoFull" alt="Brewspot" class="h-6 w-auto shrink-0" />
 
     <div ref="mobileProfileRef" class="relative">
-      <button type="button" @click="dropdownOpen = !dropdownOpen">
-        <div class="w-10 h-10 rounded-full bg-[#3B1F0E] flex items-center justify-center shrink-0">
-          <span class="font-display font-semibold text-[#FFF0D1] text-[16px]">
+      <button type="button" class="flex items-center justify-center" @click="dropdownOpen = !dropdownOpen">
+        <div class="w-8 h-8 rounded-full bg-[#3B1F0E] flex items-center justify-center shrink-0">
+          <span class="font-display font-semibold text-[#FFF0D1] text-sm">
             {{ initials }}
           </span>
         </div>
