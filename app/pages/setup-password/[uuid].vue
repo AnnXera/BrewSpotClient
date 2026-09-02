@@ -1,4 +1,3 @@
-<!--app/pages/setup-password/[uuid].vue-->
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
 import logoFull from '~/assets/images/logo-with-tag.svg'
@@ -15,10 +14,41 @@ const passwordConfirmation = ref('')
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 
+const isChecking = ref(true)
+const isInvalid = ref(false)
+const invalidMessage = ref('')
+
 const error = ref('')
 const isLoading = ref(false)
 
 const authService = useAuthService()
+
+onMounted(async () => {
+  try {
+    const res = await authService.checkSetupStatus(uuid)
+
+    if (res.already_active) {
+      navigateTo({ path: '/login', query: { notice: res.message || 'Your password has already been set up. Please sign in instead.' } })
+      return
+    }
+
+    if (!res.success) {
+      isInvalid.value = true
+      invalidMessage.value = res.message || 'This link is invalid or has expired.'
+      return
+    }
+  } catch (e: any) {
+    const data = e?.data
+    if (data?.already_active) {
+      navigateTo({ path: '/login', query: { notice: data.message || 'Your password has already been set up. Please sign in instead.' } })
+      return
+    }
+    isInvalid.value = true
+    invalidMessage.value = data?.message || 'This link is invalid or has expired.'
+  } finally {
+    isChecking.value = false
+  }
+})
 
 const requirements = computed(() => ({
   length: password.value.length >= 8,
@@ -110,7 +140,34 @@ async function handleSubmit() {
 
     <!-- Right Form Section -->
     <section class="flex items-center justify-center bg-[#FFF8EA] px-8 py-12">
-      <div class="w-full max-w-sm space-y-6">
+      <!-- Loading State -->
+      <div v-if="isChecking" class="w-full max-w-sm text-center py-12 space-y-4">
+        <div class="w-10 h-10 border-4 border-[#7B5A50] border-t-transparent rounded-full animate-spin mx-auto"></div>
+        <p class="text-sm text-[#7B5A50] font-medium">Verifying invitation link...</p>
+      </div>
+
+      <!-- Invalid Link State -->
+      <div v-else-if="isInvalid" class="w-full max-w-sm space-y-6 text-center">
+        <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto text-red-600">
+          <Icon name="heroicons:exclamation-triangle" class="w-8 h-8" />
+        </div>
+        <div class="space-y-2">
+          <h1 class="text-2xl font-bold text-[#2d201b]">Invalid or Expired Link</h1>
+          <p class="text-sm text-gray-600 leading-relaxed">{{ invalidMessage }}</p>
+        </div>
+        <div class="pt-2">
+          <button
+            type="button"
+            @click="navigateTo('/login')"
+            class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition flex items-center justify-center gap-2"
+          >
+            Go to Sign In
+          </button>
+        </div>
+      </div>
+
+      <!-- Normal Setup Form -->
+      <div v-else class="w-full max-w-sm space-y-6">
         <div>
           <h1 class="text-3xl font-bold text-[#2d201b]">Set your password</h1>
           <p class="text-gray-600 text-sm mt-1">Create a password to activate your account.</p>
