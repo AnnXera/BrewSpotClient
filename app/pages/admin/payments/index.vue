@@ -105,7 +105,7 @@ onMounted(loadPaymentHistory)
             Payment History
           </h1>
           <p class="font-sans text-sm text-[#8B6656] mt-1">
-            Subscription transactions and billing history for registered cafe owners based on backend database.
+            Subscription transactions and billing history for registered cafe owners.
           </p>
         </div>
 

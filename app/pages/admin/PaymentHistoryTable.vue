@@ -80,7 +80,7 @@
               <td colspan="5" class="px-6 py-12 text-center font-sans text-sm text-[#8B6656]">
                 <div class="flex items-center justify-center gap-2">
                   <Icon name="heroicons:arrow-path" class="w-5 h-5 animate-spin text-[#B4846C]" />
-                  <span>Loading backend payment records...</span>
+                  <span>Loading payment records...</span>
                 </div>
               </td>
             </tr>
