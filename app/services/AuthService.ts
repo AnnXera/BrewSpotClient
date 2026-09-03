@@ -38,6 +38,13 @@ interface SimpleResponse {
     retry_after_seconds?: number
 }
 
+interface SetupPasswordResponse {
+    success: boolean
+    message: string
+    already_active?: boolean
+    user?: User
+}
+
 export class AuthService extends BaseService {
     login(email: string, password: string) {
         return this.post<LoginResponse>('/auth/login', { email, password })
@@ -65,6 +72,13 @@ export class AuthService extends BaseService {
 
     register(userUuid: string, payload: FormData) {
         return this.post<SimpleResponse>(`/auth/register/${userUuid}`, payload)
+    }
+
+    setupPassword(uuid: string, password: string, passwordConfirmation: string) {
+        return this.post<SetupPasswordResponse>(`/auth/setup-password/${uuid}`, {
+            password,
+            password_confirmation: passwordConfirmation,
+        })
     }
 
     logout() {

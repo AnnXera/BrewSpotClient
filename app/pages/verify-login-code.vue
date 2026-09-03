@@ -125,7 +125,7 @@ function changeEmail() {
     </section>
 
     <!-- Right Verification Section -->
-    <section class="flex items-center justify-center bg-[#F8E9BE] px-8 py-12">
+    <section class="flex items-center justify-center bg-[##FFF8EA] px-8 py-12">
       <div class="w-full max-w-sm">
         <!-- Change Email -->
         <button

@@ -34,51 +34,67 @@ function openDatePicker() {
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row md:items-center gap-3 p-6 border-b border-[#F3E7D2]">
-    <div class="relative flex-1 min-w-[220px]">
+  <div class="flex flex-col border-b border-[#F3E7D2]
+              min-[360px]:px-[12px] min-[360px]:py-[14px] min-[360px]:gap-[12px]
+              md:flex-row md:items-center md:p-6 md:gap-[24px]">
+    <!-- Search Input -->
+    <div class="relative flex-1 w-full min-w-0">
       <Icon
         name="heroicons:magnifying-glass"
-        class="w-4 h-4 text-[#3B1F0E]/40 absolute left-3 top-1/2 -translate-y-1/2"
+        class="text-[#3B1F0E]/40 absolute top-1/2 -translate-y-1/2
+               min-[360px]:left-[10px] min-[360px]:w-[16px] min-[360px]:h-[16px]
+               md:left-[12px] md:w-[24px] md:h-[24px]"
       />
       <input
         :value="search"
         type="text"
         placeholder="Search owner or cafe"
-        class="w-full rounded-lg border border-[#EEDFC4] bg-[#FFFDF9] pl-9 pr-3 py-3 font-sans text-sm text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
+        class="w-full rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] font-sans text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40
+               min-[360px]:py-[10px] min-[360px]:text-[12px] min-[360px]:pl-[34px]
+               md:py-[12px] md:text-[14px] md:pl-[48px]"
         @input="emit('update:search', ($event.target as HTMLInputElement).value)"
       />
     </div>
 
-    <div class="relative">
-      <select
-        :value="status"
-        class="appearance-none rounded-lg border border-[#EEDFC4] bg-[#FFFDF9] p-3 pr-9 font-sans text-sm text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-        @change="emit('update:status', ($event.target as HTMLSelectElement).value)"
-      >
-        <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-      </select>
-      <Icon
-        name="heroicons:chevron-down"
-        class="w-4 h-4 text-[#3B1F0E]/40 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-      />
-    </div>
+    <!-- Dropdowns Grid (Side-by-side on mobile, inline on desktop) -->
+    <div class="grid grid-cols-2 w-full
+                min-[360px]:gap-[12px]
+                md:flex md:w-auto md:items-center md:gap-[24px]">
+      <!-- Status Dropdown -->
+      <div class="relative w-full
+                  md:w-auto">
+        <select
+          :value="status"
+          class="w-full appearance-none rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] pl-[12px] pr-[32px] font-sans text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40
+                 min-[360px]:py-[10px] min-[360px]:text-[12px]
+                 md:py-[12px] md:text-[14px] md:w-36"
+          @change="emit('update:status', ($event.target as HTMLSelectElement).value)"
+        >
+          <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+        <Icon
+          name="heroicons:chevron-down"
+          class="w-[16px] h-[16px] text-[#3B1F0E]/40 absolute right-[12px] top-1/2 -translate-y-1/2 pointer-events-none"
+        />
+      </div>
 
-    <div class="relative">
-      <input
-        ref="dateInputEl"
-        :value="date"
-        type="date"
-        class="date-input-clean rounded-lg border border-[#EEDFC4] bg-[#FFFDF9] p-3 pr-9 font-sans text-sm text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-        @input="emit('update:date', ($event.target as HTMLInputElement).value)"
-      />
-      <button type="button" tabindex="-1" class="absolute right-3 top-1/2 -translate-y-1/2" @click="openDatePicker">
-        <Icon name="heroicons:calendar-days" class="w-4 h-4 text-[#3B1F0E]/40" />
-      </button>
+      <!-- Date Dropdown -->
+      <div class="relative w-full
+                  md:w-auto">
+        <input
+          ref="dateInputEl"
+          :value="date"
+          type="date"
+          class="date-input-clean w-full rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] pl-[12px] pr-[32px] font-sans text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40
+                 min-[360px]:py-[10px] min-[360px]:text-[12px]
+                 md:py-[12px] md:text-[14px] md:w-40"
+          @input="emit('update:date', ($event.target as HTMLInputElement).value)"
+        />
+        <button type="button" tabindex="-1" class="absolute right-[12px] top-1/2 -translate-y-1/2" @click="openDatePicker">
+          <Icon name="heroicons:chevron-down" class="w-[16px] h-[16px] text-[#3B1F0E]/40" />
+        </button>
+      </div>
     </div>
-
-    <span class="font-sans text-sm text-[#3B1F0E]/60 md:ml-auto whitespace-nowrap">
-      {{ total }} record{{ total === 1 ? '' : 's' }}
-    </span>
   </div>
 </template>
 

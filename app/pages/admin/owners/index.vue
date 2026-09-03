@@ -211,27 +211,46 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row min-h-screen bg-[#FDF3E7]">
+  <div class="flex flex-col min-h-screen bg-[#FDF3E7]
+              md:flex-row">
     <NavBar :links="links" />
 
-    <main class="flex-1 p-12">
+    <main class="flex-1 p-3.5
+                min-[360px]:p-4
+                sm:p-6
+                md:p-12">
       <!-- Header -->
-      <header class="mb-8">
-        <h1 class="font-display text-[26px] leading-[39px] font-bold text-[#3D2B24]">Owner Management</h1>
-        <p class="font-sans text-[14px] leading-[21px] text-[#9E7060] mt-[2px]">
-          Manage all registered cafe owners across the platform.
+      <header class="mb-4
+                     min-[360px]:mb-5
+                     sm:mb-6
+                     md:mb-8">
+        <h1 class="font-display text-xl font-bold text-[#3D2B24]
+                   min-[360px]:text-2xl
+                   sm:text-[26px] sm:leading-[39px]">
+          Owner Management
+        </h1>
+        <p class="font-sans text-[11px] text-[#9E7060] mt-1
+                  min-[360px]:text-xs
+                  sm:text-sm">
+          Manage all registered cafe owners.
         </p>
       </header>
 
       <!-- Stat cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-        <OwnerManagementStatCard :value="stats?.total_owners" label="Total Owners" />
+      <div class="grid grid-cols-2 gap-2.5 mb-4
+                  min-[360px]:gap-3 min-[360px]:mb-5
+                  sm:gap-4
+                  md:grid-cols-3 md:gap-6 md:mb-8">
+        <div class="col-span-2
+                    md:col-span-1">
+          <OwnerManagementStatCard :value="stats?.total_owners" label="Total Owners" />
+        </div>
         <OwnerManagementStatCard :value="stats?.active" label="Active" color="#2E9E5B" />
-        <OwnerManagementStatCard :value="stats?.inactive_or_suspended" label="Inactive/Suspended" color="#D9622B" />
+        <OwnerManagementStatCard :value="stats?.inactive_or_suspended" label="Suspended/ Inactive" color="#D9622B" />
       </div>
 
-      <!-- Table card -->
-      <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden">
+      <!-- Main Content Card -->
+      <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden shadow-sm">
         <OwnerManagementFilterBar
           v-model:search="search"
           v-model:status="status"
@@ -240,8 +259,29 @@ onMounted(() => {
           :total="total"
         />
 
-        <!-- Table -->
-        <div class="overflow-x-auto">
+        <!-- Mobile Card List View (visible on small screens) -->
+        <div class="block
+                    md:hidden">
+          <div v-if="loading" class="p-8 text-center font-sans text-sm text-[#3B1F0E]/50">
+            Loading owners…
+          </div>
+          <div v-else-if="!owners.length" class="p-8 text-center font-sans text-sm text-[#3B1F0E]/50">
+            No owners found.
+          </div>
+          <OwnerManagementMobileCard
+            v-for="(owner, index) in owners"
+            :key="owner.uuid"
+            :owner="owner"
+            :index="index"
+            :status-change-loading="statusChangeLoading === owner.uuid"
+            @view="viewOwner"
+            @status-change="requestStatusChange"
+          />
+        </div>
+
+        <!-- Desktop Table View (visible on medium screens and up) -->
+        <div class="hidden overflow-x-auto
+                    md:block">
           <table class="w-full text-left">
             <thead>
               <tr class="bg-[#FBF2E1] border-b border-[#F3E7D2]">
