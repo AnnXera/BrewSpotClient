@@ -1,5 +1,5 @@
 //app/services/BaseService.ts
-import type { $Fetch } from 'ofetch'
+import type { $Fetch } from 'nitropack'
 
 export abstract class BaseService {
     constructor(protected readonly client: $Fetch) { }

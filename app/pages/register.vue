@@ -1,6 +1,7 @@
 <!-- Unified Step-by-Step Business Registration Wizard -->
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import logoFull from '~/assets/images/logo-with-tag.svg'
 
 const authService = useAuthService()
 
@@ -353,6 +354,7 @@ async function handleFinalSubmit() {
     payload.append('cafe_doc_type', cafeDocType.value)
     payload.append('branch_name', branchName.value)
     payload.append('address', address.value)
+    payload.append('owner_address', address.value)
     payload.append('cafe_phonenumber', cafePhone.value)
     payload.append('cafe_email', cafeEmail.value)
 
@@ -376,95 +378,140 @@ async function handleFinalSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen w-full flex items-center justify-center bg-[#f2e9de] p-4 overflow-x-hidden" style="font-family: 'Poppins', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-    <div class="w-full max-w-[940px] h-auto md:h-[620px] rounded-[36px] overflow-hidden shadow-2xl flex flex-col md:flex-row bg-white">
-      <!-- Left side branding panel -->
-      <div class="relative w-full md:w-6/12 bg-[#6f4227] p-6 md:p-8 text-[#f5eddc] flex flex-col justify-between min-h-full">
+  <div class="min-h-screen grid lg:grid-cols-2">
+    <!-- Left Hero Section (Matches login.vue & verify-login-code.vue) -->
+    <section class="hidden lg:flex flex-col justify-center bg-[#7B5A50] font-display text-white px-16 py-12">
+      <div class="max-w-lg mx-auto text-center space-y-12">
+        <!-- Brand Header -->
         <div>
-          <span class="text-2xl font-semibold tracking-[0.24em] uppercase">BrewSpot</span>
-          <div class="mt-8">
-            <h2 class="text-3xl font-semibold leading-tight">
-              Every great cup starts<br />with great management.
-            </h2>
-            <p class="mt-3 max-w-[16rem] text-sm text-[#f5eddc]/80">
-              BrewSpot · Café Management System · Davao City
-            </p>
-          </div>
+          <img :src="logoFull" alt="BrewSpot" class="h-16 mx-auto" />
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-          <div class="rounded-3xl border border-[#f5eddc]/15 bg-[#7b4d36]/70 p-3 text-center">
-            <p class="text-[0.65rem] uppercase tracking-[0.18em] text-[#f5eddc]/80">Today's Sales</p>
-            <p class="mt-2 text-xl font-semibold">₱9,240</p>
+        <!-- Tagline -->
+        <div class="space-y-3">
+          <h2 class="text-3xl font-bold leading-tight">
+            Every great cup starts with great management.
+          </h2>
+          <p class="text-sm text-[#e5d9d4] leading-relaxed">
+            Streamline your daily orders, table reservations, and cafe sales with ease.
+          </p>
+        </div>
+
+        <!-- System Features Highlight -->
+        <div class="grid grid-cols-3 gap-3 pt-4">
+          <div class="rounded-lg border border-[#9a776c]/60 bg-[#65463d]/30 p-4 text-center">
+            <Icon name="heroicons:shopping-bag" class="w-6 h-6 mx-auto text-white" />
+            <p class="text-xs font-semibold mt-2 text-white">POS & Inventory</p>
           </div>
-          <div class="rounded-3xl border border-[#f5eddc]/15 bg-[#7b4d36]/70 p-3 text-center">
-            <p class="text-[0.65rem] uppercase tracking-[0.18em] text-[#f5eddc]/80">Reservation</p>
-            <p class="mt-2 text-xl font-semibold">14</p>
+
+          <div class="rounded-lg border border-[#9a776c]/60 bg-[#65463d]/30 p-4 text-center">
+            <Icon name="heroicons:calendar-days" class="w-6 h-6 mx-auto text-white" />
+            <p class="text-xs font-semibold mt-2 text-white">Reservations</p>
           </div>
-          <div class="rounded-3xl border border-[#f5eddc]/15 bg-[#7b4d36]/70 p-3 text-center">
-            <p class="text-[0.65rem] uppercase tracking-[0.18em] text-[#f5eddc]/80">Table Turnover</p>
-            <p class="mt-2 text-xl font-semibold">2.4×</p>
+
+          <div class="rounded-lg border border-[#9a776c]/60 bg-[#65463d]/30 p-4 text-center">
+            <Icon name="heroicons:chart-bar" class="w-6 h-6 mx-auto text-white" />
+            <p class="text-xs font-semibold mt-2 text-white">Sales Analytics</p>
           </div>
         </div>
       </div>
+    </section>
 
-      <!-- Right side step wizard form container -->
-      <div class="w-full md:w-6/12 bg-[#fdf3e7] flex items-center justify-center p-6 overflow-y-auto max-h-full">
-        
+    <!-- Right Form Section -->
+    <section class="flex items-center justify-center bg-[#FFF8EA] px-8 py-12 min-h-screen lg:min-h-0 overflow-y-auto">
+      <div class="w-full max-w-md space-y-6 my-auto">
+
         <!-- STEP 1: Email Verification -->
-        <form v-if="currentStep === 1" class="w-full max-w-[320px] space-y-5" @submit.prevent="handleSendCode">
-          <div class="space-y-3">
-            <button type="button" class="text-xs text-[#6f4227]/70 hover:text-[#6f4227] focus:outline-none" @click="goLogin">
-              &lsaquo; Back to Login
-            </button>
-            <div>
-              <p class="text-xs uppercase tracking-[0.24em] font-semibold text-[#6f4227]">Register your business</p>
-              <h1 class="mt-2 text-2xl font-semibold text-[#3b1f0e]">Start with your email</h1>
-              <p class="mt-2 text-xs text-[#3b1f0e]/60">
-                Enter your email address to receive a verification code before completing registration.
-              </p>
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <label class="block text-xs font-medium text-[#3b1f0e]/80">Email address *</label>
-            <input
-              v-model="email"
-              type="email"
-              placeholder="jakimabdil22@gmail.com"
-              class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-4 py-2.5 text-xs text-[#3b1f0e] placeholder:text-[#3b1f0e]/40 focus:outline-none focus:ring-2 focus:ring-[#3b1f0e]/25"
-              required
-            />
-          </div>
-
-          <p v-if="error" class="text-red-600 text-xs">{{ error }}</p>
-
-          <button
-            type="submit"
-            :disabled="loading"
-            class="w-full rounded-full bg-[#6f4227] text-[#fdf3e7] py-2.5 text-xs font-semibold hover:bg-[#5c3622] transition disabled:opacity-60"
+        <div v-if="currentStep === 1" class="space-y-6">
+          <NuxtLink
+            to="/"
+            class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
           >
-            {{ loading ? 'Sending...' : 'Send Verification Code' }}
-          </button>
-        </form>
+            <Icon name="heroicons:chevron-left" class="w-4 h-4" />
+            Back to Home
+          </NuxtLink>
+
+          <div>
+            <h1 class="text-3xl font-bold text-[#2d201b]">Register your business</h1>
+            <p class="text-gray-600 text-sm mt-1">
+              Enter your email address to receive a verification code before completing registration.
+            </p>
+          </div>
+
+          <!-- Auth Error Banner -->
+          <div
+            v-if="error"
+            class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
+          >
+            <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
+            <span class="font-medium">{{ error }}</span>
+          </div>
+
+          <form @submit.prevent="handleSendCode" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium mb-1.5 text-[#2d201b]">Email Address *</label>
+              <input
+                v-model="email"
+                type="email"
+                placeholder="Enter your email"
+                class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                required
+              />
+            </div>
+
+            <div class="pt-2">
+              <button
+                type="submit"
+                :disabled="loading"
+                class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <span v-if="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                {{ loading ? 'Sending Code...' : 'Send Verification Code' }}
+              </button>
+            </div>
+
+            <p class="text-sm text-gray-600 text-center pt-2">
+              Already registered?
+              <button
+                type="button"
+                class="font-semibold text-[#7B5A50] hover:underline ml-1"
+                @click="goLogin"
+              >
+                Sign In
+              </button>
+            </p>
+          </form>
+        </div>
 
         <!-- STEP 2: OTP Verification -->
-        <div v-else-if="currentStep === 2" class="w-full max-w-[320px] space-y-5">
-          <div class="space-y-3">
-            <button type="button" class="text-xs text-[#6f4227]/70 hover:text-[#6f4227] focus:outline-none" @click="currentStep = 1">
-              &lsaquo; Change Email
-            </button>
-            <div>
-              <p class="text-xs uppercase tracking-[0.24em] font-semibold text-[#6f4227]">Check your inbox</p>
-              <h1 class="mt-2 text-xl font-bold text-[#3b1f0e]">Enter the verification code</h1>
-              <p class="mt-2 text-xs text-[#3b1f0e]/60">
-                We sent a 6-digit code to <span class="font-medium text-[#3b1f0e]">{{ email }}</span>.
-              </p>
-            </div>
+        <div v-else-if="currentStep === 2" class="space-y-6">
+          <button
+            type="button"
+            class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
+            @click="currentStep = 1"
+          >
+            <Icon name="heroicons:chevron-left" class="w-4 h-4" />
+            Change Email
+          </button>
+
+          <div>
+            <h1 class="text-3xl font-bold text-[#2d201b]">Check your inbox</h1>
+            <p class="text-gray-600 text-sm mt-2 leading-relaxed">
+              We sent a 6-digit code to <span class="font-semibold text-[#2d201b]">{{ email }}</span>. Enter it below to continue.
+            </p>
           </div>
 
-          <form class="space-y-4" @submit.prevent="handleVerifyOTP">
-            <div class="grid grid-cols-6 gap-2">
+          <!-- Auth Error Banner -->
+          <div
+            v-if="error"
+            class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
+          >
+            <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
+            <span class="font-medium">{{ error }}</span>
+          </div>
+
+          <form @submit.prevent="handleVerifyOTP" class="space-y-6">
+            <div class="flex justify-between gap-2">
               <input
                 v-for="(digit, index) in digits"
                 :key="index"
@@ -473,7 +520,7 @@ async function handleFinalSubmit() {
                 type="text"
                 inputmode="numeric"
                 maxlength="1"
-                class="w-full h-12 text-center text-base rounded-xl border border-[#3b1f0e]/15 bg-[#fffdf9] text-[#3b1f0e] focus:outline-none focus:ring-2 focus:ring-[#3b1f0e]/30 font-semibold"
+                class="w-full h-14 text-center text-lg font-semibold rounded-lg border border-gray-300 bg-white text-[#2d201b] outline-none focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20 transition"
                 @input="onDigitInput(index, $event)"
                 @keydown="onDigitKeydown(index, $event)"
               />
@@ -482,314 +529,510 @@ async function handleFinalSubmit() {
             <button
               type="submit"
               :disabled="loading || otpCode.length < 6"
-              class="w-full rounded-full bg-[#6f4227] text-[#fdf3e7] py-2.5 text-xs font-semibold hover:bg-[#5c3622] transition disabled:opacity-60"
+              class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
+              <span v-if="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
               {{ loading ? 'Verifying...' : 'Verify and Continue' }}
             </button>
 
-            <div class="text-center">
+            <p class="text-sm text-gray-600 text-center">
+              Didn't receive it?
               <button
                 type="button"
                 :disabled="cooldown > 0"
-                class="text-xs text-[#3b1f0e]/60 hover:text-[#3b1f0e] disabled:opacity-50 focus:outline-none"
+                class="font-semibold text-[#7B5A50] hover:underline disabled:opacity-50 disabled:no-underline ml-1"
                 @click="handleResendOTP"
               >
-                {{ cooldown > 0 ? `Resend OTP in ${cooldown}s` : "Didn't receive? Resend OTP" }}
+                {{ cooldown > 0 ? `Resend OTP (${cooldown}s)` : 'Resend OTP' }}
               </button>
-            </div>
-
-            <p v-if="error" class="text-red-600 text-xs text-center">{{ error }}</p>
+            </p>
           </form>
         </div>
 
         <!-- STEP 3: Personal Details -->
-        <form v-else-if="currentStep === 3" class="w-full max-w-[360px] space-y-4" @submit.prevent="handleNextToBusiness">
-          <div class="space-y-2">
-            <button type="button" class="text-xs text-[#6f4227]/70 hover:text-[#6f4227] focus:outline-none" @click="currentStep = 2">
-              &lsaquo; Back to OTP Verification
-            </button>
-            <div>
-              <p class="text-xs uppercase tracking-[0.24em] font-semibold text-[#6f4227]">Step 1 of 2: Personal Info</p>
-              <h1 class="mt-1 text-xl font-bold text-[#3b1f0e]">Personal details</h1>
-              <p class="text-xs text-[#3b1f0e]/60">
-                Provide your identity information to verify your account.
-              </p>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <label class="block mb-1 font-medium text-[#3b1f0e]/80">First Name *</label>
-              <input v-model="firstname" type="text" placeholder="Jaime" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2" required />
-            </div>
-            <div>
-              <label class="block mb-1 font-medium text-[#3b1f0e]/80">Last Name *</label>
-              <input v-model="lastname" type="text" placeholder="Banani" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2" required />
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <label class="block mb-1 font-medium text-[#3b1f0e]/80">Middle Name</label>
-              <input v-model="middlename" type="text" placeholder="Optional" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2" />
-            </div>
-            <div>
-              <label class="block mb-1 font-medium text-[#3b1f0e]/80">Username *</label>
-              <input v-model="username" type="text" placeholder="user_handle" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2" required />
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <label class="block mb-1 font-medium text-[#3b1f0e]/80">Contact No. *</label>
-              <input v-model="phoneNumber" type="text" placeholder="+63 0912 345 678" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2" required />
-            </div>
-            <div>
-              <label class="block mb-1 font-medium text-[#3b1f0e]/80">ID Type *</label>
-              <select v-model="idType" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2">
-                <option value="Driver License">Driver License</option>
-                <option value="Passport">Passport</option>
-                <option value="PRC ID">PRC ID</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="text-xs">
-            <label class="block mb-1 font-medium text-[#3b1f0e]/80">Government ID File *</label>
-            <div class="flex items-center space-x-2">
-              <input type="file" @change="handleGovIdChange" accept="image/*,.pdf" class="w-full text-xs text-[#3b1f0e]/80 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-[#6f4227] file:text-white hover:file:bg-[#5c3622]" required />
-            </div>
-            <p v-if="governmentIdFileName" class="mt-1 text-[0.7rem] text-[#6f4227] truncate font-medium">
-              Uploaded: {{ governmentIdFileName }}
-            </p>
-          </div>
-
-          <p v-if="error" class="text-red-600 text-xs text-center">{{ error }}</p>
-
-          <button type="submit" class="w-full rounded-full bg-[#6f4227] text-[#fdf3e7] py-2.5 text-xs font-semibold hover:bg-[#5c3622] transition">
-            Next: Business Registration &rsaquo;
+        <div v-else-if="currentStep === 3" class="space-y-5">
+          <button
+            type="button"
+            class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
+            @click="currentStep = 2"
+          >
+            <Icon name="heroicons:chevron-left" class="w-4 h-4" />
+            Back to Verification
           </button>
-        </form>
 
-        <!-- STEP 4: Business Details & 4 Requirements -->
-        <div v-else-if="currentStep === 4" class="w-full">
-          <!-- Page 1: Business Information -->
-          <form v-if="businessSubPage === 1" class="w-full max-w-[360px] space-y-4 mx-auto" @submit.prevent="nextBusinessSubPage">
-            <div class="space-y-2">
-              <button type="button" class="text-xs text-[#6f4227]/70 hover:text-[#6f4227] focus:outline-none" @click="currentStep = 3">
-                &lsaquo; Back to Personal Info
-              </button>
+          <div>
+            <span class="text-xs uppercase tracking-wider font-semibold text-[#7B5A50]">Step 1 of 2: Personal Info</span>
+            <h1 class="text-2xl font-bold text-[#2d201b] mt-0.5">Personal details</h1>
+            <p class="text-gray-600 text-sm mt-1">Provide your identity information to verify your account.</p>
+          </div>
+
+          <!-- Auth Error Banner -->
+          <div
+            v-if="error"
+            class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
+          >
+            <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
+            <span class="font-medium">{{ error }}</span>
+          </div>
+
+          <form @submit.prevent="handleNextToBusiness" class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
               <div>
-                <div class="flex items-center justify-between">
-                  <p class="text-xs uppercase tracking-[0.24em] font-semibold text-[#6f4227]">Business Registration</p>
-                  <span class="text-[0.7rem] bg-[#6f4227]/10 text-[#6f4227] px-2 py-0.5 rounded-full font-medium">Page 1 of 2</span>
-                </div>
-                <h1 class="mt-1 text-xl font-bold text-[#3b1f0e]">Business details</h1>
-                <p class="text-xs text-[#3b1f0e]/60">
-                  Enter your café and main branch information.
-                </p>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">First Name *</label>
+                <input
+                  v-model="firstname"
+                  type="text"
+                  placeholder="Jaime"
+                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  required
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Last Name *</label>
+                <input
+                  v-model="lastname"
+                  type="text"
+                  placeholder="Banani"
+                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  required
+                />
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block mb-1 font-medium text-[#3b1f0e]/80">Café / Business Name *</label>
-                <input v-model="cafeName" type="text" placeholder="BrewSpot Davao" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2 focus:ring-1 focus:ring-[#6f4227] outline-none" required />
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Middle Name</label>
+                <input
+                  v-model="middlename"
+                  type="text"
+                  placeholder="Optional"
+                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                />
               </div>
               <div>
-                <label class="block mb-1 font-medium text-[#3b1f0e]/80">Document Type *</label>
-                <select v-model="cafeDocType" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2 focus:ring-1 focus:ring-[#6f4227] outline-none">
-                  <option value="DTI">DTI</option>
-                  <option value="SEC">SEC</option>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Username *</label>
+                <input
+                  v-model="username"
+                  type="text"
+                  placeholder="user_handle"
+                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  required
+                />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Contact No. *</label>
+                <input
+                  v-model="phoneNumber"
+                  type="text"
+                  placeholder="+63 0912 345 678"
+                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  required
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">ID Type *</label>
+                <select
+                  v-model="idType"
+                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                >
+                  <option value="Driver License">Driver License</option>
+                  <option value="Passport">Passport</option>
+                  <option value="PRC ID">PRC ID</option>
                 </select>
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <label class="block mb-1 font-medium text-[#3b1f0e]/80">Branch Name *</label>
-                <input v-model="branchName" type="text" placeholder="Main Branch" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2 focus:ring-1 focus:ring-[#6f4227] outline-none" required />
-              </div>
-              <div>
-                <label class="block mb-1 font-medium text-[#3b1f0e]/80">Branch Phone *</label>
-                <input v-model="cafePhone" type="text" placeholder="+63 0912 345 678" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2 focus:ring-1 focus:ring-[#6f4227] outline-none" required />
-              </div>
+            <div>
+              <label class="block text-sm font-medium mb-1 text-[#2d201b]">Government ID File *</label>
+              <input
+                type="file"
+                @change="handleGovIdChange"
+                accept="image/*,.pdf"
+                class="w-full text-sm text-[#2d201b] border border-gray-300 rounded-md bg-white p-2 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                required
+              />
+              <p v-if="governmentIdFileName" class="mt-1 text-xs text-[#7B5A50] truncate font-medium">
+                Uploaded: {{ governmentIdFileName }}
+              </p>
             </div>
 
-            <div class="text-xs space-y-2">
-              <div>
-                <label class="block mb-1 font-medium text-[#3b1f0e]/80">Branch Address *</label>
-                <input v-model="address" type="text" placeholder="Street, Barangay, District, Davao City" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2 focus:ring-1 focus:ring-[#6f4227] outline-none" required />
-              </div>
-              <div>
-                <label class="block mb-1 font-medium text-[#3b1f0e]/80">Café Email *</label>
-                <input v-model="cafeEmail" type="email" placeholder="contact@brewspot.com" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2 focus:ring-1 focus:ring-[#6f4227] outline-none" required />
-              </div>
-            </div>
-
-            <p v-if="error" class="text-red-600 text-xs text-center font-medium">{{ error }}</p>
-
-            <button
-              type="submit"
-              class="w-full rounded-full bg-[#6f4227] text-[#fdf3e7] py-2.5 text-xs font-semibold hover:bg-[#5c3622] transition shadow-sm"
-            >
-              Next: Upload Business Requirements &rsaquo;
-            </button>
-          </form>
-
-          <!-- Page 2: 4 Required Business Documents & Final Submission -->
-          <form v-else class="w-full max-w-[370px] space-y-3 mx-auto" @submit.prevent="handleFinalSubmit">
-            <div class="space-y-1">
-              <button type="button" class="text-xs text-[#6f4227]/70 hover:text-[#6f4227] focus:outline-none flex items-center gap-1 font-medium" @click="prevBusinessSubPage">
-                &lsaquo; Back to Business Details
-              </button>
-              <div>
-                <div class="flex items-center justify-between">
-                  <p class="text-xs uppercase tracking-[0.24em] font-semibold text-[#6f4227]">Business Registration</p>
-                  <span class="text-[0.7rem] bg-[#6f4227]/10 text-[#6f4227] px-2.5 py-0.5 rounded-full font-semibold">Page 2 of 2</span>
-                </div>
-                <h1 class="mt-0.5 text-lg font-bold text-[#3b1f0e]">Required Business Requirements</h1>
-                <p class="text-[0.75rem] text-[#3b1f0e]/70">
-                  Upload the 4 required business documents below.
-                </p>
-              </div>
-            </div>
-
-            <div class="bg-white/80 border border-[#3b1f0e]/10 rounded-2xl p-2.5 flex items-center justify-between shadow-sm">
-              <div class="flex items-center space-x-2">
-                <div class="w-5 h-5 rounded-full text-white flex items-center justify-center text-[0.65rem] font-bold" :class="uploadedCount === 4 ? 'bg-emerald-600' : 'bg-[#6f4227]'">
-                  {{ uploadedCount }}
-                </div>
-                <span class="text-[0.75rem] font-semibold text-[#3b1f0e]">
-                  {{ uploadedCount === 4 ? 'All 4 requirements uploaded ✓' : `${uploadedCount} of 4 requirements uploaded` }}
-                </span>
-              </div>
-              <div class="w-20 bg-[#3b1f0e]/10 rounded-full h-1.5 overflow-hidden">
-                <div class="h-full transition-all duration-300" :class="uploadedCount === 4 ? 'bg-emerald-600' : 'bg-[#6f4227]'" :style="{ width: `${(uploadedCount / 4) * 100}%` }"></div>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2 text-xs">
-              <!-- 1. BIR Certificate -->
-              <div class="bg-white rounded-2xl p-2.5 border transition shadow-sm" :class="birFile ? 'border-emerald-500 bg-emerald-50/30' : 'border-[#3b1f0e]/15 hover:border-[#6f4227]/50'">
-                <div class="flex items-center justify-between mb-1">
-                  <label class="font-semibold text-[0.72rem] text-[#3b1f0e]">1. BIR Certificate <span class="text-red-500">*</span></label>
-                  <span v-if="birFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
-                </div>
-                <div v-if="!birFile" class="relative">
-                  <input type="file" @change="onBirChange" accept="image/*,.pdf" class="w-full text-[0.68rem] text-[#3b1f0e]/70 file:mr-1.5 file:py-0.5 file:px-2 file:rounded-full file:border-0 file:text-[0.62rem] file:font-semibold file:bg-[#6f4227] file:text-white hover:file:bg-[#5c3622] cursor-pointer" required />
-                </div>
-                <div v-else class="flex items-center justify-between text-[0.68rem] bg-emerald-100/60 p-1.5 rounded-xl text-emerald-900">
-                  <div class="truncate mr-1">
-                    <p class="font-medium truncate">{{ birFileName }}</p>
-                    <p class="text-[0.6rem] text-emerald-700">{{ birFileSize }}</p>
-                  </div>
-                  <button type="button" @click="clearBirFile" class="text-emerald-800 hover:text-red-600 font-bold text-xs p-0.5 rounded focus:outline-none" title="Remove file">&times;</button>
-                </div>
-              </div>
-
-              <!-- 2. Mayor's Permit -->
-              <div class="bg-white rounded-2xl p-2.5 border transition shadow-sm" :class="mayorsFile ? 'border-emerald-500 bg-emerald-50/30' : 'border-[#3b1f0e]/15 hover:border-[#6f4227]/50'">
-                <div class="flex items-center justify-between mb-1">
-                  <label class="font-semibold text-[0.72rem] text-[#3b1f0e]">2. Mayor's Permit <span class="text-red-500">*</span></label>
-                  <span v-if="mayorsFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
-                </div>
-                <div v-if="!mayorsFile" class="relative">
-                  <input type="file" @change="onMayorsChange" accept="image/*,.pdf" class="w-full text-[0.68rem] text-[#3b1f0e]/70 file:mr-1.5 file:py-0.5 file:px-2 file:rounded-full file:border-0 file:text-[0.62rem] file:font-semibold file:bg-[#6f4227] file:text-white hover:file:bg-[#5c3622] cursor-pointer" required />
-                </div>
-                <div v-else class="flex items-center justify-between text-[0.68rem] bg-emerald-100/60 p-1.5 rounded-xl text-emerald-900">
-                  <div class="truncate mr-1">
-                    <p class="font-medium truncate">{{ mayorsFileName }}</p>
-                    <p class="text-[0.6rem] text-emerald-700">{{ mayorsFileSize }}</p>
-                  </div>
-                  <button type="button" @click="clearMayorsFile" class="text-emerald-800 hover:text-red-600 font-bold text-xs p-0.5 rounded focus:outline-none" title="Remove file">&times;</button>
-                </div>
-              </div>
-
-              <!-- 3. DTI or SEC Document -->
-              <div class="bg-white rounded-2xl p-2.5 border transition shadow-sm" :class="dtiSecFile ? 'border-emerald-500 bg-emerald-50/30' : 'border-[#3b1f0e]/15 hover:border-[#6f4227]/50'">
-                <div class="flex items-center justify-between mb-1">
-                  <label class="font-semibold text-[0.72rem] text-[#3b1f0e]">3. {{ cafeDocType }} Document <span class="text-red-500">*</span></label>
-                  <span v-if="dtiSecFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
-                </div>
-                <div v-if="!dtiSecFile" class="relative">
-                  <input type="file" @change="onDtiSecChange" accept="image/*,.pdf" class="w-full text-[0.68rem] text-[#3b1f0e]/70 file:mr-1.5 file:py-0.5 file:px-2 file:rounded-full file:border-0 file:text-[0.62rem] file:font-semibold file:bg-[#6f4227] file:text-white hover:file:bg-[#5c3622] cursor-pointer" required />
-                </div>
-                <div v-else class="flex items-center justify-between text-[0.68rem] bg-emerald-100/60 p-1.5 rounded-xl text-emerald-900">
-                  <div class="truncate mr-1">
-                    <p class="font-medium truncate">{{ dtiSecFileName }}</p>
-                    <p class="text-[0.6rem] text-emerald-700">{{ dtiSecFileSize }}</p>
-                  </div>
-                  <button type="button" @click="clearDtiSecFile" class="text-emerald-800 hover:text-red-600 font-bold text-xs p-0.5 rounded focus:outline-none" title="Remove file">&times;</button>
-                </div>
-              </div>
-
-              <!-- 4. Sanitary Permit -->
-              <div class="bg-white rounded-2xl p-2.5 border transition shadow-sm" :class="sanitaryFile ? 'border-emerald-500 bg-emerald-50/30' : 'border-[#3b1f0e]/15 hover:border-[#6f4227]/50'">
-                <div class="flex items-center justify-between mb-1">
-                  <label class="font-semibold text-[0.72rem] text-[#3b1f0e]">4. Sanitary Permit <span class="text-red-500">*</span></label>
-                  <span v-if="sanitaryFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
-                </div>
-                <div v-if="!sanitaryFile" class="relative">
-                  <input type="file" @change="onSanitaryChange" accept="image/*,.pdf" class="w-full text-[0.68rem] text-[#3b1f0e]/70 file:mr-1.5 file:py-0.5 file:px-2 file:rounded-full file:border-0 file:text-[0.62rem] file:font-semibold file:bg-[#6f4227] file:text-white hover:file:bg-[#5c3622] cursor-pointer" required />
-                </div>
-                <div v-else class="flex items-center justify-between text-[0.68rem] bg-emerald-100/60 p-1.5 rounded-xl text-emerald-900">
-                  <div class="truncate mr-1">
-                    <p class="font-medium truncate">{{ sanitaryFileName }}</p>
-                    <p class="text-[0.6rem] text-emerald-700">{{ sanitaryFileSize }}</p>
-                  </div>
-                  <button type="button" @click="clearSanitaryFile" class="text-emerald-800 hover:text-red-600 font-bold text-xs p-0.5 rounded focus:outline-none" title="Remove file">&times;</button>
-                </div>
-              </div>
-            </div>
-
-            <p v-if="error" class="text-red-600 text-xs text-center font-medium whitespace-pre-line">{{ error }}</p>
-            <p v-if="success" class="text-emerald-700 text-xs text-center font-semibold">{{ success }}</p>
-
-            <div class="flex items-center space-x-2 pt-1">
-              <button
-                type="button"
-                class="w-1/3 rounded-full border border-[#6f4227] text-[#6f4227] py-2.5 text-xs font-semibold hover:bg-[#6f4227]/10 transition"
-                @click="prevBusinessSubPage"
-              >
-                &lsaquo; Back
-              </button>
+            <div class="pt-2">
               <button
                 type="submit"
-                :disabled="loading || uploadedCount < 4"
-                class="w-2/3 rounded-full bg-[#6f4227] text-[#fdf3e7] py-2.5 text-xs font-semibold hover:bg-[#5c3622] transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition flex items-center justify-center gap-2"
               >
-                {{ loading ? 'Submitting...' : 'Submit Registration' }}
+                Next: Business Registration
+                <Icon name="heroicons:chevron-right" class="w-4 h-4" />
               </button>
             </div>
           </form>
         </div>
 
+        <!-- STEP 4: Business Details & Requirements -->
+        <div v-else-if="currentStep === 4" class="space-y-5">
+          <!-- Page 1: Business Information -->
+          <div v-if="businessSubPage === 1" class="space-y-5">
+            <button
+              type="button"
+              class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
+              @click="currentStep = 3"
+            >
+              <Icon name="heroicons:chevron-left" class="w-4 h-4" />
+              Back to Personal Info
+            </button>
+
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-semibold text-[#7B5A50]">Business Registration</span>
+                <span class="text-xs bg-[#7B5A50]/10 text-[#7B5A50] px-2.5 py-0.5 rounded-full font-semibold">Page 1 of 2</span>
+              </div>
+              <h1 class="text-2xl font-bold text-[#2d201b] mt-0.5">Business details</h1>
+              <p class="text-gray-600 text-sm mt-1">Enter your café and main branch information.</p>
+            </div>
+
+            <!-- Auth Error Banner -->
+            <div
+              v-if="error"
+              class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
+            >
+              <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
+              <span class="font-medium">{{ error }}</span>
+            </div>
+
+            <form @submit.prevent="nextBusinessSubPage" class="space-y-4">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Café / Business Name *</label>
+                  <input
+                    v-model="cafeName"
+                    type="text"
+                    placeholder="BrewSpot Davao"
+                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    required
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Document Type *</label>
+                  <select
+                    v-model="cafeDocType"
+                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  >
+                    <option value="DTI">DTI</option>
+                    <option value="SEC">SEC</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Name *</label>
+                  <input
+                    v-model="branchName"
+                    type="text"
+                    placeholder="Main Branch"
+                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    required
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Phone *</label>
+                  <input
+                    v-model="cafePhone"
+                    type="text"
+                    placeholder="+63 0912 345 678"
+                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Address *</label>
+                <input
+                  v-model="address"
+                  type="text"
+                  placeholder="Street, Barangay, District, Davao City"
+                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  required
+                />
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Café Email *</label>
+                <input
+                  v-model="cafeEmail"
+                  type="email"
+                  placeholder="contact@brewspot.com"
+                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  required
+                />
+              </div>
+
+              <div class="pt-2">
+                <button
+                  type="submit"
+                  class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition flex items-center justify-center gap-2"
+                >
+                  Next: Upload Business Requirements
+                  <Icon name="heroicons:chevron-right" class="w-4 h-4" />
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Page 2: 4 Required Business Documents -->
+          <div v-else class="space-y-4">
+            <button
+              type="button"
+              class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
+              @click="prevBusinessSubPage"
+            >
+              <Icon name="heroicons:chevron-left" class="w-4 h-4" />
+              Back to Business Details
+            </button>
+
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-semibold text-[#7B5A50]">Business Registration</span>
+                <span class="text-xs bg-[#7B5A50]/10 text-[#7B5A50] px-2.5 py-0.5 rounded-full font-semibold">Page 2 of 2</span>
+              </div>
+              <h1 class="text-2xl font-bold text-[#2d201b] mt-0.5">Required Requirements</h1>
+              <p class="text-gray-600 text-sm mt-1">Upload the 4 required business documents below.</p>
+            </div>
+
+            <!-- Upload Progress Card -->
+            <div class="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between shadow-sm">
+              <div class="flex items-center space-x-2.5">
+                <div
+                  class="w-6 h-6 rounded-full text-white flex items-center justify-center text-xs font-bold transition-colors"
+                  :class="uploadedCount === 4 ? 'bg-emerald-600' : 'bg-[#7B5A50]'"
+                >
+                  {{ uploadedCount }}
+                </div>
+                <span class="text-xs font-semibold text-[#2d201b]">
+                  {{ uploadedCount === 4 ? 'All 4 requirements uploaded ✓' : `${uploadedCount} of 4 requirements uploaded` }}
+                </span>
+              </div>
+              <div class="w-24 bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div
+                  class="h-full transition-all duration-300"
+                  :class="uploadedCount === 4 ? 'bg-emerald-600' : 'bg-[#7B5A50]'"
+                  :style="{ width: `${(uploadedCount / 4) * 100}%` }"
+                ></div>
+              </div>
+            </div>
+
+            <!-- Auth Error Banner -->
+            <div
+              v-if="error"
+              class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
+            >
+              <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
+              <span class="font-medium whitespace-pre-line">{{ error }}</span>
+            </div>
+
+            <form @submit.prevent="handleFinalSubmit" class="space-y-3">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <!-- 1. BIR Certificate -->
+                <div
+                  class="bg-white rounded-lg p-3 border transition shadow-sm"
+                  :class="birFile ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'"
+                >
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="font-semibold text-xs text-[#2d201b]">1. BIR Certificate <span class="text-red-500">*</span></label>
+                    <span v-if="birFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
+                  </div>
+                  <div v-if="!birFile">
+                    <input
+                      type="file"
+                      @change="onBirChange"
+                      accept="image/*,.pdf"
+                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                      required
+                    />
+                  </div>
+                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
+                    <div class="truncate mr-2">
+                      <p class="font-medium truncate text-xs">{{ birFileName }}</p>
+                      <p class="text-[0.65rem] text-emerald-700">{{ birFileSize }}</p>
+                    </div>
+                    <button
+                      type="button"
+                      @click="clearBirFile"
+                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
+                      title="Remove file"
+                    >&times;</button>
+                  </div>
+                </div>
+
+                <!-- 2. Mayor's Permit -->
+                <div
+                  class="bg-white rounded-lg p-3 border transition shadow-sm"
+                  :class="mayorsFile ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'"
+                >
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="font-semibold text-xs text-[#2d201b]">2. Mayor's Permit <span class="text-red-500">*</span></label>
+                    <span v-if="mayorsFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
+                  </div>
+                  <div v-if="!mayorsFile">
+                    <input
+                      type="file"
+                      @change="onMayorsChange"
+                      accept="image/*,.pdf"
+                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                      required
+                    />
+                  </div>
+                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
+                    <div class="truncate mr-2">
+                      <p class="font-medium truncate text-xs">{{ mayorsFileName }}</p>
+                      <p class="text-[0.65rem] text-emerald-700">{{ mayorsFileSize }}</p>
+                    </div>
+                    <button
+                      type="button"
+                      @click="clearMayorsFile"
+                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
+                      title="Remove file"
+                    >&times;</button>
+                  </div>
+                </div>
+
+                <!-- 3. DTI or SEC Document -->
+                <div
+                  class="bg-white rounded-lg p-3 border transition shadow-sm"
+                  :class="dtiSecFile ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'"
+                >
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="font-semibold text-xs text-[#2d201b]">3. {{ cafeDocType }} Document <span class="text-red-500">*</span></label>
+                    <span v-if="dtiSecFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
+                  </div>
+                  <div v-if="!dtiSecFile">
+                    <input
+                      type="file"
+                      @change="onDtiSecChange"
+                      accept="image/*,.pdf"
+                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                      required
+                    />
+                  </div>
+                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
+                    <div class="truncate mr-2">
+                      <p class="font-medium truncate text-xs">{{ dtiSecFileName }}</p>
+                      <p class="text-[0.65rem] text-emerald-700">{{ dtiSecFileSize }}</p>
+                    </div>
+                    <button
+                      type="button"
+                      @click="clearDtiSecFile"
+                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
+                      title="Remove file"
+                    >&times;</button>
+                  </div>
+                </div>
+
+                <!-- 4. Sanitary Permit -->
+                <div
+                  class="bg-white rounded-lg p-3 border transition shadow-sm"
+                  :class="sanitaryFile ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'"
+                >
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="font-semibold text-xs text-[#2d201b]">4. Sanitary Permit <span class="text-red-500">*</span></label>
+                    <span v-if="sanitaryFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
+                  </div>
+                  <div v-if="!sanitaryFile">
+                    <input
+                      type="file"
+                      @change="onSanitaryChange"
+                      accept="image/*,.pdf"
+                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                      required
+                    />
+                  </div>
+                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
+                    <div class="truncate mr-2">
+                      <p class="font-medium truncate text-xs">{{ sanitaryFileName }}</p>
+                      <p class="text-[0.65rem] text-emerald-700">{{ sanitaryFileSize }}</p>
+                    </div>
+                    <button
+                      type="button"
+                      @click="clearSanitaryFile"
+                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
+                      title="Remove file"
+                    >&times;</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  class="w-1/3 h-11 rounded-md border border-[#7B5A50] text-[#7B5A50] font-medium hover:bg-[#7B5A50]/10 transition"
+                  @click="prevBusinessSubPage"
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  :disabled="loading || uploadedCount < 4"
+                  class="w-2/3 h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <span v-if="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  {{ loading ? 'Submitting...' : 'Submit Registration' }}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
         <!-- STEP 5: Review / Submitted Screen -->
-        <div v-else-if="currentStep === 5" class="w-full max-w-[340px] space-y-5">
-          <div class="space-y-3">
-            <p class="text-xs uppercase tracking-[0.24em] font-semibold text-[#6f4227]">Registration Submitted</p>
-            <h1 class="mt-2 text-2xl font-bold text-[#3b1f0e]">Admin is currently reviewing</h1>
-            <p class="mt-2 text-xs text-[#3b1f0e]/60">
+        <div v-else-if="currentStep === 5" class="space-y-6">
+          <div>
+            <span class="text-xs uppercase tracking-wider font-semibold text-[#7B5A50]">Registration Submitted</span>
+            <h1 class="text-2xl font-bold text-[#2d201b] mt-1">Admin is currently reviewing</h1>
+            <p class="text-gray-600 text-sm mt-2 leading-relaxed">
               Your business registration has been sent. Our team will review your documents and approve your account within 1-3 business days.
             </p>
           </div>
 
-          <div class="rounded-3xl border border-[#6f4227]/10 bg-[#fff6eb] p-4">
-            <p class="text-xs font-semibold text-[#3b1f0e]">What happens next</p>
-            <ul class="mt-3 space-y-2 text-xs text-[#3b1f0e]/80">
-              <li>• Document Review</li>
-              <li>• Email Notification</li>
-              <li>• Account Activation</li>
+          <div class="rounded-lg border border-[#7B5A50]/20 bg-white p-4 space-y-3 shadow-sm">
+            <p class="text-sm font-semibold text-[#2d201b]">What happens next</p>
+            <ul class="space-y-2 text-sm text-gray-600">
+              <li class="flex items-center gap-2">
+                <Icon name="heroicons:check-circle" class="w-5 h-5 text-[#7B5A50]" />
+                Document Review
+              </li>
+              <li class="flex items-center gap-2">
+                <Icon name="heroicons:check-circle" class="w-5 h-5 text-[#7B5A50]" />
+                Email Notification
+              </li>
+              <li class="flex items-center gap-2">
+                <Icon name="heroicons:check-circle" class="w-5 h-5 text-[#7B5A50]" />
+                Account Activation
+              </li>
             </ul>
           </div>
 
-          <button type="button" class="w-full rounded-full bg-[#6f4227] text-[#fdf3e7] py-2.5 text-xs font-semibold hover:bg-[#5c3622] transition" @click="goLogin">
-            Back to Login
-          </button>
+          <div class="flex items-center gap-3">
+            <NuxtLink
+              to="/"
+              class="w-1/2 h-11 rounded-md border border-[#7B5A50] text-[#7B5A50] font-medium hover:bg-[#7B5A50]/10 transition flex items-center justify-center gap-2"
+            >
+              <Icon name="heroicons:home" class="w-4 h-4" />
+              Back to Home
+            </NuxtLink>
+            <button
+              type="button"
+              class="w-1/2 h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition flex items-center justify-center gap-2"
+              @click="goLogin"
+            >
+              Back to Login
+            </button>
+          </div>
         </div>
 
       </div>
-    </div>
+    </section>
   </div>
 </template>

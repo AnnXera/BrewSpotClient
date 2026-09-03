@@ -95,6 +95,15 @@ function goRegister() {
     <!-- Right Login Form Section -->
     <section class="flex items-center justify-center bg-[#FFF8EA] px-8 py-12">
       <div class="w-full max-w-sm space-y-6">
+        <!-- Back to Landing Page -->
+        <NuxtLink
+          to="/"
+          class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
+        >
+          <Icon name="heroicons:chevron-left" class="w-4 h-4" />
+          Back to Home
+        </NuxtLink>
+
         <!-- Form Header -->
         <div>
           <h1 class="text-3xl font-bold text-[#2d201b]">Welcome back</h1>
@@ -165,6 +174,18 @@ function goRegister() {
               {{ isLoading ? "Signing In..." : "Sign In" }}
             </button>
           </div>
+
+          <!-- Register link -->
+          <p class="text-sm text-gray-600 text-center pt-2">
+            Don't have an account?
+            <button
+              type="button"
+              class="font-semibold text-[#7B5A50] hover:underline ml-1"
+              @click="goRegister"
+            >
+              Register Business
+            </button>
+          </p>
         </form>
       </div>
     </section>
