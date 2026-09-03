@@ -1,29 +1,30 @@
 <!-- app/components/common/Pagination.vue -->
 <template>
-  <div v-if="lastPage > 1" class="flex items-center justify-center gap-4 p-5">
+  <div class="flex items-center justify-center gap-4 p-4 sm:p-5 border-t border-[#F0E6D8]">
     <button
-      class="p-2 text-[#9E7060] disabled:opacity-30 hover:text-[#3B1F0E] transition-colors"
-      :disabled="page === 1"
+      type="button"
+      class="p-1.5 text-[#9E7060] disabled:opacity-30 disabled:cursor-not-allowed hover:text-[#3D2B24] transition-colors"
+      :disabled="page <= 1"
       @click="prev"
     >
-      <Icon name="heroicons:chevron-left-20-solid" class="w-6 h-6" />
+      <Icon name="heroicons:chevron-left-20-solid" class="w-5 h-5 sm:w-6 sm:h-6" />
     </button>
 
-    <span class="font-sans text-sm font-medium text-[#3B1F0E]">Page {{ page }} of {{ lastPage }}</span>
+    <span class="font-display font-medium text-xs sm:text-sm text-[#7D5A50]">
+      Page {{ page }} of {{ Math.max(1, lastPage) }}
+    </span>
 
     <button
-      class="p-2 text-[#9E7060] disabled:opacity-30 hover:text-[#3B1F0E] transition-colors"
-      :disabled="page === lastPage"
+      type="button"
+      class="p-1.5 text-[#9E7060] disabled:opacity-30 disabled:cursor-not-allowed hover:text-[#3D2B24] transition-colors"
+      :disabled="page >= Math.max(1, lastPage)"
       @click="next"
     >
-      <Icon name="heroicons:chevron-right-20-solid" class="w-6 h-6" />
+      <Icon name="heroicons:chevron-right-20-solid" class="w-5 h-5 sm:w-6 sm:h-6" />
     </button>
   </div>
 </template>
 
-<!-- Generic "Page X of Y" pagination, styled after the original
-     owner-detail/PaymentHistoryTable.vue pattern. Use this on any
-     page/table instead of re-implementing prev/next controls. -->
 <script setup lang="ts">
 interface Props {
   page: number
@@ -41,6 +42,6 @@ function prev() {
 }
 
 function next() {
-  if (props.page < props.lastPage) emit('change', props.page + 1)
+  if (props.page < Math.max(1, props.lastPage)) emit('change', props.page + 1)
 }
 </script>

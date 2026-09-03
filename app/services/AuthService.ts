@@ -38,6 +38,15 @@ interface SimpleResponse {
     retry_after_seconds?: number
 }
 
+interface CheckSetupStatusResponse {
+    success: boolean
+    status?: string
+    already_active?: boolean
+    message?: string
+    email?: string
+    role?: string
+}
+
 interface SetupPasswordResponse {
     success: boolean
     message: string
@@ -46,6 +55,10 @@ interface SetupPasswordResponse {
 }
 
 export class AuthService extends BaseService {
+    checkSetupStatus(uuid: string) {
+        return this.get<CheckSetupStatusResponse>(`/auth/setup-password/${uuid}`)
+    }
+
     login(email: string, password: string) {
         return this.post<LoginResponse>('/auth/login', { email, password })
     }
