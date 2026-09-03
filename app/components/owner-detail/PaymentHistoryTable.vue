@@ -1,4 +1,4 @@
-<!-- components/owner-detail/PaymentHistoryTable.vue -->
+<!-- components/owner-detail/PaymentHistoryTable.vue change-->
 <template>
   <h2 class="font-display text-[18px] min-[360px]:text-[20px] font-bold text-[#3D2B24] mb-3 min-[360px]:mb-4">Recent Activity &amp; Payment History</h2>
 
