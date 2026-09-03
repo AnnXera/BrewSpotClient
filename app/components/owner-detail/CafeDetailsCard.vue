@@ -1,50 +1,39 @@
 <!--components/owner-detail/CafeDetailsCard.vue-->
 <template>
-  <div class="bg-white border border-[#EEDFC4] rounded-2xl p-6">
-    
-    <h2 class="font-display text-[18px] font-bold text-[#3D2B24] mb-[20px]">
+  <div class="bg-white border border-[#EEDFC4] rounded-2xl p-4 min-[360px]:p-5 sm:p-6 shadow-sm">
+    <h2 class="font-display text-base min-[360px]:text-[18px] font-bold text-[#3D2B24] mb-3 min-[360px]:mb-4">
       {{ cafe?.cafe_name ?? 'Cafe' }} Details
     </h2>
 
-    <div class="flex items-center gap-3 pb-[20px] mb-[20px] border-b border-[#F3E7D2]">
-      
-        <img
+    <div class="flex items-center gap-3 pb-4 min-[360px]:pb-5 mb-4 min-[360px]:mb-5 border-b border-[#F3E7D2]">
+      <img
         v-if="branch?.cafe_picture"
         :src="branch.cafe_picture"
-        class="w-[56px] h-[56px] rounded-lg object-cover shrink-0"
+        class="w-12 h-12 min-[360px]:w-14 min-[360px]:h-14 rounded-lg object-cover shrink-0"
       />
+      <div v-else class="w-12 h-12 min-[360px]:w-14 min-[360px]:h-14 rounded-lg bg-[#F0E3CE] shrink-0" />
 
-      <div v-else class="w-[56px] h-[56px] rounded-lg bg-[#F0E3CE] shrink-0" />
-
-      <p class="font-display text-[18px] font-bold text-[#3D2B24]">
+      <p class="font-display text-base min-[360px]:text-[18px] font-bold text-[#3D2B24]">
         {{ cafe?.cafe_name }} - {{ branch?.branch_type === 'main' ? 'Main' : branch?.branch_name }}
       </p>
-
     </div>
 
-    <div class="font-display font-medium text-[14px] space-y-4">
+    <div class="font-display font-medium text-[13px] min-[360px]:text-[14px] space-y-3 min-[360px]:space-y-3.5">
+      <div>
+        <p class="font-bold text-[10px] min-[360px]:text-[11px] text-[#9E7060] uppercase tracking-[0.77%] mb-0.5 min-[360px]:mb-1">Main Address</p>
+        <p class="text-[#3B1F0E] break-words">{{ branch?.address ?? '—' }}</p>
+      </div>
 
       <div>
-        <p class="font-bold text-[11px] text-[#9E7060] uppercase tracking-[0.77%] mb-1">Main Address</p>
-        <p class="text-[#3B1F0E]">{{ branch?.address ?? '—' }}</p>
-      </div>
-      
-      <div class="grid grid-cols-2 gap-4">
-
-        <div>
-          <p class="font-bold text-[11px] text-[#9E7060] uppercase tracking-[0.77%] mb-1">Email Address</p>
-          <p class="text-[#3B1F0E]">{{ branch?.cafe_email ?? '—' }}</p>
-        </div>
-
-        <div>
-          <p class="font-bold text-[11px] text-[#9E7060] uppercase tracking-[0.77%] mb-1">Phone Number</p>
-          <p class="text-[#3B1F0E]">{{ branch?.cafe_phonenumber ?? '—' }}</p>
-        </div>
-
+        <p class="font-bold text-[10px] min-[360px]:text-[11px] text-[#9E7060] uppercase tracking-[0.77%] mb-0.5 min-[360px]:mb-1">Email Address</p>
+        <p class="text-[#3B1F0E] break-all">{{ branch?.cafe_email ?? '—' }}</p>
       </div>
 
+      <div>
+        <p class="font-bold text-[10px] min-[360px]:text-[11px] text-[#9E7060] uppercase tracking-[0.77%] mb-0.5 min-[360px]:mb-1">Phone Number</p>
+        <p class="text-[#3B1F0E]">{{ branch?.cafe_phonenumber ?? '—' }}</p>
+      </div>
     </div>
-
   </div>
 </template>
 
