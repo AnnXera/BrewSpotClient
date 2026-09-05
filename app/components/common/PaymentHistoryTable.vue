@@ -1,4 +1,4 @@
-<!-- app/pages/admin/PaymentHistoryTable.vue -->
+<!-- app/components/common/PaymentHistoryTable.vue -->
 <template>
   <div>
     <!-- Top Feature Bar: Search, Filters & Export CSV -->
@@ -49,11 +49,10 @@
       </div>
     </div>
 
-    <!-- Main Payment History Card Container (Matching Reference Screenshot) -->
+    <!-- Main Payment History Card Container -->
     <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden shadow-sm">
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse">
-          <!-- Table Header matching exact color #FFF0D1 -->
           <thead>
             <tr class="bg-[#FFF0D1] border-b border-[#F3E7D2]">
               <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">

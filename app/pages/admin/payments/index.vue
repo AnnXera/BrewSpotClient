@@ -1,6 +1,5 @@
-<!-- pages/admin/payments/index.vue -->
 <script setup lang="ts">
-import PaymentHistoryTable, { type PaymentTransaction } from '~/pages/admin/PaymentHistoryTable.vue'
+import PaymentHistoryTable, { type PaymentTransaction } from '~/components/common/PaymentHistoryTable.vue'
 
 definePageMeta({
   role: 'Admin',

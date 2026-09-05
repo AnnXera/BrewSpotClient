@@ -70,7 +70,7 @@ function goLogin() {
           class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition flex items-center justify-center gap-2"
           @click="goLogin"
         >
-          <Icon name="heroicons:arrow-right-start-on-rectangle" class="w-4 h-4" />
+          <Icon name="heroicons:arrow-right-on-rectangle" class="w-4 h-4" />
           <span>Continue to Sign In</span>
         </button>
       </div>

@@ -1,9 +1,19 @@
 <!--components/owner-detail/CafeDetailsCard.vue-->
 <template>
   <div class="bg-white border border-[#EEDFC4] rounded-2xl p-4 min-[360px]:p-5 sm:p-6 shadow-sm">
-    <h2 class="font-display text-base min-[360px]:text-[18px] font-bold text-[#3D2B24] mb-3 min-[360px]:mb-4">
-      {{ cafe?.cafe_name ?? 'Cafe' }} Details
-    </h2>
+    <div class="flex items-center justify-between mb-3 min-[360px]:mb-4">
+      <h2 class="font-display text-base min-[360px]:text-[18px] font-bold text-[#3D2B24]">
+        {{ cafe?.cafe_name ?? 'Cafe' }} Details
+      </h2>
+      <button
+        type="button"
+        class="text-xs font-semibold text-[#9E7060] hover:text-[#3B1F0E] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+        @click="emit('goToBranches')"
+      >
+        <span>View Branches</span>
+        <Icon name="heroicons:arrow-right" class="w-3.5 h-3.5" />
+      </button>
+    </div>
 
     <div class="flex items-center gap-3 pb-4 min-[360px]:pb-5 mb-4 min-[360px]:mb-5 border-b border-[#F3E7D2]">
       <img
@@ -54,5 +64,9 @@ interface Branch {
 defineProps<{
   cafe: Cafe | null
   branch: Branch | null
+}>()
+
+const emit = defineEmits<{
+  goToBranches: []
 }>()
 </script>

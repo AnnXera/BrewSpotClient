@@ -350,73 +350,73 @@ onMounted(() => {
         <CommonPagination :page="currentPage" :last-page="lastPage" @change="goToPage" />
       </div>
     </main>
-  </div>
 
-  <ApprovalDetailsModal
-    v-if="registrationTab === 'owner'"
-    :open="modalOpen"
-    :loading="modalLoading"
-    :approval="modalApproval"
-    :owner-details="modalOwnerDetails"
-    :registration-type="registrationTab"
-    :decision-loading="decisionLoading"
-    @close="closeModal"
-    @approve="handleDecision('approved')"
-    @reject="requestReject"
-  />
+    <ApprovalDetailsModal
+      v-if="registrationTab === 'owner'"
+      :open="modalOpen"
+      :loading="modalLoading"
+      :approval="modalApproval"
+      :owner-details="modalOwnerDetails"
+      :registration-type="registrationTab"
+      :decision-loading="decisionLoading"
+      @close="closeModal"
+      @approve="handleDecision('approved')"
+      @reject="requestReject"
+    />
 
-  <!-- NOTE: same auto-import naming rule — app/components/approval/BranchDetailsModal.vue
-       resolves to <ApprovalBranchDetailsModal>, not <BranchDetailsModal>. -->
-  <ApprovalBranchDetailsModal
-    v-else
-    :open="modalOpen"
-    :loading="modalLoading"
-    :approval="modalApproval"
-    :owner-details="modalOwnerDetails"
-    :decision-loading="decisionLoading"
-    @close="closeModal"
-    @approve="handleDecision('approved')"
-    @reject="requestReject"
-  />
+    <!-- NOTE: same auto-import naming rule — app/components/approval/BranchDetailsModal.vue
+         resolves to <ApprovalBranchDetailsModal>, not <BranchDetailsModal>. -->
+    <ApprovalBranchDetailsModal
+      v-else
+      :open="modalOpen"
+      :loading="modalLoading"
+      :approval="modalApproval"
+      :owner-details="modalOwnerDetails"
+      :decision-loading="decisionLoading"
+      @close="closeModal"
+      @approve="handleDecision('approved')"
+      @reject="requestReject"
+    />
 
-  <!-- Rejection reason prompt -->
-  <Teleport to="body">
-    <div
-      v-if="rejectReasonPrompt"
-      class="fixed inset-0 z-[60] flex items-center justify-center bg-[#3B1F0E]/40 backdrop-blur-sm p-4"
-      @click.self="cancelReject"
-    >
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-        <h2 class="font-display text-lg font-semibold text-[#3B1F0E] mb-2">Reason for rejection</h2>
-        <p class="font-sans text-sm text-[#3B1F0E]/70 mb-4">
-          This reason will be included in the email sent to the owner.
-        </p>
+    <!-- Rejection reason prompt -->
+    <Teleport to="body">
+      <div
+        v-if="rejectReasonPrompt"
+        class="fixed inset-0 z-[60] flex items-center justify-center bg-[#3B1F0E]/40 backdrop-blur-sm p-4"
+        @click.self="cancelReject"
+      >
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+          <h2 class="font-display text-lg font-semibold text-[#3B1F0E] mb-2">Reason for rejection</h2>
+          <p class="font-sans text-sm text-[#3B1F0E]/70 mb-4">
+            This reason will be included in the email sent to the owner.
+          </p>
 
-        <textarea
-          v-model="rejectReason"
-          rows="4"
-          placeholder="e.g. Submitted documents are unclear or expired."
-          class="w-full rounded-xl border border-[#EDD8CC] px-4 py-3 font-sans text-sm text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30 resize-none"
-        />
+          <textarea
+            v-model="rejectReason"
+            rows="4"
+            placeholder="e.g. Submitted documents are unclear or expired."
+            class="w-full rounded-xl border border-[#EDD8CC] px-4 py-3 font-sans text-sm text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30 resize-none"
+          />
 
-        <div class="flex items-center justify-end gap-3 mt-6">
-          <button
-            type="button"
-            class="rounded-lg px-4 py-2 font-sans text-sm font-medium text-[#3B1F0E]/70 hover:bg-[#F3E7D2] transition-colors"
-            @click="cancelReject"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            :disabled="!rejectReason.trim()"
-            class="rounded-lg px-4 py-2 font-sans text-sm font-semibold bg-[#D9534F] text-white hover:bg-[#C24541] transition-colors disabled:opacity-50"
-            @click="confirmReject"
-          >
-            Reject &amp; Notify Owner
-          </button>
+          <div class="flex items-center justify-end gap-3 mt-6">
+            <button
+              type="button"
+              class="rounded-lg px-4 py-2 font-sans text-sm font-medium text-[#3B1F0E]/70 hover:bg-[#F3E7D2] transition-colors"
+              @click="cancelReject"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              :disabled="!rejectReason.trim()"
+              class="rounded-lg px-4 py-2 font-sans text-sm font-semibold bg-[#D9534F] text-white hover:bg-[#C24541] transition-colors disabled:opacity-50"
+              @click="confirmReject"
+            >
+              Reject &amp; Notify Owner
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  </Teleport>
+    </Teleport>
+  </div>
 </template>

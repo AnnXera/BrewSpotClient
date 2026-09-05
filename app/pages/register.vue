@@ -1006,45 +1006,69 @@ async function handleFinalSubmit() {
         <!-- STEP 5: Review / Submitted Screen -->
         <div v-else-if="currentStep === 5" class="space-y-6">
           <div>
-            <span class="text-xs uppercase tracking-wider font-semibold text-[#7B5A50]">Registration Submitted</span>
-            <h1 class="text-2xl font-bold text-[#2d201b] mt-1">Admin is currently reviewing</h1>
+            <span class="text-xs uppercase tracking-wider font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">Registration Submitted ✓</span>
+            <h1 class="text-2xl font-bold text-[#2d201b] mt-2">Application Received! 🎉</h1>
             <p class="text-gray-600 text-sm mt-2 leading-relaxed">
-              Your business registration has been sent. Our team will review your documents and approve your account within 1-3 business days.
+              We've sent a confirmation email to <span class="font-semibold text-[#2d201b]">{{ email }}</span> with a direct link to view your submitted details and track review progress.
             </p>
           </div>
 
-          <div class="rounded-lg border border-[#7B5A50]/20 bg-white p-4 space-y-3 shadow-sm">
-            <p class="text-sm font-semibold text-[#2d201b]">What happens next</p>
-            <ul class="space-y-2 text-sm text-gray-600">
+          <!-- Direct View Details CTA Card -->
+          <div class="rounded-xl border border-[#7B5A50]/20 bg-white p-5 space-y-4 shadow-sm">
+            <div class="flex items-start gap-3">
+              <div class="w-9 h-9 rounded-lg bg-[#7B5A50]/10 text-[#7B5A50] flex items-center justify-center shrink-0">
+                <Icon name="heroicons:document-text" class="w-5 h-5" />
+              </div>
+              <div>
+                <p class="text-sm font-bold text-[#2d201b]">View Your Submitted Application</p>
+                <p class="text-xs text-gray-500 mt-0.5">
+                  Check all the information and uploaded documents you entered anytime.
+                </p>
+              </div>
+            </div>
+
+            <NuxtLink
+              v-if="userUuid"
+              :to="`/application/${userUuid}`"
+              class="w-full h-10 rounded-lg bg-[#7B5A50] text-white text-xs font-bold hover:bg-[#65463d] transition flex items-center justify-center gap-2 shadow-sm"
+            >
+              <Icon name="heroicons:eye" class="w-4 h-4" />
+              View Application Details
+            </NuxtLink>
+          </div>
+
+          <div class="rounded-lg border border-[#7B5A50]/15 bg-[#FFF8EA]/60 p-4 space-y-2.5">
+            <p class="text-xs font-bold text-[#2d201b] uppercase tracking-wide">What happens next?</p>
+            <ul class="space-y-2 text-xs text-gray-600">
               <li class="flex items-center gap-2">
-                <Icon name="heroicons:check-circle" class="w-5 h-5 text-[#7B5A50]" />
-                Document Review
+                <Icon name="heroicons:check-circle" class="w-4 h-4 text-[#7B5A50]" />
+                1. Document Verification & Compliance Review (1–3 business days)
               </li>
               <li class="flex items-center gap-2">
-                <Icon name="heroicons:check-circle" class="w-5 h-5 text-[#7B5A50]" />
-                Email Notification
+                <Icon name="heroicons:check-circle" class="w-4 h-4 text-[#7B5A50]" />
+                2. Email Notification upon Admin Approval
               </li>
               <li class="flex items-center gap-2">
-                <Icon name="heroicons:check-circle" class="w-5 h-5 text-[#7B5A50]" />
-                Account Activation
+                <Icon name="heroicons:check-circle" class="w-4 h-4 text-[#7B5A50]" />
+                3. Password Setup & Immediate Dashboard Access
               </li>
             </ul>
           </div>
 
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 pt-2">
             <NuxtLink
               to="/"
-              class="w-1/2 h-11 rounded-md border border-[#7B5A50] text-[#7B5A50] font-medium hover:bg-[#7B5A50]/10 transition flex items-center justify-center gap-2"
+              class="w-1/2 h-10 rounded-md border border-[#7B5A50] text-[#7B5A50] font-medium hover:bg-[#7B5A50]/10 transition flex items-center justify-center gap-1.5 text-xs"
             >
               <Icon name="heroicons:home" class="w-4 h-4" />
               Back to Home
             </NuxtLink>
             <button
               type="button"
-              class="w-1/2 h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition flex items-center justify-center gap-2"
+              class="w-1/2 h-10 rounded-md border border-gray-300 text-gray-700 font-medium hover:bg-gray-100 transition flex items-center justify-center gap-1.5 text-xs"
               @click="goLogin"
             >
-              Back to Login
+              Go to Sign In
             </button>
           </div>
         </div>

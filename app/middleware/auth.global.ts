@@ -23,7 +23,7 @@ export default defineNuxtRouteMiddleware((to) => {
         return navigateTo('/login', { replace: true })
     }
 
-    const publicRoutes = ['/', '/login', '/verify-login-code', '/register', '/setup-password']
+    const publicRoutes = ['/', '/login', '/verify-login-code', '/register', '/setup-password', '/application', '/unauthorized']
     const isPublic = publicRoutes.some((p) => p === '/' ? to.path === '/' : (to.path === p || to.path.startsWith(p + '/')))
 
     // 3. Protect authenticated routes for unauthenticated users

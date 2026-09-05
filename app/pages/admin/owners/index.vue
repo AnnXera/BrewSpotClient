@@ -320,17 +320,17 @@ onMounted(() => {
         <CommonPagination :page="currentPage" :last-page="lastPage" @change="goToPage" />
       </div>
     </main>
-  </div>
 
-  <ConfirmDialog
-    :open="!!confirmDialog"
-    :title="confirmDialog?.newStatus === 'suspended' ? 'Suspend this owner?' : 'Reactivate this owner?'"
-    :message="confirmDialog?.newStatus === 'suspended'
-      ? `This will suspend ${confirmDialog?.owner.name}, deactivate their branches, and cancel their active subscription. This action can be reversed later.`
-      : `This will reactivate ${confirmDialog?.owner.name} and restore their branches.`"
-    :confirm-label="confirmDialog?.newStatus === 'suspended' ? 'Suspend' : 'Reactivate'"
-    :danger="confirmDialog?.newStatus === 'suspended'"
-    @confirm="confirmStatusChange"
-    @cancel="cancelStatusChange"
-  />
+    <ConfirmDialog
+      :open="!!confirmDialog"
+      :title="confirmDialog?.newStatus === 'suspended' ? 'Suspend this owner?' : 'Reactivate this owner?'"
+      :message="confirmDialog?.newStatus === 'suspended'
+        ? `This will suspend ${confirmDialog?.owner.name}, deactivate their branches, and cancel their active subscription. This action can be reversed later.`
+        : `This will reactivate ${confirmDialog?.owner.name} and restore their branches.`"
+      :confirm-label="confirmDialog?.newStatus === 'suspended' ? 'Suspend' : 'Reactivate'"
+      :danger="confirmDialog?.newStatus === 'suspended'"
+      @confirm="confirmStatusChange"
+      @cancel="cancelStatusChange"
+    />
+  </div>
 </template>

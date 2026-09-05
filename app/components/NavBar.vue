@@ -28,7 +28,7 @@ function isActive(link: NavLink) {
 }
 
 function iconName(link: NavLink) {
-  return isActive(link) ? `heroicons:${link.icon}-solid` : `heroicons:${link.icon}`
+  return `heroicons:${link.icon}`
 }
 
 const initials = computed(() => {
@@ -134,7 +134,7 @@ onBeforeUnmount(() => {
           class="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FBF2E1] transition-colors text-left"
           @click="handleLogout"
         >
-          <Icon name="heroicons:arrow-right-start-on-rectangle" class="w-5 h-5 text-[#D9534F] shrink-0" />
+          <Icon name="heroicons:arrow-right-on-rectangle" class="w-5 h-5 text-[#D9534F] shrink-0" />
           <span class="font-sans text-sm font-medium text-[#D9534F]">Logout</span>
         </button>
       </div>
@@ -203,7 +203,7 @@ onBeforeUnmount(() => {
           class="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FBF2E1] transition-colors text-left"
           @click="handleLogout"
         >
-          <Icon name="heroicons:arrow-right-start-on-rectangle" class="w-5 h-5 text-[#D9534F] shrink-0" />
+          <Icon name="heroicons:arrow-right-on-rectangle" class="w-5 h-5 text-[#D9534F] shrink-0" />
           <span class="font-sans text-sm font-medium text-[#D9534F]">Logout</span>
         </button>
       </div>

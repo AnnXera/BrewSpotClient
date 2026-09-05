@@ -26,7 +26,15 @@ const cafes = ref<any[]>([])
 const subscription = ref<any>(null)
 const paymentHistory = ref<any[]>([])
 
-const activeTab = ref<'profile' | 'branches'>('profile')
+const activeTab = ref<'profile' | 'branches'>(
+  route.query.tab === 'branches' ? 'branches' : 'profile'
+)
+
+watch(() => route.query.tab, (newTab) => {
+  if (newTab === 'branches' || newTab === 'profile') {
+    activeTab.value = newTab
+  }
+})
 
 async function fetchOwner() {
   loading.value = true
@@ -236,8 +244,16 @@ onMounted(fetchOwner)
         <!-- PROFILE TAB -->
         <template v-if="activeTab === 'profile'">
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 min-[360px]:gap-5 md:gap-6 mb-[20px] min-[360px]:mb-[24px]">
-            <OwnerDetailAccountDetailsCard :owner="owner" :branch-count="allBranches.length" />
-            <OwnerDetailCafeDetailsCard :cafe="primaryCafe" :branch="primaryBranch" />
+            <OwnerDetailAccountDetailsCard
+              :owner="owner"
+              :branch-count="allBranches.length"
+              @go-to-branches="activeTab = 'branches'"
+            />
+            <OwnerDetailCafeDetailsCard
+              :cafe="primaryCafe"
+              :branch="primaryBranch"
+              @go-to-branches="activeTab = 'branches'"
+            />
             <OwnerDetailSubscriptionCard :subscription="subscription" />
           </div>
 
@@ -276,24 +292,24 @@ onMounted(fetchOwner)
         </template>
       </template>
     </main>
+
+    <OwnerDetailBranchDetailsModal
+      :open="branchModalOpen"
+      :branch="selectedBranch"
+      :owner="owner"
+      @close="closeBranchDetails"
+    />
+
+    <ConfirmDialog
+      :open="!!confirmDialog"
+      :title="confirmDialog?.newStatus === 'suspended' ? 'Suspend this owner?' : 'Reactivate this owner?'"
+      :message="confirmDialog?.newStatus === 'suspended'
+        ? 'This will suspend this owner, deactivate their branches, and cancel their active subscription. This action can be reversed later.'
+        : 'This will reactivate this owner and restore their branches.'"
+      :confirm-label="confirmDialog?.newStatus === 'suspended' ? 'Suspend' : 'Reactivate'"
+      :danger="confirmDialog?.newStatus === 'suspended'"
+      @confirm="confirmStatusChange"
+      @cancel="cancelStatusChange"
+    />
   </div>
-
-  <OwnerDetailBranchDetailsModal
-    :open="branchModalOpen"
-    :branch="selectedBranch"
-    :owner="owner"
-    @close="closeBranchDetails"
-  />
-
-  <ConfirmDialog
-    :open="!!confirmDialog"
-    :title="confirmDialog?.newStatus === 'suspended' ? 'Suspend this owner?' : 'Reactivate this owner?'"
-    :message="confirmDialog?.newStatus === 'suspended'
-      ? 'This will suspend this owner, deactivate their branches, and cancel their active subscription. This action can be reversed later.'
-      : 'This will reactivate this owner and restore their branches.'"
-    :confirm-label="confirmDialog?.newStatus === 'suspended' ? 'Suspend' : 'Reactivate'"
-    :danger="confirmDialog?.newStatus === 'suspended'"
-    @confirm="confirmStatusChange"
-    @cancel="cancelStatusChange"
-  />
 </template>

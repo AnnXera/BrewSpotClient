@@ -54,7 +54,59 @@ interface SetupPasswordResponse {
     user?: User
 }
 
+export interface ApplicationDetails {
+    user: {
+        uuid: string
+        firstname: string
+        middlename?: string | null
+        lastname: string
+        username: string
+        email: string
+        phone_number: string
+        address: string
+        status: string
+        created_at: string
+    }
+    cafe?: {
+        uuid: string
+        cafe_name: string
+        doc_type?: string
+    } | null
+    branch?: {
+        uuid: string
+        branch_name: string
+        address: string
+        cafe_email: string
+        cafe_phonenumber: string
+        branch_type: string
+        status: string
+    } | null
+    documents: {
+        government_id: { type?: string; uploaded: boolean }
+        cafe_document: { type?: string; uploaded: boolean }
+        bir: { type: string; uploaded: boolean }
+        mayors_permit: { type: string; uploaded: boolean }
+        sanitary_permit: { type: string; uploaded: boolean }
+    }
+    approval: {
+        status: string
+        reason?: string | null
+        submitted_at: string
+        reviewed_at?: string | null
+    }
+}
+
+export interface ApplicationDetailsResponse {
+    success: boolean
+    message?: string
+    application?: ApplicationDetails
+}
+
 export class AuthService extends BaseService {
+    getApplicationDetails(uuid: string) {
+        return this.get<ApplicationDetailsResponse>(`/auth/application/${uuid}`)
+    }
+
     checkSetupStatus(uuid: string) {
         return this.get<CheckSetupStatusResponse>(`/auth/setup-password/${uuid}`)
     }
