@@ -1,6 +1,16 @@
 // app/services/SubscriptionService.ts
 import { BaseService } from './BaseService'
 
+export interface FeatureItem {
+  uuid: string
+  key: string
+  name: string
+  description: string | null
+  is_active: boolean
+  created_at?: string | null
+  updated_at?: string | null
+}
+
 export interface SubscriberListItem {
   subscription_uuid: string
   status: string
@@ -17,7 +27,13 @@ export interface SubscriptionPlanItem {
   sub_name: string
   price: number | string
   max_branches: number
+  features?: string[]
+  description?: string | null
   duration_days: number
+  is_active?: boolean
+  is_selectable?: boolean
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 export interface SubscriptionItem {
@@ -50,6 +66,125 @@ export interface TransactionHistoryItem {
 }
 
 export class SubscriptionService extends BaseService {
+  // ─── ADMIN: SUBSCRIPTION PLANS ─────────────────────────────────────────────
+
+  /**
+   * GET /api/admin/subscription-plans
+   * Admin — list all subscription plans (active and inactive)
+   */
+  getPlans(params: { per_page?: number; page?: number } = {}) {
+    return this.get<{ success: boolean; plans: PaginatedResponse<SubscriptionPlanItem> }>('/admin/subscription-plans', params)
+  }
+
+  /**
+   * GET /api/admin/subscription-plans/{uuid}
+   * Admin — get subscription plan details
+   */
+  getPlan(uuid: string) {
+    return this.get<{ success: boolean; plan?: SubscriptionPlanItem; message?: string }>(`/admin/subscription-plans/${uuid}`)
+  }
+
+  /**
+   * POST /api/admin/subscription-plans/create
+   * Admin — create a subscription plan with feature list
+   */
+  createPlan(payload: {
+    sub_name: string
+    price: number
+    max_branches: number
+    features?: string[]
+    description?: string
+    duration_days: number
+    is_active?: boolean
+  }) {
+    return this.post<{ success: boolean; message: string; plan?: SubscriptionPlanItem }>('/admin/subscription-plans/create', payload)
+  }
+
+  /**
+   * PATCH /api/admin/subscription-plans/{uuid}/update
+   * Admin — update a subscription plan with feature list
+   */
+  updatePlan(uuid: string, payload: Partial<{
+    sub_name: string
+    price: number
+    max_branches: number
+    features: string[]
+    description: string
+    duration_days: number
+    is_active: boolean
+  }>) {
+    return this.patch<{ success: boolean; message: string; plan?: SubscriptionPlanItem }>(`/admin/subscription-plans/${uuid}/update`, payload)
+  }
+
+  /**
+   * DELETE /api/admin/subscription-plans/{uuid}/delete
+   * Admin — soft delete a subscription plan
+   */
+  deletePlan(uuid: string) {
+    return this.delete<{ success: boolean; message: string }>(`/admin/subscription-plans/${uuid}/delete`)
+  }
+
+  /**
+   * PATCH /api/admin/subscription-plans/{uuid}/restore
+   * Admin — restore a soft deleted subscription plan
+   */
+  restorePlan(uuid: string) {
+    return this.patch<{ success: boolean; message: string; plan?: SubscriptionPlanItem }>(`/admin/subscription-plans/${uuid}/restore`, {})
+  }
+
+  // ─── ADMIN: FEATURES CATALOG ───────────────────────────────────────────────
+
+  /**
+   * GET /api/admin/features
+   * Admin — list all system features
+   */
+  getFeatures(params: { per_page?: number; page?: number } = {}) {
+    return this.get<{ success: boolean; features: PaginatedResponse<FeatureItem> }>('/admin/features', params)
+  }
+
+  /**
+   * GET /api/admin/features/active
+   * Admin — get all active features for plan checkboxes
+   */
+  getActiveFeatures() {
+    return this.get<{ success: boolean; features: FeatureItem[] }>('/admin/features/active')
+  }
+
+  /**
+   * POST /api/admin/features
+   * Admin — create a new master feature definition
+   */
+  createFeature(payload: {
+    key: string
+    name: string
+    description?: string
+    is_active?: boolean
+  }) {
+    return this.post<{ success: boolean; message: string; feature?: FeatureItem }>('/admin/features', payload)
+  }
+
+  /**
+   * PATCH /api/admin/features/{uuid}
+   * Admin — update a master feature definition
+   */
+  updateFeature(uuid: string, payload: Partial<{
+    name: string
+    description: string
+    is_active: boolean
+  }>) {
+    return this.patch<{ success: boolean; message: string; feature?: FeatureItem }>(`/admin/features/${uuid}`, payload)
+  }
+
+  /**
+   * DELETE /api/admin/features/{uuid}
+   * Admin — delete a master feature definition
+   */
+  deleteFeature(uuid: string) {
+    return this.delete<{ success: boolean; message: string }>(`/admin/features/${uuid}`)
+  }
+
+  // ─── ADMIN: SUBSCRIBERS & TRANSACTIONS ──────────────────────────────────────
+
   /**
    * GET /api/admin/subscribers
    * Admin — view all users with a subscription
@@ -66,12 +201,22 @@ export class SubscriptionService extends BaseService {
     return this.get<{ success: boolean; history: PaginatedResponse<SubscriptionItem> }>(`/admin/owners/${ownerUuid}/subscription-history`, params)
   }
 
+  // ─── CAFE OWNER: SUBSCRIPTION ──────────────────────────────────────────────
+
   /**
    * GET /api/owner/subscription/current
    * Cafe Owner — get current active subscription plan
    */
   getCurrentPlan() {
     return this.get<{ success: boolean; subscription?: SubscriptionItem; message?: string }>('/owner/subscription/current')
+  }
+
+  /**
+   * GET /api/owner/subscription-plans
+   * Cafe Owner — view active available subscription plans for selection/upgrade
+   */
+  getAvailablePlans(params: { per_page?: number; page?: number } = {}) {
+    return this.get<{ success: boolean; plans: PaginatedResponse<SubscriptionPlanItem> }>('/owner/subscription-plans', params)
   }
 
   /**

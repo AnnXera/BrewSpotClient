@@ -97,7 +97,7 @@ onMounted(loadOwnerSubscription)
                 {{ currentPlan?.plan?.sub_name || 'Active Plan' }}
               </span>
               <span
-                class="inline-flex items-center px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-[#D4EDDA] text-[#28A745]"
+                class="inline-flex items-center px-3 py-0.5 rounded-full font-display font-semibold text-xs bg-[#D4EDDA] text-[#28A745] capitalize"
               >
                 {{ currentPlan?.status || 'Active' }}
               </span>
@@ -115,7 +115,7 @@ onMounted(loadOwnerSubscription)
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 font-sans text-sm">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 font-sans text-sm mb-6">
           <div class="bg-[#FFFDF9] p-4 rounded-xl border border-[#F3E7D2]">
             <span class="text-[#8B6656] block text-xs font-medium uppercase tracking-wider">Start Date</span>
             <span class="font-semibold text-[#3B1F0E] mt-0.5 block">
@@ -128,6 +128,26 @@ onMounted(loadOwnerSubscription)
               {{ formatDate(currentPlan?.end_date) }}
             </span>
           </div>
+        </div>
+
+        <!-- Plan Features List -->
+        <div class="pt-4 border-t border-[#F3E7D2]">
+          <span class="font-sans text-xs uppercase font-bold text-[#8B6656] block mb-2 tracking-wider">
+            Unlocked Features
+          </span>
+          <div v-if="currentPlan?.plan?.features && currentPlan.plan.features.length > 0" class="flex flex-wrap gap-2">
+            <span
+              v-for="feat in currentPlan.plan.features"
+              :key="feat"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#FFFDF9] border border-[#EEDFC4] text-[#3D2B24]"
+            >
+              <Icon name="heroicons:check-badge" class="w-4 h-4 text-[#28A745]" />
+              <span class="capitalize">{{ feat.replace(/_/g, ' ') }}</span>
+            </span>
+          </div>
+          <p v-else class="font-sans text-xs text-[#9E7060]">
+            Basic plan access with single branch support.
+          </p>
         </div>
       </div>
 

@@ -155,7 +155,10 @@ onMounted(fetchOwner)
     <NavBar :links="links" />
 
     <main class="flex-1 p-3.5 min-[360px]:p-4 sm:p-6 md:p-12">
-      <div v-if="loading" class="font-sans text-sm text-[#3B1F0E]/50">Loading owner…</div>
+      <div v-if="loading" class="flex flex-col items-center justify-center py-20 gap-3 text-[#3B1F0E]/50">
+        <Icon name="heroicons:arrow-path" class="w-6 h-6 animate-spin text-[#B4846C]" />
+        <span class="font-sans text-sm">Loading owner…</span>
+      </div>
 
       <template v-else-if="owner">
         <!-- Breadcrumb -->

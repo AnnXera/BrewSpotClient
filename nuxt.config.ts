@@ -4,6 +4,13 @@ export default defineNuxtConfig({
 
   modules: ['@pinia/nuxt', '@nuxtjs/tailwindcss', '@nuxt/fonts', '@nuxt/icon'],
 
+  icon: {
+    clientBundle: {
+      scan: true,
+      sizeLimitKb: 512,
+    },
+  },
+
   fonts: {
     families: [
       { name: 'Inter', provider: 'google' },

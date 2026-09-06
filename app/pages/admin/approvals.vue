@@ -65,6 +65,10 @@ async function fetchApprovals() {
   }
 }
 
+async function refreshData() {
+  await Promise.all([fetchStats(), fetchApprovals()])
+}
+
 function switchRegistrationTab(tab: RegistrationTab) {
   if (tab === registrationTab.value) return
   registrationTab.value = tab
@@ -143,30 +147,32 @@ async function handleDecision(status: 'approved' | 'rejected', reason?: string) 
     }
 
     closeModal()
-    await Promise.all([fetchStats(), fetchApprovals()])
+    rejectModalOpen.value = false
+    rejectReason.value = ''
+    fetchStats()
+    fetchApprovals()
   } catch (e) {
-    console.error('Failed to update approval decision', e)
+    console.error('Failed to update status', e)
   } finally {
     decisionLoading.value = false
   }
 }
 
-// Rejection reason prompt — collected before calling handleDecision('rejected', reason)
-const rejectReasonPrompt = ref(false)
+// Reject modal
+const rejectModalOpen = ref(false)
 const rejectReason = ref('')
 
-function requestReject() {
+function openRejectModal() {
   rejectReason.value = ''
-  rejectReasonPrompt.value = true
+  rejectModalOpen.value = true
 }
 
-function cancelReject() {
-  rejectReasonPrompt.value = false
+function closeRejectModal() {
+  rejectModalOpen.value = false
   rejectReason.value = ''
 }
 
 async function confirmReject() {
-  rejectReasonPrompt.value = false
   await handleDecision('rejected', rejectReason.value)
 }
 
@@ -181,12 +187,25 @@ onMounted(() => {
     <NavBar :links="links" />
 
     <main class="flex-1 p-12">
-      <header class="mb-6">
-        <h1 class="font-display text-[26px] leading-[39px] font-bold text-[#3D2B24]">Approval Status</h1>
-        <p class="font-sans text-[14px] leading-[21px] text-[#9E7060] mt-[2px]">
-          Review and manage owner applications by approval status.
-        </p>
-      </header>
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 class="font-display text-[26px] leading-[39px] font-bold text-[#3D2B24]">Approval Status</h1>
+          <p class="font-sans text-[14px] leading-[21px] text-[#9E7060] mt-[2px]">
+            Review and manage owner applications by approval status.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 px-[16px] py-[8px] rounded-[8px] bg-white border border-[#EDD8CC] text-[#7D5A50] font-display font-medium text-[14px] hover:bg-[#FBF2E1] transition-colors shadow-sm self-start sm:self-auto cursor-pointer"
+          :disabled="loading"
+          @click="refreshData"
+        >
+          <Icon name="heroicons:arrow-path" class="w-4 h-4" :class="{ 'animate-spin': loading }" />
+          <span>Refresh</span>
+        </button>
+      </div>
 
       <!-- Owner Registration / Branch Registration -->
       <div class="relative flex items-center mb-6 border-b border-[#EEDFC4]">
@@ -314,8 +333,11 @@ onMounted(() => {
 
             <tbody>
               <tr v-if="loading">
-                <td colspan="6" class="px-6 py-10 text-center font-sans text-sm text-[#3B1F0E]/50">
-                  Loading applications…
+                <td colspan="6" class="px-6 py-10 text-center">
+                  <div class="flex flex-col items-center justify-center gap-2 text-[#3B1F0E]/50">
+                    <Icon name="heroicons:arrow-path" class="w-5 h-5 animate-spin text-[#B4846C]" />
+                    <span class="font-sans text-sm">Loading applications…</span>
+                  </div>
                 </td>
               </tr>
               <tr v-else-if="!approvals.length">

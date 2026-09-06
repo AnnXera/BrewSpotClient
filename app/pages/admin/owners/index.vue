@@ -117,6 +117,10 @@ async function fetchOwners() {
   }
 }
 
+async function refreshData() {
+  await Promise.all([fetchStats(), fetchOwners()])
+}
+
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 watch(search, () => {
   if (searchTimeout) clearTimeout(searchTimeout)
@@ -220,21 +224,33 @@ onMounted(() => {
                 sm:p-6
                 md:p-12">
       <!-- Header -->
-      <header class="mb-4
-                     min-[360px]:mb-5
-                     sm:mb-6
-                     md:mb-8">
-        <h1 class="font-display text-xl font-bold text-[#3D2B24]
-                   min-[360px]:text-2xl
-                   sm:text-[26px] sm:leading-[39px]">
-          Owner Management
-        </h1>
-        <p class="font-sans text-[11px] text-[#9E7060] mt-1
-                  min-[360px]:text-xs
-                  sm:text-sm">
-          Manage all registered cafe owners.
-        </p>
-      </header>
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4
+                  min-[360px]:mb-5
+                  sm:mb-6
+                  md:mb-8">
+        <div>
+          <h1 class="font-display text-xl font-bold text-[#3D2B24]
+                     min-[360px]:text-2xl
+                     sm:text-[26px] sm:leading-[39px]">
+            Owner Management
+          </h1>
+          <p class="font-sans text-[11px] text-[#9E7060] mt-1
+                    min-[360px]:text-xs
+                    sm:text-sm">
+            Manage all registered cafe owners.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 px-[16px] py-[8px] rounded-[8px] bg-white border border-[#EDD8CC] text-[#7D5A50] font-display font-medium text-[14px] hover:bg-[#FBF2E1] transition-colors shadow-sm self-start sm:self-auto cursor-pointer"
+          :disabled="loading"
+          @click="refreshData"
+        >
+          <Icon name="heroicons:arrow-path" class="w-4 h-4" :class="{ 'animate-spin': loading }" />
+          <span>Refresh</span>
+        </button>
+      </div>
 
       <!-- Stat cards -->
       <div class="grid grid-cols-2 gap-2.5 mb-4
@@ -262,8 +278,9 @@ onMounted(() => {
         <!-- Mobile Card List View (visible on small screens) -->
         <div class="block
                     md:hidden">
-          <div v-if="loading" class="p-8 text-center font-sans text-sm text-[#3B1F0E]/50">
-            Loading owners…
+          <div v-if="loading" class="p-8 flex flex-col items-center justify-center gap-2 text-[#3B1F0E]/50">
+            <Icon name="heroicons:arrow-path" class="w-5 h-5 animate-spin text-[#B4846C]" />
+            <span class="font-sans text-sm">Loading owners…</span>
           </div>
           <div v-else-if="!owners.length" class="p-8 text-center font-sans text-sm text-[#3B1F0E]/50">
             No owners found.
@@ -295,8 +312,11 @@ onMounted(() => {
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="6" class="px-6 py-10 text-center font-sans text-sm text-[#3B1F0E]/50">
-                  Loading owners…
+                <td colspan="6" class="px-6 py-10 text-center">
+                  <div class="flex flex-col items-center justify-center gap-2 text-[#3B1F0E]/50">
+                    <Icon name="heroicons:arrow-path" class="w-5 h-5 animate-spin text-[#B4846C]" />
+                    <span class="font-sans text-sm">Loading owners…</span>
+                  </div>
                 </td>
               </tr>
               <tr v-else-if="!owners.length">
