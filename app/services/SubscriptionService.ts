@@ -26,6 +26,8 @@ export interface SubscriptionPlanItem {
   uuid: string
   sub_name: string
   price: number | string
+  monthly_price?: number | string
+  yearly_price?: number | string
   max_branches: number
   features?: string[]
   description?: string | null
@@ -39,6 +41,7 @@ export interface SubscriptionPlanItem {
 export interface SubscriptionItem {
   uuid: string
   status: string
+  billing_cycle?: 'monthly' | 'yearly' | string
   start_date: string | null
   end_date: string | null
   cancel_at_period_end: boolean
@@ -91,6 +94,7 @@ export class SubscriptionService extends BaseService {
   createPlan(payload: {
     sub_name: string
     price: number
+    yearly_price?: number
     max_branches: number
     features?: string[]
     description?: string
@@ -107,6 +111,7 @@ export class SubscriptionService extends BaseService {
   updatePlan(uuid: string, payload: Partial<{
     sub_name: string
     price: number
+    yearly_price: number
     max_branches: number
     features: string[]
     description: string

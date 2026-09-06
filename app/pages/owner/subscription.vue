@@ -34,14 +34,17 @@ async function loadOwnerSubscription() {
     const historyRes = await subService.getPlanHistory({ per_page: 20 })
     if (historyRes?.success && historyRes.history?.data?.length) {
       history.value = historyRes.history.data.map((item) => {
-        const rawPrice = item.plan?.price ?? 0
+        const isYearly = item.billing_cycle === 'yearly'
+        const rawPrice = isYearly ? (item.plan?.yearly_price ?? item.plan?.price ?? 0) : (item.plan?.price ?? 0)
         const priceNum = typeof rawPrice === 'string' ? parseFloat(rawPrice) : rawPrice
-        const formattedPrice = isNaN(priceNum) ? '0.00' : (priceNum > 1000 ? priceNum / 100 : priceNum).toFixed(2)
+        const formattedPrice = isNaN(priceNum) ? '0.00' : (priceNum > 10000 ? priceNum / 100 : priceNum).toFixed(2)
 
         return {
           transaction_id: item.uuid ? `TXN-${item.uuid.replace(/-/g, '').slice(0, 7).toUpperCase()}` : 'TXN-0000000',
           date: item.start_date || item.created_at || new Date().toISOString(),
-          description: item.plan?.sub_name ? `Monthly Subscription - ${item.plan.sub_name}` : 'Monthly Subscription',
+          description: item.plan?.sub_name
+            ? `${isYearly ? 'Yearly' : 'Monthly'} Subscription - ${item.plan.sub_name}`
+            : `${isYearly ? 'Yearly' : 'Monthly'} Subscription`,
           amount: formattedPrice,
           status: item.status || 'active',
         }
@@ -65,6 +68,14 @@ function formatDate(val?: string | null): string {
   } catch {
     return val
   }
+}
+
+function getActivePlanPrice(): string {
+  if (!currentPlan.value?.plan) return '0.00'
+  const isYearly = currentPlan.value?.billing_cycle === 'yearly'
+  const price = isYearly ? (currentPlan.value.plan.yearly_price ?? currentPlan.value.plan.price) : currentPlan.value.plan.price
+  const num = typeof price === 'string' ? parseFloat(price) : price
+  return isNaN(num) ? '0.00' : num.toFixed(2)
 }
 
 onMounted(loadOwnerSubscription)
@@ -92,7 +103,7 @@ onMounted(loadOwnerSubscription)
       <div v-if="currentPlan" class="bg-white border border-[#EEDFC4] rounded-2xl p-6 md:p-8 mb-8 shadow-sm">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#F3E7D2] pb-6 mb-6">
           <div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2.5 flex-wrap">
               <span class="font-display text-2xl font-bold text-[#3B1F0E]">
                 {{ currentPlan?.plan?.sub_name || 'Active Plan' }}
               </span>
@@ -100,6 +111,11 @@ onMounted(loadOwnerSubscription)
                 class="inline-flex items-center px-3 py-0.5 rounded-full font-display font-semibold text-xs bg-[#D4EDDA] text-[#28A745] capitalize"
               >
                 {{ currentPlan?.status || 'Active' }}
+              </span>
+              <span
+                class="inline-flex items-center px-2.5 py-0.5 rounded-full font-display font-semibold text-xs bg-[#FFF8EA] border border-[#EDD8CC] text-[#7D5A50] capitalize"
+              >
+                {{ currentPlan?.billing_cycle === 'yearly' ? 'Yearly Billing' : 'Monthly Billing' }}
               </span>
             </div>
             <p class="font-sans text-sm text-[#8B6656] mt-1">
@@ -109,9 +125,11 @@ onMounted(loadOwnerSubscription)
 
           <div class="text-left sm:text-right">
             <span class="font-display text-3xl font-bold text-[#7D5A50]">
-              ${{ typeof currentPlan?.plan?.price === 'number' ? currentPlan.plan.price.toFixed(2) : '0.00' }}
+              ${{ getActivePlanPrice() }}
             </span>
-            <span class="font-sans text-xs text-[#8B6656] block">/ month</span>
+            <span class="font-sans text-xs text-[#8B6656] block">
+              / {{ currentPlan?.billing_cycle === 'yearly' ? 'year' : 'month' }}
+            </span>
           </div>
         </div>
 

@@ -45,18 +45,28 @@ function formatPrice(val: string | number): string {
       </div>
 
       <!-- Price & Branch Metric Box -->
-      <div class="my-4 p-4 rounded-xl bg-[#FFFBF3] border border-[#F3E7D2] flex items-center justify-between">
+      <div class="my-4 p-4 rounded-xl bg-[#FFFBF3] border border-[#F3E7D2] grid grid-cols-2 sm:grid-cols-3 gap-3 items-center">
         <div>
-          <span class="font-sans text-[11px] font-bold uppercase tracking-wider text-[#9E7060] block">Price</span>
+          <span class="font-sans text-[11px] font-bold uppercase tracking-wider text-[#9E7060] block">Monthly</span>
           <div class="flex items-baseline gap-1 mt-0.5">
-            <span class="font-display text-[24px] font-bold text-[#7D5A50]">${{ formatPrice(plan.price) }}</span>
-            <span class="font-sans text-[11px] text-[#9E7060]">/ {{ plan.duration_days }}d</span>
+            <span class="font-display text-[20px] font-bold text-[#7D5A50]">${{ formatPrice(plan.price) }}</span>
+            <span class="font-sans text-[11px] text-[#9E7060]">/mo</span>
           </div>
         </div>
 
-        <div class="text-right">
+        <div>
+          <span class="font-sans text-[11px] font-bold uppercase tracking-wider text-[#9E7060] block">Yearly</span>
+          <div class="flex items-baseline gap-1 mt-0.5">
+            <span class="font-display text-[20px] font-bold text-[#7D5A50]">
+              ${{ formatPrice(plan.yearly_price ?? 0) }}
+            </span>
+            <span class="font-sans text-[11px] text-[#9E7060]">/yr</span>
+          </div>
+        </div>
+
+        <div class="col-span-2 sm:col-span-1 sm:text-right">
           <span class="font-sans text-[11px] font-bold uppercase tracking-wider text-[#9E7060] block">Branch Limit</span>
-          <div class="flex items-center justify-end gap-1 mt-0.5 font-display text-[16px] font-bold text-[#3B1F0E]">
+          <div class="flex items-center sm:justify-end gap-1 mt-0.5 font-display text-[15px] font-bold text-[#3B1F0E]">
             <Icon name="heroicons:building-storefront" class="w-4 h-4 text-[#7D5A50]" />
             <span>{{ plan.max_branches }} {{ plan.max_branches === 1 ? 'Branch' : 'Branches' }}</span>
           </div>
