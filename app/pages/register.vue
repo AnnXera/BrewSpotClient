@@ -5,12 +5,6 @@ import logoFull from '~/assets/images/logo-with-tag.svg'
 
 const authService = useAuthService()
 
-// Wizard Steps:
-// 1 = Email Input
-// 2 = OTP Verification
-// 3 = Personal Info & Gov ID Upload
-// 4 = Business Details & 4 Required Business Documents
-// 5 = Registration Review / Submission Confirmation
 const currentStep = ref(1)
 
 const error = ref('')
@@ -37,6 +31,8 @@ const ownerAddress = ref('')
 const idType = ref('drivers_license')
 const governmentIdFile = ref<File | null>(null)
 const governmentIdFileName = ref('')
+const governmentIdFileBack = ref<File | null>(null)
+const governmentIdFileBackName = ref('')
 
 // Step 4: Business Details & Documents
 const businessSubPage = ref(1)
@@ -94,7 +90,6 @@ async function handleSendCode() {
   try {
     const res = await authService.sendRegistrationCode(email.value) as any
     if (res) {
-      cafeEmail.value = email.value
       digits.value = ['', '', '', '', '', '']
       currentStep.value = 2
     } else {
@@ -175,19 +170,58 @@ function extractErrorMessage(e: any, defaultMsg: string): string {
   return e?.data?.message ?? e?.response?._data?.message ?? e?.message ?? defaultMsg
 }
 
+function isValidFileType(file: File): boolean {
+  const allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf']
+  const ext = file.name.split('.').pop()?.toLowerCase() || ''
+  return allowedExtensions.includes(ext)
+}
+
 // Step 3: Personal Info
 function handleGovIdChange(event: Event) {
   error.value = ''
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (file) {
-    if (file.size > 5 * 1024 * 1024) {
-      error.value = 'Government ID file size must not exceed 5MB.'
+    if (!isValidFileType(file)) {
+      error.value = 'Government ID (Front) must be a JPG, JPEG, PNG, or PDF file.'
       input.value = ''
+      governmentIdFile.value = null
+      governmentIdFileName.value = ''
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      error.value = 'Government ID (Front) file size must not exceed 5MB.'
+      input.value = ''
+      governmentIdFile.value = null
+      governmentIdFileName.value = ''
       return
     }
     governmentIdFile.value = file
     governmentIdFileName.value = file.name
+  }
+}
+
+function handleGovIdBackChange(event: Event) {
+  error.value = ''
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) {
+    if (!isValidFileType(file)) {
+      error.value = 'Government ID (Back) must be a JPG, JPEG, PNG, or PDF file.'
+      input.value = ''
+      governmentIdFileBack.value = null
+      governmentIdFileBackName.value = ''
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      error.value = 'Government ID (Back) file size must not exceed 5MB.'
+      input.value = ''
+      governmentIdFileBack.value = null
+      governmentIdFileBackName.value = ''
+      return
+    }
+    governmentIdFileBack.value = file
+    governmentIdFileBackName.value = file.name
   }
 }
 
@@ -198,7 +232,11 @@ function handleNextToBusiness() {
     return
   }
   if (!governmentIdFile.value) {
-    error.value = 'Please upload a valid Government ID file.'
+    error.value = 'Please upload the Front of your Government ID.'
+    return
+  }
+  if (!governmentIdFileBack.value) {
+    error.value = 'Please upload the Back of your Government ID.'
     return
   }
   currentStep.value = 4
@@ -228,6 +266,11 @@ function validateBusinessPage1(): boolean {
     error.value = 'Café Email is required.'
     return false
   }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(cafeEmail.value.trim())) {
+    error.value = 'Please enter a valid Café Email address.'
+    return false
+  }
   return true
 }
 
@@ -247,9 +290,16 @@ function onBirChange(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (file) {
+    if (!isValidFileType(file)) {
+      error.value = 'BIR Certificate must be a JPG, JPEG, PNG, or PDF file.'
+      input.value = ''
+      clearBirFile()
+      return
+    }
     if (file.size > 5 * 1024 * 1024) {
       error.value = 'BIR Certificate file size must not exceed 5MB.'
       input.value = ''
+      clearBirFile()
       return
     }
     birFile.value = file
@@ -269,9 +319,16 @@ function onMayorsChange(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (file) {
+    if (!isValidFileType(file)) {
+      error.value = "Mayor's Permit must be a JPG, JPEG, PNG, or PDF file."
+      input.value = ''
+      clearMayorsFile()
+      return
+    }
     if (file.size > 5 * 1024 * 1024) {
       error.value = "Mayor's Permit file size must not exceed 5MB."
       input.value = ''
+      clearMayorsFile()
       return
     }
     mayorsFile.value = file
@@ -291,9 +348,16 @@ function onDtiSecChange(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (file) {
+    if (!isValidFileType(file)) {
+      error.value = `${cafeDocType.value} Document must be a JPG, JPEG, PNG, or PDF file.`
+      input.value = ''
+      clearDtiSecFile()
+      return
+    }
     if (file.size > 5 * 1024 * 1024) {
       error.value = `${cafeDocType.value} document file size must not exceed 5MB.`
       input.value = ''
+      clearDtiSecFile()
       return
     }
     dtiSecFile.value = file
@@ -313,9 +377,16 @@ function onSanitaryChange(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (file) {
+    if (!isValidFileType(file)) {
+      error.value = 'Sanitary Permit must be a JPG, JPEG, PNG, or PDF file.'
+      input.value = ''
+      clearSanitaryFile()
+      return
+    }
     if (file.size > 5 * 1024 * 1024) {
       error.value = 'Sanitary Permit file size must not exceed 5MB.'
       input.value = ''
+      clearSanitaryFile()
       return
     }
     sanitaryFile.value = file
@@ -350,8 +421,8 @@ async function handleFinalSubmit() {
     return
   }
 
-  if (!governmentIdFile.value) {
-    error.value = 'Missing Government ID file. Please return to Personal Information step.'
+  if (!governmentIdFile.value || !governmentIdFileBack.value) {
+    error.value = 'Missing Government ID files (Front & Back). Please return to Personal Information step.'
     return
   }
 
@@ -366,12 +437,13 @@ async function handleFinalSubmit() {
     payload.append('owner_address', ownerAddress.value)
     payload.append('id_type', idType.value || 'drivers_license')
     payload.append('file', governmentIdFile.value)
+    // TODO / BACKEND INSTRUCTION: Pass 'file_back' to server once backend updates RegisterRequest to save government ID back image
+    payload.append('file_back', governmentIdFileBack.value)
 
     payload.append('cafe_name', cafeName.value)
     payload.append('cafe_doc_type', cafeDocType.value)
     payload.append('branch_name', branchName.value)
     payload.append('address', address.value)
-    payload.append('owner_address', address.value)
     payload.append('cafe_phonenumber', cafePhone.value)
     payload.append('cafe_email', cafeEmail.value)
 
@@ -599,7 +671,7 @@ async function handleFinalSubmit() {
                 <input
                   v-model="firstname"
                   type="text"
-                  placeholder="Jaime"
+                  placeholder="John"
                   class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                   required
                 />
@@ -609,7 +681,7 @@ async function handleFinalSubmit() {
                 <input
                   v-model="lastname"
                   type="text"
-                  placeholder="Banani"
+                  placeholder="Doe"
                   class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                   required
                 />
@@ -631,49 +703,80 @@ async function handleFinalSubmit() {
                 <input
                   v-model="username"
                   type="text"
-                  placeholder="user_handle"
+                  placeholder="Username"
                   class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                   required
                 />
               </div>
             </div>
 
-          <div class="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <label class="block mb-1 font-medium text-[#3b1f0e]/80">Contact No. *</label>
-              <input v-model="phoneNumber" type="text" placeholder="+63 0912 345 678" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2" required />
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Contact No. *</label>
+                <input
+                  v-model="phoneNumber"
+                  type="text"
+                  placeholder="+63 912 345 6789"
+                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  required
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">ID Type *</label>
+                <select
+                  v-model="idType"
+                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                >
+                  <option value="drivers_license">Driver's License</option>
+                  <option value="passport">Passport</option>
+                  <option value="national_id">National ID</option>
+                  <option value="sss">SSS ID</option>
+                  <option value="philhealth">PhilHealth ID</option>
+                  <option value="pagibig">Pag-IBIG ID</option>
+                  <option value="voters_id">Voter's ID</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label class="block mb-1 font-medium text-[#3b1f0e]/80">ID Type *</label>
-              <select v-model="idType" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2">
-                <option value="drivers_license">Driver's License</option>
-                <option value="passport">Passport</option>
-                <option value="national_id">National ID</option>
-                <option value="sss">SSS ID</option>
-                <option value="philhealth">PhilHealth ID</option>
-                <option value="pagibig">Pag-IBIG ID</option>
-                <option value="voters_id">Voter's ID</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="text-xs">
-            <label class="block mb-1 font-medium text-[#3b1f0e]/80">Personal Address *</label>
-            <input v-model="ownerAddress" type="text" placeholder="Street, Barangay, District, Davao City" class="w-full rounded-full border border-[#3b1f0e]/20 bg-[#fffdf9] px-3 py-2" required />
-          </div>
 
             <div>
-              <label class="block text-sm font-medium mb-1 text-[#2d201b]">Government ID File *</label>
+              <label class="block text-sm font-medium mb-1 text-[#2d201b]">Personal Address *</label>
               <input
-                type="file"
-                @change="handleGovIdChange"
-                accept="image/*,.pdf"
-                class="w-full text-sm text-[#2d201b] border border-gray-300 rounded-md bg-white p-2 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                v-model="ownerAddress"
+                type="text"
+                placeholder="Street, Barangay, District, Davao City"
+                class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                 required
               />
-              <p v-if="governmentIdFileName" class="mt-1 text-xs text-[#7B5A50] truncate font-medium">
-                Uploaded: {{ governmentIdFileName }}
-              </p>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-1 text-[#2d201b]">Government ID (Front & Back) *</label>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <input
+                    type="file"
+                    @change="handleGovIdChange"
+                    accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                    class="w-full text-sm text-[#2d201b] border border-gray-300 rounded-md bg-white p-2 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                    required
+                  />
+                  <p v-if="governmentIdFileName" class="mt-1 text-xs text-[#7B5A50] truncate font-medium">
+                    Front: {{ governmentIdFileName }}
+                  </p>
+                </div>
+                <div>
+                  <input
+                    type="file"
+                    @change="handleGovIdBackChange"
+                    accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                    class="w-full text-sm text-[#2d201b] border border-gray-300 rounded-md bg-white p-2 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                    required
+                  />
+                  <p v-if="governmentIdFileBackName" class="mt-1 text-xs text-[#7B5A50] truncate font-medium">
+                    Back: {{ governmentIdFileBackName }}
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div class="pt-2">
@@ -866,7 +969,7 @@ async function handleFinalSubmit() {
                     <input
                       type="file"
                       @change="onBirChange"
-                      accept="image/*,.pdf"
+                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
                       class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
                       required
                     />
@@ -898,7 +1001,7 @@ async function handleFinalSubmit() {
                     <input
                       type="file"
                       @change="onMayorsChange"
-                      accept="image/*,.pdf"
+                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
                       class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
                       required
                     />
@@ -930,7 +1033,7 @@ async function handleFinalSubmit() {
                     <input
                       type="file"
                       @change="onDtiSecChange"
-                      accept="image/*,.pdf"
+                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
                       class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
                       required
                     />
@@ -962,7 +1065,7 @@ async function handleFinalSubmit() {
                     <input
                       type="file"
                       @change="onSanitaryChange"
-                      accept="image/*,.pdf"
+                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
                       class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
                       required
                     />

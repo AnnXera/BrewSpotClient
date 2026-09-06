@@ -40,11 +40,11 @@
         <button
           type="button"
           class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-display text-sm font-semibold bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FDF3E7] hover:border-[#7D5A50] transition-all shadow-sm"
-          title="Export records to CSV file"
-          @click="exportToCSV"
+          title="Export records to formatted Excel spreadsheet"
+          @click="handleExportExcel"
         >
-          <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 text-[#7D5A50]" />
-          <span>Export CSV</span>
+          <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 text-[#28A745]" />
+          <span>Export Excel</span>
         </button>
       </div>
     </div>
@@ -408,24 +408,10 @@ function printReceipt() {
   window.print()
 }
 
-function exportToCSV() {
-  const headers = ['Transaction ID', 'Date', 'Activity/Plan', 'Amount', 'Status']
-  const rows = filteredHistory.value.map((t) => [
-    formatTxnId(t.transaction_id),
-    formatDate(t.date),
-    `"${t.description.replace(/"/g, '""')}"`,
-    formatAmount(t.amount),
-    formatStatusLabel(t.status),
-  ])
-
-  const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.setAttribute('href', url)
-  link.setAttribute('download', `payment_history_${new Date().toISOString().slice(0, 10)}.csv`)
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+function handleExportExcel() {
+  const label = selectedStatus.value
+    ? formatStatusLabel(selectedStatus.value)
+    : 'All Payment Statuses'
+  exportToExcel(filteredHistory.value, label)
 }
 </script>
