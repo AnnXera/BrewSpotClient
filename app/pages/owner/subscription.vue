@@ -47,6 +47,7 @@ async function loadOwnerSubscription() {
             : `${isYearly ? 'Yearly' : 'Monthly'} Subscription`,
           amount: formattedPrice,
           status: item.status || 'active',
+          payment_gateway: item.payment_gateway || item.payment_method || 'PayPal',
         }
       })
     } else {

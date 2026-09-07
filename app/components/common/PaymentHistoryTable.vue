@@ -241,7 +241,7 @@
 
               <div class="flex items-center justify-between py-2 border-b border-[#F3E7D2]">
                 <span class="text-[#8B6656]">Payment Gateway</span>
-                <span class="font-medium text-[#3B1F0E]">PayMongo Online</span>
+                <span class="font-medium text-[#3B1F0E]">{{ formatGateway(activeReceipt.payment_gateway || activeReceipt.payment_method) }}</span>
               </div>
 
               <div class="pt-4 flex items-center justify-between">
@@ -286,6 +286,8 @@ export interface PaymentTransaction {
   status: string
   owner_name?: string
   owner_email?: string
+  payment_gateway?: string
+  payment_method?: string
 }
 
 const props = withDefaults(
@@ -367,6 +369,15 @@ function formatAmount(amt?: string | number): string {
   const numeric = typeof amt === 'string' ? parseFloat(amt.replace(/[^0-9.]/g, '')) : amt
   if (isNaN(numeric)) return String(amt)
   return `$${numeric.toFixed(2)}`
+}
+
+function formatGateway(val?: string): string {
+  if (!val) return 'PayPal'
+  const v = val.toLowerCase()
+  if (v.includes('paypal')) return 'PayPal'
+  if (v.includes('cash')) return 'Cash'
+  if (v.includes('paymongo')) return 'PayPal'
+  return val.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 function formatStatusLabel(st?: string): string {

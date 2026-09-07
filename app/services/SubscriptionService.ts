@@ -46,6 +46,8 @@ export interface SubscriptionItem {
   end_date: string | null
   cancel_at_period_end: boolean
   plan?: SubscriptionPlanItem
+  payment_gateway?: string
+  payment_method?: string
   created_at: string | null
 }
 
@@ -66,6 +68,7 @@ export interface TransactionHistoryItem {
   owner_name?: string
   owner_email?: string
   payment_method?: string
+  payment_gateway?: string
 }
 
 export class SubscriptionService extends BaseService {
