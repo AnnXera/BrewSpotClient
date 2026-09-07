@@ -34,6 +34,13 @@ const governmentIdFile = ref<File | null>(null)
 const governmentIdFileName = ref('')
 const governmentIdFileBack = ref<File | null>(null)
 const governmentIdFileBackName = ref('')
+const fieldErrors = ref<Record<string, string>>({})
+
+function clearFieldError(field: string) {
+  if (fieldErrors.value[field]) {
+    delete fieldErrors.value[field]
+  }
+}
 
 watch(idType, (newVal) => {
   if (newVal === 'passport') {
@@ -234,17 +241,27 @@ function handleGovIdBackChange(event: Event) {
 }
 
 function onPhoneNumberInput(event: Event) {
+  clearFieldError('phone_number')
   const target = event.target as HTMLInputElement
-  const sanitized = target.value.replace(/[^\d+\s\-()]/g, '')
-  phoneNumber.value = sanitized
-  target.value = sanitized
+  let val = target.value.replace(/\D/g, '')
+  if (val.startsWith('63')) {
+    val = '0' + val.slice(2)
+  }
+  val = val.slice(0, 11)
+  phoneNumber.value = val
+  target.value = val
 }
 
 function onCafePhoneInput(event: Event) {
+  clearFieldError('cafe_phonenumber')
   const target = event.target as HTMLInputElement
-  const sanitized = target.value.replace(/[^\d+\s\-()]/g, '')
-  cafePhone.value = sanitized
-  target.value = sanitized
+  let val = target.value.replace(/\D/g, '')
+  if (val.startsWith('63')) {
+    val = '0' + val.slice(2)
+  }
+  val = val.slice(0, 11)
+  cafePhone.value = val
+  target.value = val
 }
 
 function normalizePhoneNumber(num: string): string {
@@ -252,25 +269,103 @@ function normalizePhoneNumber(num: string): string {
   return digits.replace(/^63/, '0')
 }
 
-function handleNextToBusiness() {
+async function checkUsernameAvailability() {
+  if (!username.value.trim()) return
+  try {
+    const res = await authService.validateRegistrationStep(userUuid.value, { username: username.value.trim() })
+    if (res.errors?.username) {
+      fieldErrors.value.username = res.errors.username[0]
+    } else {
+      delete fieldErrors.value.username
+    }
+  } catch (e: any) {
+    const errs = e?.data?.errors || e?.response?._data?.errors
+    if (errs?.username?.[0]) {
+      fieldErrors.value.username = errs.username[0]
+    }
+  }
+}
+
+async function checkPhoneAvailability() {
+  if (!phoneNumber.value.trim()) return
+  if (!/^09\d{9}$/.test(phoneNumber.value)) {
+    fieldErrors.value.phone_number = 'Personal contact number must start with 09 and be 11 digits long (e.g., 09123456789).'
+    return
+  }
+  try {
+    const res = await authService.validateRegistrationStep(userUuid.value, { phone_number: phoneNumber.value.trim() })
+    if (res.errors?.phone_number) {
+      fieldErrors.value.phone_number = res.errors.phone_number[0]
+    } else {
+      delete fieldErrors.value.phone_number
+    }
+  } catch (e: any) {
+    const errs = e?.data?.errors || e?.response?._data?.errors
+    if (errs?.phone_number?.[0]) {
+      fieldErrors.value.phone_number = errs.phone_number[0]
+    }
+  }
+}
+
+async function checkCafeEmailAvailability() {
+  if (!cafeEmail.value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cafeEmail.value.trim())) return
+  try {
+    const res = await authService.validateRegistrationStep(userUuid.value, { cafe_email: cafeEmail.value.trim() })
+    if (res.errors?.cafe_email) {
+      fieldErrors.value.cafe_email = res.errors.cafe_email[0]
+    } else {
+      delete fieldErrors.value.cafe_email
+    }
+  } catch (e: any) {
+    const errs = e?.data?.errors || e?.response?._data?.errors
+    if (errs?.cafe_email?.[0]) {
+      fieldErrors.value.cafe_email = errs.cafe_email[0]
+    }
+  }
+}
+
+async function checkCafePhoneAvailability() {
+  if (!cafePhone.value.trim()) return
+  if (!/^09\d{9}$/.test(cafePhone.value)) {
+    fieldErrors.value.cafe_phonenumber = 'Branch phone number must start with 09 and be 11 digits long (e.g., 09123456789).'
+    return
+  }
+  try {
+    const res = await authService.validateRegistrationStep(userUuid.value, {
+      cafe_phonenumber: cafePhone.value.trim(),
+      phone_number: phoneNumber.value.trim(),
+    })
+    if (res.errors?.cafe_phonenumber) {
+      fieldErrors.value.cafe_phonenumber = res.errors.cafe_phonenumber[0]
+    } else {
+      delete fieldErrors.value.cafe_phonenumber
+    }
+  } catch (e: any) {
+    const errs = e?.data?.errors || e?.response?._data?.errors
+    if (errs?.cafe_phonenumber?.[0]) {
+      fieldErrors.value.cafe_phonenumber = errs.cafe_phonenumber[0]
+    }
+  }
+}
+
+async function handleNextToBusiness() {
   error.value = ''
+  fieldErrors.value = {}
+
   if (!firstname.value || !lastname.value || !username.value || !phoneNumber.value || !ownerAddress.value) {
     error.value = 'Please complete all required personal fields.'
     return
   }
-  if (/[a-zA-Z]/.test(phoneNumber.value)) {
-    error.value = 'Personal contact number cannot contain letters.'
-    return
-  }
-  const phoneDigits = phoneNumber.value.replace(/\D/g, '')
-  if (phoneDigits.length < 7 || !/^[0-9+\s\-()]+$/.test(phoneNumber.value)) {
-    error.value = 'Please enter a valid personal contact number (at least 7 digits, no letters).'
+  if (!/^09\d{9}$/.test(phoneNumber.value)) {
+    fieldErrors.value.phone_number = 'Personal contact number must start with 09 and be 11 digits long (e.g., 09123456789).'
+    error.value = 'Please correct the phone number format.'
     return
   }
   if (cafePhone.value.trim()) {
     const normPersonal = normalizePhoneNumber(phoneNumber.value)
     const normCafe = normalizePhoneNumber(cafePhone.value)
     if (normPersonal && normCafe && normPersonal === normCafe) {
+      fieldErrors.value.phone_number = 'Personal contact number and café phone number must be different.'
       error.value = 'Personal contact number and café phone number must be different.'
       return
     }
@@ -285,60 +380,125 @@ function handleNextToBusiness() {
     error.value = 'Please upload the Back of your Government ID.'
     return
   }
+
+  loading.value = true
+  try {
+    const res = await authService.validateRegistrationStep(userUuid.value, {
+      step: 'personal',
+      username: username.value.trim(),
+      phone_number: phoneNumber.value.trim(),
+    })
+    if (res.errors) {
+      for (const [k, msgs] of Object.entries(res.errors)) {
+        if (Array.isArray(msgs) && msgs.length > 0) {
+          fieldErrors.value[k] = msgs[0]
+        }
+      }
+      error.value = Object.values(fieldErrors.value)[0] || 'Please resolve the errors above.'
+      return
+    }
+  } catch (e: any) {
+    const errs = e?.data?.errors || e?.response?._data?.errors
+    if (errs && typeof errs === 'object') {
+      for (const [k, msgs] of Object.entries(errs)) {
+        if (Array.isArray(msgs) && msgs.length > 0) {
+          fieldErrors.value[k] = msgs[0] as string
+        }
+      }
+      error.value = Object.values(fieldErrors.value)[0] || 'Please resolve the errors above.'
+      return
+    }
+    error.value = extractErrorMessage(e, 'Validation failed. Please check your personal details.')
+    return
+  } finally {
+    loading.value = false
+  }
+
   currentStep.value = 4
   businessSubPage.value = 1
 }
 
 // Step 4: Business Details & 4 Documents
-function validateBusinessPage1(): boolean {
+async function nextBusinessSubPage() {
   error.value = ''
+  fieldErrors.value = {}
+
   if (!cafeName.value.trim()) {
     error.value = 'Café / Business Name is required.'
-    return false
+    return
   }
   if (!branchName.value.trim()) {
     error.value = 'Branch Name is required.'
-    return false
+    return
   }
   if (!address.value.trim()) {
     error.value = 'Branch Address is required.'
-    return false
+    return
   }
   if (!cafePhone.value.trim()) {
+    fieldErrors.value.cafe_phonenumber = 'Branch Phone Number is required.'
     error.value = 'Branch Phone Number is required.'
-    return false
+    return
   }
-  if (/[a-zA-Z]/.test(cafePhone.value)) {
-    error.value = 'Branch phone number cannot contain letters.'
-    return false
-  }
-  const cafeDigits = cafePhone.value.replace(/\D/g, '')
-  if (cafeDigits.length < 7 || !/^[0-9+\s\-()]+$/.test(cafePhone.value)) {
-    error.value = 'Please enter a valid branch phone number (at least 7 digits, no letters).'
-    return false
+  if (!/^09\d{9}$/.test(cafePhone.value)) {
+    fieldErrors.value.cafe_phonenumber = 'Branch phone number must start with 09 and be 11 digits long (e.g., 09123456789).'
+    error.value = 'Branch phone number must start with 09 and be 11 digits long (e.g., 09123456789).'
+    return
   }
   const normPersonal = normalizePhoneNumber(phoneNumber.value)
   const normCafe = normalizePhoneNumber(cafePhone.value)
   if (normPersonal && normCafe && normPersonal === normCafe) {
+    fieldErrors.value.cafe_phonenumber = 'Branch phone number must be different from your personal contact number.'
     error.value = 'Branch phone number must be different from your personal contact number.'
-    return false
+    return
   }
   if (!cafeEmail.value.trim()) {
+    fieldErrors.value.cafe_email = 'Café Email is required.'
     error.value = 'Café Email is required.'
-    return false
+    return
   }
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(cafeEmail.value.trim())) {
+    fieldErrors.value.cafe_email = 'Please enter a valid Café Email address.'
     error.value = 'Please enter a valid Café Email address.'
-    return false
+    return
   }
-  return true
-}
 
-function nextBusinessSubPage() {
-  if (validateBusinessPage1()) {
-    businessSubPage.value = 2
+  loading.value = true
+  try {
+    const res = await authService.validateRegistrationStep(userUuid.value, {
+      step: 'cafe',
+      cafe_email: cafeEmail.value.trim(),
+      cafe_phonenumber: cafePhone.value.trim(),
+      phone_number: phoneNumber.value.trim(),
+    })
+    if (res.errors) {
+      for (const [k, msgs] of Object.entries(res.errors)) {
+        if (Array.isArray(msgs) && msgs.length > 0) {
+          fieldErrors.value[k] = msgs[0]
+        }
+      }
+      error.value = Object.values(fieldErrors.value)[0] || 'Please resolve the errors above.'
+      return
+    }
+  } catch (e: any) {
+    const errs = e?.data?.errors || e?.response?._data?.errors
+    if (errs && typeof errs === 'object') {
+      for (const [k, msgs] of Object.entries(errs)) {
+        if (Array.isArray(msgs) && msgs.length > 0) {
+          fieldErrors.value[k] = msgs[0] as string
+        }
+      }
+      error.value = Object.values(fieldErrors.value)[0] || 'Please resolve the errors above.'
+      return
+    }
+    error.value = extractErrorMessage(e, 'Validation failed. Please check your café details.')
+    return
+  } finally {
+    loading.value = false
   }
+
+  businessSubPage.value = 2
 }
 
 function prevBusinessSubPage() {
@@ -489,14 +649,16 @@ async function handleFinalSubmit() {
     return
   }
 
-  const normPersonal = normalizePhoneNumber(phoneNumber.value)
-  const normCafe = normalizePhoneNumber(cafePhone.value)
-  if (normPersonal && normCafe && normPersonal === normCafe) {
-    error.value = 'Branch phone number must be different from your personal contact number.'
+  if (!/^09\d{9}$/.test(phoneNumber.value)) {
+    error.value = 'Personal contact number must start with 09 and be 11 digits long (e.g., 09123456789).'
     return
   }
-  if (/[a-zA-Z]/.test(phoneNumber.value) || /[a-zA-Z]/.test(cafePhone.value)) {
-    error.value = 'Phone numbers must not contain letters.'
+  if (!/^09\d{9}$/.test(cafePhone.value)) {
+    error.value = 'Branch phone number must start with 09 and be 11 digits long (e.g., 09123456789).'
+    return
+  }
+  if (phoneNumber.value === cafePhone.value) {
+    error.value = 'Branch phone number must be different from your personal contact number.'
     return
   }
 
@@ -534,6 +696,32 @@ async function handleFinalSubmit() {
       error.value = res.message || 'Registration failed.'
     }
   } catch (e: any) {
+    const errs = e?.data?.errors || e?.response?._data?.errors
+    if (errs && typeof errs === 'object') {
+      fieldErrors.value = {}
+      for (const [k, msgs] of Object.entries(errs)) {
+        if (Array.isArray(msgs) && msgs.length > 0) {
+          fieldErrors.value[k] = msgs[0] as string
+        }
+      }
+      const personalFields = ['username', 'phone_number', 'firstname', 'middlename', 'lastname', 'owner_address', 'id_type', 'file', 'file_back']
+      const businessFields = ['cafe_name', 'branch_name', 'address', 'cafe_email', 'cafe_phonenumber', 'cafe_picture', 'cafe_doc_type']
+
+      const hasPersonalErr = personalFields.some(f => fieldErrors.value[f])
+      const hasBusinessErr = businessFields.some(f => fieldErrors.value[f])
+
+      if (hasPersonalErr) {
+        currentStep.value = 3
+      } else if (hasBusinessErr) {
+        currentStep.value = 4
+        businessSubPage.value = 1
+      } else {
+        currentStep.value = 4
+        businessSubPage.value = 2
+      }
+      error.value = Object.values(fieldErrors.value)[0] || 'Please review the highlighted fields and fix any errors.'
+      return
+    }
     error.value = extractErrorMessage(e, 'Registration failed.')
   } finally {
     loading.value = false
@@ -779,9 +967,17 @@ async function handleFinalSubmit() {
                   v-model="username"
                   type="text"
                   placeholder="Username"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  :class="[
+                    'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
+                    fieldErrors.username
+                      ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                      : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
+                  ]"
                   required
+                  @input="clearFieldError('username')"
+                  @blur="checkUsernameAvailability"
                 />
+                <p v-if="fieldErrors.username" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.username }}</p>
               </div>
             </div>
 
@@ -790,13 +986,21 @@ async function handleFinalSubmit() {
                 <label class="block text-sm font-medium mb-1 text-[#2d201b]">Contact No. *</label>
                 <input
                   v-model="phoneNumber"
-                  type="text"
-                  inputmode="tel"
-                  placeholder="+63 912 345 6789"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  type="tel"
+                  inputmode="numeric"
+                  maxlength="11"
+                  placeholder="09123456789"
+                  :class="[
+                    'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
+                    fieldErrors.phone_number
+                      ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                      : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
+                  ]"
                   required
                   @input="onPhoneNumberInput"
+                  @blur="checkPhoneAvailability"
                 />
+                <p v-if="fieldErrors.phone_number" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.phone_number }}</p>
               </div>
               <div>
                 <label class="block text-sm font-medium mb-1 text-[#2d201b]">ID Type *</label>
@@ -940,13 +1144,21 @@ async function handleFinalSubmit() {
                   <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Phone *</label>
                   <input
                     v-model="cafePhone"
-                    type="text"
-                    inputmode="tel"
-                    placeholder="+63 0912 345 678"
-                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    type="tel"
+                    inputmode="numeric"
+                    maxlength="11"
+                    placeholder="09123456789"
+                    :class="[
+                      'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
+                      fieldErrors.cafe_phonenumber
+                        ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                        : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
+                    ]"
                     required
                     @input="onCafePhoneInput"
+                    @blur="checkCafePhoneAvailability"
                   />
+                  <p v-if="fieldErrors.cafe_phonenumber" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.cafe_phonenumber }}</p>
                 </div>
               </div>
 
@@ -967,9 +1179,17 @@ async function handleFinalSubmit() {
                   v-model="cafeEmail"
                   type="email"
                   placeholder="contact@brewspot.com"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  :class="[
+                    'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
+                    fieldErrors.cafe_email
+                      ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                      : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
+                  ]"
                   required
+                  @input="clearFieldError('cafe_email')"
+                  @blur="checkCafeEmailAvailability"
                 />
+                <p v-if="fieldErrors.cafe_email" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.cafe_email }}</p>
               </div>
 
               <div class="pt-2">

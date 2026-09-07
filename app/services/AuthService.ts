@@ -135,6 +135,13 @@ export class AuthService extends BaseService {
         return this.post<SimpleResponse>('/auth/resend-code', { email })
     }
 
+    validateRegistrationStep(userUuid: string, data: Record<string, any>) {
+        return this.post<{ success: boolean; errors?: Record<string, string[]>; message?: string }>(
+            `/auth/validate-registration-step/${userUuid}`,
+            data
+        )
+    }
+
     register(userUuid: string, payload: FormData) {
         return this.post<SimpleResponse>(`/auth/register/${userUuid}`, payload)
     }
