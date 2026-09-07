@@ -30,13 +30,23 @@
               </div>
             </div>
 
-            <button
-              type="button"
-              class="cursor-pointer rounded-lg border border-[#EDD8CC] px-2.5 py-1 min-[360px]:px-3 min-[360px]:py-1.5 font-display font-semibold text-xs min-[360px]:text-[13px] text-[#7D5A50] hover:bg-[#7D5A50] hover:text-[#FFF0D1] hover:border-[#7D5A50] transition-colors shrink-0"
-              @click="emit('view', doc.download_url)"
-            >
-              View
-            </button>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                class="cursor-pointer rounded-lg border border-[#EDD8CC] px-2.5 py-1 min-[360px]:px-3 min-[360px]:py-1.5 font-display font-semibold text-xs min-[360px]:text-[13px] text-[#7D5A50] hover:bg-[#7D5A50] hover:text-[#FFF0D1] hover:border-[#7D5A50] transition-colors"
+                @click="emit('view', doc.download_url)"
+              >
+                {{ doc.has_back ? 'Front' : 'View' }}
+              </button>
+              <button
+                v-if="doc.has_back && doc.download_back_url"
+                type="button"
+                class="cursor-pointer rounded-lg border border-[#7D5A50] px-2.5 py-1 min-[360px]:px-3 min-[360px]:py-1.5 font-display font-semibold text-xs min-[360px]:text-[13px] text-[#7D5A50] hover:bg-[#7D5A50] hover:text-[#FFF0D1] transition-colors"
+                @click="emit('view', doc.download_back_url)"
+              >
+                Back
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -82,6 +92,8 @@ interface OwnerDoc {
   user_doc_id: number
   id_type: string
   download_url: string
+  download_back_url?: string | null
+  has_back?: boolean
   uploaded_at: string | null
 }
 

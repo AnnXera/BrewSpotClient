@@ -15,6 +15,7 @@ const links = [
 ]
 
 const ownerService = useOwnerManagementService()
+const route = useRoute()
 
 type RegistrationTab = 'owner' | 'branch'
 type StatusTab = 'general' | 'pending_approval' | 'approved' | 'rejected'
@@ -176,9 +177,33 @@ async function confirmReject() {
   await handleDecision('rejected', rejectReason.value)
 }
 
-onMounted(() => {
+onMounted(async () => {
   fetchStats()
-  fetchApprovals()
+  await fetchApprovals()
+
+  if (route.query.uuid) {
+    const target = approvals.value.find((a) => a.uuid === route.query.uuid)
+    if (target) {
+      openDetails(target)
+    } else {
+      try {
+        const res = await ownerService.approvalSnapshot(route.query.uuid as string)
+        if (res.success) {
+          modalApproval.value = {
+            uuid: route.query.uuid as string,
+            status: 'pending_approval',
+            user: res.owner,
+            cafe: res.cafe,
+            branch: res.branch,
+          } as any
+          modalOwnerDetails.value = res
+          modalOpen.value = true
+        }
+      } catch (err) {
+        console.warn('Could not auto-open approval from query param:', err)
+      }
+    }
+  }
 })
 </script>
 

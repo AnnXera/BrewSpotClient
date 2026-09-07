@@ -82,7 +82,7 @@ export interface ApplicationDetails {
         status: string
     } | null
     documents: {
-        government_id: { type?: string; uploaded: boolean }
+        government_id: { type?: string; uploaded: boolean; has_back?: boolean }
         cafe_document: { type?: string; uploaded: boolean }
         bir: { type: string; uploaded: boolean }
         mayors_permit: { type: string; uploaded: boolean }

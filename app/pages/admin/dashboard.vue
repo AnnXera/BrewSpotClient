@@ -44,6 +44,7 @@ const approvalStats = ref<ApprovalStats>({
 
 const pendingApprovalsList = ref<ApprovalListItem[]>([])
 const transactionsList = ref<PaymentTransaction[]>([])
+const activeSubscribersCount = ref(0)
 
 async function loadDashboardData() {
   loading.value = true
@@ -63,7 +64,7 @@ async function loadDashboardData() {
     }
 
     // 3. Fetch Pending Approvals Stream
-    const appRes = await ownerService.approvals({ status: 'pending', per_page: 5 })
+    const appRes = await ownerService.approvals({ status: 'pending_approval', per_page: 5 })
     if (appRes?.success && appRes.approvals?.data) {
       pendingApprovalsList.value = appRes.approvals.data
     }
@@ -72,6 +73,7 @@ async function loadDashboardData() {
     const list: PaymentTransaction[] = []
     const subRes = await subService.getSubscribers({ per_page: 20 })
     if (subRes?.success && subRes.subscribers?.data?.length) {
+      activeSubscribersCount.value = subRes.subscribers.total ?? subRes.subscribers.data.length
       subRes.subscribers.data.forEach((sub) => {
         const rawAmt = sub.amount ? parseFloat(sub.amount) : 0
         list.push({
@@ -79,7 +81,7 @@ async function loadDashboardData() {
             ? `TXN-${sub.subscription_uuid.replace(/-/g, '').slice(0, 7).toUpperCase()}`
             : 'TXN-0000000',
           date: new Date().toISOString(),
-          description: sub.plan ? `Monthly Subscription - ${sub.plan}` : 'Monthly Subscription',
+          description: sub.plan ? `Subscription - ${sub.plan}` : 'Subscription',
           amount: isNaN(rawAmt) ? '0.00' : rawAmt.toFixed(2),
           status: sub.status || 'active',
           owner_name: sub.name,
@@ -178,7 +180,7 @@ onMounted(loadDashboardData)
         :total-owners="ownerStats.total_owners"
         :active-owners="ownerStats.active"
         :pending-approvals="approvalStats.pending_approval"
-        :active-subscriptions="transactionsList.length"
+        :active-subscriptions="activeSubscribersCount"
         :total-revenue="totalRevenue"
         :loading="loading"
       />

@@ -8,35 +8,27 @@ const ownerService = useOwnerManagementService()
 
 const loading = ref(true)
 const transactions = ref<PaymentTransaction[]>([])
+const registeredSubscribers = ref(0)
 
 async function loadPaymentHistory() {
   loading.value = true
   const list: PaymentTransaction[] = []
 
   try {
-    // 1. Fetch backend subscribers list GET /api/admin/subscribers
+    // 1. Fetch backend subscribers count GET /api/admin/subscribers
     const subRes = await subService.getSubscribers({ per_page: 50 })
-    if (subRes?.success && subRes.subscribers?.data?.length) {
-      subRes.subscribers.data.forEach((sub) => {
-        const rawAmt = sub.amount ? parseFloat(sub.amount) : 0
-        list.push({
-          transaction_id: sub.subscription_uuid
-            ? `TXN-${sub.subscription_uuid.replace(/-/g, '').slice(0, 7).toUpperCase()}`
-            : 'TXN-0000000',
-          date: new Date().toISOString(),
-          description: sub.plan ? `Monthly Subscription - ${sub.plan}` : 'Monthly Subscription',
-          amount: isNaN(rawAmt) ? '0.00' : rawAmt.toFixed(2),
-          status: sub.status || 'active',
-          owner_name: sub.name,
-          owner_email: sub.email || undefined,
-        })
-      })
+    if (subRes?.success && subRes.subscribers) {
+      registeredSubscribers.value = subRes.subscribers.total ?? subRes.subscribers.data?.length ?? 0
     }
 
-    // 2. Fetch owner subscription histories if owners exist in database
-    const ownersRes = await ownerService.list({ per_page: 20 })
+    // 2. Fetch owner subscription payment histories (real database records matching owner details)
+    const ownersRes = await ownerService.list({ per_page: 50 })
     if (ownersRes?.success && ownersRes.owners?.data?.length) {
       const activeSubscribers = ownersRes.owners.data.filter((o) => o.status === 'active' || o.subscription)
+      if (!registeredSubscribers.value) {
+        registeredSubscribers.value = activeSubscribers.length
+      }
+
       for (const owner of activeSubscribers) {
         try {
           const detailRes = await ownerService.show(owner.uuid)
@@ -59,12 +51,35 @@ async function loadPaymentHistory() {
         }
       }
     }
+
+    // Fallback: If no owner detail payment history exists but subscribers were returned
+    if (list.length === 0 && subRes?.success && subRes.subscribers?.data?.length) {
+      subRes.subscribers.data.forEach((sub) => {
+        const rawAmt = sub.amount ? parseFloat(sub.amount) : 0
+        list.push({
+          transaction_id: sub.subscription_uuid
+            ? `TXN-${sub.subscription_uuid.replace(/-/g, '').slice(0, 7).toUpperCase()}`
+            : 'TXN-0000000',
+          date: new Date().toISOString(),
+          description: sub.plan ? `Subscription - ${sub.plan}` : 'Subscription',
+          amount: isNaN(rawAmt) ? '0.00' : rawAmt.toFixed(2),
+          status: sub.status || 'active',
+          owner_name: sub.name,
+          owner_email: sub.email || undefined,
+        })
+      })
+    }
   } catch (err) {
     console.warn('Backend payment fetch:', err)
   } finally {
-    // Rely strictly on backend database state — no fake/demo data
+    // Deduplicate by normalized transaction key
     const map = new Map<string, PaymentTransaction>()
-    list.forEach((t) => map.set(t.transaction_id, t))
+    list.forEach((t) => {
+      const normKey = t.transaction_id.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 7)
+      if (!map.has(normKey)) {
+        map.set(normKey, t)
+      }
+    })
     transactions.value = Array.from(map.values())
     loading.value = false
   }
@@ -108,7 +123,7 @@ onMounted(loadPaymentHistory)
     <PaymentAnalyticsCards
       :total-transactions="transactions.length"
       :total-revenue="totalRevenue"
-      :registered-subscribers="transactions.length"
+      :registered-subscribers="registeredSubscribers"
     />
 
     <!-- Payment History Table Component -->

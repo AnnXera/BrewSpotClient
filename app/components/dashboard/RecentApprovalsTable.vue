@@ -94,7 +94,7 @@ function formatDate(val?: string | null): string {
 
             <td class="px-6 py-4 text-right whitespace-nowrap">
               <NuxtLink
-                to="/admin/approvals"
+                :to="`/admin/approvals?uuid=${item.uuid}`"
                 class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#7D5A50] text-[#FFF0D1] hover:bg-[#684940] transition-colors"
               >
                 <span>Review</span>

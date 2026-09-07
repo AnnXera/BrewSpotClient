@@ -20,7 +20,9 @@
             class="bg-[#FFFDF9] border border-[#EDD8CC] rounded-xl p-4 min-[360px]:p-4 shadow-none"
           >
             <div class="flex items-center justify-between gap-2 mb-2">
-              <span class="font-sans text-xs min-[360px]:text-[13px] font-bold text-[#3D2B24]">{{ txn.transaction_id }}</span>
+              <span class="font-sans text-xs min-[360px]:text-[13px] font-bold text-[#3D2B24]" :title="txn.raw_id || txn.transaction_id">
+                {{ formatTxnId(txn.transaction_id) }}
+              </span>
               <StatusBadge :status="txn.status" />
             </div>
 
@@ -70,7 +72,11 @@
               :key="txn.transaction_id"
               class="border-b border-[#F3E7D2] last:border-b-0"
             >
-              <td class="px-6 py-5 font-sans text-[14px] font-bold text-[#3D2B24]">{{ txn.transaction_id }}</td>
+              <td class="px-6 py-5 font-sans text-[14px] font-bold text-[#3D2B24]">
+                <span :title="txn.raw_id || txn.transaction_id" class="cursor-default">
+                  {{ formatTxnId(txn.transaction_id) }}
+                </span>
+              </td>
               <td class="px-6 py-5 font-sans text-[14px] text-[#3B1F0E]/70">{{ formatDate(txn.date) }}</td>
               <td class="px-6 py-5 font-sans text-[14px] font-semibold text-[#3D2B24]">{{ txn.description }}</td>
               <td class="px-6 py-5 font-sans text-[14px] font-bold text-[#7D5A50]">₱{{ txn.amount }}</td>
@@ -91,6 +97,7 @@
 <script setup lang="ts">
 interface Transaction {
   transaction_id: string
+  raw_id?: string
   date: string | null
   description: string
   amount: string | number
@@ -111,6 +118,13 @@ const paginated = computed(() => {
   const start = (page.value - 1) * perPage
   return list.slice(start, start + perPage)
 })
+
+function formatTxnId(rawId?: string) {
+  if (!rawId) return '—'
+  if (rawId.startsWith('TXN-')) return rawId
+  const clean = rawId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+  return `TXN-${clean.slice(0, 7)}`
+}
 
 function formatDate(value?: string | null) {
   if (!value) return '—'

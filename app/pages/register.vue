@@ -1,6 +1,6 @@
 <!-- Unified Step-by-Step Business Registration Wizard -->
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import logoFull from '~/assets/images/logo-with-tag.svg'
 
 const authService = useAuthService()
@@ -29,10 +29,18 @@ const username = ref('')
 const phoneNumber = ref('')
 const ownerAddress = ref('')
 const idType = ref('drivers_license')
+const isBackIdRequired = computed(() => idType.value !== 'passport')
 const governmentIdFile = ref<File | null>(null)
 const governmentIdFileName = ref('')
 const governmentIdFileBack = ref<File | null>(null)
 const governmentIdFileBackName = ref('')
+
+watch(idType, (newVal) => {
+  if (newVal === 'passport') {
+    governmentIdFileBack.value = null
+    governmentIdFileBackName.value = ''
+  }
+})
 
 // Step 4: Business Details & Documents
 const businessSubPage = ref(1)
@@ -225,17 +233,55 @@ function handleGovIdBackChange(event: Event) {
   }
 }
 
+function onPhoneNumberInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  const sanitized = target.value.replace(/[^\d+\s\-()]/g, '')
+  phoneNumber.value = sanitized
+  target.value = sanitized
+}
+
+function onCafePhoneInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  const sanitized = target.value.replace(/[^\d+\s\-()]/g, '')
+  cafePhone.value = sanitized
+  target.value = sanitized
+}
+
+function normalizePhoneNumber(num: string): string {
+  const digits = (num || '').replace(/\D/g, '')
+  return digits.replace(/^63/, '0')
+}
+
 function handleNextToBusiness() {
   error.value = ''
   if (!firstname.value || !lastname.value || !username.value || !phoneNumber.value || !ownerAddress.value) {
     error.value = 'Please complete all required personal fields.'
     return
   }
-  if (!governmentIdFile.value) {
-    error.value = 'Please upload the Front of your Government ID.'
+  if (/[a-zA-Z]/.test(phoneNumber.value)) {
+    error.value = 'Personal contact number cannot contain letters.'
     return
   }
-  if (!governmentIdFileBack.value) {
+  const phoneDigits = phoneNumber.value.replace(/\D/g, '')
+  if (phoneDigits.length < 7 || !/^[0-9+\s\-()]+$/.test(phoneNumber.value)) {
+    error.value = 'Please enter a valid personal contact number (at least 7 digits, no letters).'
+    return
+  }
+  if (cafePhone.value.trim()) {
+    const normPersonal = normalizePhoneNumber(phoneNumber.value)
+    const normCafe = normalizePhoneNumber(cafePhone.value)
+    if (normPersonal && normCafe && normPersonal === normCafe) {
+      error.value = 'Personal contact number and café phone number must be different.'
+      return
+    }
+  }
+  if (!governmentIdFile.value) {
+    error.value = isBackIdRequired.value
+      ? 'Please upload the Front of your Government ID.'
+      : 'Please upload your Passport file.'
+    return
+  }
+  if (isBackIdRequired.value && !governmentIdFileBack.value) {
     error.value = 'Please upload the Back of your Government ID.'
     return
   }
@@ -260,6 +306,21 @@ function validateBusinessPage1(): boolean {
   }
   if (!cafePhone.value.trim()) {
     error.value = 'Branch Phone Number is required.'
+    return false
+  }
+  if (/[a-zA-Z]/.test(cafePhone.value)) {
+    error.value = 'Branch phone number cannot contain letters.'
+    return false
+  }
+  const cafeDigits = cafePhone.value.replace(/\D/g, '')
+  if (cafeDigits.length < 7 || !/^[0-9+\s\-()]+$/.test(cafePhone.value)) {
+    error.value = 'Please enter a valid branch phone number (at least 7 digits, no letters).'
+    return false
+  }
+  const normPersonal = normalizePhoneNumber(phoneNumber.value)
+  const normCafe = normalizePhoneNumber(cafePhone.value)
+  if (normPersonal && normCafe && normPersonal === normCafe) {
+    error.value = 'Branch phone number must be different from your personal contact number.'
     return false
   }
   if (!cafeEmail.value.trim()) {
@@ -421,8 +482,21 @@ async function handleFinalSubmit() {
     return
   }
 
-  if (!governmentIdFile.value || !governmentIdFileBack.value) {
-    error.value = 'Missing Government ID files (Front & Back). Please return to Personal Information step.'
+  if (!governmentIdFile.value || (isBackIdRequired.value && !governmentIdFileBack.value)) {
+    error.value = isBackIdRequired.value
+      ? 'Missing Government ID files (Front & Back). Please return to Personal Information step.'
+      : 'Missing Passport file. Please return to Personal Information step.'
+    return
+  }
+
+  const normPersonal = normalizePhoneNumber(phoneNumber.value)
+  const normCafe = normalizePhoneNumber(cafePhone.value)
+  if (normPersonal && normCafe && normPersonal === normCafe) {
+    error.value = 'Branch phone number must be different from your personal contact number.'
+    return
+  }
+  if (/[a-zA-Z]/.test(phoneNumber.value) || /[a-zA-Z]/.test(cafePhone.value)) {
+    error.value = 'Phone numbers must not contain letters.'
     return
   }
 
@@ -437,8 +511,9 @@ async function handleFinalSubmit() {
     payload.append('owner_address', ownerAddress.value)
     payload.append('id_type', idType.value || 'drivers_license')
     payload.append('file', governmentIdFile.value)
-    // TODO / BACKEND INSTRUCTION: Pass 'file_back' to server once backend updates RegisterRequest to save government ID back image
-    payload.append('file_back', governmentIdFileBack.value)
+    if (isBackIdRequired.value && governmentIdFileBack.value) {
+      payload.append('file_back', governmentIdFileBack.value)
+    }
 
     payload.append('cafe_name', cafeName.value)
     payload.append('cafe_doc_type', cafeDocType.value)
@@ -716,9 +791,11 @@ async function handleFinalSubmit() {
                 <input
                   v-model="phoneNumber"
                   type="text"
+                  inputmode="tel"
                   placeholder="+63 912 345 6789"
                   class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                   required
+                  @input="onPhoneNumberInput"
                 />
               </div>
               <div>
@@ -750,8 +827,10 @@ async function handleFinalSubmit() {
             </div>
 
             <div>
-              <label class="block text-sm font-medium mb-1 text-[#2d201b]">Government ID (Front & Back) *</label>
-              <div class="grid grid-cols-2 gap-3">
+              <label class="block text-sm font-medium mb-1 text-[#2d201b]">
+                {{ isBackIdRequired ? 'Government ID (Front & Back) *' : 'Passport (Photo / Bio-page) *' }}
+              </label>
+              <div :class="isBackIdRequired ? 'grid grid-cols-2 gap-3' : ''">
                 <div>
                   <input
                     type="file"
@@ -761,16 +840,16 @@ async function handleFinalSubmit() {
                     required
                   />
                   <p v-if="governmentIdFileName" class="mt-1 text-xs text-[#7B5A50] truncate font-medium">
-                    Front: {{ governmentIdFileName }}
+                    {{ isBackIdRequired ? `Front: ${governmentIdFileName}` : `File: ${governmentIdFileName}` }}
                   </p>
                 </div>
-                <div>
+                <div v-if="isBackIdRequired">
                   <input
                     type="file"
                     @change="handleGovIdBackChange"
                     accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
                     class="w-full text-sm text-[#2d201b] border border-gray-300 rounded-md bg-white p-2 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
-                    required
+                    :required="isBackIdRequired"
                   />
                   <p v-if="governmentIdFileBackName" class="mt-1 text-xs text-[#7B5A50] truncate font-medium">
                     Back: {{ governmentIdFileBackName }}
@@ -862,9 +941,11 @@ async function handleFinalSubmit() {
                   <input
                     v-model="cafePhone"
                     type="text"
+                    inputmode="tel"
                     placeholder="+63 0912 345 678"
                     class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                     required
+                    @input="onCafePhoneInput"
                   />
                 </div>
               </div>
