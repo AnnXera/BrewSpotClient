@@ -14,7 +14,10 @@ const emit = defineEmits<{
 
 function getFeatureName(key: string): string {
   const found = props.featuresList?.find((f) => f.key === key)
-  return found ? found.name : key.replace(/_/g, ' ')
+  if (found) return found.name
+  const detail = props.plan.feature_details?.find((f) => f.key === key)
+  if (detail) return detail.name
+  return key.replace(/_/g, ' ')
 }
 
 function formatPrice(val: string | number): string {

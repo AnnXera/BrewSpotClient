@@ -30,6 +30,7 @@ export interface SubscriptionPlanItem {
   yearly_price?: number | string
   max_branches: number
   features?: string[]
+  feature_details?: FeatureItem[]
   description?: string | null
   duration_days: number
   is_active?: boolean

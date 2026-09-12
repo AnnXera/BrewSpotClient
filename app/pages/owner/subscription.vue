@@ -79,6 +79,26 @@ function getActivePlanPrice(): string {
   return isNaN(num) ? '0.00' : num.toFixed(2)
 }
 
+const activePlanFeatures = computed(() => {
+  const plan = currentPlan.value?.plan
+  if (!plan) return []
+  if (plan.feature_details && plan.feature_details.length > 0) {
+    return plan.feature_details.map((f: any) => ({
+      key: f.key,
+      name: f.name || f.key.replace(/_/g, ' '),
+    }))
+  }
+  if (plan.features && plan.features.length > 0) {
+    return plan.features.map((f: any) => {
+      if (typeof f === 'object' && f !== null) {
+        return { key: f.key, name: f.name || f.key.replace(/_/g, ' ') }
+      }
+      return { key: f, name: f.replace(/_/g, ' ') }
+    })
+  }
+  return []
+})
+
 onMounted(loadOwnerSubscription)
 </script>
 
@@ -154,14 +174,14 @@ onMounted(loadOwnerSubscription)
           <span class="font-sans text-xs uppercase font-bold text-[#8B6656] block mb-2 tracking-wider">
             Unlocked Features
           </span>
-          <div v-if="currentPlan?.plan?.features && currentPlan.plan.features.length > 0" class="flex flex-wrap gap-2">
+          <div v-if="activePlanFeatures.length > 0" class="flex flex-wrap gap-2">
             <span
-              v-for="feat in currentPlan.plan.features"
-              :key="feat"
+              v-for="feat in activePlanFeatures"
+              :key="feat.key"
               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#FFFDF9] border border-[#EEDFC4] text-[#3D2B24]"
             >
               <Icon name="heroicons:check-badge" class="w-4 h-4 text-[#28A745]" />
-              <span class="capitalize">{{ feat.replace(/_/g, ' ') }}</span>
+              <span>{{ feat.name }}</span>
             </span>
           </div>
           <p v-else class="font-sans text-xs text-[#9E7060]">
