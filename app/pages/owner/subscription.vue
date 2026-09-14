@@ -140,7 +140,10 @@ onMounted(loadOwnerSubscription)
               </span>
             </div>
             <p class="font-sans text-sm text-[#8B6656] mt-1">
-              Supports up to {{ currentPlan?.plan?.max_branches || 1 }} cafe branch location(s).
+              Multi-Branch Management:
+              <span :class="currentPlan?.plan?.has_multi_branch || currentPlan?.plan?.features?.includes('multi_branch') ? 'text-[#28A745] font-semibold' : 'text-[#8B6656]'">
+                {{ currentPlan?.plan?.has_multi_branch || currentPlan?.plan?.features?.includes('multi_branch') ? 'Enabled' : 'Not included — upgrade to Premium or higher to add more branches.' }}
+              </span>
             </p>
           </div>
 
@@ -185,7 +188,7 @@ onMounted(loadOwnerSubscription)
             </span>
           </div>
           <p v-else class="font-sans text-xs text-[#9E7060]">
-            Basic plan access with single branch support.
+            Basic plan access (single branch only, no advanced features).
           </p>
         </div>
       </div>

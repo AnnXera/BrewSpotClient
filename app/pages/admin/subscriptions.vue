@@ -132,7 +132,7 @@ onMounted(loadData)
             Subscriptions
           </h1>
           <p class="font-sans text-[14px] leading-[21px] text-[#9E7060] mt-[2px]">
-            Manage platform subscription plans, branch limitations, and feature entitlements.
+            Manage platform subscription plans, multi-branch access, and feature entitlements.
           </p>
         </div>
 

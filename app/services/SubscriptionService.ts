@@ -28,7 +28,7 @@ export interface SubscriptionPlanItem {
   price: number | string
   monthly_price?: number | string
   yearly_price?: number | string
-  max_branches: number
+  has_multi_branch?: boolean
   features?: string[]
   feature_details?: FeatureItem[]
   description?: string | null
@@ -99,7 +99,6 @@ export class SubscriptionService extends BaseService {
     sub_name: string
     price: number
     yearly_price?: number
-    max_branches: number
     features?: string[]
     description?: string
     duration_days: number
@@ -116,7 +115,6 @@ export class SubscriptionService extends BaseService {
     sub_name: string
     price: number
     yearly_price: number
-    max_branches: number
     features: string[]
     description: string
     duration_days: number
