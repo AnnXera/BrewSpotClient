@@ -139,6 +139,11 @@ export class SubscriptionService extends BaseService {
     return this.patch<{ success: boolean; message: string; plan?: SubscriptionPlanItem }>(`/admin/subscription-plans/${uuid}/restore`, {})
   }
 
+  // Cancel checkout
+  async cancelCheckout(params: { token?: string, ba_token?: string, subscription_id?: string }) {
+    return this.post<{ success: boolean; message: string }>('/owner/subscriptions/cancel', params)
+  }
+
   // ─── ADMIN: FEATURES CATALOG ───────────────────────────────────────────────
 
   /**
