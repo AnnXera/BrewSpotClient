@@ -15,19 +15,21 @@ async function loadPaymentHistory() {
   const list: PaymentTransaction[] = []
 
   try {
-    // 1. Fetch backend subscribers count GET /api/admin/subscribers
+    // 1. Fetch backend subscribers count GET /api/admin/subscribers (fallback data)
     const subRes = await subService.getSubscribers({ per_page: 50 })
     if (subRes?.success && subRes.subscribers) {
-      registeredSubscribers.value = subRes.subscribers.total ?? subRes.subscribers.data?.length ?? 0
+      // Create a set of unique emails from the subscribers list to get an accurate subscriber count
+      const uniqueEmails = new Set(subRes.subscribers.data.map((sub: any) => sub.email).filter(Boolean))
+      registeredSubscribers.value = uniqueEmails.size
     }
 
     // 2. Fetch owner subscription payment histories (real database records matching owner details)
     const ownersRes = await ownerService.list({ per_page: 50 })
     if (ownersRes?.success && ownersRes.owners?.data?.length) {
       const activeSubscribers = ownersRes.owners.data.filter((o) => o.status === 'active' || o.subscription)
-      if (!registeredSubscribers.value) {
-        registeredSubscribers.value = activeSubscribers.length
-      }
+      
+      // Override with actual unique active owners
+      registeredSubscribers.value = activeSubscribers.length
 
       for (const owner of activeSubscribers) {
         try {

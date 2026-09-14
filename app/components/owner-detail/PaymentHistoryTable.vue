@@ -1,9 +1,20 @@
 <!-- components/owner-detail/PaymentHistoryTable.vue -->
 <template>
   <div class="space-y-3 min-[360px]:space-y-4">
-    <h2 class="font-display text-[18px] min-[360px]:text-[20px] font-bold text-[#3D2B24]">
-      Recent Activity &amp; Payment History
-    </h2>
+    <div class="flex items-center justify-between gap-4">
+      <h2 class="font-display text-[18px] min-[360px]:text-[20px] font-bold text-[#3D2B24]">
+        Recent Activity &amp; Payment History
+      </h2>
+      <button
+        v-if="history.length > 0"
+        type="button"
+        class="inline-flex items-center gap-2 px-3 py-1.5 min-[360px]:px-4 min-[360px]:py-2 rounded-xl border border-[#EDD8CC] bg-white text-[#7D5A50] font-display font-medium text-xs min-[360px]:text-sm hover:bg-[#FBF2E1] transition-colors shadow-sm shrink-0"
+        @click="handleExport"
+      >
+        <Icon name="heroicons:arrow-down-tray" class="w-4 h-4" />
+        <span class="hidden min-[360px]:inline">Export</span>
+      </button>
+    </div>
 
     <!-- Unified Card Container for both Mobile and Desktop -->
     <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden shadow-sm">
@@ -106,6 +117,7 @@ interface Transaction {
 
 const props = defineProps<{
   history: Transaction[]
+  ownerName?: string
 }>()
 
 const page = ref(1)
@@ -129,5 +141,11 @@ function formatTxnId(rawId?: string) {
 function formatDate(value?: string | null) {
   if (!value) return '—'
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value))
+}
+
+import { exportToExcel } from '~/utils/excelExport'
+
+function handleExport() {
+  exportToExcel(props.history as any, 'All', props.ownerName)
 }
 </script>

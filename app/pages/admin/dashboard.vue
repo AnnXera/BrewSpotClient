@@ -73,14 +73,14 @@ async function loadDashboardData() {
     const list: PaymentTransaction[] = []
     const subRes = await subService.getSubscribers({ per_page: 20 })
     if (subRes?.success && subRes.subscribers?.data?.length) {
-      activeSubscribersCount.value = subRes.subscribers.total ?? subRes.subscribers.data.length
+      activeSubscribersCount.value = ownerStats.value.active
       subRes.subscribers.data.forEach((sub) => {
-        const rawAmt = sub.amount ? parseFloat(sub.amount) : 0
+        const rawAmt = sub.amount ? parseFloat(String(sub.amount).replace(/[^0-9.]/g, '')) : 0
         list.push({
-          transaction_id: sub.subscription_uuid
+          transaction_id: sub.transaction_id || (sub.subscription_uuid
             ? `TXN-${sub.subscription_uuid.replace(/-/g, '').slice(0, 7).toUpperCase()}`
-            : 'TXN-0000000',
-          date: new Date().toISOString(),
+            : 'TXN-0000000'),
+          date: sub.date || new Date().toISOString(),
           description: sub.plan ? `Subscription - ${sub.plan}` : 'Subscription',
           amount: isNaN(rawAmt) ? '0.00' : rawAmt.toFixed(2),
           status: sub.status || 'active',

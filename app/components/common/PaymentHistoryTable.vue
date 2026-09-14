@@ -1,56 +1,56 @@
 <!-- app/components/common/PaymentHistoryTable.vue -->
 <template>
   <div>
-    <!-- Top Feature Bar: Search, Filters & Export CSV -->
-    <div v-if="showControls" class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-      <!-- Search Input -->
-      <div class="relative w-full sm:w-80">
-        <Icon
-          name="heroicons:magnifying-glass"
-          class="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9E7060]"
-        />
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search TXN ID, activity, amount..."
-          class="w-full pl-10 pr-4 py-2.5 bg-white border border-[#EEDFC4] rounded-xl font-sans text-sm text-[#3B1F0E] placeholder-[#9E7060]/60 focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] transition-all shadow-sm"
-        />
-        <button
-          v-if="searchQuery"
-          type="button"
-          class="absolute right-3 top-1/2 -translate-y-1/2 text-[#9E7060] hover:text-[#3B1F0E]"
-          @click="searchQuery = ''"
-        >
-          <Icon name="heroicons:x-mark" class="w-4 h-4" />
-        </button>
-      </div>
-
-      <!-- Action Buttons & Status Filter -->
-      <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-        <select
-          v-model="selectedStatus"
-          class="px-4 py-2.5 bg-white border border-[#EEDFC4] rounded-xl font-sans text-sm font-medium text-[#3B1F0E] focus:outline-none focus:border-[#7D5A50] shadow-sm"
-        >
-          <option value="">All Payment Statuses</option>
-          <option value="success">Success / Active</option>
-          <option value="pending">Pending</option>
-          <option value="failed">Failed / Cancelled</option>
-        </select>
-
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-display text-sm font-semibold bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FDF3E7] hover:border-[#7D5A50] transition-all shadow-sm"
-          title="Export records to formatted Excel spreadsheet"
-          @click="handleExportExcel"
-        >
-          <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 text-[#28A745]" />
-          <span>Export Excel</span>
-        </button>
-      </div>
-    </div>
-
     <!-- Main Payment History Card Container -->
     <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden shadow-sm">
+      <!-- Top Feature Bar: Search, Filters & Export CSV -->
+      <div v-if="showControls" class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-6 border-b border-[#F3E7D2]">
+        <!-- Search Input -->
+        <div class="relative w-full sm:w-80">
+          <Icon
+            name="heroicons:magnifying-glass"
+            class="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9E7060]"
+          />
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search TXN ID, activity, amount..."
+            class="w-full pl-10 pr-4 py-2.5 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm text-[#3B1F0E] placeholder-[#9E7060]/60 focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] transition-all shadow-sm"
+          />
+          <button
+            v-if="searchQuery"
+            type="button"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-[#9E7060] hover:text-[#3B1F0E]"
+            @click="searchQuery = ''"
+          >
+            <Icon name="heroicons:x-mark" class="w-4 h-4" />
+          </button>
+        </div>
+
+        <!-- Action Buttons & Status Filter -->
+        <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          <select
+            v-model="selectedStatus"
+            class="px-4 py-2.5 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm font-medium text-[#3B1F0E] focus:outline-none focus:border-[#7D5A50] shadow-sm"
+          >
+            <option value="">All Payment Statuses</option>
+            <option value="success">Success / Active</option>
+            <option value="pending">Pending</option>
+            <option value="failed">Failed / Cancelled</option>
+          </select>
+
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-display text-sm font-semibold bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FDF3E7] hover:border-[#7D5A50] transition-all shadow-sm"
+            title="Export records to formatted Excel spreadsheet"
+            @click="handleExportExcel"
+          >
+            <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 text-[#28A745]" />
+            <span>Export Excel</span>
+          </button>
+        </div>
+      </div>
+
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse">
           <thead>
@@ -60,6 +60,9 @@
               </th>
               <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
                 Date
+              </th>
+              <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
+                Owner Name
               </th>
               <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
                 Activity / Plan Type
@@ -76,7 +79,7 @@
           <!-- Table Body -->
           <tbody>
             <tr v-if="loading">
-              <td colspan="5" class="px-6 py-12 text-center font-sans text-sm text-[#8B6656]">
+              <td colspan="6" class="px-6 py-12 text-center font-sans text-sm text-[#8B6656]">
                 <div class="flex items-center justify-center gap-2">
                   <Icon name="heroicons:arrow-path" class="w-5 h-5 animate-spin text-[#B4846C]" />
                   <span>Loading payment records...</span>
@@ -85,7 +88,7 @@
             </tr>
 
             <tr v-else-if="!filteredHistory.length">
-              <td colspan="5" class="px-6 py-12 text-center font-sans text-sm text-[#8B6656]/70">
+              <td colspan="6" class="px-6 py-12 text-center font-sans text-sm text-[#8B6656]/70">
                 No matching subscription payment history found.
               </td>
             </tr>
@@ -114,6 +117,11 @@
               <!-- Date -->
               <td class="px-6 py-5 font-sans text-[14px] text-[#3B1F0E]/80 whitespace-nowrap">
                 {{ formatDate(txn.date) }}
+              </td>
+
+              <!-- Owner Name -->
+              <td class="px-6 py-5 font-sans text-[14px] font-semibold text-[#3B1F0E] whitespace-nowrap">
+                {{ txn.owner_name || 'N/A' }}
               </td>
 
               <!-- Activity / Plan Type -->
