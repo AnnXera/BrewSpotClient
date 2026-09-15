@@ -101,9 +101,11 @@ async function loadDashboardData() {
   }
 }
 
-// Compute total revenue
 const totalRevenue = computed(() => {
   return transactionsList.value.reduce((acc, t) => {
+    const status = t.status?.toLowerCase() || ''
+    if (status === 'failed' || status === 'cancelled') return acc
+
     const val = typeof t.amount === 'number' ? t.amount : parseFloat(String(t.amount).replace(/[^0-9.]/g, ''))
     return acc + (isNaN(val) ? 0 : val)
   }, 0)

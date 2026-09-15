@@ -91,9 +91,12 @@ async function loadPaymentHistory() {
 
 // Analytics computed values based strictly on real backend data
 const totalRevenue = computed(() => {
-  return transactions.value.reduce((acc, t) => {
-    const val = parseFloat(String(t.amount).replace(/[^0-9.]/g, ''))
-    return acc + (isNaN(val) ? 0 : val)
+  return transactions.value.reduce((sum, txn) => {
+    const status = txn.status?.toLowerCase() || ''
+    if (status === 'failed' || status === 'cancelled') return sum
+
+    const val = typeof txn.amount === 'number' ? txn.amount : parseFloat(String(txn.amount).replace(/[^0-9.]/g, ''))
+    return sum + (isNaN(val) ? 0 : val)
   }, 0)
 })
 
