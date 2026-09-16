@@ -65,6 +65,10 @@ const allBranches = computed(() =>
   )
 )
 
+const activeBranchesCount = computed(() =>
+  allBranches.value.filter(b => ['active', 'inactive'].includes(b.status)).length
+)
+
 const branchSearchQuery = ref('')
 const branchStatusFilter = ref('')
 
@@ -246,7 +250,7 @@ onMounted(fetchOwner)
 
           <button
             type="button"
-            class="font-display transition-colors relative z-10
+            class="font-display transition-colors relative z-10 flex items-center gap-2
                    min-[360px]:px-5 min-[360px]:py-3.5 min-[360px]:text-[14px]
                    md:px-5 md:py-3.5 md:text-[16px]"
             :class="activeTab === 'branches'
@@ -254,7 +258,11 @@ onMounted(fetchOwner)
               : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
             @click="activeTab = 'branches'"
           >
-            Cafe Branches ({{ allBranches.length }})
+            Cafe Branches
+            <span
+              class="rounded-full px-2 py-0.5 text-[11px] font-bold"
+              :class="activeTab === 'branches' ? 'bg-[#3B1F0E] text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+            >{{ allBranches.length }}</span>
             <span
               v-if="activeTab === 'branches'"
               class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full"
@@ -270,7 +278,7 @@ onMounted(fetchOwner)
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 min-[360px]:gap-5 md:gap-6 mb-[20px] min-[360px]:mb-[24px]">
             <OwnerDetailAccountDetailsCard
               :owner="owner"
-              :branch-count="allBranches.length"
+              :branch-count="activeBranchesCount"
               @go-to-branches="activeTab = 'branches'"
             />
             <OwnerDetailCafeDetailsCard

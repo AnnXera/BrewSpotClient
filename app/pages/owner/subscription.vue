@@ -107,7 +107,7 @@ onMounted(loadOwnerSubscription)
     <!-- Desktop & Mobile Sidebar Navigation -->
     <NavBar :links="links" />
 
-    <main class="flex-1 p-6 md:p-12">
+    <main class="flex-1 p-4 sm:p-6 md:p-12">
       <!-- Title -->
       <div class="flex items-center justify-between mb-8">
         <div>
@@ -139,12 +139,6 @@ onMounted(loadOwnerSubscription)
                 {{ currentPlan?.billing_cycle === 'yearly' ? 'Yearly Billing' : 'Monthly Billing' }}
               </span>
             </div>
-            <p class="font-sans text-sm text-[#8B6656] mt-1">
-              Multi-Branch Management:
-              <span :class="currentPlan?.plan?.has_multi_branch || currentPlan?.plan?.features?.includes('multi_branch') ? 'text-[#28A745] font-semibold' : 'text-[#8B6656]'">
-                {{ currentPlan?.plan?.has_multi_branch || currentPlan?.plan?.features?.includes('multi_branch') ? 'Enabled' : 'Not included — upgrade to Premium or higher to add more branches.' }}
-              </span>
-            </p>
           </div>
 
           <div class="text-left sm:text-right">

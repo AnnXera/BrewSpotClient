@@ -36,7 +36,13 @@ const ownerStats = ref<OwnerStats>({
   inactive_or_suspended: 0,
 })
 
-const approvalStats = ref<ApprovalStats>({
+const ownerApprovalStats = ref<ApprovalStats>({
+  pending_approval: 0,
+  approved: 0,
+  rejected: 0,
+})
+
+const branchApprovalStats = ref<ApprovalStats>({
   pending_approval: 0,
   approved: 0,
   rejected: 0,
@@ -57,10 +63,17 @@ async function loadDashboardData() {
       ownerStats.value = oStatsRes.stats
     }
 
-    // 2. Fetch Approval Stats
-    const aStatsRes = await ownerService.approvalStats()
-    if (aStatsRes?.success && aStatsRes.stats) {
-      approvalStats.value = aStatsRes.stats
+    // 2. Fetch Approval Stats (Owner & Branch separately)
+    const [ownerStatsRes, branchStatsRes] = await Promise.all([
+      ownerService.approvalStats('owner'),
+      ownerService.approvalStats('branch')
+    ])
+    
+    if (ownerStatsRes?.success && ownerStatsRes.stats) {
+      ownerApprovalStats.value = ownerStatsRes.stats
+    }
+    if (branchStatsRes?.success && branchStatsRes.stats) {
+      branchApprovalStats.value = branchStatsRes.stats
     }
 
     // 3. Fetch Pending Approvals Stream
@@ -148,12 +161,12 @@ onMounted(loadDashboardData)
         <!-- Header Quick Action Buttons -->
         <div class="flex flex-wrap items-center gap-3">
           <NuxtLink
-            v-if="approvalStats.pending_approval > 0"
+            v-if="ownerApprovalStats.pending_approval + branchApprovalStats.pending_approval > 0"
             to="/admin/approvals"
             class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-display text-sm font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-all shadow-sm"
           >
             <Icon name="heroicons:bell" class="w-4 h-4" />
-            <span>{{ approvalStats.pending_approval }} Approvals Pending</span>
+            <span>{{ ownerApprovalStats.pending_approval + branchApprovalStats.pending_approval }} Approvals Pending</span>
           </NuxtLink>
 
           <button
@@ -181,7 +194,7 @@ onMounted(loadDashboardData)
       <AdminMetricCards
         :total-owners="ownerStats.total_owners"
         :active-owners="ownerStats.active"
-        :pending-approvals="approvalStats.pending_approval"
+        :pending-approvals="ownerApprovalStats.pending_approval + branchApprovalStats.pending_approval"
         :active-subscriptions="activeSubscribersCount"
         :total-revenue="totalRevenue"
         :loading="loading"
@@ -189,7 +202,8 @@ onMounted(loadDashboardData)
 
       <!-- 2. Visual Status & Distribution Breakdown Charts -->
       <AdminStatusBreakdown
-        :approval-stats="approvalStats"
+        :owner-approval-stats="ownerApprovalStats"
+        :branch-approval-stats="branchApprovalStats"
         :owner-stats="ownerStats"
       />
 

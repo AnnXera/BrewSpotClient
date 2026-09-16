@@ -20,10 +20,7 @@
       </p>
 
       <p class="font-display text-xs min-[360px]:text-[13px] text-[#9E7060] mb-4 min-[360px]:mb-5 pb-4 min-[360px]:pb-5 border-b border-[#F3E7D2]">
-        {{ subscription.plan_name }} · Multi-Branch
-        <span :class="subscription.has_multi_branch ? 'text-[#28A745] font-semibold' : 'text-[#DC3545] font-semibold'">
-          {{ subscription.has_multi_branch ? 'Enabled' : 'Not Included' }}
-        </span>
+        {{ subscription.plan_name }}
       </p>
 
       <div class="grid grid-cols-2 gap-3 min-[360px]:gap-4 font-display font-medium text-[13px] min-[360px]:text-[14px]">

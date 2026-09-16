@@ -47,8 +47,8 @@ function formatPrice(val: string | number): string {
         </span>
       </div>
 
-      <!-- Price & Multi-Branch Metric Box -->
-      <div class="my-4 p-4 rounded-xl bg-[#FFFBF3] border border-[#F3E7D2] grid grid-cols-2 sm:grid-cols-3 gap-3 items-center">
+      <!-- Price Metric Box -->
+      <div class="my-4 p-4 rounded-xl bg-[#FFFBF3] border border-[#F3E7D2] grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
         <div>
           <span class="font-sans text-[11px] font-bold uppercase tracking-wider text-[#9E7060] block">Monthly</span>
           <div class="flex items-baseline gap-1 mt-0.5">
@@ -64,19 +64,6 @@ function formatPrice(val: string | number): string {
               ${{ formatPrice(plan.yearly_price ?? 0) }}
             </span>
             <span class="font-sans text-[11px] text-[#9E7060]">/yr</span>
-          </div>
-        </div>
-
-        <div class="col-span-2 sm:col-span-1 sm:text-right">
-          <span class="font-sans text-[11px] font-bold uppercase tracking-wider text-[#9E7060] block">Multi-Branch</span>
-          <div class="flex items-center sm:justify-end gap-1 mt-0.5 font-display text-[14px] font-bold"
-            :class="plan.has_multi_branch || plan.features?.includes('multi_branch') ? 'text-[#28A745]' : 'text-[#DC3545]'"
-          >
-            <Icon
-              :name="plan.has_multi_branch || plan.features?.includes('multi_branch') ? 'heroicons:check-circle' : 'heroicons:x-circle'"
-              class="w-4 h-4"
-            />
-            <span>{{ plan.has_multi_branch || plan.features?.includes('multi_branch') ? 'Supported' : 'Not Included' }}</span>
           </div>
         </div>
       </div>
@@ -103,11 +90,7 @@ function formatPrice(val: string | number): string {
     </div>
 
     <!-- Card Footer with Icon Actions -->
-    <div class="pt-4 border-t border-[#F3E7D2] flex items-center justify-between">
-      <span class="font-sans text-xs text-[#9E7060]">
-        {{ plan.duration_days }}-day billing cycle
-      </span>
-
+    <div class="pt-4 border-t border-[#F3E7D2] flex items-center justify-end">
       <div class="inline-flex items-center gap-1">
         <button
           type="button"

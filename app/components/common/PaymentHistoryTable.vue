@@ -27,21 +27,45 @@
           </button>
         </div>
 
-        <!-- Action Buttons & Status Filter -->
-        <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-          <select
-            v-model="selectedStatus"
-            class="px-4 py-2.5 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm font-medium text-[#3B1F0E] focus:outline-none focus:border-[#7D5A50] shadow-sm"
-          >
-            <option value="">All Payment Statuses</option>
-            <option value="success">Success / Active</option>
-            <option value="pending">Pending</option>
-            <option value="failed">Failed / Cancelled</option>
-          </select>
+        <!-- Action Buttons & Filters -->
+        <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          
+          <!-- Date Pickers -->
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <input 
+              type="date" 
+              v-model="startDate" 
+              class="w-full sm:w-auto px-3 py-2 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm text-[#3B1F0E] focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] shadow-sm"
+              title="Start Date"
+            />
+            <span class="text-[#8B6656] font-sans text-sm font-medium">to</span>
+            <input 
+              type="date" 
+              v-model="endDate" 
+              class="w-full sm:w-auto px-3 py-2 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm text-[#3B1F0E] focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] shadow-sm"
+              title="End Date"
+            />
+          </div>
+
+          <div class="relative w-full sm:w-auto min-w-[160px]">
+            <select
+              v-model="selectedStatus"
+              class="w-full appearance-none pl-4 pr-10 py-2.5 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm font-medium text-[#3B1F0E] focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] shadow-sm"
+            >
+              <option value="">All Payment Statuses</option>
+              <option value="success">Success / Active</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed / Cancelled</option>
+            </select>
+            <Icon
+              name="heroicons:chevron-down"
+              class="w-4 h-4 text-[#9E7060] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            />
+          </div>
 
           <button
             type="button"
-            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-display text-sm font-semibold bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FDF3E7] hover:border-[#7D5A50] transition-all shadow-sm"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-display text-sm font-semibold bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FDF3E7] hover:border-[#7D5A50] transition-all shadow-sm"
             title="Export records to formatted Excel spreadsheet"
             @click="handleExportExcel"
           >
@@ -314,6 +338,8 @@ const props = withDefaults(
 
 const searchQuery = ref('')
 const selectedStatus = ref('')
+const startDate = ref('')
+const endDate = ref('')
 const currentPage = ref(1)
 const toastMessage = ref('')
 const activeReceipt = ref<PaymentTransaction | null>(null)
@@ -335,7 +361,25 @@ const filteredHistory = computed(() => {
       itemSt === st ||
       (st === 'success' && ['active', 'succeeded', 'paid', 'approved', 'success'].includes(itemSt))
 
-    return matchesQuery && matchesStatus
+    let matchesDate = true
+    if (startDate.value || endDate.value) {
+      if (item.date) {
+        const itemD = new Date(item.date).getTime()
+        if (!isNaN(itemD)) {
+          if (startDate.value) {
+            const sd = new Date(startDate.value).getTime()
+            if (itemD < sd) matchesDate = false
+          }
+          if (endDate.value && matchesDate) {
+            const ed = new Date(endDate.value)
+            ed.setHours(23, 59, 59, 999)
+            if (itemD > ed.getTime()) matchesDate = false
+          }
+        }
+      }
+    }
+
+    return matchesQuery && matchesStatus && matchesDate
   })
 })
 
@@ -346,7 +390,7 @@ const paginatedRows = computed(() => {
   return filteredHistory.value.slice(start, start + props.perPage)
 })
 
-watch([searchQuery, selectedStatus], () => {
+watch([searchQuery, selectedStatus, startDate, endDate], () => {
   currentPage.value = 1
 })
 
