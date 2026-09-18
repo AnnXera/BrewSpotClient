@@ -143,7 +143,7 @@ onMounted(loadOwnerSubscription)
 
           <div class="text-left sm:text-right">
             <span class="font-display text-3xl font-bold text-[#7D5A50]">
-              ${{ getActivePlanPrice() }}
+              ₱{{ getActivePlanPrice() }}
             </span>
             <span class="font-sans text-xs text-[#8B6656] block">
               / {{ currentPlan?.billing_cycle === 'yearly' ? 'year' : 'month' }}

@@ -20,7 +20,7 @@ function formatDate(value: string | null) {
 </script>
 
 <template>
-  <div class="p-3.5 border-b border-[#F3E7D2] last:border-b-0 hover:bg-[#FFFAF0] transition-colors
+  <div class="p-3.5 border-b border-[#F3E7D2] last:border-b-0 hover:bg-[#FFFAF0] transition-all duration-200 cursor-default
               min-[360px]:p-4
               sm:p-5">
     <!-- Row 1: Avatar, Name & Cafe, Status Badge -->
@@ -89,37 +89,37 @@ function formatDate(value: string | null) {
         Joined: {{ formatDate(owner.date_joined) }}
       </span>
 
-      <div class="flex items-center gap-3
-                  min-[360px]:gap-4">
+      <div class="flex items-center gap-2
+                  min-[360px]:gap-3">
         <button
           type="button"
-          class="p-1 hover:opacity-70 transition-opacity"
+          class="p-1.5 rounded-lg text-[#9E7060] hover:text-[#7D5A50] hover:bg-[#F3E7D2]/50 transition-all focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
           title="View"
           @click="emit('view', owner)"
         >
-          <Icon name="heroicons:eye" class="w-5 h-5 text-[#9E7060]" />
+          <Icon name="heroicons:eye" class="w-5 h-5" />
         </button>
 
         <button
           v-if="owner.status === 'active'"
           type="button"
-          class="p-1 hover:opacity-70 transition-opacity disabled:opacity-40"
+          class="p-1.5 rounded-lg text-[#9E7060] hover:text-[#D9622B] hover:bg-[#F3E7D2]/50 transition-all disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
           :disabled="statusChangeLoading"
           title="Suspend"
           @click="emit('status-change', owner, 'suspended')"
         >
-          <Icon name="heroicons:no-symbol" class="w-5 h-5 text-[#9E7060]" />
+          <Icon name="heroicons:no-symbol" class="w-5 h-5" />
         </button>
 
         <button
           v-else-if="owner.status === 'suspended'"
           type="button"
-          class="p-1 hover:opacity-70 transition-opacity disabled:opacity-40"
+          class="p-1.5 rounded-lg text-[#9E7060] hover:text-[#2E9E5B] hover:bg-[#F3E7D2]/50 transition-all disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
           :disabled="statusChangeLoading"
           title="Reactivate"
           @click="emit('status-change', owner, 'active')"
         >
-          <Icon name="heroicons:check-circle" class="w-5 h-5 text-[#9E7060]" />
+          <Icon name="heroicons:check-circle" class="w-5 h-5" />
         </button>
       </div>
     </div>

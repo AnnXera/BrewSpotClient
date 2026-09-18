@@ -417,10 +417,10 @@ function formatDate(val?: string | null): string {
 }
 
 function formatAmount(amt?: string | number): string {
-  if (amt === undefined || amt === null) return '$89.00'
+  if (amt === undefined || amt === null) return '₱89.00'
   const numeric = typeof amt === 'string' ? parseFloat(amt.replace(/[^0-9.]/g, '')) : amt
   if (isNaN(numeric)) return String(amt)
-  return `$${numeric.toFixed(2)}`
+  return `₱${numeric.toFixed(2)}`
 }
 
 function formatGateway(val?: string): string {

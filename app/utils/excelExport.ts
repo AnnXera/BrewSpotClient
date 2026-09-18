@@ -128,7 +128,7 @@ export function exportToExcel(transactions: PaymentTransaction[], selectedStatus
   <Style ss:ID="sCurrency">
    <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
    <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#3B1F0E"/>
-   <NumberFormat ss:Format="$#,##0.00"/>
+   <NumberFormat ss:Format="₱#,##0.00"/>
    <Borders>
     <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F3E7D2"/>
     <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F3E7D2"/>
@@ -141,7 +141,7 @@ export function exportToExcel(transactions: PaymentTransaction[], selectedStatus
    <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
    <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#3B1F0E"/>
    <Interior ss:Color="#FFFDF9" ss:Pattern="Solid"/>
-   <NumberFormat ss:Format="$#,##0.00"/>
+   <NumberFormat ss:Format="₱#,##0.00"/>
    <Borders>
     <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F3E7D2"/>
     <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F3E7D2"/>
@@ -195,7 +195,7 @@ export function exportToExcel(transactions: PaymentTransaction[], selectedStatus
    <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
    <Font ss:FontName="Calibri" ss:Size="12" ss:Bold="1" ss:Color="#28A745"/>
    <Interior ss:Color="#FFF0D1" ss:Pattern="Solid"/>
-   <NumberFormat ss:Format="$#,##0.00"/>
+   <NumberFormat ss:Format="₱#,##0.00"/>
    <Borders>
     <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#7D5A50"/>
     <Border ss:Position="Bottom" ss:LineStyle="Double" ss:Weight="3" ss:Color="#7D5A50"/>
@@ -239,7 +239,7 @@ export function exportToExcel(transactions: PaymentTransaction[], selectedStatus
    <!-- Row 5: Summary Card Values -->
    <Row ss:Height="26">
     <Cell ss:MergeAcross="1" ss:StyleID="sSummaryVal"><Data ss:Type="Number">${totalTransactions}</Data></Cell>
-    <Cell ss:MergeAcross="1" ss:StyleID="sSummaryVal"><Data ss:Type="String">$${totalRevenue.toFixed(2)}</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="sSummaryVal"><Data ss:Type="String">₱${totalRevenue.toFixed(2)}</Data></Cell>
     <Cell ss:MergeAcross="1" ss:StyleID="sSummaryVal"><Data ss:Type="String">${escapeXml(selectedStatusLabel)}</Data></Cell>
    </Row>
 
@@ -251,7 +251,7 @@ export function exportToExcel(transactions: PaymentTransaction[], selectedStatus
     <Cell ss:StyleID="sHeader"><Data ss:Type="String">Date</Data></Cell>
     <Cell ss:StyleID="sHeader"><Data ss:Type="String">Activity / Plan Type</Data></Cell>
     <Cell ss:StyleID="sHeader"><Data ss:Type="String">Owner / Email</Data></Cell>
-    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Amount ($)</Data></Cell>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Amount (₱)</Data></Cell>
     <Cell ss:StyleID="sHeader"><Data ss:Type="String">Payment Status</Data></Cell>
    </Row>
 

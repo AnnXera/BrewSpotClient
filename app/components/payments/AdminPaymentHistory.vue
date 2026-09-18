@@ -64,7 +64,9 @@ async function loadPaymentHistory() {
             ? `TXN-${sub.subscription_uuid.replace(/-/g, '').slice(0, 7).toUpperCase()}`
             : 'TXN-0000000',
           date: new Date().toISOString(),
-          description: sub.plan ? `Subscription - ${sub.plan}` : 'Subscription',
+          description: sub.plan 
+            ? `${sub.billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'} Subscription - ${sub.plan}` 
+            : `${sub.billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'} Subscription`,
           amount: isNaN(rawAmt) ? '0.00' : rawAmt.toFixed(2),
           status: sub.status || 'active',
           owner_name: sub.name,

@@ -217,7 +217,7 @@ async function save() {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label class="block font-sans text-xs font-semibold uppercase tracking-wide text-[#3B1F0E]/70 mb-1">
-                      Monthly Price ($) *
+                      Monthly Price (₱) *
                     </label>
                     <input
                       v-model.number="form.price"
@@ -232,7 +232,7 @@ async function save() {
                   <div>
                     <div class="flex items-center justify-between mb-1">
                       <label class="block font-sans text-xs font-semibold uppercase tracking-wide text-[#3B1F0E]/70">
-                        Yearly Price ($) *
+                        Yearly Price (₱) *
                       </label>
                       <span
                         v-if="yearlyDiscountPercent > 0"
@@ -250,22 +250,24 @@ async function save() {
                       class="w-full rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] px-4 py-2.5 font-sans text-sm text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
                     />
                     <p v-if="form.yearly_price > 0" class="font-sans text-[11px] text-[#9E7060] mt-1">
-                      Effective ${{ effectiveMonthlyRate }}/mo billed annually
+                      Effective ₱{{ effectiveMonthlyRate }}/mo billed annually
                     </p>
                   </div>
                 </div>
 
                 <div>
                   <label class="block font-sans text-xs font-semibold uppercase tracking-wide text-[#3B1F0E]/70 mb-1">
-                    Duration (Days) *
+                    Trial Duration (Days)
                   </label>
                   <input
                     v-model.number="form.duration_days"
                     type="number"
                     min="1"
-                    required
                     class="w-full rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] px-4 py-2.5 font-sans text-sm text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
                   />
+                  <p class="font-sans text-[11px] text-[#9E7060] mt-1">
+                    Leave blank for paid plans. Only applies to trial subscriptions.
+                  </p>
                 </div>
 
                 <div>

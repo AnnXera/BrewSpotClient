@@ -91,7 +91,7 @@ defineProps<{
       <div class="mt-4">
         <p class="font-display text-3xl font-bold text-[#28A745]">
           <span v-if="loading" class="animate-pulse">...</span>
-          <span v-else>${{ totalRevenue.toFixed(2) }}</span>
+          <span v-else>₱{{ totalRevenue.toFixed(2) }}</span>
         </p>
         <div class="flex items-center gap-2 mt-2 text-xs font-medium text-[#8B6656]">
           <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">

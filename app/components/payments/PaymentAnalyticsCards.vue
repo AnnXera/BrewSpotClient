@@ -21,7 +21,7 @@ defineProps<{
     <div class="bg-white border border-[#EEDFC4] p-6 rounded-2xl shadow-sm flex items-center justify-between">
       <div>
         <p class="font-sans text-xs font-semibold uppercase text-[#9E7060] tracking-wider">Total Revenue</p>
-        <p class="font-display text-3xl font-bold text-[#28A745] mt-2">${{ totalRevenue.toFixed(2) }}</p>
+        <p class="font-display text-3xl font-bold text-[#28A745] mt-2">₱{{ totalRevenue.toFixed(2) }}</p>
       </div>
       <div class="w-12 h-12 rounded-xl bg-[#D4EDDA] flex items-center justify-center text-[#28A745]">
         <Icon name="heroicons:currency-dollar" class="w-6 h-6" />

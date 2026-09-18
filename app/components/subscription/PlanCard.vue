@@ -52,7 +52,7 @@ function formatPrice(val: string | number): string {
         <div>
           <span class="font-sans text-[11px] font-bold uppercase tracking-wider text-[#9E7060] block">Monthly</span>
           <div class="flex items-baseline gap-1 mt-0.5">
-            <span class="font-display text-[20px] font-bold text-[#7D5A50]">${{ formatPrice(plan.price) }}</span>
+            <span class="font-display text-[20px] font-bold text-[#7D5A50]">₱{{ formatPrice(plan.price) }}</span>
             <span class="font-sans text-[11px] text-[#9E7060]">/mo</span>
           </div>
         </div>
@@ -61,7 +61,7 @@ function formatPrice(val: string | number): string {
           <span class="font-sans text-[11px] font-bold uppercase tracking-wider text-[#9E7060] block">Yearly</span>
           <div class="flex items-baseline gap-1 mt-0.5">
             <span class="font-display text-[20px] font-bold text-[#7D5A50]">
-              ${{ formatPrice(plan.yearly_price ?? 0) }}
+              ₱{{ formatPrice(plan.yearly_price ?? 0) }}
             </span>
             <span class="font-sans text-[11px] text-[#9E7060]">/yr</span>
           </div>
