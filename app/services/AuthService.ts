@@ -82,7 +82,7 @@ export interface ApplicationDetails {
         status: string
     } | null
     documents: {
-        government_id: { type?: string; uploaded: boolean }
+        government_id: { type?: string; uploaded: boolean; has_back?: boolean }
         cafe_document: { type?: string; uploaded: boolean }
         bir: { type: string; uploaded: boolean }
         mayors_permit: { type: string; uploaded: boolean }
@@ -133,6 +133,13 @@ export class AuthService extends BaseService {
 
     resendRegistrationCode(email: string) {
         return this.post<SimpleResponse>('/auth/resend-code', { email })
+    }
+
+    validateRegistrationStep(userUuid: string, data: Record<string, any>) {
+        return this.post<{ success: boolean; errors?: Record<string, string[]>; message?: string }>(
+            `/auth/validate-registration-step/${userUuid}`,
+            data
+        )
     }
 
     register(userUuid: string, payload: FormData) {

@@ -65,12 +65,37 @@ const allBranches = computed(() =>
   )
 )
 
+const activeBranchesCount = computed(() =>
+  allBranches.value.filter(b => ['active', 'inactive'].includes(b.status)).length
+)
+
+const branchSearchQuery = ref('')
+const branchStatusFilter = ref('')
+
+const filteredBranches = computed(() => {
+  return allBranches.value.filter((branch) => {
+    const searchLower = branchSearchQuery.value.toLowerCase()
+    const matchesSearch = !searchLower || 
+      (branch.branch_name && branch.branch_name.toLowerCase().includes(searchLower)) || 
+      (branch.cafe_name && branch.cafe_name.toLowerCase().includes(searchLower)) ||
+      (branch.address && branch.address.toLowerCase().includes(searchLower))
+      
+    const matchesStatus = branchStatusFilter.value === '' || branch.status === branchStatusFilter.value
+    
+    return matchesSearch && matchesStatus
+  })
+})
+
 const branchPage = ref(1)
 const branchesPerPage = 5
-const totalBranchPages = computed(() => Math.max(1, Math.ceil(allBranches.value.length / branchesPerPage)))
+const totalBranchPages = computed(() => Math.max(1, Math.ceil(filteredBranches.value.length / branchesPerPage)))
 const paginatedBranches = computed(() => {
   const start = (branchPage.value - 1) * branchesPerPage
-  return allBranches.value.slice(start, start + branchesPerPage)
+  return filteredBranches.value.slice(start, start + branchesPerPage)
+})
+
+watch([branchSearchQuery, branchStatusFilter], () => {
+  branchPage.value = 1
 })
 
 const selectedBranch = ref<any | null>(null)
@@ -225,7 +250,7 @@ onMounted(fetchOwner)
 
           <button
             type="button"
-            class="font-display transition-colors relative z-10
+            class="font-display transition-colors relative z-10 flex items-center gap-2
                    min-[360px]:px-5 min-[360px]:py-3.5 min-[360px]:text-[14px]
                    md:px-5 md:py-3.5 md:text-[16px]"
             :class="activeTab === 'branches'
@@ -233,7 +258,11 @@ onMounted(fetchOwner)
               : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
             @click="activeTab = 'branches'"
           >
-            Cafe Branches ({{ allBranches.length }})
+            Cafe Branches
+            <span
+              class="rounded-full px-2 py-0.5 text-[11px] font-bold"
+              :class="activeTab === 'branches' ? 'bg-[#3B1F0E] text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+            >{{ allBranches.length }}</span>
             <span
               v-if="activeTab === 'branches'"
               class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full"
@@ -249,7 +278,7 @@ onMounted(fetchOwner)
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 min-[360px]:gap-5 md:gap-6 mb-[20px] min-[360px]:mb-[24px]">
             <OwnerDetailAccountDetailsCard
               :owner="owner"
-              :branch-count="allBranches.length"
+              :branch-count="activeBranchesCount"
               @go-to-branches="activeTab = 'branches'"
             />
             <OwnerDetailCafeDetailsCard
@@ -266,14 +295,62 @@ onMounted(fetchOwner)
             @view="viewDocument"
           />
 
-          <OwnerDetailPaymentHistoryTable :history="paymentHistory" />
+          <OwnerDetailPaymentHistoryTable 
+            :history="paymentHistory"
+            :owner-name="owner ? `${owner.firstname} ${owner.lastname}` : undefined"
+          />
         </template>
 
         <!-- BRANCHES TAB -->
         <template v-else>
           <div class="bg-white border border-[#EEDFC4] rounded-2xl md:rounded-3xl shadow-sm overflow-hidden">
-            <div v-if="allBranches.length === 0" class="p-8 text-center font-sans text-sm text-[#9E7060]">
-              No branches found for this owner.
+            <!-- Filter Bar -->
+            <div class="flex flex-col border-b border-[#F3E7D2]
+                        min-[360px]:px-[12px] min-[360px]:py-[14px] min-[360px]:gap-[12px]
+                        md:flex-row md:items-center md:p-6 md:gap-[24px]">
+              <!-- Search Input -->
+              <div class="relative flex-1 w-full min-w-0">
+                <Icon
+                  name="heroicons:magnifying-glass"
+                  class="text-[#3B1F0E]/40 absolute top-1/2 -translate-y-1/2
+                         min-[360px]:left-[10px] min-[360px]:w-[16px] min-[360px]:h-[16px]
+                         md:left-[12px] md:w-[24px] md:h-[24px]"
+                />
+                <input
+                  v-model="branchSearchQuery"
+                  type="text"
+                  placeholder="Search branches by name or address..."
+                  class="w-full rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] font-sans text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40
+                         min-[360px]:py-[10px] min-[360px]:text-[12px] min-[360px]:pl-[34px]
+                         md:py-[12px] md:text-[14px] md:pl-[48px]"
+                />
+              </div>
+
+              <!-- Dropdown -->
+              <div class="w-full md:w-auto">
+                <div class="relative w-full md:w-auto">
+                  <select
+                    v-model="branchStatusFilter"
+                    class="w-full appearance-none rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] pl-[12px] pr-[32px] font-sans text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40
+                           min-[360px]:py-[10px] min-[360px]:text-[12px]
+                           md:py-[12px] md:text-[14px] md:w-48"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="pending">Pending</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                  <Icon
+                    name="heroicons:chevron-down"
+                    class="w-[16px] h-[16px] text-[#3B1F0E]/40 absolute right-[12px] top-1/2 -translate-y-1/2 pointer-events-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div v-if="filteredBranches.length === 0" class="p-8 text-center font-sans text-sm text-[#9E7060]">
+              No branches found matching your criteria.
             </div>
 
             <div v-else class="p-4 sm:p-6 space-y-4">

@@ -47,6 +47,7 @@ async function loadOwnerSubscription() {
             : `${isYearly ? 'Yearly' : 'Monthly'} Subscription`,
           amount: formattedPrice,
           status: item.status || 'active',
+          payment_gateway: item.payment_gateway || item.payment_method || 'PayPal',
         }
       })
     } else {
@@ -78,6 +79,26 @@ function getActivePlanPrice(): string {
   return isNaN(num) ? '0.00' : num.toFixed(2)
 }
 
+const activePlanFeatures = computed(() => {
+  const plan = currentPlan.value?.plan
+  if (!plan) return []
+  if (plan.feature_details && plan.feature_details.length > 0) {
+    return plan.feature_details.map((f: any) => ({
+      key: f.key,
+      name: f.name || f.key.replace(/_/g, ' '),
+    }))
+  }
+  if (plan.features && plan.features.length > 0) {
+    return plan.features.map((f: any) => {
+      if (typeof f === 'object' && f !== null) {
+        return { key: f.key, name: f.name || f.key.replace(/_/g, ' ') }
+      }
+      return { key: f, name: f.replace(/_/g, ' ') }
+    })
+  }
+  return []
+})
+
 onMounted(loadOwnerSubscription)
 </script>
 
@@ -86,7 +107,7 @@ onMounted(loadOwnerSubscription)
     <!-- Desktop & Mobile Sidebar Navigation -->
     <NavBar :links="links" />
 
-    <main class="flex-1 p-6 md:p-12">
+    <main class="flex-1 p-4 sm:p-6 md:p-12">
       <!-- Title -->
       <div class="flex items-center justify-between mb-8">
         <div>
@@ -118,14 +139,11 @@ onMounted(loadOwnerSubscription)
                 {{ currentPlan?.billing_cycle === 'yearly' ? 'Yearly Billing' : 'Monthly Billing' }}
               </span>
             </div>
-            <p class="font-sans text-sm text-[#8B6656] mt-1">
-              Supports up to {{ currentPlan?.plan?.max_branches || 1 }} cafe branch location(s).
-            </p>
           </div>
 
           <div class="text-left sm:text-right">
             <span class="font-display text-3xl font-bold text-[#7D5A50]">
-              ${{ getActivePlanPrice() }}
+              ₱{{ getActivePlanPrice() }}
             </span>
             <span class="font-sans text-xs text-[#8B6656] block">
               / {{ currentPlan?.billing_cycle === 'yearly' ? 'year' : 'month' }}
@@ -153,18 +171,18 @@ onMounted(loadOwnerSubscription)
           <span class="font-sans text-xs uppercase font-bold text-[#8B6656] block mb-2 tracking-wider">
             Unlocked Features
           </span>
-          <div v-if="currentPlan?.plan?.features && currentPlan.plan.features.length > 0" class="flex flex-wrap gap-2">
+          <div v-if="activePlanFeatures.length > 0" class="flex flex-wrap gap-2">
             <span
-              v-for="feat in currentPlan.plan.features"
-              :key="feat"
+              v-for="feat in activePlanFeatures"
+              :key="feat.key"
               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#FFFDF9] border border-[#EEDFC4] text-[#3D2B24]"
             >
               <Icon name="heroicons:check-badge" class="w-4 h-4 text-[#28A745]" />
-              <span class="capitalize">{{ feat.replace(/_/g, ' ') }}</span>
+              <span>{{ feat.name }}</span>
             </span>
           </div>
           <p v-else class="font-sans text-xs text-[#9E7060]">
-            Basic plan access with single branch support.
+            Basic plan access (single branch only, no advanced features).
           </p>
         </div>
       </div>

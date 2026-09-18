@@ -1,6 +1,6 @@
 import type { PaymentTransaction } from '~/components/common/PaymentHistoryTable.vue'
 
-export function exportToExcel(transactions: PaymentTransaction[], selectedStatusLabel = 'All') {
+export function exportToExcel(transactions: PaymentTransaction[], selectedStatusLabel = 'All', ownerName?: string) {
   const currentDate = new Date().toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
@@ -8,6 +8,14 @@ export function exportToExcel(transactions: PaymentTransaction[], selectedStatus
     hour: '2-digit',
     minute: '2-digit',
   })
+
+  const titleText = ownerName 
+    ? `BREWSPOT SYSTEM - ${ownerName.toUpperCase()}'S PAYMENT & BILLING REPORT`
+    : `BREWSPOT SYSTEM - OFFICIAL PAYMENT & BILLING REPORT`
+
+  const fileName = ownerName
+    ? `BrewSpot_Payment_Report_${ownerName.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.xls`
+    : `BrewSpot_Payment_Report_${new Date().toISOString().slice(0, 10)}.xls`
 
   // Calculate summary metrics
   const totalTransactions = transactions.length
@@ -120,7 +128,7 @@ export function exportToExcel(transactions: PaymentTransaction[], selectedStatus
   <Style ss:ID="sCurrency">
    <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
    <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#3B1F0E"/>
-   <NumberFormat ss:Format="$#,##0.00"/>
+   <NumberFormat ss:Format="₱#,##0.00"/>
    <Borders>
     <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F3E7D2"/>
     <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F3E7D2"/>
@@ -133,7 +141,7 @@ export function exportToExcel(transactions: PaymentTransaction[], selectedStatus
    <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
    <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#3B1F0E"/>
    <Interior ss:Color="#FFFDF9" ss:Pattern="Solid"/>
-   <NumberFormat ss:Format="$#,##0.00"/>
+   <NumberFormat ss:Format="₱#,##0.00"/>
    <Borders>
     <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F3E7D2"/>
     <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F3E7D2"/>
@@ -187,7 +195,7 @@ export function exportToExcel(transactions: PaymentTransaction[], selectedStatus
    <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
    <Font ss:FontName="Calibri" ss:Size="12" ss:Bold="1" ss:Color="#28A745"/>
    <Interior ss:Color="#FFF0D1" ss:Pattern="Solid"/>
-   <NumberFormat ss:Format="$#,##0.00"/>
+   <NumberFormat ss:Format="₱#,##0.00"/>
    <Borders>
     <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#7D5A50"/>
     <Border ss:Position="Bottom" ss:LineStyle="Double" ss:Weight="3" ss:Color="#7D5A50"/>
@@ -208,7 +216,7 @@ export function exportToExcel(transactions: PaymentTransaction[], selectedStatus
    <!-- Row 1: Brand Title Banner -->
    <Row ss:Height="36">
     <Cell ss:MergeAcross="5" ss:StyleID="sTitle">
-     <Data ss:Type="String">   BREWSPOT SYSTEM - OFFICIAL PAYMENT &amp; BILLING REPORT</Data>
+     <Data ss:Type="String">   ${escapeXml(titleText)}</Data>
     </Cell>
    </Row>
 
@@ -231,7 +239,7 @@ export function exportToExcel(transactions: PaymentTransaction[], selectedStatus
    <!-- Row 5: Summary Card Values -->
    <Row ss:Height="26">
     <Cell ss:MergeAcross="1" ss:StyleID="sSummaryVal"><Data ss:Type="Number">${totalTransactions}</Data></Cell>
-    <Cell ss:MergeAcross="1" ss:StyleID="sSummaryVal"><Data ss:Type="String">$${totalRevenue.toFixed(2)}</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="sSummaryVal"><Data ss:Type="String">₱${totalRevenue.toFixed(2)}</Data></Cell>
     <Cell ss:MergeAcross="1" ss:StyleID="sSummaryVal"><Data ss:Type="String">${escapeXml(selectedStatusLabel)}</Data></Cell>
    </Row>
 
@@ -243,7 +251,7 @@ export function exportToExcel(transactions: PaymentTransaction[], selectedStatus
     <Cell ss:StyleID="sHeader"><Data ss:Type="String">Date</Data></Cell>
     <Cell ss:StyleID="sHeader"><Data ss:Type="String">Activity / Plan Type</Data></Cell>
     <Cell ss:StyleID="sHeader"><Data ss:Type="String">Owner / Email</Data></Cell>
-    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Amount ($)</Data></Cell>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Amount (₱)</Data></Cell>
     <Cell ss:StyleID="sHeader"><Data ss:Type="String">Payment Status</Data></Cell>
    </Row>
 
@@ -323,7 +331,7 @@ export function exportToExcel(transactions: PaymentTransaction[], selectedStatus
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.setAttribute('href', url)
-  link.setAttribute('download', `BrewSpot_Payment_Report_${new Date().toISOString().slice(0, 10)}.xls`)
+  link.setAttribute('download', fileName)
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)

@@ -28,8 +28,9 @@ export interface SubscriptionPlanItem {
   price: number | string
   monthly_price?: number | string
   yearly_price?: number | string
-  max_branches: number
+  has_multi_branch?: boolean
   features?: string[]
+  feature_details?: FeatureItem[]
   description?: string | null
   duration_days: number
   is_active?: boolean
@@ -46,6 +47,8 @@ export interface SubscriptionItem {
   end_date: string | null
   cancel_at_period_end: boolean
   plan?: SubscriptionPlanItem
+  payment_gateway?: string
+  payment_method?: string
   created_at: string | null
 }
 
@@ -66,6 +69,7 @@ export interface TransactionHistoryItem {
   owner_name?: string
   owner_email?: string
   payment_method?: string
+  payment_gateway?: string
 }
 
 export class SubscriptionService extends BaseService {
@@ -95,7 +99,6 @@ export class SubscriptionService extends BaseService {
     sub_name: string
     price: number
     yearly_price?: number
-    max_branches: number
     features?: string[]
     description?: string
     duration_days: number
@@ -112,7 +115,6 @@ export class SubscriptionService extends BaseService {
     sub_name: string
     price: number
     yearly_price: number
-    max_branches: number
     features: string[]
     description: string
     duration_days: number
@@ -135,6 +137,11 @@ export class SubscriptionService extends BaseService {
    */
   restorePlan(uuid: string) {
     return this.patch<{ success: boolean; message: string; plan?: SubscriptionPlanItem }>(`/admin/subscription-plans/${uuid}/restore`, {})
+  }
+
+  // Cancel checkout
+  async cancelCheckout(params: { token?: string, ba_token?: string, subscription_id?: string }) {
+    return this.post<{ success: boolean; message: string }>('/owner/subscriptions/cancel', params)
   }
 
   // ─── ADMIN: FEATURES CATALOG ───────────────────────────────────────────────

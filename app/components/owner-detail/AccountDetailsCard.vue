@@ -37,11 +37,10 @@
         <p class="font-bold text-[10px] min-[360px]:text-[11px] text-[#9E7060] uppercase tracking-[0.77%] mb-0.5 min-[360px]:mb-1">Member Since</p>
         <p class="font-medium text-[#3B1F0E]">{{ formatDate(owner.created_at) }}</p>
       </div>
-      <div class="cursor-pointer group" @click="emit('goToBranches')">
-        <p class="font-bold text-[10px] min-[360px]:text-[11px] text-[#9E7060] uppercase tracking-[0.77%] mb-0.5 min-[360px]:mb-1 group-hover:text-[#3B1F0E]">Total Cafe Branches</p>
-        <p class="font-medium text-[#3B1F0E] group-hover:underline inline-flex items-center gap-1">
-          {{ branchCount }} Branches
-          <Icon name="heroicons:arrow-right" class="w-3 h-3 text-[#9E7060] group-hover:text-[#3B1F0E]" />
+      <div>
+        <p class="font-bold text-[10px] min-[360px]:text-[11px] text-[#9E7060] uppercase tracking-[0.77%] mb-0.5 min-[360px]:mb-1">Total Cafe Branches</p>
+        <p class="font-medium text-[#3B1F0E]">
+          {{ branchCount }} {{ branchCount === 1 ? 'Branch' : 'Branches' }}
         </p>
       </div>
     </div>

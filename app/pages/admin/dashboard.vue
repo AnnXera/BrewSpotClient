@@ -36,7 +36,13 @@ const ownerStats = ref<OwnerStats>({
   inactive_or_suspended: 0,
 })
 
-const approvalStats = ref<ApprovalStats>({
+const ownerApprovalStats = ref<ApprovalStats>({
+  pending_approval: 0,
+  approved: 0,
+  rejected: 0,
+})
+
+const branchApprovalStats = ref<ApprovalStats>({
   pending_approval: 0,
   approved: 0,
   rejected: 0,
@@ -44,6 +50,7 @@ const approvalStats = ref<ApprovalStats>({
 
 const pendingApprovalsList = ref<ApprovalListItem[]>([])
 const transactionsList = ref<PaymentTransaction[]>([])
+const activeSubscribersCount = ref(0)
 
 async function loadDashboardData() {
   loading.value = true
@@ -56,14 +63,21 @@ async function loadDashboardData() {
       ownerStats.value = oStatsRes.stats
     }
 
-    // 2. Fetch Approval Stats
-    const aStatsRes = await ownerService.approvalStats()
-    if (aStatsRes?.success && aStatsRes.stats) {
-      approvalStats.value = aStatsRes.stats
+    // 2. Fetch Approval Stats (Owner & Branch separately)
+    const [ownerStatsRes, branchStatsRes] = await Promise.all([
+      ownerService.approvalStats('owner'),
+      ownerService.approvalStats('branch')
+    ])
+    
+    if (ownerStatsRes?.success && ownerStatsRes.stats) {
+      ownerApprovalStats.value = ownerStatsRes.stats
+    }
+    if (branchStatsRes?.success && branchStatsRes.stats) {
+      branchApprovalStats.value = branchStatsRes.stats
     }
 
     // 3. Fetch Pending Approvals Stream
-    const appRes = await ownerService.approvals({ status: 'pending', per_page: 5 })
+    const appRes = await ownerService.approvals({ status: 'pending_approval', per_page: 5 })
     if (appRes?.success && appRes.approvals?.data) {
       pendingApprovalsList.value = appRes.approvals.data
     }
@@ -72,14 +86,15 @@ async function loadDashboardData() {
     const list: PaymentTransaction[] = []
     const subRes = await subService.getSubscribers({ per_page: 20 })
     if (subRes?.success && subRes.subscribers?.data?.length) {
+      activeSubscribersCount.value = ownerStats.value.active
       subRes.subscribers.data.forEach((sub) => {
-        const rawAmt = sub.amount ? parseFloat(sub.amount) : 0
+        const rawAmt = sub.amount ? parseFloat(String(sub.amount).replace(/[^0-9.]/g, '')) : 0
         list.push({
-          transaction_id: sub.subscription_uuid
+          transaction_id: sub.transaction_id || (sub.subscription_uuid
             ? `TXN-${sub.subscription_uuid.replace(/-/g, '').slice(0, 7).toUpperCase()}`
-            : 'TXN-0000000',
-          date: new Date().toISOString(),
-          description: sub.plan ? `Monthly Subscription - ${sub.plan}` : 'Monthly Subscription',
+            : 'TXN-0000000'),
+          date: sub.date || new Date().toISOString(),
+          description: sub.plan ? `Subscription - ${sub.plan}` : 'Subscription',
           amount: isNaN(rawAmt) ? '0.00' : rawAmt.toFixed(2),
           status: sub.status || 'active',
           owner_name: sub.name,
@@ -99,9 +114,11 @@ async function loadDashboardData() {
   }
 }
 
-// Compute total revenue
 const totalRevenue = computed(() => {
   return transactionsList.value.reduce((acc, t) => {
+    const status = t.status?.toLowerCase() || ''
+    if (status === 'failed' || status === 'cancelled') return acc
+
     const val = typeof t.amount === 'number' ? t.amount : parseFloat(String(t.amount).replace(/[^0-9.]/g, ''))
     return acc + (isNaN(val) ? 0 : val)
   }, 0)
@@ -144,12 +161,12 @@ onMounted(loadDashboardData)
         <!-- Header Quick Action Buttons -->
         <div class="flex flex-wrap items-center gap-3">
           <NuxtLink
-            v-if="approvalStats.pending_approval > 0"
+            v-if="ownerApprovalStats.pending_approval + branchApprovalStats.pending_approval > 0"
             to="/admin/approvals"
             class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-display text-sm font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-all shadow-sm"
           >
             <Icon name="heroicons:bell" class="w-4 h-4" />
-            <span>{{ approvalStats.pending_approval }} Approvals Pending</span>
+            <span>{{ ownerApprovalStats.pending_approval + branchApprovalStats.pending_approval }} Approvals Pending</span>
           </NuxtLink>
 
           <button
@@ -177,15 +194,16 @@ onMounted(loadDashboardData)
       <AdminMetricCards
         :total-owners="ownerStats.total_owners"
         :active-owners="ownerStats.active"
-        :pending-approvals="approvalStats.pending_approval"
-        :active-subscriptions="transactionsList.length"
+        :pending-approvals="ownerApprovalStats.pending_approval + branchApprovalStats.pending_approval"
+        :active-subscriptions="activeSubscribersCount"
         :total-revenue="totalRevenue"
         :loading="loading"
       />
 
       <!-- 2. Visual Status & Distribution Breakdown Charts -->
       <AdminStatusBreakdown
-        :approval-stats="approvalStats"
+        :owner-approval-stats="ownerApprovalStats"
+        :branch-approval-stats="branchApprovalStats"
         :owner-stats="ownerStats"
       />
 

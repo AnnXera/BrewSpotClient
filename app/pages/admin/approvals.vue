@@ -15,6 +15,7 @@ const links = [
 ]
 
 const ownerService = useOwnerManagementService()
+const route = useRoute()
 
 type RegistrationTab = 'owner' | 'branch'
 type StatusTab = 'general' | 'pending_approval' | 'approved' | 'rejected'
@@ -176,9 +177,33 @@ async function confirmReject() {
   await handleDecision('rejected', rejectReason.value)
 }
 
-onMounted(() => {
+onMounted(async () => {
   fetchStats()
-  fetchApprovals()
+  await fetchApprovals()
+
+  if (route.query.uuid) {
+    const target = approvals.value.find((a) => a.uuid === route.query.uuid)
+    if (target) {
+      openDetails(target)
+    } else {
+      try {
+        const res = await ownerService.approvalSnapshot(route.query.uuid as string)
+        if (res.success) {
+          modalApproval.value = {
+            uuid: route.query.uuid as string,
+            status: 'pending_approval',
+            user: res.owner,
+            cafe: res.cafe,
+            branch: res.branch,
+          } as any
+          modalOwnerDetails.value = res
+          modalOpen.value = true
+        }
+      } catch (err) {
+        console.warn('Could not auto-open approval from query param:', err)
+      }
+    }
+  }
 })
 </script>
 
@@ -383,7 +408,7 @@ onMounted(() => {
       :decision-loading="decisionLoading"
       @close="closeModal"
       @approve="handleDecision('approved')"
-      @reject="requestReject"
+      @reject="openRejectModal"
     />
 
     <!-- NOTE: same auto-import naming rule — app/components/approval/BranchDetailsModal.vue
@@ -397,15 +422,15 @@ onMounted(() => {
       :decision-loading="decisionLoading"
       @close="closeModal"
       @approve="handleDecision('approved')"
-      @reject="requestReject"
+      @reject="openRejectModal"
     />
 
     <!-- Rejection reason prompt -->
     <Teleport to="body">
       <div
-        v-if="rejectReasonPrompt"
+        v-if="rejectModalOpen"
         class="fixed inset-0 z-[60] flex items-center justify-center bg-[#3B1F0E]/40 backdrop-blur-sm p-4"
-        @click.self="cancelReject"
+        @click.self="closeRejectModal"
       >
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
           <h2 class="font-display text-lg font-semibold text-[#3B1F0E] mb-2">Reason for rejection</h2>
@@ -424,17 +449,18 @@ onMounted(() => {
             <button
               type="button"
               class="rounded-lg px-4 py-2 font-sans text-sm font-medium text-[#3B1F0E]/70 hover:bg-[#F3E7D2] transition-colors"
-              @click="cancelReject"
+              :disabled="decisionLoading"
+              @click="closeRejectModal"
             >
               Cancel
             </button>
             <button
               type="button"
-              :disabled="!rejectReason.trim()"
+              :disabled="!rejectReason.trim() || decisionLoading"
               class="rounded-lg px-4 py-2 font-sans text-sm font-semibold bg-[#D9534F] text-white hover:bg-[#C24541] transition-colors disabled:opacity-50"
               @click="confirmReject"
             >
-              Reject &amp; Notify Owner
+              {{ decisionLoading ? 'Rejecting...' : 'Reject & Notify Owner' }}
             </button>
           </div>
         </div>

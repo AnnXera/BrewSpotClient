@@ -1,56 +1,80 @@
 <!-- app/components/common/PaymentHistoryTable.vue -->
 <template>
   <div>
-    <!-- Top Feature Bar: Search, Filters & Export CSV -->
-    <div v-if="showControls" class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-      <!-- Search Input -->
-      <div class="relative w-full sm:w-80">
-        <Icon
-          name="heroicons:magnifying-glass"
-          class="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9E7060]"
-        />
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search TXN ID, activity, amount..."
-          class="w-full pl-10 pr-4 py-2.5 bg-white border border-[#EEDFC4] rounded-xl font-sans text-sm text-[#3B1F0E] placeholder-[#9E7060]/60 focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] transition-all shadow-sm"
-        />
-        <button
-          v-if="searchQuery"
-          type="button"
-          class="absolute right-3 top-1/2 -translate-y-1/2 text-[#9E7060] hover:text-[#3B1F0E]"
-          @click="searchQuery = ''"
-        >
-          <Icon name="heroicons:x-mark" class="w-4 h-4" />
-        </button>
-      </div>
-
-      <!-- Action Buttons & Status Filter -->
-      <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-        <select
-          v-model="selectedStatus"
-          class="px-4 py-2.5 bg-white border border-[#EEDFC4] rounded-xl font-sans text-sm font-medium text-[#3B1F0E] focus:outline-none focus:border-[#7D5A50] shadow-sm"
-        >
-          <option value="">All Payment Statuses</option>
-          <option value="success">Success / Active</option>
-          <option value="pending">Pending</option>
-          <option value="failed">Failed / Cancelled</option>
-        </select>
-
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-display text-sm font-semibold bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FDF3E7] hover:border-[#7D5A50] transition-all shadow-sm"
-          title="Export records to formatted Excel spreadsheet"
-          @click="handleExportExcel"
-        >
-          <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 text-[#28A745]" />
-          <span>Export Excel</span>
-        </button>
-      </div>
-    </div>
-
     <!-- Main Payment History Card Container -->
     <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden shadow-sm">
+      <!-- Top Feature Bar: Search, Filters & Export CSV -->
+      <div v-if="showControls" class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-6 border-b border-[#F3E7D2]">
+        <!-- Search Input -->
+        <div class="relative w-full sm:w-80">
+          <Icon
+            name="heroicons:magnifying-glass"
+            class="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9E7060]"
+          />
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search TXN ID, activity, amount..."
+            class="w-full pl-10 pr-4 py-2.5 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm text-[#3B1F0E] placeholder-[#9E7060]/60 focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] transition-all shadow-sm"
+          />
+          <button
+            v-if="searchQuery"
+            type="button"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-[#9E7060] hover:text-[#3B1F0E]"
+            @click="searchQuery = ''"
+          >
+            <Icon name="heroicons:x-mark" class="w-4 h-4" />
+          </button>
+        </div>
+
+        <!-- Action Buttons & Filters -->
+        <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          
+          <!-- Date Pickers -->
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <input 
+              type="date" 
+              v-model="startDate" 
+              class="w-full sm:w-auto px-3 py-2 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm text-[#3B1F0E] focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] shadow-sm"
+              title="Start Date"
+            />
+            <span class="text-[#8B6656] font-sans text-sm font-medium">to</span>
+            <input 
+              type="date" 
+              v-model="endDate" 
+              class="w-full sm:w-auto px-3 py-2 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm text-[#3B1F0E] focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] shadow-sm"
+              title="End Date"
+            />
+          </div>
+
+          <div class="relative w-full sm:w-auto min-w-[160px]">
+            <select
+              v-model="selectedStatus"
+              class="w-full appearance-none pl-4 pr-10 py-2.5 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm font-medium text-[#3B1F0E] focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] shadow-sm"
+            >
+              <option value="">All Payment Statuses</option>
+              <option value="success">Success / Active</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed / Cancelled</option>
+            </select>
+            <Icon
+              name="heroicons:chevron-down"
+              class="w-4 h-4 text-[#9E7060] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            />
+          </div>
+
+          <button
+            type="button"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-display text-sm font-semibold bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FDF3E7] hover:border-[#7D5A50] transition-all shadow-sm"
+            title="Export records to formatted Excel spreadsheet"
+            @click="handleExportExcel"
+          >
+            <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 text-[#28A745]" />
+            <span>Export Excel</span>
+          </button>
+        </div>
+      </div>
+
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse">
           <thead>
@@ -60,6 +84,9 @@
               </th>
               <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
                 Date
+              </th>
+              <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
+                Owner Name
               </th>
               <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
                 Activity / Plan Type
@@ -76,7 +103,7 @@
           <!-- Table Body -->
           <tbody>
             <tr v-if="loading">
-              <td colspan="5" class="px-6 py-12 text-center font-sans text-sm text-[#8B6656]">
+              <td colspan="6" class="px-6 py-12 text-center font-sans text-sm text-[#8B6656]">
                 <div class="flex items-center justify-center gap-2">
                   <Icon name="heroicons:arrow-path" class="w-5 h-5 animate-spin text-[#B4846C]" />
                   <span>Loading payment records...</span>
@@ -85,7 +112,7 @@
             </tr>
 
             <tr v-else-if="!filteredHistory.length">
-              <td colspan="5" class="px-6 py-12 text-center font-sans text-sm text-[#8B6656]/70">
+              <td colspan="6" class="px-6 py-12 text-center font-sans text-sm text-[#8B6656]/70">
                 No matching subscription payment history found.
               </td>
             </tr>
@@ -114,6 +141,11 @@
               <!-- Date -->
               <td class="px-6 py-5 font-sans text-[14px] text-[#3B1F0E]/80 whitespace-nowrap">
                 {{ formatDate(txn.date) }}
+              </td>
+
+              <!-- Owner Name -->
+              <td class="px-6 py-5 font-sans text-[14px] font-semibold text-[#3B1F0E] whitespace-nowrap">
+                {{ txn.owner_name || 'N/A' }}
               </td>
 
               <!-- Activity / Plan Type -->
@@ -241,7 +273,7 @@
 
               <div class="flex items-center justify-between py-2 border-b border-[#F3E7D2]">
                 <span class="text-[#8B6656]">Payment Gateway</span>
-                <span class="font-medium text-[#3B1F0E]">PayMongo Online</span>
+                <span class="font-medium text-[#3B1F0E]">{{ formatGateway(activeReceipt.payment_gateway || activeReceipt.payment_method) }}</span>
               </div>
 
               <div class="pt-4 flex items-center justify-between">
@@ -286,6 +318,8 @@ export interface PaymentTransaction {
   status: string
   owner_name?: string
   owner_email?: string
+  payment_gateway?: string
+  payment_method?: string
 }
 
 const props = withDefaults(
@@ -304,6 +338,8 @@ const props = withDefaults(
 
 const searchQuery = ref('')
 const selectedStatus = ref('')
+const startDate = ref('')
+const endDate = ref('')
 const currentPage = ref(1)
 const toastMessage = ref('')
 const activeReceipt = ref<PaymentTransaction | null>(null)
@@ -325,7 +361,25 @@ const filteredHistory = computed(() => {
       itemSt === st ||
       (st === 'success' && ['active', 'succeeded', 'paid', 'approved', 'success'].includes(itemSt))
 
-    return matchesQuery && matchesStatus
+    let matchesDate = true
+    if (startDate.value || endDate.value) {
+      if (item.date) {
+        const itemD = new Date(item.date).getTime()
+        if (!isNaN(itemD)) {
+          if (startDate.value) {
+            const sd = new Date(startDate.value).getTime()
+            if (itemD < sd) matchesDate = false
+          }
+          if (endDate.value && matchesDate) {
+            const ed = new Date(endDate.value)
+            ed.setHours(23, 59, 59, 999)
+            if (itemD > ed.getTime()) matchesDate = false
+          }
+        }
+      }
+    }
+
+    return matchesQuery && matchesStatus && matchesDate
   })
 })
 
@@ -336,7 +390,7 @@ const paginatedRows = computed(() => {
   return filteredHistory.value.slice(start, start + props.perPage)
 })
 
-watch([searchQuery, selectedStatus], () => {
+watch([searchQuery, selectedStatus, startDate, endDate], () => {
   currentPage.value = 1
 })
 
@@ -363,10 +417,19 @@ function formatDate(val?: string | null): string {
 }
 
 function formatAmount(amt?: string | number): string {
-  if (amt === undefined || amt === null) return '$89.00'
+  if (amt === undefined || amt === null) return '₱89.00'
   const numeric = typeof amt === 'string' ? parseFloat(amt.replace(/[^0-9.]/g, '')) : amt
   if (isNaN(numeric)) return String(amt)
-  return `$${numeric.toFixed(2)}`
+  return `₱${numeric.toFixed(2)}`
+}
+
+function formatGateway(val?: string): string {
+  if (!val) return 'PayPal'
+  const v = val.toLowerCase()
+  if (v.includes('paypal')) return 'PayPal'
+  if (v.includes('cash')) return 'Cash'
+  if (v.includes('paymongo')) return 'PayPal'
+  return val.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 function formatStatusLabel(st?: string): string {

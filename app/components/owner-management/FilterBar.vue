@@ -49,8 +49,8 @@ function openDatePicker() {
         :value="search"
         type="text"
         placeholder="Search owner or cafe"
-        class="w-full rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] font-sans text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40
-               min-[360px]:py-[10px] min-[360px]:text-[12px] min-[360px]:pl-[34px]
+        class="w-full rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] font-sans text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 transition-colors hover:border-[#D9C4B8] hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40 focus:border-[#B4846C]/40 focus:bg-white
+               min-[360px]:py-[10px] min-[360px]:text-[13px] min-[360px]:pl-[34px]
                md:py-[12px] md:text-[14px] md:pl-[48px]"
         @input="emit('update:search', ($event.target as HTMLInputElement).value)"
       />
@@ -65,8 +65,8 @@ function openDatePicker() {
                   md:w-auto">
         <select
           :value="status"
-          class="w-full appearance-none rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] pl-[12px] pr-[32px] font-sans text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40
-                 min-[360px]:py-[10px] min-[360px]:text-[12px]
+          class="w-full appearance-none rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] pl-[12px] pr-[32px] font-sans text-[#3B1F0E] transition-colors hover:border-[#D9C4B8] hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40 focus:border-[#B4846C]/40 focus:bg-white cursor-pointer
+                 min-[360px]:py-[10px] min-[360px]:text-[13px]
                  md:py-[12px] md:text-[14px] md:w-36"
           @change="emit('update:status', ($event.target as HTMLSelectElement).value)"
         >
@@ -85,8 +85,8 @@ function openDatePicker() {
           ref="dateInputEl"
           :value="date"
           type="date"
-          class="date-input-clean w-full rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] pl-[12px] pr-[32px] font-sans text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40
-                 min-[360px]:py-[10px] min-[360px]:text-[12px]
+          class="date-input-clean w-full rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] pl-[12px] pr-[32px] font-sans text-[#3B1F0E] transition-colors hover:border-[#D9C4B8] hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40 focus:border-[#B4846C]/40 focus:bg-white cursor-pointer
+                 min-[360px]:py-[10px] min-[360px]:text-[13px]
                  md:py-[12px] md:text-[14px] md:w-40"
           @input="emit('update:date', ($event.target as HTMLInputElement).value)"
         />

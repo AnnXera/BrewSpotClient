@@ -21,7 +21,6 @@ const form = ref({
   sub_name: '',
   price: 0,
   yearly_price: 0,
-  max_branches: 1,
   duration_days: 30,
   description: '',
   is_active: true,
@@ -52,7 +51,6 @@ watch(
         sub_name: newPlan.sub_name,
         price: typeof newPlan.price === 'string' ? parseFloat(newPlan.price) : newPlan.price,
         yearly_price: typeof newPlan.yearly_price === 'string' ? parseFloat(newPlan.yearly_price) : (newPlan.yearly_price ?? 0),
-        max_branches: newPlan.max_branches,
         duration_days: newPlan.duration_days,
         description: newPlan.description || '',
         is_active: newPlan.is_active ?? true,
@@ -63,7 +61,6 @@ watch(
         sub_name: '',
         price: 0,
         yearly_price: 0,
-        max_branches: 1,
         duration_days: 30,
         description: '',
         is_active: true,
@@ -96,10 +93,6 @@ async function save() {
     errorMessage.value = 'Yearly price must be 0 or greater.'
     return
   }
-  if (form.value.max_branches < 1) {
-    errorMessage.value = 'Max branches must be at least 1.'
-    return
-  }
 
   isSaving.value = true
   errorMessage.value = ''
@@ -110,7 +103,6 @@ async function save() {
         sub_name: form.value.sub_name,
         price: form.value.price,
         yearly_price: form.value.yearly_price,
-        max_branches: form.value.max_branches,
         duration_days: form.value.duration_days,
         description: form.value.description,
         is_active: form.value.is_active,
@@ -125,7 +117,6 @@ async function save() {
         sub_name: form.value.sub_name,
         price: form.value.price,
         yearly_price: form.value.yearly_price,
-        max_branches: form.value.max_branches,
         duration_days: form.value.duration_days,
         description: form.value.description,
         is_active: form.value.is_active,
@@ -220,26 +211,13 @@ async function save() {
                       class="w-full rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] px-4 py-2.5 font-sans text-sm text-[#3B1F0E] placeholder:text-[#B4846C] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
                     />
                   </div>
-
-                  <div>
-                    <label class="block font-sans text-xs font-semibold uppercase tracking-wide text-[#3B1F0E]/70 mb-1">
-                      Max Branches *
-                    </label>
-                    <input
-                      v-model.number="form.max_branches"
-                      type="number"
-                      min="1"
-                      required
-                      class="w-full rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] px-4 py-2.5 font-sans text-sm text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
-                    />
-                  </div>
                 </div>
 
                 <!-- Pricing Row (Monthly & Yearly) -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label class="block font-sans text-xs font-semibold uppercase tracking-wide text-[#3B1F0E]/70 mb-1">
-                      Monthly Price ($) *
+                      Monthly Price (₱) *
                     </label>
                     <input
                       v-model.number="form.price"
@@ -254,7 +232,7 @@ async function save() {
                   <div>
                     <div class="flex items-center justify-between mb-1">
                       <label class="block font-sans text-xs font-semibold uppercase tracking-wide text-[#3B1F0E]/70">
-                        Yearly Price ($) *
+                        Yearly Price (₱) *
                       </label>
                       <span
                         v-if="yearlyDiscountPercent > 0"
@@ -272,22 +250,24 @@ async function save() {
                       class="w-full rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] px-4 py-2.5 font-sans text-sm text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
                     />
                     <p v-if="form.yearly_price > 0" class="font-sans text-[11px] text-[#9E7060] mt-1">
-                      Effective ${{ effectiveMonthlyRate }}/mo billed annually
+                      Effective ₱{{ effectiveMonthlyRate }}/mo billed annually
                     </p>
                   </div>
                 </div>
 
                 <div>
                   <label class="block font-sans text-xs font-semibold uppercase tracking-wide text-[#3B1F0E]/70 mb-1">
-                    Duration (Days) *
+                    Trial Duration (Days)
                   </label>
                   <input
                     v-model.number="form.duration_days"
                     type="number"
                     min="1"
-                    required
                     class="w-full rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] px-4 py-2.5 font-sans text-sm text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
                   />
+                  <p class="font-sans text-[11px] text-[#9E7060] mt-1">
+                    Leave blank for paid plans. Only applies to trial subscriptions.
+                  </p>
                 </div>
 
                 <div>

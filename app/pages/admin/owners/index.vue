@@ -229,21 +229,21 @@ onMounted(() => {
                   sm:mb-6
                   md:mb-8">
         <div>
-          <h1 class="font-display text-xl font-bold text-[#3D2B24]
-                     min-[360px]:text-2xl
-                     sm:text-[26px] sm:leading-[39px]">
+          <h1 class="font-display text-2xl font-extrabold text-[#3D2B24] tracking-tight
+                     min-[360px]:text-3xl
+                     sm:text-[32px] sm:leading-[40px]">
             Owner Management
           </h1>
-          <p class="font-sans text-[11px] text-[#9E7060] mt-1
-                    min-[360px]:text-xs
-                    sm:text-sm">
+          <p class="font-sans text-[13px] text-[#9E7060] mt-1
+                    min-[360px]:text-sm
+                    sm:text-[15px]">
             Manage all registered cafe owners.
           </p>
         </div>
 
         <button
           type="button"
-          class="inline-flex items-center gap-2 px-[16px] py-[8px] rounded-[8px] bg-white border border-[#EDD8CC] text-[#7D5A50] font-display font-medium text-[14px] hover:bg-[#FBF2E1] transition-colors shadow-sm self-start sm:self-auto cursor-pointer"
+          class="inline-flex items-center gap-2 px-[16px] py-[8px] rounded-lg bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-medium text-[14px] hover:bg-[#FDF3E7] hover:border-[#D9C4B8] hover:shadow-md hover:-translate-y-[1px] active:translate-y-[1px] active:shadow-sm transition-all shadow-sm self-start sm:self-auto cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
           :disabled="loading"
           @click="refreshData"
         >
@@ -266,7 +266,7 @@ onMounted(() => {
       </div>
 
       <!-- Main Content Card -->
-      <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden shadow-sm">
+      <div class="bg-white border border-[#EEDFC4] rounded-[20px] overflow-hidden shadow-sm transition-shadow hover:shadow-md">
         <OwnerManagementFilterBar
           v-model:search="search"
           v-model:status="status"

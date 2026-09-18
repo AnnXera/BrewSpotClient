@@ -346,6 +346,9 @@ function goLogin() {
                 <p class="font-semibold text-[#7B5A50] mt-0.5 flex items-center gap-1.5">
                   <Icon name="heroicons:identification" class="w-4 h-4" />
                   {{ formatIdType(application.documents.government_id.type) }}
+                  <span v-if="application.documents.government_id.has_back" class="text-[10px] font-medium text-[#7B5A50]/80 bg-[#7B5A50]/10 px-1.5 py-0.5 rounded">
+                    Front & Back
+                  </span>
                 </p>
               </div>
             </div>

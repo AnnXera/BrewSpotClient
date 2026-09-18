@@ -286,13 +286,23 @@ function viewCafePicture() {
                                             </div>
                                         </div>
 
-                                        <button
-                                            type="button"
-                                            class="cursor-pointer font-semibold text-[14px] text-[#FFF0D1] rounded-[10px] border px-[20px] py-[6px] bg-[#7D5A50]"
-                                            @click="viewDocument(doc.download_url)"
-                                        >
-                                            View
-                                        </button>
+                                        <div class="flex items-center gap-2 shrink-0">
+                                            <button
+                                                type="button"
+                                                class="cursor-pointer font-semibold text-[14px] text-[#FFF0D1] rounded-[10px] border px-[16px] py-[6px] bg-[#7D5A50] hover:bg-[#65463d] transition"
+                                                @click="viewDocument(doc.download_url)"
+                                            >
+                                                {{ doc.has_back ? 'View Front' : 'View' }}
+                                            </button>
+                                            <button
+                                                v-if="doc.has_back && doc.download_back_url"
+                                                type="button"
+                                                class="cursor-pointer font-semibold text-[14px] text-[#7D5A50] rounded-[10px] border border-[#7D5A50] px-[16px] py-[6px] bg-white hover:bg-[#FFF8EA] transition"
+                                                @click="viewDocument(doc.download_back_url)"
+                                            >
+                                                View Back
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -124,7 +124,7 @@ onMounted(loadData)
     <!-- Navigation Sidebar -->
     <NavBar :links="links" />
 
-    <main class="flex-1 p-12">
+    <main class="flex-1 min-[360px]:p-[16px] md:p-12">
       <!-- Header -->
       <header class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -132,7 +132,7 @@ onMounted(loadData)
             Subscriptions
           </h1>
           <p class="font-sans text-[14px] leading-[21px] text-[#9E7060] mt-[2px]">
-            Manage platform subscription plans, branch limitations, and feature entitlements.
+            Manage platform subscription plans, multi-branch access, and feature entitlements.
           </p>
         </div>
 

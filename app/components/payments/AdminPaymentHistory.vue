@@ -8,35 +8,29 @@ const ownerService = useOwnerManagementService()
 
 const loading = ref(true)
 const transactions = ref<PaymentTransaction[]>([])
+const registeredSubscribers = ref(0)
 
 async function loadPaymentHistory() {
   loading.value = true
   const list: PaymentTransaction[] = []
 
   try {
-    // 1. Fetch backend subscribers list GET /api/admin/subscribers
+    // 1. Fetch backend subscribers count GET /api/admin/subscribers (fallback data)
     const subRes = await subService.getSubscribers({ per_page: 50 })
-    if (subRes?.success && subRes.subscribers?.data?.length) {
-      subRes.subscribers.data.forEach((sub) => {
-        const rawAmt = sub.amount ? parseFloat(sub.amount) : 0
-        list.push({
-          transaction_id: sub.subscription_uuid
-            ? `TXN-${sub.subscription_uuid.replace(/-/g, '').slice(0, 7).toUpperCase()}`
-            : 'TXN-0000000',
-          date: new Date().toISOString(),
-          description: sub.plan ? `Monthly Subscription - ${sub.plan}` : 'Monthly Subscription',
-          amount: isNaN(rawAmt) ? '0.00' : rawAmt.toFixed(2),
-          status: sub.status || 'active',
-          owner_name: sub.name,
-          owner_email: sub.email || undefined,
-        })
-      })
+    if (subRes?.success && subRes.subscribers) {
+      // Create a set of unique emails from the subscribers list to get an accurate subscriber count
+      const uniqueEmails = new Set(subRes.subscribers.data.map((sub: any) => sub.email).filter(Boolean))
+      registeredSubscribers.value = uniqueEmails.size
     }
 
-    // 2. Fetch owner subscription histories if owners exist in database
-    const ownersRes = await ownerService.list({ per_page: 20 })
+    // 2. Fetch owner subscription payment histories (real database records matching owner details)
+    const ownersRes = await ownerService.list({ per_page: 50 })
     if (ownersRes?.success && ownersRes.owners?.data?.length) {
       const activeSubscribers = ownersRes.owners.data.filter((o) => o.status === 'active' || o.subscription)
+      
+      // Override with actual unique active owners
+      registeredSubscribers.value = activeSubscribers.length
+
       for (const owner of activeSubscribers) {
         try {
           const detailRes = await ownerService.show(owner.uuid)
@@ -51,6 +45,7 @@ async function loadPaymentHistory() {
                 status: ph.status || 'active',
                 owner_name: owner.name,
                 owner_email: owner.email,
+                payment_gateway: ph.payment_gateway || ph.payment_method || 'PayPal',
               })
             })
           }
@@ -59,12 +54,38 @@ async function loadPaymentHistory() {
         }
       }
     }
+
+    // Fallback: If no owner detail payment history exists but subscribers were returned
+    if (list.length === 0 && subRes?.success && subRes.subscribers?.data?.length) {
+      subRes.subscribers.data.forEach((sub) => {
+        const rawAmt = sub.amount ? parseFloat(sub.amount) : 0
+        list.push({
+          transaction_id: sub.subscription_uuid
+            ? `TXN-${sub.subscription_uuid.replace(/-/g, '').slice(0, 7).toUpperCase()}`
+            : 'TXN-0000000',
+          date: new Date().toISOString(),
+          description: sub.plan 
+            ? `${sub.billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'} Subscription - ${sub.plan}` 
+            : `${sub.billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'} Subscription`,
+          amount: isNaN(rawAmt) ? '0.00' : rawAmt.toFixed(2),
+          status: sub.status || 'active',
+          owner_name: sub.name,
+          owner_email: sub.email || undefined,
+          payment_gateway: sub.mode_of_payment || 'PayPal',
+        })
+      })
+    }
   } catch (err) {
     console.warn('Backend payment fetch:', err)
   } finally {
-    // Rely strictly on backend database state — no fake/demo data
+    // Deduplicate by normalized transaction key
     const map = new Map<string, PaymentTransaction>()
-    list.forEach((t) => map.set(t.transaction_id, t))
+    list.forEach((t) => {
+      const normKey = t.transaction_id.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 7)
+      if (!map.has(normKey)) {
+        map.set(normKey, t)
+      }
+    })
     transactions.value = Array.from(map.values())
     loading.value = false
   }
@@ -72,9 +93,12 @@ async function loadPaymentHistory() {
 
 // Analytics computed values based strictly on real backend data
 const totalRevenue = computed(() => {
-  return transactions.value.reduce((acc, t) => {
-    const val = parseFloat(String(t.amount).replace(/[^0-9.]/g, ''))
-    return acc + (isNaN(val) ? 0 : val)
+  return transactions.value.reduce((sum, txn) => {
+    const status = txn.status?.toLowerCase() || ''
+    if (status === 'failed' || status === 'cancelled') return sum
+
+    const val = typeof txn.amount === 'number' ? txn.amount : parseFloat(String(txn.amount).replace(/[^0-9.]/g, ''))
+    return sum + (isNaN(val) ? 0 : val)
   }, 0)
 })
 
@@ -108,7 +132,7 @@ onMounted(loadPaymentHistory)
     <PaymentAnalyticsCards
       :total-transactions="transactions.length"
       :total-revenue="totalRevenue"
-      :registered-subscribers="transactions.length"
+      :registered-subscribers="registeredSubscribers"
     />
 
     <!-- Payment History Table Component -->

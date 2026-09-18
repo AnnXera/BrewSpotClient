@@ -7,10 +7,10 @@ defineProps<{
 }>()
 
 function formatAmount(amt?: string | number): string {
-  if (amt === undefined || amt === null) return '$0.00'
+  if (amt === undefined || amt === null) return '₱0.00'
   const numeric = typeof amt === 'string' ? parseFloat(amt.replace(/[^0-9.]/g, '')) : amt
   if (isNaN(numeric)) return String(amt)
-  return `$${numeric.toFixed(2)}`
+  return `₱${numeric.toFixed(2)}`
 }
 </script>
 
@@ -80,8 +80,13 @@ function formatAmount(amt?: string | number): string {
             </td>
 
             <td class="px-6 py-4 text-right whitespace-nowrap">
-              <span class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#D4EDDA] text-[#28A745]">
-                Active
+              <span 
+                class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-bold"
+                :class="item.status.toLowerCase() === 'active' || item.status.toLowerCase() === 'success' ? 'bg-[#D4EDDA] text-[#28A745]' : 
+                        item.status.toLowerCase() === 'failed' || item.status.toLowerCase() === 'cancelled' ? 'bg-[#F8D7DA] text-[#DC3545]' : 
+                        'bg-[#FFF3CD] text-[#856404]'"
+              >
+                {{ item.status.charAt(0).toUpperCase() + item.status.slice(1).toLowerCase() }}
               </span>
             </td>
           </tr>

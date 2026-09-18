@@ -16,11 +16,13 @@
     <template v-if="subscription">
       <p class="font-display text-2xl min-[360px]:text-[28px] sm:text-[32px] font-bold text-[#7D5A50] mb-0.5 min-[360px]:mb-1">
         {{ formatCurrency(subscription.price) }}
-        <span class="font-display text-xs min-[360px]:text-[14px] font-medium text-[#9E7060]">/ month</span>
+        <span class="font-display text-xs min-[360px]:text-[14px] font-medium text-[#9E7060]">
+          / {{ subscription.billing_cycle === 'yearly' ? 'year' : 'month' }}
+        </span>
       </p>
 
       <p class="font-display text-xs min-[360px]:text-[13px] text-[#9E7060] mb-4 min-[360px]:mb-5 pb-4 min-[360px]:pb-5 border-b border-[#F3E7D2]">
-        {{ subscription.plan_name }} (up to {{ subscription.max_branches }} branches)
+        {{ subscription.plan_name }}
       </p>
 
       <div class="grid grid-cols-2 gap-3 min-[360px]:gap-4 font-display font-medium text-[13px] min-[360px]:text-[14px]">
@@ -50,7 +52,8 @@ interface Subscription {
   status: string
   plan_name: string | null
   price: number | string | null
-  max_branches: number | null
+  billing_cycle?: string | null
+  has_multi_branch: boolean | null
   payment_method: string | null
   end_date: string | null
 }
