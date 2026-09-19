@@ -140,10 +140,13 @@ function openCheckout(plan: SubscriptionPlanItem) {
 }
 
 function onCheckoutSuccess(subscriptionId: string) {
+  const isUpgrade = !!currentPlan.value
   viewMode.value = 'current'
   loadOwnerSubscription()
   // Add a nice toast here in real app
-  alert('Subscription successful! PayPal ID: ' + subscriptionId)
+  alert(isUpgrade
+    ? 'Plan change scheduled! It will take effect on your next billing date.'
+    : 'Subscription successful! PayPal ID: ' + subscriptionId)
 }
 
 onMounted(loadOwnerSubscription)
@@ -218,6 +221,17 @@ onMounted(loadOwnerSubscription)
                 / {{ currentPlan?.billing_cycle === 'yearly' ? 'year' : 'month' }}
               </span>
             </div>
+          </div>
+
+          <div
+            v-if="currentPlan?.pending_plan"
+            class="flex items-start gap-2.5 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl p-4 mb-6 font-sans text-sm text-[#7D5A50]"
+          >
+            <Icon name="heroicons:clock" class="w-5 h-5 shrink-0 mt-0.5 text-[#8B6656]" />
+            <span>
+              Your plan is changing to <strong>{{ currentPlan.pending_plan.sub_name }}</strong> on your next billing date
+              ({{ formatDate(currentPlan?.end_date) }}). You'll keep your current plan's features until then.
+            </span>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 font-sans text-sm mb-6">
