@@ -5,8 +5,8 @@ definePageMeta({
 
 const links = [
   { label: 'Dashboard', to: '/owner/dashboard', icon: 'squares-2x2' },
-  { label: 'Branches', to: '/owner/branches', icon: 'building-storefront' },
-  { label: 'Menu', to: '/owner/menu', icon: 'clipboard' },
+  { label: 'Cafe Management', to: '/owner/branches', icon: 'building-storefront' },
+  { label: 'Menu Management', to: '/owner/menu', icon: 'book-open' },
   { label: 'Subscription', to: '/owner/subscription', icon: 'credit-card' },
 ]
 </script>
