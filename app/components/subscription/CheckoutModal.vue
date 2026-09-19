@@ -26,6 +26,21 @@ const errorMsg = ref('')
 const paypalContainer = ref<HTMLElement | null>(null)
 let paypalButtonsInstance: any = null
 
+// Upgrade proration preview — populated whenever the buyer already has a PayPal
+// subscription. Upgrades (higher price) get an immediate prorated charge via a
+// one-time order; downgrades/lateral moves stay on the existing revise() flow
+// and take effect at the next billing cycle at no extra cost.
+interface UpgradePreview {
+  success: boolean
+  is_upgrade?: boolean
+  prorated_amount?: number
+  next_billing_date?: string
+  current_plan_name?: string
+  new_plan_name?: string
+}
+const upgradePreview = ref<UpgradePreview | null>(null)
+const loadingPreview = ref(false)
+
 // Credit Card Mockup State
 const cardForm = ref({
   name: '',
@@ -40,23 +55,40 @@ const authCookie = useCookie('auth_token')
 
 const finalPrice = computed(() => {
   if (!props.plan) return '0.00'
-  const price = props.billingCycle === 'yearly' 
-    ? (props.plan.yearly_price ?? props.plan.price) 
+  if (upgradePreview.value?.is_upgrade && upgradePreview.value.prorated_amount != null) {
+    return upgradePreview.value.prorated_amount.toFixed(2)
+  }
+  const price = props.billingCycle === 'yearly'
+    ? (props.plan.yearly_price ?? props.plan.price)
     : props.plan.price
   const num = typeof price === 'string' ? parseFloat(price) : price
   return isNaN(num) ? '0.00' : num.toFixed(2)
 })
+
+const isUpgradeFlow = computed(() => !!upgradePreview.value?.is_upgrade)
+
+function formatNextBillingDate(): string {
+  const val = upgradePreview.value?.next_billing_date
+  if (!val) return ''
+  try {
+    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(val))
+  } catch {
+    return ''
+  }
+}
 
 const paypalPlanId = computed(() => {
   if (!props.plan) return null
   return props.billingCycle === 'yearly' ? props.plan.paypal_yearly_plan_id : props.plan.paypal_plan_id
 })
 
-watch(() => props.open, (isOpen) => {
+watch(() => props.open, async (isOpen) => {
   if (isOpen) {
     paymentMethod.value = 'paypal'
     errorMsg.value = ''
     processing.value = false
+    upgradePreview.value = null
+    await loadUpgradePreview()
     setTimeout(initPayPal, 100) // wait for DOM
   } else {
     if (paypalButtonsInstance) {
@@ -65,6 +97,37 @@ watch(() => props.open, (isOpen) => {
     }
   }
 })
+
+// Fetch the prorated preview when the buyer already has a live PayPal subscription,
+// so we know whether this is an upgrade (immediate charge) or a downgrade (free, next cycle).
+async function loadUpgradePreview() {
+  const currentSub = props.currentSubscription
+  if (!currentSub?.paypal_subscription_id || !props.plan?.uuid) {
+    upgradePreview.value = null
+    return
+  }
+
+  loadingPreview.value = true
+  try {
+    const token = authCookie.value
+    const res = await $fetch<UpgradePreview>(`${apiBase}/owner/subscriptions/paypal/upgrade/preview`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: {
+        plan_uuid: props.plan.uuid,
+        billing_cycle: props.billingCycle
+      }
+    })
+    upgradePreview.value = res.success ? res : null
+  } catch (err) {
+    console.error('Upgrade preview error:', err)
+    upgradePreview.value = null
+  } finally {
+    loadingPreview.value = false
+  }
+}
 
 watch(paymentMethod, (newVal) => {
   if (newVal === 'paypal') {
@@ -84,9 +147,15 @@ function initPayPal() {
     paypalButtonsInstance.close().catch(() => {})
   }
 
+  // The subscribe/revise SDK instance is loaded with intent=subscription, which cannot
+  // create one-time orders. Upgrades need a second SDK instance loaded with intent=capture
+  // (see owner/subscription.vue), namespaced as `paypal_orders` so both can coexist.
+  const usingUpgradeOrder = isUpgradeFlow.value && !!props.currentSubscription?.paypal_subscription_id
+  const paypalSdk = usingUpgradeOrder ? (window as any).paypal_orders : (window as any).paypal
+
   // Check if SDK is loaded
-  if (!(window as any).paypal) {
-    errorMsg.value = 'PayPal SDK failed to load.'
+  if (!paypalSdk) {
+    errorMsg.value = usingUpgradeOrder ? 'PayPal payment SDK failed to load.' : 'PayPal SDK failed to load.'
     return
   }
 
@@ -96,33 +165,94 @@ function initPayPal() {
     return
   }
 
-  paypalButtonsInstance = (window as any).paypal.Buttons({
+  const currentSub = props.currentSubscription
+  const buttonConfig: any = {
     style: {
       shape: 'rect',
       color: 'gold',
       layout: 'vertical',
-      label: 'subscribe'
+      label: isUpgradeFlow.value ? 'pay' : 'subscribe'
     },
-    createSubscription: function(data: any, actions: any) {
-      const currentSub = props.currentSubscription
-      // Check if it's an upgrade/downgrade of an existing PayPal plan
+    onError: function(err: any) {
+      console.error('PayPal Checkout error:', err)
+      errorMsg.value = 'An error occurred with PayPal checkout. Please try again.'
+    }
+  }
+
+  if (currentSub?.paypal_subscription_id && isUpgradeFlow.value) {
+    // Upgrade: charge the prorated difference as a one-time order now.
+    // The recurring plan itself is switched server-side once that charge succeeds.
+    buttonConfig.createOrder = async function() {
+      const token = authCookie.value
+      const res = await $fetch<{ success: boolean, order_id?: string, message?: string }>(`${apiBase}/owner/subscriptions/paypal/upgrade/order`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: {
+          plan_uuid: props.plan?.uuid,
+          billing_cycle: props.billingCycle
+        }
+      })
+
+      if (!res.success || !res.order_id) {
+        errorMsg.value = res.message || 'Unable to start the upgrade payment.'
+        throw new Error(errorMsg.value)
+      }
+
+      return res.order_id
+    }
+
+    buttonConfig.onApprove = async function(data: any) {
+      processing.value = true
+      errorMsg.value = ''
+      try {
+        const token = authCookie.value
+        const res = await $fetch<{ success: boolean, message?: string }>(`${apiBase}/owner/subscriptions/paypal/upgrade/capture`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: {
+            order_id: data.orderID,
+            plan_uuid: props.plan?.uuid
+          }
+        })
+
+        if (res.success) {
+          emit('success', data.orderID)
+          emit('close')
+        } else {
+          errorMsg.value = res.message || 'Failed to complete the upgrade.'
+        }
+      } catch (err: any) {
+        console.error('PayPal upgrade capture error:', err)
+        errorMsg.value = err.response?._data?.message || 'An error occurred while completing your upgrade.'
+      } finally {
+        processing.value = false
+      }
+    }
+  } else {
+    // New subscription, or a downgrade/lateral move on an existing one (free, applies next cycle).
+    buttonConfig.createSubscription = function(data: any, actions: any) {
       if (currentSub?.paypal_subscription_id) {
         return actions.subscription.revise(currentSub.paypal_subscription_id, {
           'plan_id': pId
         })
       }
-      
+
       return actions.subscription.create({
         'plan_id': pId
       });
-    },
-    onApprove: async function(data: any, actions: any) {
+    }
+
+    buttonConfig.onApprove = async function(data: any) {
       processing.value = true
       errorMsg.value = ''
       try {
         // Use the ref we grabbed at the root level of setup
         const token = authCookie.value
-        
+
         const res = await $fetch<{success: boolean, message?: string}>(`${apiBase}/owner/subscriptions/paypal`, {
           method: 'POST',
           headers: {
@@ -130,7 +260,8 @@ function initPayPal() {
           },
           body: {
             paypal_subscription_id: data.subscriptionID,
-            plan_uuid: props.plan?.uuid
+            plan_uuid: props.plan?.uuid,
+            billing_cycle: props.billingCycle
           }
         })
 
@@ -146,12 +277,10 @@ function initPayPal() {
       } finally {
         processing.value = false
       }
-    },
-    onError: function(err: any) {
-      console.error('PayPal Checkout error:', err)
-      errorMsg.value = 'An error occurred with PayPal checkout. Please try again.'
     }
-  })
+  }
+
+  paypalButtonsInstance = paypalSdk.Buttons(buttonConfig)
 
   paypalButtonsInstance.render(paypalContainer.value)
 }
@@ -220,10 +349,14 @@ function close() {
                       <p class="font-sans text-sm text-[#7D5A50] capitalize">{{ billingCycle }} Billing</p>
                     </div>
                   </div>
-                  
+
+                  <div v-if="isUpgradeFlow" class="mb-4 p-3 rounded-lg bg-[#FFF8EA] border border-[#EDD8CC] text-xs font-sans text-[#7D5A50] leading-relaxed">
+                    Prorated upgrade charge for the rest of your current cycle. Full {{ billingCycle }} price for {{ plan?.sub_name }} starts on your next billing date{{ formatNextBillingDate() ? ` (${formatNextBillingDate()})` : '' }}.
+                  </div>
+
                   <div class="pt-4 border-t border-dashed border-[#EDD8CC]">
                     <div class="flex justify-between items-center">
-                      <span class="font-sans text-sm text-[#7D5A50]">Total Due Today</span>
+                      <span class="font-sans text-sm text-[#7D5A50]">{{ isUpgradeFlow ? 'Prorated Amount Due Today' : 'Total Due Today' }}</span>
                       <span class="font-display font-bold text-2xl text-[#3B1F0E]">₱{{ finalPrice }}</span>
                     </div>
                   </div>
@@ -231,7 +364,12 @@ function close() {
 
                 <div class="mt-6">
                   <p class="font-sans text-xs text-[#9E7060] leading-relaxed">
-                    By confirming this subscription, you authorize BrewSpot to charge your selected payment method on a recurring basis. You can cancel at any time.
+                    <template v-if="isUpgradeFlow">
+                      This one-time charge covers the upgrade for the remainder of your current billing period. Your subscription will then continue billing on its existing schedule at the new plan's price.
+                    </template>
+                    <template v-else>
+                      By confirming this subscription, you authorize BrewSpot to charge your selected payment method on a recurring basis. You can cancel at any time.
+                    </template>
                   </p>
                 </div>
               </div>

@@ -19,12 +19,21 @@ const links = [
 const config = useRuntimeConfig()
 const paypalClientId = config.public.paypalClientId
 
-// Dynamically inject PayPal Script
+// Dynamically inject PayPal Script.
+// Two SDK instances are needed: the default one handles recurring subscriptions
+// (create/revise), which requires intent=subscription. Upgrades charge an immediate
+// one-time prorated order instead, which needs intent=capture — incompatible with the
+// first instance, so it's loaded under its own data-namespace to avoid clobbering it.
 useHead({
   script: [
     {
       src: `https://www.paypal.com/sdk/js?client-id=${paypalClientId}&vault=true&intent=subscription`,
       defer: true
+    },
+    {
+      src: `https://www.paypal.com/sdk/js?client-id=${paypalClientId}&intent=capture&components=buttons`,
+      defer: true,
+      'data-namespace': 'paypal_orders'
     }
   ]
 })
