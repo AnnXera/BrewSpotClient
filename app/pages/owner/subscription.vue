@@ -114,8 +114,7 @@ function getDisplayPrice(plan: SubscriptionPlanItem, cycle: 'monthly'|'yearly'):
   return isNaN(num) ? '0.00' : num.toFixed(2)
 }
 
-const activePlanFeatures = computed(() => {
-  const plan = currentPlan.value?.plan
+function planFeatures(plan: any) {
   if (!plan) return []
   if (plan.feature_details && plan.feature_details.length > 0) {
     return plan.feature_details.map((f: any) => ({
@@ -132,7 +131,19 @@ const activePlanFeatures = computed(() => {
     })
   }
   return []
-})
+}
+
+const activePlanFeatures = computed(() => planFeatures(currentPlan.value?.plan))
+const nextPlanFeatures = computed(() => planFeatures(currentPlan.value?.pending_plan))
+
+function getNextPlanPrice(): string {
+  const plan = currentPlan.value?.pending_plan
+  if (!plan) return '0.00'
+  const isYearly = (currentPlan.value?.pending_billing_cycle ?? currentPlan.value?.billing_cycle) === 'yearly'
+  const price = isYearly ? (plan.yearly_price ?? plan.price) : plan.price
+  const num = typeof price === 'string' ? parseFloat(price) : price
+  return isNaN(num) ? '0.00' : num.toFixed(2)
+}
 
 function openCheckout(plan: SubscriptionPlanItem) {
   selectedPlanToCheckout.value = plan
@@ -193,80 +204,137 @@ onMounted(loadOwnerSubscription)
       <!-- VIEW MODE: CURRENT -->
       <div v-if="viewMode === 'current'">
         <!-- Current Subscription Active Plan Card (Strictly Backend Based) -->
-        <div v-if="currentPlan" class="bg-white border border-[#EEDFC4] rounded-2xl p-6 md:p-8 mb-8 shadow-sm">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#F3E7D2] pb-6 mb-6">
-            <div>
-              <div class="flex items-center gap-2.5 flex-wrap">
-                <span class="font-display text-2xl font-bold text-[#3B1F0E]">
-                  {{ currentPlan?.plan?.sub_name || 'Active Plan' }}
+        <div
+          v-if="currentPlan"
+          class="grid grid-cols-1 gap-6 mb-8"
+          :class="currentPlan.pending_plan ? 'lg:grid-cols-2 items-start' : ''"
+        >
+          <!-- Current Plan -->
+          <div class="bg-white border border-[#EEDFC4] rounded-2xl p-6 md:p-8 shadow-sm">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#F3E7D2] pb-6 mb-6">
+              <div>
+                <span class="font-sans text-xs uppercase font-bold text-[#8B6656] tracking-wider block mb-2">
+                  Current Plan
                 </span>
-                <span
-                  class="inline-flex items-center px-3 py-0.5 rounded-full font-display font-semibold text-xs bg-[#D4EDDA] text-[#28A745] capitalize"
-                >
-                  {{ currentPlan?.status || 'Active' }}
+                <div class="flex items-center gap-2.5 flex-wrap">
+                  <span class="font-display text-2xl font-bold text-[#3B1F0E]">
+                    {{ currentPlan?.plan?.sub_name || 'Active Plan' }}
+                  </span>
+                  <span
+                    class="inline-flex items-center px-3 py-0.5 rounded-full font-display font-semibold text-xs bg-[#D4EDDA] text-[#28A745] capitalize"
+                  >
+                    {{ currentPlan?.status || 'Active' }}
+                  </span>
+                  <span
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full font-display font-semibold text-xs bg-[#FFF8EA] border border-[#EDD8CC] text-[#7D5A50] capitalize"
+                  >
+                    {{ currentPlan?.billing_cycle === 'yearly' ? 'Yearly Billing' : 'Monthly Billing' }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="text-left sm:text-right">
+                <span class="font-display text-3xl font-bold text-[#7D5A50]">
+                  ₱{{ getActivePlanPrice() }}
                 </span>
-                <span
-                  class="inline-flex items-center px-2.5 py-0.5 rounded-full font-display font-semibold text-xs bg-[#FFF8EA] border border-[#EDD8CC] text-[#7D5A50] capitalize"
-                >
-                  {{ currentPlan?.billing_cycle === 'yearly' ? 'Yearly Billing' : 'Monthly Billing' }}
+                <span class="font-sans text-xs text-[#8B6656] block">
+                  / {{ currentPlan?.billing_cycle === 'yearly' ? 'year' : 'month' }}
                 </span>
               </div>
             </div>
 
-            <div class="text-left sm:text-right">
-              <span class="font-display text-3xl font-bold text-[#7D5A50]">
-                ₱{{ getActivePlanPrice() }}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 font-sans text-sm mb-6">
+              <div class="bg-[#FFFDF9] p-4 rounded-xl border border-[#F3E7D2]">
+                <span class="text-[#8B6656] block text-xs font-medium uppercase tracking-wider">Start Date</span>
+                <span class="font-semibold text-[#3B1F0E] mt-0.5 block">
+                  {{ formatDate(currentPlan?.start_date) }}
+                </span>
+              </div>
+              <div class="bg-[#FFFDF9] p-4 rounded-xl border border-[#F3E7D2]">
+                <span class="text-[#8B6656] block text-xs font-medium uppercase tracking-wider">Next Billing Date</span>
+                <span class="font-semibold text-[#3B1F0E] mt-0.5 block">
+                  {{ formatDate(currentPlan?.end_date) }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Plan Features List -->
+            <div class="pt-4 border-t border-[#F3E7D2]">
+              <span class="font-sans text-xs uppercase font-bold text-[#8B6656] block mb-2 tracking-wider">
+                Unlocked Features
               </span>
-              <span class="font-sans text-xs text-[#8B6656] block">
-                / {{ currentPlan?.billing_cycle === 'yearly' ? 'year' : 'month' }}
-              </span>
+              <div v-if="activePlanFeatures.length > 0" class="flex flex-wrap gap-2">
+                <span
+                  v-for="feat in activePlanFeatures"
+                  :key="feat.key"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#FFFDF9] border border-[#EEDFC4] text-[#3D2B24]"
+                >
+                  <Icon name="heroicons:check-badge" class="w-4 h-4 text-[#28A745]" />
+                  <span>{{ feat.name }}</span>
+                </span>
+              </div>
+              <p v-else class="font-sans text-xs text-[#9E7060]">
+                Basic plan access (single branch only, no advanced features).
+              </p>
             </div>
           </div>
 
+          <!-- Next Plan (scheduled, not yet active) -->
           <div
-            v-if="currentPlan?.pending_plan"
-            class="flex items-start gap-2.5 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl p-4 mb-6 font-sans text-sm text-[#7D5A50]"
+            v-if="currentPlan.pending_plan"
+            class="bg-[#FFFDF9] border border-dashed border-[#D9B98D] rounded-2xl p-6 md:p-8 shadow-sm"
           >
-            <Icon name="heroicons:clock" class="w-5 h-5 shrink-0 mt-0.5 text-[#8B6656]" />
-            <span>
-              Your plan is changing to <strong>{{ currentPlan.pending_plan.sub_name }}</strong> on your next billing date
-              ({{ formatDate(currentPlan?.end_date) }}). You'll keep your current plan's features until then.
-            </span>
-          </div>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-dashed border-[#EEDFC4] pb-6 mb-6">
+              <div>
+                <span class="inline-flex items-center gap-1.5 font-sans text-xs uppercase font-bold text-[#B8752F] tracking-wider mb-2">
+                  <Icon name="heroicons:clock" class="w-4 h-4" />
+                  Next Plan &mdash; Not Active Yet
+                </span>
+                <div class="flex items-center gap-2.5 flex-wrap">
+                  <span class="font-display text-2xl font-bold text-[#3B1F0E]">
+                    {{ currentPlan.pending_plan.sub_name }}
+                  </span>
+                  <span
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full font-display font-semibold text-xs bg-white border border-[#EDD8CC] text-[#7D5A50] capitalize"
+                  >
+                    {{ (currentPlan.pending_billing_cycle ?? currentPlan.billing_cycle) === 'yearly' ? 'Yearly Billing' : 'Monthly Billing' }}
+                  </span>
+                </div>
+              </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 font-sans text-sm mb-6">
-            <div class="bg-[#FFFDF9] p-4 rounded-xl border border-[#F3E7D2]">
-              <span class="text-[#8B6656] block text-xs font-medium uppercase tracking-wider">Start Date</span>
-              <span class="font-semibold text-[#3B1F0E] mt-0.5 block">
-                {{ formatDate(currentPlan?.start_date) }}
-              </span>
+              <div class="text-left sm:text-right">
+                <span class="font-display text-3xl font-bold text-[#7D5A50]">
+                  ₱{{ getNextPlanPrice() }}
+                </span>
+                <span class="font-sans text-xs text-[#8B6656] block">
+                  / {{ (currentPlan.pending_billing_cycle ?? currentPlan.billing_cycle) === 'yearly' ? 'year' : 'month' }}
+                </span>
+              </div>
             </div>
-            <div class="bg-[#FFFDF9] p-4 rounded-xl border border-[#F3E7D2]">
-              <span class="text-[#8B6656] block text-xs font-medium uppercase tracking-wider">Next Billing Date</span>
-              <span class="font-semibold text-[#3B1F0E] mt-0.5 block">
-                {{ formatDate(currentPlan?.end_date) }}
-              </span>
-            </div>
-          </div>
 
-          <!-- Plan Features List -->
-          <div class="pt-4 border-t border-[#F3E7D2]">
-            <span class="font-sans text-xs uppercase font-bold text-[#8B6656] block mb-2 tracking-wider">
-              Unlocked Features
-            </span>
-            <div v-if="activePlanFeatures.length > 0" class="flex flex-wrap gap-2">
-              <span
-                v-for="feat in activePlanFeatures"
-                :key="feat.key"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#FFFDF9] border border-[#EEDFC4] text-[#3D2B24]"
-              >
-                <Icon name="heroicons:check-badge" class="w-4 h-4 text-[#28A745]" />
-                <span>{{ feat.name }}</span>
-              </span>
-            </div>
-            <p v-else class="font-sans text-xs text-[#9E7060]">
-              Basic plan access (single branch only, no advanced features).
+            <p class="font-sans text-sm text-[#7D5A50] mb-6">
+              Takes effect on your next billing date, <strong>{{ formatDate(currentPlan?.end_date) }}</strong>.
+              You'll keep using your current plan's features until then — no charge has been made for this plan yet.
             </p>
+
+            <div class="pt-4 border-t border-dashed border-[#EEDFC4]">
+              <span class="font-sans text-xs uppercase font-bold text-[#8B6656] block mb-2 tracking-wider">
+                Features You'll Unlock
+              </span>
+              <div v-if="nextPlanFeatures.length > 0" class="flex flex-wrap gap-2">
+                <span
+                  v-for="feat in nextPlanFeatures"
+                  :key="feat.key"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#EEDFC4] text-[#3D2B24]"
+                >
+                  <Icon name="heroicons:check-badge" class="w-4 h-4 text-[#B8752F]" />
+                  <span>{{ feat.name }}</span>
+                </span>
+              </div>
+              <p v-else class="font-sans text-xs text-[#9E7060]">
+                Basic plan access (single branch only, no advanced features).
+              </p>
+            </div>
           </div>
         </div>
 
