@@ -103,7 +103,7 @@ function viewDetails(uuid: string) {
   <div class="flex flex-col md:flex-row min-h-screen bg-[#FDF3E7]">
     <NavBar :links="links" />
     <main class="flex-1 p-8">
-      <h1 class="font-display text-[32px] font-extrabold text-[#3D2B24] tracking-tight mb-8">Cafe Management</h1>
+      <h1 class="font-display text-[32px] font-extrabold text-[#3D2B24] tracking-tight mb-6">Cafe Management</h1>
 
       <div class="bg-white border border-[#EEDFC4] rounded-[20px] shadow-sm flex flex-col">
         <CafeManagementCafeFilterBar 
