@@ -31,6 +31,8 @@ export interface SubscriptionPlanItem {
   price: number | string
   monthly_price?: number | string
   yearly_price?: number | string
+  paypal_plan_id?: string | null
+  paypal_yearly_plan_id?: string | null
   has_multi_branch?: boolean
   features?: string[]
   feature_details?: FeatureItem[]

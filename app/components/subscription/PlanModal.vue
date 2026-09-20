@@ -54,6 +54,8 @@ watch(
         duration_days: newPlan.duration_days,
         description: newPlan.description || '',
         is_active: newPlan.is_active ?? true,
+        paypal_plan_id: newPlan.paypal_plan_id || null,
+        paypal_yearly_plan_id: newPlan.paypal_yearly_plan_id || null,
         features: Array.isArray(newPlan.features) ? [...newPlan.features] : [],
       }
     } else {
@@ -64,6 +66,8 @@ watch(
         duration_days: 30,
         description: '',
         is_active: true,
+        paypal_plan_id: null as string | null,
+        paypal_yearly_plan_id: null as string | null,
         features: [],
       }
     }
@@ -292,6 +296,44 @@ async function save() {
                   <label for="modal_plan_is_active" class="font-sans text-xs font-medium text-[#3B1F0E] cursor-pointer">
                     Plan is active and selectable by cafe owners
                   </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Section 1.5: PayPal Integration (Read-only) -->
+            <div v-if="plan && (form.paypal_plan_id || form.paypal_yearly_plan_id)" class="pt-4 border-t border-[#F3E7D2]">
+              <h3 class="font-display text-[18px] font-bold text-[#3D2B24] mb-[16px] flex items-center gap-2">
+                <Icon name="logos:paypal" class="w-5 h-5" />
+                PayPal Integration
+              </h3>
+              
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[#FFF8EA] p-4 rounded-xl border border-[#EDD8CC]">
+                <div>
+                  <label class="block font-sans text-xs font-semibold uppercase tracking-wide text-[#3B1F0E]/70 mb-1">
+                    Monthly Plan ID
+                  </label>
+                  <input
+                    v-model="form.paypal_plan_id"
+                    type="text"
+                    readonly
+                    class="w-full rounded-lg border border-[#EDD8CC]/50 bg-white/50 px-3 py-2 font-sans text-sm text-[#3B1F0E]/80 focus:outline-none cursor-default"
+                  />
+                </div>
+                <div>
+                  <label class="block font-sans text-xs font-semibold uppercase tracking-wide text-[#3B1F0E]/70 mb-1">
+                    Yearly Plan ID
+                  </label>
+                  <input
+                    v-model="form.paypal_yearly_plan_id"
+                    type="text"
+                    readonly
+                    class="w-full rounded-lg border border-[#EDD8CC]/50 bg-white/50 px-3 py-2 font-sans text-sm text-[#3B1F0E]/80 focus:outline-none cursor-default"
+                  />
+                </div>
+                <div class="sm:col-span-2">
+                  <p class="font-sans text-[11px] text-[#9E7060] leading-relaxed">
+                    These IDs are automatically generated and synced with PayPal when you run the <code>php artisan paypal:sync-plans</code> command in the backend. They are read-only here to prevent accidental checkout errors.
+                  </p>
                 </div>
               </div>
             </div>
