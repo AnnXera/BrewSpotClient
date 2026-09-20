@@ -59,21 +59,14 @@ async function loadOwnerSubscription() {
     }
 
     if (historyRes?.success && historyRes.history?.data?.length) {
-      history.value = historyRes.history.data.map((item) => {
-        const isYearly = item.billing_cycle === 'yearly'
-        const rawPrice = isYearly ? (item.plan?.yearly_price ?? item.plan?.price ?? 0) : (item.plan?.price ?? 0)
-        const priceNum = typeof rawPrice === 'string' ? parseFloat(rawPrice) : rawPrice
-        const formattedPrice = isNaN(priceNum) ? '0.00' : (priceNum > 10000 ? priceNum / 100 : priceNum).toFixed(2)
-
+      history.value = historyRes.history.data.map((item: any) => {
         return {
-          transaction_id: item.uuid ? `TXN-${item.uuid.replace(/-/g, '').slice(0, 7).toUpperCase()}` : 'TXN-0000000',
-          date: item.start_date || item.created_at || new Date().toISOString(),
-          description: item.plan?.sub_name
-            ? `${isYearly ? 'Yearly' : 'Monthly'} Subscription - ${item.plan.sub_name}`
-            : `${isYearly ? 'Yearly' : 'Monthly'} Subscription`,
-          amount: formattedPrice,
-          status: item.status || 'active',
-          payment_gateway: item.payment_gateway || item.payment_method || 'PayPal',
+          transaction_id: item.transaction_id,
+          date: item.date,
+          description: item.description,
+          amount: item.amount,
+          status: item.status,
+          payment_gateway: item.payment_gateway,
         }
       })
     } else {

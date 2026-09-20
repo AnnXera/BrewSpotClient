@@ -85,7 +85,7 @@
               <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
                 Date
               </th>
-              <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
+              <th v-if="showOwnerName" class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
                 Owner Name
               </th>
               <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
@@ -144,7 +144,7 @@
               </td>
 
               <!-- Owner Name -->
-              <td class="px-6 py-5 font-sans text-[14px] font-semibold text-[#3B1F0E] whitespace-nowrap">
+              <td v-if="showOwnerName" class="px-6 py-5 font-sans text-[14px] font-semibold text-[#3B1F0E] whitespace-nowrap">
                 {{ txn.owner_name || 'N/A' }}
               </td>
 
@@ -328,11 +328,13 @@ const props = withDefaults(
     loading?: boolean
     perPage?: number
     showControls?: boolean
+    showOwnerName?: boolean
   }>(),
   {
     loading: false,
     perPage: 5,
     showControls: true,
+    showOwnerName: false,
   }
 )
 

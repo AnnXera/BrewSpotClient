@@ -4,7 +4,7 @@ import PaymentHistoryTable, { type PaymentTransaction } from '~/components/commo
 import PaymentAnalyticsCards from '~/components/payments/PaymentAnalyticsCards.vue'
 
 const subService = useSubscriptionService()
-const ownerService = useOwnerManagementService()
+const paymentService = usePaymentService()
 
 const loading = ref(true)
 const transactions = ref<PaymentTransaction[]>([])
@@ -15,7 +15,7 @@ async function loadPaymentHistory() {
   const list: PaymentTransaction[] = []
 
   try {
-    // 1. Fetch backend subscribers count GET /api/admin/subscribers (fallback data)
+    // 1. Fetch backend subscribers count GET /api/admin/subscribers
     const subRes = await subService.getSubscribers({ per_page: 50 })
     if (subRes?.success && subRes.subscribers) {
       // Create a set of unique emails from the subscribers list to get an accurate subscriber count
@@ -23,41 +23,27 @@ async function loadPaymentHistory() {
       registeredSubscribers.value = uniqueEmails.size
     }
 
-    // 2. Fetch owner subscription payment histories (real database records matching owner details)
-    const ownersRes = await ownerService.list({ per_page: 50 })
-    if (ownersRes?.success && ownersRes.owners?.data?.length) {
-      const activeSubscribers = ownersRes.owners.data.filter((o) => o.status === 'active' || o.subscription)
-      
-      // Override with actual unique active owners
-      registeredSubscribers.value = activeSubscribers.length
-
-      for (const owner of activeSubscribers) {
-        try {
-          const detailRes = await ownerService.show(owner.uuid)
-          if (detailRes?.success && detailRes.payment_history?.length) {
-            detailRes.payment_history.forEach((ph: any) => {
-              const rawAmt = ph.amount ? parseFloat(String(ph.amount).replace(/[^0-9.]/g, '')) : 0
-              list.push({
-                transaction_id: ph.transaction_id || `TXN-${owner.uuid.slice(0, 7).toUpperCase()}`,
-                date: ph.date || owner.date_joined,
-                description: ph.description || `Subscription - ${owner.subscription || 'Plan'}`,
-                amount: isNaN(rawAmt) ? '0.00' : rawAmt.toFixed(2),
-                status: ph.status || 'active',
-                owner_name: owner.name,
-                owner_email: owner.email,
-                payment_gateway: ph.payment_gateway || ph.payment_method || 'PayPal',
-              })
-            })
-          }
-        } catch {
-          // ignore error if single owner detail fetch fails
-        }
-      }
+    // 2. Fetch global payment history directly
+    const payRes = await paymentService.getAllPayments({ per_page: 500 })
+    if (payRes?.success && payRes.history?.data) {
+      payRes.history.data.forEach((ph: any) => {
+        const rawAmt = ph.amount ? parseFloat(String(ph.amount).replace(/[^0-9.]/g, '')) : 0
+        list.push({
+          transaction_id: ph.transaction_id || `TXN-${ph.uuid?.slice(0, 7).toUpperCase() || '000000'}`,
+          date: ph.date || ph.created_at,
+          description: ph.description || 'Subscription Payment',
+          amount: isNaN(rawAmt) ? '0.00' : rawAmt.toFixed(2),
+          status: ph.status || 'active',
+          owner_name: ph.owner_name,
+          owner_email: ph.owner_email,
+          payment_gateway: ph.payment_gateway || 'PayPal',
+        })
+      })
     }
 
-    // Fallback: If no owner detail payment history exists but subscribers were returned
+    // Fallback: If no actual payment records exist but subscribers were returned (useful for seeded dev data)
     if (list.length === 0 && subRes?.success && subRes.subscribers?.data?.length) {
-      subRes.subscribers.data.forEach((sub) => {
+      subRes.subscribers.data.forEach((sub: any) => {
         const rawAmt = sub.amount ? parseFloat(sub.amount) : 0
         list.push({
           transaction_id: sub.subscription_uuid
@@ -75,6 +61,7 @@ async function loadPaymentHistory() {
         })
       })
     }
+
   } catch (err) {
     console.warn('Backend payment fetch:', err)
   } finally {
@@ -136,6 +123,6 @@ onMounted(loadPaymentHistory)
     />
 
     <!-- Payment History Table Component -->
-    <PaymentHistoryTable :history="transactions" :loading="loading" :show-controls="true" />
+    <PaymentHistoryTable :history="transactions" :loading="loading" :show-controls="true" :show-owner-name="true" />
   </div>
 </template>
