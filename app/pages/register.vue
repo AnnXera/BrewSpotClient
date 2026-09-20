@@ -445,15 +445,17 @@ async function checkUsernameAvailability() {
   if (!username.value.trim()) return
   try {
     const res = await authService.validateRegistrationStep(userUuid.value, { username: username.value.trim() })
-    if (res.errors?.username) {
-      fieldErrors.value.username = res.errors.username[0]
+    const errMsg = res.errors?.username?.[0]
+    if (errMsg) {
+      fieldErrors.value.username = errMsg
     } else {
       delete fieldErrors.value.username
     }
   } catch (e: any) {
     const errs = e?.data?.errors || e?.response?._data?.errors
-    if (errs?.username?.[0]) {
-      fieldErrors.value.username = errs.username[0]
+    const errMsg = errs?.username?.[0]
+    if (errMsg) {
+      fieldErrors.value.username = errMsg
     }
   }
 }
@@ -466,15 +468,17 @@ async function checkPhoneAvailability() {
   }
   try {
     const res = await authService.validateRegistrationStep(userUuid.value, { phone_number: phoneNumber.value.trim() })
-    if (res.errors?.phone_number) {
-      fieldErrors.value.phone_number = res.errors.phone_number[0]
+    const errMsg = res.errors?.phone_number?.[0]
+    if (errMsg) {
+      fieldErrors.value.phone_number = errMsg
     } else {
       delete fieldErrors.value.phone_number
     }
   } catch (e: any) {
     const errs = e?.data?.errors || e?.response?._data?.errors
-    if (errs?.phone_number?.[0]) {
-      fieldErrors.value.phone_number = errs.phone_number[0]
+    const errMsg = errs?.phone_number?.[0]
+    if (errMsg) {
+      fieldErrors.value.phone_number = errMsg
     }
   }
 }
@@ -483,15 +487,17 @@ async function checkCafeEmailAvailability() {
   if (!cafeEmail.value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cafeEmail.value.trim())) return
   try {
     const res = await authService.validateRegistrationStep(userUuid.value, { cafe_email: cafeEmail.value.trim() })
-    if (res.errors?.cafe_email) {
-      fieldErrors.value.cafe_email = res.errors.cafe_email[0]
+    const errMsg = res.errors?.cafe_email?.[0]
+    if (errMsg) {
+      fieldErrors.value.cafe_email = errMsg
     } else {
       delete fieldErrors.value.cafe_email
     }
   } catch (e: any) {
     const errs = e?.data?.errors || e?.response?._data?.errors
-    if (errs?.cafe_email?.[0]) {
-      fieldErrors.value.cafe_email = errs.cafe_email[0]
+    const errMsg = errs?.cafe_email?.[0]
+    if (errMsg) {
+      fieldErrors.value.cafe_email = errMsg
     }
   }
 }
@@ -507,15 +513,17 @@ async function checkCafePhoneAvailability() {
       cafe_phonenumber: cafePhone.value.trim(),
       phone_number: phoneNumber.value.trim(),
     })
-    if (res.errors?.cafe_phonenumber) {
-      fieldErrors.value.cafe_phonenumber = res.errors.cafe_phonenumber[0]
+    const errMsg = res.errors?.cafe_phonenumber?.[0]
+    if (errMsg) {
+      fieldErrors.value.cafe_phonenumber = errMsg
     } else {
       delete fieldErrors.value.cafe_phonenumber
     }
   } catch (e: any) {
     const errs = e?.data?.errors || e?.response?._data?.errors
-    if (errs?.cafe_phonenumber?.[0]) {
-      fieldErrors.value.cafe_phonenumber = errs.cafe_phonenumber[0]
+    const errMsg = errs?.cafe_phonenumber?.[0]
+    if (errMsg) {
+      fieldErrors.value.cafe_phonenumber = errMsg
     }
   }
 }
@@ -563,7 +571,7 @@ async function handleNextToBusiness() {
     if (res.errors) {
       for (const [k, msgs] of Object.entries(res.errors)) {
         if (Array.isArray(msgs) && msgs.length > 0) {
-          fieldErrors.value[k] = msgs[0]
+          fieldErrors.value[k] = msgs[0] as string
         }
       }
       error.value = Object.values(fieldErrors.value)[0] || 'Please resolve the errors above.'
@@ -647,7 +655,7 @@ async function nextBusinessSubPage() {
     if (res.errors) {
       for (const [k, msgs] of Object.entries(res.errors)) {
         if (Array.isArray(msgs) && msgs.length > 0) {
-          fieldErrors.value[k] = msgs[0]
+          fieldErrors.value[k] = msgs[0] as string
         }
       }
       error.value = Object.values(fieldErrors.value)[0] || 'Please resolve the errors above.'

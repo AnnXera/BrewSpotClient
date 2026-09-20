@@ -18,8 +18,11 @@ export interface SubscriberListItem {
   email: string | null
   phone_number: string | null
   plan: string | null
+  billing_cycle?: 'monthly' | 'yearly' | string | null
   mode_of_payment: string | null
   amount: string | null
+  transaction_id?: string | null
+  date?: string | null
 }
 
 export interface SubscriptionPlanItem {
