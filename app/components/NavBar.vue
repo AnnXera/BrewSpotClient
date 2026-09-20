@@ -28,7 +28,7 @@ function isActive(link: NavLink) {
 }
 
 function iconName(link: NavLink) {
-  return `heroicons:${link.icon}`
+  return isActive(link) ? `heroicons:${link.icon}-solid` : `heroicons:${link.icon}`
 }
 
 const initials = computed(() => {
