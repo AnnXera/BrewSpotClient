@@ -275,9 +275,9 @@ onMounted(loadOwnerSubscription)
           <!-- Next Plan (scheduled, not yet active) -->
           <div
             v-if="currentPlan.pending_plan"
-            class="bg-[#FFFDF9] border border-dashed border-[#D9B98D] rounded-2xl p-6 md:p-8 shadow-sm"
+            class="bg-[#FFF8EA] border border-[#D9B98D] rounded-2xl p-6 md:p-8 shadow-sm"
           >
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-dashed border-[#EEDFC4] pb-6 mb-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#EEDFC4] pb-6 mb-6">
               <div>
                 <span class="inline-flex items-center gap-1.5 font-sans text-xs uppercase font-bold text-[#B8752F] tracking-wider mb-2">
                   <Icon name="heroicons:clock" class="w-4 h-4" />
@@ -310,7 +310,7 @@ onMounted(loadOwnerSubscription)
               You'll keep using your current plan's features until then — no charge has been made for this plan yet.
             </p>
 
-            <div class="pt-4 border-t border-dashed border-[#EEDFC4]">
+            <div class="pt-4 border-t border-[#EEDFC4]">
               <span class="font-sans text-xs uppercase font-bold text-[#8B6656] block mb-2 tracking-wider">
                 Features You'll Unlock
               </span>
@@ -332,19 +332,42 @@ onMounted(loadOwnerSubscription)
         </div>
 
         <!-- No Active Subscription State -->
-        <div v-else-if="!loading" class="bg-white border border-[#EEDFC4] rounded-2xl p-12 mb-8 text-center shadow-sm flex flex-col items-center">
-          <div class="w-16 h-16 bg-[#F3E7D2] rounded-full flex items-center justify-center mx-auto mb-4">
-            <Icon name="heroicons:credit-card" class="w-8 h-8 text-[#9E7060]" />
+        <div v-else-if="!loading" class="bg-[#FFFDF9] border border-[#EEDFC4] rounded-3xl p-8 md:p-16 mb-8 text-center shadow-sm relative overflow-hidden flex flex-col items-center">
+          <!-- Decorative Background Elements -->
+          <div class="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#F3E7D2]/50 to-transparent"></div>
+          
+          <div class="relative z-10 w-24 h-24 bg-white rounded-2xl shadow-lg border border-[#EDD8CC] flex items-center justify-center mx-auto mb-6 rotate-3">
+            <div class="absolute -right-3 -top-3 w-8 h-8 bg-[#3B1F0E] rounded-full flex items-center justify-center -rotate-12 shadow-md">
+              <Icon name="heroicons:star-solid" class="w-4 h-4 text-[#F3E7D2]" />
+            </div>
+            <Icon name="heroicons:building-storefront" class="w-10 h-10 text-[#3B1F0E]" />
           </div>
-          <h3 class="font-display text-xl font-bold text-[#3B1F0E]">No Active Subscription</h3>
-          <p class="font-sans text-sm text-[#8B6656] mt-2 max-w-md mx-auto mb-6">
-            You currently do not have an active subscription. Upgrade your plan today to unlock premium features and manage multiple branches.
+          
+          <h3 class="relative z-10 font-display text-2xl md:text-3xl font-black text-[#3B1F0E] mb-3">
+            Ready to grow your coffee empire?
+          </h3>
+          <p class="relative z-10 font-sans text-base text-[#7D5A50] max-w-lg mx-auto mb-8">
+            You're currently on the basic free tier. Upgrade your plan today to unlock the full potential of Brewspot and streamline your operations.
           </p>
+          
+          <div class="relative z-10 flex flex-wrap justify-center gap-3 mb-10">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-semibold text-[#3D2B24] shadow-sm">
+              <Icon name="heroicons:map" class="w-4 h-4 text-[#B8752F]" /> Multi-branch Management
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-semibold text-[#3D2B24] shadow-sm">
+              <Icon name="heroicons:chart-bar" class="w-4 h-4 text-[#B8752F]" /> Advanced Analytics
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-semibold text-[#3D2B24] shadow-sm">
+              <Icon name="heroicons:users" class="w-4 h-4 text-[#B8752F]" /> Staff Roles
+            </span>
+          </div>
+
           <button
             @click="viewMode = 'browse'"
-            class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-lg shadow-[#3B1F0E]/20"
+            class="relative z-10 inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-all hover:-translate-y-1 shadow-[0_8px_20px_-6px_rgba(59,31,14,0.5)]"
           >
-            Browse Plans Now
+            <Icon name="heroicons:sparkles" class="w-5 h-5" />
+            View Premium Plans
           </button>
         </div>
 
@@ -363,31 +386,36 @@ onMounted(loadOwnerSubscription)
         
         <!-- Monthly / Yearly Toggle -->
         <div class="flex justify-center mb-10 relative">
-          <div class="inline-flex items-center p-1 bg-white border border-[#EDD8CC] rounded-full shadow-sm relative">
+          <div class="inline-flex p-1 bg-white border border-[#EDD8CC] rounded-full shadow-sm relative">
             
-            <!-- Sliding Background Indicator -->
-            <div 
-              class="absolute top-1 bottom-1 bg-[#3B1F0E] rounded-full transition-all duration-300 ease-out shadow-sm"
-              :class="browseBillingCycle === 'monthly' ? 'left-1 w-[92px]' : 'left-[98px] w-[142px]'"
-            ></div>
+            <!-- Inner container for the slider to match button dimensions exactly -->
+            <div class="absolute inset-1 pointer-events-none">
+              <div 
+                class="w-1/2 h-full bg-[#3B1F0E] rounded-full transition-transform duration-300 ease-out shadow-sm"
+                :class="browseBillingCycle === 'monthly' ? 'translate-x-0' : 'translate-x-full'"
+              ></div>
+            </div>
             
-            <button
-              class="relative px-6 py-2 rounded-full font-display text-sm font-semibold transition-colors z-10 w-[92px]"
-              :class="browseBillingCycle === 'monthly' ? 'text-white' : 'text-[#7D5A50] hover:text-[#3B1F0E]'"
-              @click="browseBillingCycle = 'monthly'"
-            >
-              Monthly
-            </button>
-            <button
-              class="relative px-6 py-2 rounded-full font-display text-sm font-semibold transition-colors z-10 flex items-center justify-center gap-2 w-[142px]"
-              :class="browseBillingCycle === 'yearly' ? 'text-white' : 'text-[#7D5A50] hover:text-[#3B1F0E]'"
-              @click="browseBillingCycle = 'yearly'"
-            >
-              Yearly
-              <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-[#FFF8EA] text-[#3B1F0E] text-[10px] font-bold tracking-wider" :class="browseBillingCycle === 'yearly' ? 'bg-white/20 text-white shadow-inner' : ''">
-                SAVE 20%
-              </span>
-            </button>
+            <!-- Buttons wrapper to enforce equal widths -->
+            <div class="relative z-10 grid grid-cols-2 w-full sm:min-w-[320px]">
+              <button
+                class="px-4 sm:px-6 py-2.5 rounded-full font-display text-sm font-semibold transition-colors"
+                :class="browseBillingCycle === 'monthly' ? 'text-white' : 'text-[#7D5A50] hover:text-[#3B1F0E]'"
+                @click="browseBillingCycle = 'monthly'"
+              >
+                Monthly
+              </button>
+              <button
+                class="px-4 sm:px-6 py-2.5 rounded-full font-display text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                :class="browseBillingCycle === 'yearly' ? 'text-white' : 'text-[#7D5A50] hover:text-[#3B1F0E]'"
+                @click="browseBillingCycle = 'yearly'"
+              >
+                <span>Yearly</span>
+                <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-[#FFF8EA] text-[#3B1F0E] text-[10px] font-bold tracking-wider" :class="browseBillingCycle === 'yearly' ? 'bg-white/20 text-white shadow-inner' : ''">
+                  SAVE 20%
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 
