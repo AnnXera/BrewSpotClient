@@ -55,7 +55,7 @@ function goToPage(page: number) {
 }
 
 onMounted(() => {
-  fetchCurrentSubscription()
+  fetchCurrentSubscription(true, true) // force refetch, but silently
   fetchBranches()
 })
 

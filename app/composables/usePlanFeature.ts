@@ -7,10 +7,11 @@ export function usePlanFeature() {
   const isLoaded = useState<boolean>('owner_sub_loaded', () => false)
   const isLoading = useState<boolean>('owner_sub_loading', () => false)
 
-  async function fetchCurrentSubscription(force = false) {
+  async function fetchCurrentSubscription(force = false, silent = false) {
     if (isLoaded.value && !force) return currentPlan.value
 
-    isLoading.value = true
+    if (!silent) isLoading.value = true
+    
     try {
       const res = await subService.getCurrentPlan()
       if (res?.success && res.subscription) {
@@ -22,7 +23,7 @@ export function usePlanFeature() {
       currentPlan.value = null
     } finally {
       isLoaded.value = true
-      isLoading.value = false
+      if (!silent) isLoading.value = false
     }
     return currentPlan.value
   }
