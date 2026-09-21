@@ -26,7 +26,110 @@ const firstname = ref('')
 const middlename = ref('')
 const lastname = ref('')
 const username = ref('')
+
+function sanitizeName(val: string): string {
+  return val.replace(/[^a-zA-Z\s\-'ñÑÀ-ÿ]/g, '')
+}
+
+function isValidName(val: string): boolean {
+  if (!val) return true
+  return /^[a-zA-Z\s\-'ñÑÀ-ÿ]+$/.test(val.trim())
+}
+
+function onFirstNameInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  firstname.value = sanitizeName(target.value)
+  target.value = firstname.value
+}
+
+function onLastNameInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  lastname.value = sanitizeName(target.value)
+  target.value = lastname.value
+}
+
+function onMiddleNameInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  middlename.value = sanitizeName(target.value)
+  target.value = middlename.value
+}
+const phoneType = ref<'mobile' | 'telephone'>('mobile')
+const mobileDigits = ref('')
+const landlineDigits = ref('')
 const phoneNumber = ref('')
+
+function cleanMobileDigits(val: string): string {
+  let cleaned = val.replace(/\D/g, '')
+  if (cleaned.startsWith('639')) {
+    cleaned = cleaned.slice(2)
+  } else if (cleaned.startsWith('0')) {
+    cleaned = cleaned.replace(/^0+/, '')
+  }
+  return cleaned.slice(0, 10)
+}
+
+function syncPhoneNumber() {
+  if (phoneType.value === 'mobile') {
+    mobileDigits.value = cleanMobileDigits(mobileDigits.value)
+    phoneNumber.value = mobileDigits.value ? `+63${mobileDigits.value}` : ''
+  } else {
+    phoneNumber.value = landlineDigits.value.trim()
+  }
+}
+
+function onPhoneTypeChange() {
+  error.value = ''
+  syncPhoneNumber()
+}
+
+function onMobileInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  mobileDigits.value = cleanMobileDigits(target.value)
+  target.value = mobileDigits.value
+  syncPhoneNumber()
+}
+
+function onLandlineInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  landlineDigits.value = target.value.replace(/[^\d\s\-()]/g, '')
+  syncPhoneNumber()
+}
+
+function isValidPhPhone(phoneStr: string): boolean {
+  const digits = phoneStr.replace(/\D/g, '')
+  if (digits.startsWith('639') && digits.length === 12) return true
+  if (digits.startsWith('09') && digits.length === 11) return true
+  if (digits.startsWith('9') && digits.length === 10) return true
+  if (digits.startsWith('0') && digits.length >= 9 && digits.length <= 11) return true
+  return false
+}
+
+function validatePhoneNumber(): boolean {
+  if (phoneType.value === 'mobile') {
+    const cleaned = mobileDigits.value.replace(/\D/g, '')
+    if (!cleaned) {
+      error.value = 'Please enter your PH mobile phone number.'
+      return false
+    }
+    if (!/^9\d{9}$/.test(cleaned)) {
+      error.value = 'Invalid PH mobile number format. Must be 10 digits starting with 9 (e.g., 9171234567).'
+      return false
+    }
+    phoneNumber.value = `+63${cleaned}`
+  } else {
+    const digitsOnly = landlineDigits.value.replace(/\D/g, '')
+    if (!digitsOnly) {
+      error.value = 'Please enter your telephone number.'
+      return false
+    }
+    if (!/^0\d{8,10}$/.test(digitsOnly)) {
+      error.value = 'Invalid PH telephone format. Must include area code starting with 0 (e.g., 082-123-4567 or 02-8123-4567).'
+      return false
+    }
+    phoneNumber.value = landlineDigits.value.trim()
+  }
+  return true
+}
 const ownerAddress = ref('')
 const idType = ref('drivers_license')
 const isBackIdRequired = computed(() => idType.value !== 'passport')
@@ -55,8 +158,65 @@ const cafeName = ref('')
 const cafeDocType = ref<'DTI' | 'SEC'>('DTI')
 const branchName = ref('')
 const address = ref('')
+const cafePhoneType = ref<'mobile' | 'telephone'>('mobile')
+const cafeMobileDigits = ref('')
+const cafeLandlineDigits = ref('')
 const cafePhone = ref('')
 const cafeEmail = ref('')
+
+function syncCafePhone() {
+  if (cafePhoneType.value === 'mobile') {
+    cafeMobileDigits.value = cleanMobileDigits(cafeMobileDigits.value)
+    cafePhone.value = cafeMobileDigits.value ? `+63${cafeMobileDigits.value}` : ''
+  } else {
+    cafePhone.value = cafeLandlineDigits.value.trim()
+  }
+}
+
+function onCafePhoneTypeChange() {
+  error.value = ''
+  syncCafePhone()
+}
+
+function onCafeMobileInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  cafeMobileDigits.value = cleanMobileDigits(target.value)
+  target.value = cafeMobileDigits.value
+  syncCafePhone()
+}
+
+function onCafeLandlineInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  cafeLandlineDigits.value = target.value.replace(/[^\d\s\-()]/g, '')
+  syncCafePhone()
+}
+
+function validateCafePhone(): boolean {
+  if (cafePhoneType.value === 'mobile') {
+    const cleaned = cafeMobileDigits.value.replace(/\D/g, '')
+    if (!cleaned) {
+      error.value = 'Please enter your branch mobile phone number.'
+      return false
+    }
+    if (!/^9\d{9}$/.test(cleaned)) {
+      error.value = 'Invalid Branch mobile phone format. Must be 10 digits starting with 9 (e.g., 9171234567).'
+      return false
+    }
+    cafePhone.value = `+63${cleaned}`
+  } else {
+    const digitsOnly = cafeLandlineDigits.value.replace(/\D/g, '')
+    if (!digitsOnly) {
+      error.value = 'Please enter your branch telephone number.'
+      return false
+    }
+    if (!/^0\d{8,10}$/.test(digitsOnly)) {
+      error.value = 'Invalid Branch telephone format. Must include area code starting with 0 (e.g., 082-123-4567 or 02-8123-4567).'
+      return false
+    }
+    cafePhone.value = cafeLandlineDigits.value.trim()
+  }
+  return true
+}
 
 // 4 Required Business Files
 const birFile = ref<File | null>(null)
@@ -94,16 +254,28 @@ function goLogin() {
   navigateTo('/login')
 }
 
+function isValidEmail(emailStr: string): boolean {
+  if (!emailStr) return false
+  const trimmed = emailStr.trim()
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+  return emailRegex.test(trimmed)
+}
+
 // Step 1: Send Code
 async function handleSendCode() {
   error.value = ''
-  if (!email.value) {
-    error.value = 'Please enter a valid email address.'
+  const trimmedEmail = email.value.trim()
+  if (!trimmedEmail) {
+    error.value = 'Please enter your email address.'
+    return
+  }
+  if (!isValidEmail(trimmedEmail)) {
+    error.value = 'Invalid email format. Email must follow standard user@domain.com syntax with an "@" symbol and a valid domain (e.g., name@gmail.com).'
     return
   }
   loading.value = true
   try {
-    const res = await authService.sendRegistrationCode(email.value) as any
+    const res = await authService.sendRegistrationCode(trimmedEmail) as any
     if (res) {
       digits.value = ['', '', '', '', '', '']
       currentStep.value = 2
@@ -137,7 +309,7 @@ async function handleVerifyOTP() {
   error.value = ''
   loading.value = true
   try {
-    const res = await authService.verifyRegistrationCode(email.value, otpCode.value) as any
+    const res = await authService.verifyRegistrationCode(email.value.trim(), otpCode.value) as any
     if (res.user_uuid) {
       userUuid.value = res.user_uuid
       currentStep.value = 3
@@ -155,7 +327,7 @@ async function handleResendOTP() {
   if (cooldown.value > 0) return
   error.value = ''
   try {
-    const res = await authService.resendRegistrationCode(email.value)
+    const res = await authService.resendRegistrationCode(email.value.trim())
     if (res.success) {
       cooldown.value = 60
       const interval = setInterval(() => {
@@ -273,15 +445,17 @@ async function checkUsernameAvailability() {
   if (!username.value.trim()) return
   try {
     const res = await authService.validateRegistrationStep(userUuid.value, { username: username.value.trim() })
-    if (res.errors?.username) {
-      fieldErrors.value.username = res.errors.username[0]
+    const errMsg = res.errors?.username?.[0]
+    if (errMsg) {
+      fieldErrors.value.username = errMsg
     } else {
       delete fieldErrors.value.username
     }
   } catch (e: any) {
     const errs = e?.data?.errors || e?.response?._data?.errors
-    if (errs?.username?.[0]) {
-      fieldErrors.value.username = errs.username[0]
+    const errMsg = errs?.username?.[0]
+    if (errMsg) {
+      fieldErrors.value.username = errMsg
     }
   }
 }
@@ -294,15 +468,17 @@ async function checkPhoneAvailability() {
   }
   try {
     const res = await authService.validateRegistrationStep(userUuid.value, { phone_number: phoneNumber.value.trim() })
-    if (res.errors?.phone_number) {
-      fieldErrors.value.phone_number = res.errors.phone_number[0]
+    const errMsg = res.errors?.phone_number?.[0]
+    if (errMsg) {
+      fieldErrors.value.phone_number = errMsg
     } else {
       delete fieldErrors.value.phone_number
     }
   } catch (e: any) {
     const errs = e?.data?.errors || e?.response?._data?.errors
-    if (errs?.phone_number?.[0]) {
-      fieldErrors.value.phone_number = errs.phone_number[0]
+    const errMsg = errs?.phone_number?.[0]
+    if (errMsg) {
+      fieldErrors.value.phone_number = errMsg
     }
   }
 }
@@ -311,15 +487,17 @@ async function checkCafeEmailAvailability() {
   if (!cafeEmail.value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cafeEmail.value.trim())) return
   try {
     const res = await authService.validateRegistrationStep(userUuid.value, { cafe_email: cafeEmail.value.trim() })
-    if (res.errors?.cafe_email) {
-      fieldErrors.value.cafe_email = res.errors.cafe_email[0]
+    const errMsg = res.errors?.cafe_email?.[0]
+    if (errMsg) {
+      fieldErrors.value.cafe_email = errMsg
     } else {
       delete fieldErrors.value.cafe_email
     }
   } catch (e: any) {
     const errs = e?.data?.errors || e?.response?._data?.errors
-    if (errs?.cafe_email?.[0]) {
-      fieldErrors.value.cafe_email = errs.cafe_email[0]
+    const errMsg = errs?.cafe_email?.[0]
+    if (errMsg) {
+      fieldErrors.value.cafe_email = errMsg
     }
   }
 }
@@ -335,15 +513,17 @@ async function checkCafePhoneAvailability() {
       cafe_phonenumber: cafePhone.value.trim(),
       phone_number: phoneNumber.value.trim(),
     })
-    if (res.errors?.cafe_phonenumber) {
-      fieldErrors.value.cafe_phonenumber = res.errors.cafe_phonenumber[0]
+    const errMsg = res.errors?.cafe_phonenumber?.[0]
+    if (errMsg) {
+      fieldErrors.value.cafe_phonenumber = errMsg
     } else {
       delete fieldErrors.value.cafe_phonenumber
     }
   } catch (e: any) {
     const errs = e?.data?.errors || e?.response?._data?.errors
-    if (errs?.cafe_phonenumber?.[0]) {
-      fieldErrors.value.cafe_phonenumber = errs.cafe_phonenumber[0]
+    const errMsg = errs?.cafe_phonenumber?.[0]
+    if (errMsg) {
+      fieldErrors.value.cafe_phonenumber = errMsg
     }
   }
 }
@@ -391,7 +571,7 @@ async function handleNextToBusiness() {
     if (res.errors) {
       for (const [k, msgs] of Object.entries(res.errors)) {
         if (Array.isArray(msgs) && msgs.length > 0) {
-          fieldErrors.value[k] = msgs[0]
+          fieldErrors.value[k] = msgs[0] as string
         }
       }
       error.value = Object.values(fieldErrors.value)[0] || 'Please resolve the errors above.'
@@ -475,7 +655,7 @@ async function nextBusinessSubPage() {
     if (res.errors) {
       for (const [k, msgs] of Object.entries(res.errors)) {
         if (Array.isArray(msgs) && msgs.length > 0) {
-          fieldErrors.value[k] = msgs[0]
+          fieldErrors.value[k] = msgs[0] as string
         }
       }
       error.value = Object.values(fieldErrors.value)[0] || 'Please resolve the errors above.'
@@ -937,6 +1117,7 @@ async function handleFinalSubmit() {
                   placeholder="John"
                   class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                   required
+                  @input="onFirstNameInput"
                 />
               </div>
               <div>
@@ -947,6 +1128,7 @@ async function handleFinalSubmit() {
                   placeholder="Doe"
                   class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                   required
+                  @input="onLastNameInput"
                 />
               </div>
             </div>
@@ -959,6 +1141,7 @@ async function handleFinalSubmit() {
                   type="text"
                   placeholder="Optional"
                   class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  @input="onMiddleNameInput"
                 />
               </div>
               <div>
@@ -981,8 +1164,9 @@ async function handleFinalSubmit() {
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
-              <div>
+            <div class="grid grid-cols-12 gap-2.5">
+              <!-- Contact No. (7 of 12 cols - extended width so all input numbers fit) -->
+              <div class="col-span-7">
                 <label class="block text-sm font-medium mb-1 text-[#2d201b]">Contact No. *</label>
                 <input
                   v-model="phoneNumber"
@@ -1006,7 +1190,7 @@ async function handleFinalSubmit() {
                 <label class="block text-sm font-medium mb-1 text-[#2d201b]">ID Type *</label>
                 <select
                   v-model="idType"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  class="w-full h-11 rounded-md border border-gray-300 px-2 outline-none transition bg-white text-xs font-medium text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20 truncate"
                 >
                   <option value="drivers_license">Driver's License</option>
                   <option value="passport">Passport</option>
@@ -1129,8 +1313,9 @@ async function handleFinalSubmit() {
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-3">
-                <div>
+              <div class="grid grid-cols-12 gap-2.5">
+                <!-- Branch Name (5 of 12 cols) -->
+                <div class="col-span-5">
                   <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Name *</label>
                   <input
                     v-model="branchName"
@@ -1140,7 +1325,9 @@ async function handleFinalSubmit() {
                     required
                   />
                 </div>
-                <div>
+
+                <!-- Branch Phone (7 of 12 cols - extended width so all input numbers fit) -->
+                <div class="col-span-7">
                   <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Phone *</label>
                   <input
                     v-model="cafePhone"
