@@ -20,7 +20,7 @@ const router = useRouter()
       </h1>
       <p class="font-sans text-sm text-[#8B6656] mb-2 leading-relaxed">
         Your payment is being processed. Your subscription will be activated shortly
-        once PayPal confirms the transaction.
+        once PayMongo confirms the transaction.
       </p>
       <p class="font-sans text-xs text-[#9E7060] mb-8">
         This usually takes a few seconds. Refresh your subscription page if it doesn't update immediately.

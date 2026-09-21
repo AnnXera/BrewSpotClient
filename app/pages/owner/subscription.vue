@@ -16,18 +16,7 @@ const links = [
   { label: 'Subscription', to: '/owner/subscription', icon: 'credit-card' },
 ]
 
-const config = useRuntimeConfig()
-const paypalClientId = config.public.paypalClientId
-
-// Dynamically inject PayPal Script
-useHead({
-  script: [
-    {
-      src: `https://www.paypal.com/sdk/js?client-id=${paypalClientId}&vault=true&intent=subscription`,
-      defer: true
-    }
-  ]
-})
+const route = useRoute()
 
 const subService = useSubscriptionService()
 
@@ -143,17 +132,48 @@ function openCheckout(plan: SubscriptionPlanItem) {
   isCheckoutOpen.value = true
 }
 
-function onCheckoutSuccess(subscriptionId: string) {
-  const isUpgrade = !!currentPlan.value
-  viewMode.value = 'current'
-  loadOwnerSubscription()
-  // Add a nice toast here in real app
-  alert(isUpgrade
-    ? 'Plan change scheduled! It will take effect on your next billing date.'
-    : 'Subscription successful! PayPal ID: ' + subscriptionId)
+/**
+ * PayMongo redirects back here after the hosted checkout page with ?checkout=success or
+ * ?checkout=cancelled. The subscription is activated by the webhook, not by this redirect,
+ * so a success return is reported as "payment received" rather than claiming it is active.
+ */
+function handleCheckoutReturn() {
+  const outcome = route.query.checkout
+
+  if (outcome === 'success') {
+    viewMode.value = 'current'
+    alert('Payment received. Your subscription will activate as soon as PayMongo confirms the payment — this usually takes a few seconds.')
+  } else if (outcome === 'cancelled') {
+    alert('Checkout was cancelled. You have not been charged.')
+  }
 }
 
-onMounted(loadOwnerSubscription)
+/**
+ * Renewal links from the expiration reminder email arrive as
+ * ?renew=<plan_uuid>&cycle=<monthly|yearly>. Open checkout on that plan directly so the
+ * owner lands straight on payment instead of having to find the plan again.
+ */
+function openRenewalFromQuery() {
+  const renewUuid = route.query.renew
+  if (typeof renewUuid !== 'string' || !renewUuid) return
+
+  const plan = availablePlans.value.find(p => p.uuid === renewUuid)
+  if (!plan) return
+
+  const cycle = route.query.cycle
+  if (cycle === 'yearly' || cycle === 'monthly') {
+    browseBillingCycle.value = cycle
+  }
+
+  viewMode.value = 'browse'
+  openCheckout(plan)
+}
+
+onMounted(async () => {
+  await loadOwnerSubscription()
+  handleCheckoutReturn()
+  openRenewalFromQuery()
+})
 </script>
 
 <template>
@@ -491,7 +511,6 @@ onMounted(loadOwnerSubscription)
       :current-subscription="currentPlan"
       :billing-cycle="browseBillingCycle"
       @close="isCheckoutOpen = false"
-      @success="onCheckoutSuccess"
     />
   </div>
 </template>

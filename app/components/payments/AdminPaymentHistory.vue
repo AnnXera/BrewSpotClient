@@ -36,7 +36,7 @@ async function loadPaymentHistory() {
           status: ph.status || 'active',
           owner_name: ph.owner_name,
           owner_email: ph.owner_email,
-          payment_gateway: ph.payment_gateway || 'PayPal',
+          payment_gateway: ph.payment_gateway || 'PayMongo',
         })
       })
     }
@@ -57,7 +57,7 @@ async function loadPaymentHistory() {
           status: sub.status || 'active',
           owner_name: sub.name,
           owner_email: sub.email || undefined,
-          payment_gateway: sub.mode_of_payment || 'PayPal',
+          payment_gateway: sub.mode_of_payment || 'PayMongo',
         })
       })
     }

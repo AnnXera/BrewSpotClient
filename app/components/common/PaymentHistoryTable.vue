@@ -426,11 +426,13 @@ function formatAmount(amt?: string | number): string {
 }
 
 function formatGateway(val?: string): string {
-  if (!val) return 'PayPal'
+  if (!val) return 'PayMongo'
   const v = val.toLowerCase()
-  if (v.includes('paypal')) return 'PayPal'
   if (v.includes('cash')) return 'Cash'
-  if (v.includes('paymongo')) return 'PayPal'
+  if (v.includes('trial')) return 'Free Trial'
+  if (v.includes('paymongo')) return 'PayMongo'
+  // Historical rows from the previous gateway are still shown as what they were.
+  if (v.includes('paypal')) return 'PayPal'
   return val.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
