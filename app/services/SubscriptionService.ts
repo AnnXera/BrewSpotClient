@@ -47,14 +47,30 @@ export interface SubscriptionPlanItem {
 export interface SubscriptionItem {
   uuid: string
   status: string
-  billing_cycle?: 'monthly' | 'yearly' | string
+  billing_cycle?: 'monthly' | 'yearly' | 'daily' | 'trial' | string
+  pending_billing_cycle?: string | null
   start_date: string | null
   end_date: string | null
+  /** When the next term becomes payable — the day the owner's paid days run out. */
+  renewal_opens_at?: string | null
   cancel_at_period_end: boolean
   plan?: SubscriptionPlanItem
+  pending_plan?: SubscriptionPlanItem | null
   payment_gateway?: string
   payment_method?: string
   created_at: string | null
+}
+
+/**
+ * Returned instead of a subscription once a term has run out: the plan the owner should
+ * pay for to come back — a change they booked before lapsing, or the plan that ended.
+ */
+export interface RenewalOffer {
+  plan: SubscriptionPlanItem
+  billing_cycle: string
+  was_scheduled: boolean
+  previous_plan?: string | null
+  ended_on?: string | null
 }
 
 export interface PaginatedResponse<T> {
@@ -239,7 +255,7 @@ export class SubscriptionService extends BaseService {
    * Cafe Owner — get current active subscription plan
    */
   getCurrentPlan() {
-    return this.get<{ success: boolean; subscription?: SubscriptionItem; message?: string }>('/owner/subscription/current')
+    return this.get<{ success: boolean; subscription?: SubscriptionItem; renewal_offer?: RenewalOffer | null; message?: string }>('/owner/subscription/current')
   }
 
   /**

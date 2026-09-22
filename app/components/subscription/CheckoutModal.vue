@@ -31,7 +31,27 @@ const finalPrice = computed(() => {
   return isNaN(num) ? '0.00' : num.toFixed(2)
 })
 
-const termLabel = computed(() => props.billingCycle === 'yearly' ? 'year' : 'month')
+// Checkout forces a daily cadence for daily plans server-side, so mirror that rule here
+// rather than repeating the toggle's "monthly" back at the owner.
+const effectiveCycle = computed(() =>
+  /daily/i.test(props.plan?.sub_name ?? '') ? 'daily' : props.billingCycle
+)
+
+const cycleLabel = computed(() => {
+  switch (effectiveCycle.value) {
+    case 'yearly': return 'Yearly'
+    case 'daily':  return 'Daily'
+    default:        return 'Monthly'
+  }
+})
+
+const termLabel = computed(() => {
+  switch (effectiveCycle.value) {
+    case 'yearly': return 'year'
+    case 'daily':  return 'day'
+    default:        return 'month'
+  }
+})
 
 watch(() => props.open, (isOpen) => {
   if (isOpen) {
@@ -118,7 +138,7 @@ function close() {
                   <div class="flex justify-between items-start mb-4">
                     <div>
                       <h4 class="font-display font-bold text-[#3B1F0E] text-lg">{{ plan?.sub_name }}</h4>
-                      <p class="font-sans text-sm text-[#7D5A50] capitalize">{{ billingCycle }} Billing</p>
+                      <p class="font-sans text-sm text-[#7D5A50]">{{ cycleLabel }} Billing</p>
                     </div>
                   </div>
 
@@ -134,8 +154,8 @@ function close() {
                   <p class="font-sans text-xs text-[#9E7060] leading-relaxed">
                     This is a one-time payment covering one {{ termLabel }} of your
                     {{ plan?.sub_name }}. You will not be charged automatically — we will
-                    email you before it expires so you can renew, and any days left on your
-                    current term carry over.
+                    email you before it expires, and renewal opens on the term's final day,
+                    which carries over to the new term.
                   </p>
                 </div>
               </div>

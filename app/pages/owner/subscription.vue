@@ -24,6 +24,10 @@ const loading = ref(true)
 const currentPlan = ref<any>(null)
 const history = ref<PaymentTransaction[]>([])
 const availablePlans = ref<SubscriptionPlanItem[]>([])
+// What to offer an owner whose term has already run out — the plan they booked before it
+// lapsed, or failing that the one that just ended. Payment only happens at the end of a
+// term, so this is what they came back to pay for.
+const renewalOffer = ref<any>(null)
 
 const viewMode = ref<'current' | 'browse'>('current')
 const browseBillingCycle = ref<'monthly' | 'yearly'>('monthly')
@@ -44,8 +48,10 @@ async function loadOwnerSubscription() {
 
     if (planRes?.success && planRes.subscription) {
       currentPlan.value = planRes.subscription
+      renewalOffer.value = null
     } else {
       currentPlan.value = null
+      renewalOffer.value = planRes?.renewal_offer ?? null
     }
 
     if (historyRes?.success && historyRes.history?.data?.length) {
@@ -80,6 +86,26 @@ function formatDate(val?: string | null): string {
     return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(val))
   } catch {
     return val
+  }
+}
+
+// Billing cadence is not just monthly/yearly — daily and trial terms exist too, and
+// labelling those "Monthly" misreports what the owner is actually on.
+function cycleLabel(cycle?: string | null): string {
+  switch (cycle) {
+    case 'yearly': return 'Yearly Billing'
+    case 'daily':  return 'Daily Billing'
+    case 'trial':  return 'Free Trial'
+    default:       return 'Monthly Billing'
+  }
+}
+
+function cycleUnit(cycle?: string | null): string {
+  switch (cycle) {
+    case 'yearly': return 'year'
+    case 'daily':  return 'day'
+    case 'trial':  return 'trial'
+    default:       return 'month'
   }
 }
 
@@ -133,6 +159,20 @@ function openCheckout(plan: SubscriptionPlanItem) {
   isCheckoutOpen.value = true
 }
 
+/**
+ * Pay for the plan an owner was left with when their term ran out.
+ *
+ * The offer carries its own cycle, since a booked change may have switched it — the browse
+ * toggle is realigned to it so the checkout modal prices the right term.
+ */
+function payRenewalOffer() {
+  const offer = renewalOffer.value
+  if (!offer?.plan) return
+
+  browseBillingCycle.value = offer.billing_cycle === 'yearly' ? 'yearly' : 'monthly'
+  openCheckout(offer.plan)
+}
+
 function isCurrentPlan(plan: SubscriptionPlanItem): boolean {
   return currentPlan.value?.plan?.uuid === plan.uuid
     && currentPlan.value?.billing_cycle === browseBillingCycle.value
@@ -148,10 +188,24 @@ function isScheduledPlan(plan: SubscriptionPlanItem): boolean {
 const hasScheduledChange = computed(() => !!currentPlan.value?.pending_plan)
 
 /**
+ * Whether the owner's paid days have run out, leaving only the term's grace day.
+ *
+ * Nothing is chargeable before this point — not a renewal, not an upgrade — so the plan
+ * buttons stay inert until it flips, and then they become the way to pay for what's next.
+ */
+const isRenewalOpen = computed(() => {
+  const opensAt = currentPlan.value?.renewal_opens_at
+  if (!opensAt) return false
+  return new Date(opensAt).getTime() <= Date.now()
+})
+
+/**
  * What clicking this plan will actually do, so the button never lies about it.
  */
 function planButtonLabel(plan: SubscriptionPlanItem): string {
   if (!currentPlan.value) return 'Subscribe Now'
+  // Paid days are used up: every plan is now something the owner can pay for today.
+  if (isRenewalOpen.value) return isCurrentPlan(plan) ? 'Renew Now' : 'Pay & Switch Now'
   if (isScheduledPlan(plan)) return 'Scheduled'
   if (isCurrentPlan(plan)) return hasScheduledChange.value ? 'Keep This Plan' : 'Current Plan'
   return 'Switch at Renewal'
@@ -159,6 +213,8 @@ function planButtonLabel(plan: SubscriptionPlanItem): string {
 
 function planButtonDisabled(plan: SubscriptionPlanItem): boolean {
   if (scheduling.value) return true
+  // Once renewal opens, anything on the list is payable — including the plan they hold.
+  if (isRenewalOpen.value) return false
   if (isScheduledPlan(plan)) return true
   // Selecting the current plan is only meaningful as "cancel my scheduled change".
   return isCurrentPlan(plan) && !hasScheduledChange.value
@@ -223,6 +279,10 @@ function handleCheckoutReturn() {
  * Renewal links from the expiration reminder email arrive as
  * ?renew=<plan_uuid>&cycle=<monthly|yearly>. Open checkout on that plan directly so the
  * owner lands straight on payment instead of having to find the plan again.
+ *
+ * The reminder goes out days before payment is possible, so a link followed too early
+ * shows the current plan and the date renewal opens rather than a checkout the backend
+ * would only reject.
  */
 function openRenewalFromQuery() {
   const renewUuid = route.query.renew
@@ -230,6 +290,11 @@ function openRenewalFromQuery() {
 
   const plan = availablePlans.value.find(p => p.uuid === renewUuid)
   if (!plan) return
+
+  if (currentPlan.value && !isRenewalOpen.value) {
+    viewMode.value = 'current'
+    return
+  }
 
   const cycle = route.query.cycle
   if (cycle === 'yearly' || cycle === 'monthly') {
@@ -312,7 +377,7 @@ onMounted(async () => {
                   <span
                     class="inline-flex items-center px-2.5 py-0.5 rounded-full font-display font-semibold text-xs bg-[#FFF8EA] border border-[#EDD8CC] text-[#7D5A50] capitalize"
                   >
-                    {{ currentPlan?.billing_cycle === 'yearly' ? 'Yearly Billing' : 'Monthly Billing' }}
+                    {{ cycleLabel(currentPlan?.billing_cycle) }}
                   </span>
                 </div>
               </div>
@@ -322,7 +387,7 @@ onMounted(async () => {
                   ₱{{ getActivePlanPrice() }}
                 </span>
                 <span class="font-sans text-xs text-[#8B6656] block">
-                  / {{ currentPlan?.billing_cycle === 'yearly' ? 'year' : 'month' }}
+                  / {{ cycleUnit(currentPlan?.billing_cycle) }}
                 </span>
               </div>
             </div>
@@ -335,11 +400,27 @@ onMounted(async () => {
                 </span>
               </div>
               <div class="bg-[#FFFDF9] p-4 rounded-xl border border-[#F3E7D2]">
-                <span class="text-[#8B6656] block text-xs font-medium uppercase tracking-wider">Next Billing Date</span>
+                <span class="text-[#8B6656] block text-xs font-medium uppercase tracking-wider">Expires On</span>
                 <span class="font-semibold text-[#3B1F0E] mt-0.5 block">
                   {{ formatDate(currentPlan?.end_date) }}
                 </span>
               </div>
+            </div>
+
+            <div
+              v-if="currentPlan?.renewal_opens_at"
+              class="flex items-start gap-2 mb-6 p-3 rounded-xl font-sans text-xs leading-relaxed"
+              :class="isRenewalOpen ? 'bg-[#FFF8EA] border border-[#D9B98D] text-[#8F5B12]' : 'bg-[#FFFDF9] border border-[#F3E7D2] text-[#7D5A50]'"
+            >
+              <Icon :name="isRenewalOpen ? 'heroicons:bell-alert' : 'heroicons:information-circle'" class="w-4 h-4 shrink-0 mt-0.5" />
+              <span v-if="isRenewalOpen">
+                Your paid days are used up — you have until <strong>{{ formatDate(currentPlan?.end_date) }}</strong> to pay
+                for your next term. Your remaining day carries over, so you lose nothing by renewing now.
+              </span>
+              <span v-else>
+                You're not charged automatically. Renewal opens on
+                <strong>{{ formatDate(currentPlan?.renewal_opens_at) }}</strong>, once your paid days run out.
+              </span>
             </div>
 
             <!-- Plan Features List -->
@@ -381,7 +462,7 @@ onMounted(async () => {
                   <span
                     class="inline-flex items-center px-2.5 py-0.5 rounded-full font-display font-semibold text-xs bg-white border border-[#EDD8CC] text-[#7D5A50] capitalize"
                   >
-                    {{ (currentPlan.pending_billing_cycle ?? currentPlan.billing_cycle) === 'yearly' ? 'Yearly Billing' : 'Monthly Billing' }}
+                    {{ cycleLabel(currentPlan.pending_billing_cycle ?? currentPlan.billing_cycle) }}
                   </span>
                 </div>
               </div>
@@ -391,14 +472,17 @@ onMounted(async () => {
                   ₱{{ getNextPlanPrice() }}
                 </span>
                 <span class="font-sans text-xs text-[#8B6656] block">
-                  / {{ (currentPlan.pending_billing_cycle ?? currentPlan.billing_cycle) === 'yearly' ? 'year' : 'month' }}
+                  / {{ cycleUnit(currentPlan.pending_billing_cycle ?? currentPlan.billing_cycle) }}
                 </span>
               </div>
             </div>
 
             <p class="font-sans text-sm text-[#7D5A50] mb-6">
-              Takes effect on your next billing date, <strong>{{ formatDate(currentPlan?.end_date) }}</strong>.
+              Takes effect when your current term ends on <strong>{{ formatDate(currentPlan?.end_date) }}</strong>.
               You'll keep using your current plan's features until then — no charge has been made for this plan yet.
+              <template v-if="currentPlan?.renewal_opens_at">
+                You can pay for it from <strong>{{ formatDate(currentPlan?.renewal_opens_at) }}</strong>.
+              </template>
             </p>
 
             <div class="pt-4 border-t border-[#EEDFC4]">
@@ -419,6 +503,68 @@ onMounted(async () => {
                 Basic plan access (single branch only, no advanced features).
               </p>
             </div>
+          </div>
+        </div>
+
+        <!-- Term Ended — pick up where the owner left off -->
+        <div
+          v-else-if="!loading && renewalOffer"
+          class="bg-[#FFF8EA] border border-[#D9B98D] rounded-2xl p-6 md:p-8 mb-8 shadow-sm"
+        >
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#EEDFC4] pb-6 mb-6">
+            <div>
+              <span class="inline-flex items-center gap-1.5 font-sans text-xs uppercase font-bold text-[#B8752F] tracking-wider mb-2">
+                <Icon name="heroicons:exclamation-triangle" class="w-4 h-4" />
+                Subscription Ended
+              </span>
+              <div class="flex items-center gap-2.5 flex-wrap">
+                <span class="font-display text-2xl font-bold text-[#3B1F0E]">
+                  {{ renewalOffer.plan?.sub_name }}
+                </span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full font-display font-semibold text-xs bg-white border border-[#EDD8CC] text-[#7D5A50]">
+                  {{ cycleLabel(renewalOffer.billing_cycle) }}
+                </span>
+              </div>
+            </div>
+
+            <div class="text-left sm:text-right">
+              <span class="font-display text-3xl font-bold text-[#7D5A50]">
+                ₱{{ getDisplayPrice(renewalOffer.plan, renewalOffer.billing_cycle === 'yearly' ? 'yearly' : 'monthly') }}
+              </span>
+              <span class="font-sans text-xs text-[#8B6656] block">
+                / {{ cycleUnit(renewalOffer.billing_cycle) }}
+              </span>
+            </div>
+          </div>
+
+          <p class="font-sans text-sm text-[#7D5A50] mb-6">
+            <template v-if="renewalOffer.was_scheduled">
+              Your {{ renewalOffer.previous_plan }} ended on
+              <strong>{{ formatDate(renewalOffer.ended_on) }}</strong>, and you'd scheduled a switch to the
+              {{ renewalOffer.plan?.sub_name }}. Pay for it now to start your new term.
+            </template>
+            <template v-else>
+              Your {{ renewalOffer.plan?.sub_name }} ended on
+              <strong>{{ formatDate(renewalOffer.ended_on) }}</strong>. Renew it to restore the features it unlocked,
+              or browse the other plans.
+            </template>
+          </p>
+
+          <div class="flex flex-col sm:flex-row gap-3">
+            <button
+              @click="payRenewalOffer"
+              class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-lg shadow-[#3B1F0E]/20"
+            >
+              <Icon name="heroicons:credit-card" class="w-5 h-5" />
+              {{ renewalOffer.was_scheduled ? 'Pay & Start' : 'Renew' }} {{ renewalOffer.plan?.sub_name }}
+            </button>
+            <button
+              @click="viewMode = 'browse'"
+              class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white text-[#3B1F0E] font-display font-semibold border border-[#EDD8CC] hover:bg-[#FFF8EA] transition-colors"
+            >
+              <Icon name="heroicons:squares-2x2" class="w-5 h-5" />
+              Browse Plans
+            </button>
           </div>
         </div>
 
