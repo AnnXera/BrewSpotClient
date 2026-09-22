@@ -4,21 +4,39 @@ import MenuPageHeader from '~/components/menu/MenuPageHeader.vue'
 import MenuToolbar from '~/components/menu/MenuToolbar.vue'
 import ItemCard from '~/components/menu/ItemCard.vue'
 import EmptyState from '~/components/menu/EmptyState.vue'
+import ItemModal from '~/components/menu/ItemModal.vue'
 
 definePageMeta({
   layout: 'owner',
 })
 
+const route = useRoute()
+const router = useRouter()
 const menuService = useMenuService()
 
 const items = ref<any[]>([])
+const categories = ref<any[]>([])
 const isLoading = ref(true)
 
 async function fetchData() {
   isLoading.value = true
   try {
-    const res = await menuService.getMenuItems()
-    items.value = res.items?.data || res.items || []
+    const [itemsRes, catsRes] = await Promise.all([
+      menuService.getMenuItems(),
+      menuService.getMenuCategories()
+    ])
+    items.value = itemsRes.items?.data || itemsRes.items || []
+    
+    const fetchedCats = catsRes.categories?.data || catsRes.categories || []
+    categories.value = [
+      ...fetchedCats,
+      {
+        id: 'uncategorized',
+        uuid: 'uncategorized',
+        name: 'Uncategorized',
+        description: 'Items that do not belong to any category',
+      }
+    ]
   } catch (error) {
     console.error('Failed to fetch all items', error)
   } finally {
@@ -27,6 +45,36 @@ async function fetchData() {
 }
 
 onMounted(fetchData)
+
+const isItemModalOpen = computed(() => {
+  return route.query.action === 'add-item' || route.query.action === 'edit-item'
+})
+
+const itemToEdit = computed(() => {
+  if (route.query.action === 'edit-item' && route.query.item) {
+    return items.value.find(i => i.uuid === route.query.item) || null
+  }
+  return null
+})
+
+function handleAddAction() {
+  router.push({ query: { ...route.query, action: 'add-item' } })
+}
+
+function handleEditItem(itemUuid: string) {
+  router.push({ query: { ...route.query, action: 'edit-item', item: itemUuid } })
+}
+
+function closeItemModal() {
+  const newQuery = { ...route.query }
+  delete newQuery.action
+  delete newQuery.item
+  router.push({ query: newQuery })
+}
+
+function onItemSaved() {
+  fetchData()
+}
 
 const breadcrumbs = [
   { label: 'Menu Management', to: '/owner/menu-management' },
@@ -58,7 +106,7 @@ const links = [
           <MenuToolbar 
             searchPlaceholder="Search Item"
             addButtonLabel="+ Add Item"
-            @add="() => {}"
+            @add="handleAddAction"
           />
         </div>
 
@@ -74,7 +122,7 @@ const links = [
                 v-for="item in items" 
                 :key="item.id" 
                 :item="item"
-                @edit="() => {}"
+                @edit="handleEditItem(item.uuid)"
                 @delete="() => {}"
               />
             </div>
@@ -102,5 +150,13 @@ const links = [
         </div>
       </div>
     </main>
+
+    <ItemModal 
+      :show="isItemModalOpen"
+      :item="itemToEdit"
+      :categories="categories"
+      @close="closeItemModal"
+      @saved="onItemSaved"
+    />
   </div>
 </template>

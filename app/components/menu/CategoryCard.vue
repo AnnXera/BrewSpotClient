@@ -48,6 +48,7 @@ const getImageUrl = () => {
 
       <!-- Delete Button (floating) -->
       <button 
+        v-if="category.uuid !== 'uncategorized' && category.id !== 'uncategorized'"
         @click.stop="$emit('delete', category.uuid || category.id || '')"
         class="absolute top-2 right-2 w-8 h-8 rounded-full bg-[#FDE8E8] text-[#D9534F] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
         title="Delete Category"

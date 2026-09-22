@@ -5,6 +5,7 @@ import MenuToolbar from '~/components/menu/MenuToolbar.vue'
 import CategoryCard from '~/components/menu/CategoryCard.vue'
 import ItemCard from '~/components/menu/ItemCard.vue'
 import EmptyState from '~/components/menu/EmptyState.vue'
+import ItemModal from '~/components/menu/ItemModal.vue'
 
 definePageMeta({
   layout: 'owner',
@@ -30,14 +31,30 @@ async function fetchData() {
       const res = await menuService.getMenuItems({ category_uuid: currentCategoryUuid.value })
       items.value = res.items?.data || res.items || []
       
-      // We also need the category details for the header
-      const catRes = await menuService.getMenuCategories()
-      const allCats = catRes.categories?.data || catRes.categories || []
-      currentCategory.value = allCats.find((c: any) => c.uuid === currentCategoryUuid.value || c.id == currentCategoryUuid.value)
+      if (currentCategoryUuid.value === 'uncategorized') {
+        currentCategory.value = {
+          uuid: 'uncategorized',
+          name: 'Uncategorized',
+          description: 'Items that do not belong to any category'
+        }
+      } else {
+        const catRes = await menuService.getMenuCategories()
+        const allCats = catRes.categories?.data || catRes.categories || []
+        currentCategory.value = allCats.find((c: any) => c.uuid === currentCategoryUuid.value || c.id == currentCategoryUuid.value)
+      }
     } else {
       // Fetch all categories
       const res = await menuService.getMenuCategories()
-      categories.value = res.categories?.data || res.categories || []
+      const fetchedCats = res.categories?.data || res.categories || []
+      categories.value = [
+        ...fetchedCats,
+        {
+          id: 'uncategorized',
+          uuid: 'uncategorized',
+          name: 'Uncategorized',
+          description: 'Items that do not belong to any category',
+        }
+      ]
     }
   } catch (error) {
     console.error('Failed to fetch data', error)
@@ -72,6 +89,41 @@ function handleCategoryClick(id: string | number) {
   router.push({ path: '/owner/menu-management', query: { category: id } })
 }
 
+const isItemModalOpen = computed(() => {
+  return route.query.action === 'add-item' || route.query.action === 'edit-item'
+})
+
+const itemToEdit = computed(() => {
+  if (route.query.action === 'edit-item' && route.query.item) {
+    return items.value.find(i => i.uuid === route.query.item) || null
+  }
+  return null
+})
+
+function handleAddAction() {
+  if (isCategoryView.value) {
+    router.push({ query: { ...route.query, action: 'add-item' } })
+  } else {
+    // TODO: Add category action
+    console.log('Add category clicked')
+  }
+}
+
+function handleEditItem(itemUuid: string) {
+  router.push({ query: { ...route.query, action: 'edit-item', item: itemUuid } })
+}
+
+function closeItemModal() {
+  const newQuery = { ...route.query }
+  delete newQuery.action
+  delete newQuery.item
+  router.push({ query: newQuery })
+}
+
+function onItemSaved() {
+  fetchData()
+}
+
 const links = [
   { label: 'Dashboard', to: '/owner/dashboard', icon: 'squares-2x2' },
   { label: 'Cafe Management', to: '/owner/cafes', icon: 'building-storefront' },
@@ -97,7 +149,7 @@ const links = [
           <MenuToolbar 
             :searchPlaceholder="isCategoryView ? 'Search Item' : 'Search Category'"
             :addButtonLabel="isCategoryView ? '+ Add Item' : '+ Add Category'"
-            @add="() => {}"
+            @add="handleAddAction"
           />
         </div>
 
@@ -126,7 +178,7 @@ const links = [
                 v-for="item in items" 
                 :key="item.id" 
                 :item="item"
-                @edit="() => {}"
+                @edit="handleEditItem(item.uuid)"
                 @delete="() => {}"
               />
             </div>
@@ -164,5 +216,13 @@ const links = [
         </div>
       </div>
     </main>
+
+    <ItemModal 
+      :show="isItemModalOpen"
+      :item="itemToEdit"
+      :categories="categories"
+      @close="closeItemModal"
+      @saved="onItemSaved"
+    />
   </div>
 </template>
