@@ -31,6 +31,7 @@ const browseBillingCycle = ref<'monthly' | 'yearly'>('monthly')
 // Checkout Modal State
 const isCheckoutOpen = ref(false)
 const selectedPlanToCheckout = ref<SubscriptionPlanItem | null>(null)
+const scheduling = ref(false)
 
 async function loadOwnerSubscription() {
   loading.value = true
@@ -130,6 +131,76 @@ function getNextPlanPrice(): string {
 function openCheckout(plan: SubscriptionPlanItem) {
   selectedPlanToCheckout.value = plan
   isCheckoutOpen.value = true
+}
+
+function isCurrentPlan(plan: SubscriptionPlanItem): boolean {
+  return currentPlan.value?.plan?.uuid === plan.uuid
+    && currentPlan.value?.billing_cycle === browseBillingCycle.value
+}
+
+function isScheduledPlan(plan: SubscriptionPlanItem): boolean {
+  const pending = currentPlan.value?.pending_plan
+  if (!pending) return false
+  const pendingCycle = currentPlan.value?.pending_billing_cycle ?? currentPlan.value?.billing_cycle
+  return pending.uuid === plan.uuid && pendingCycle === browseBillingCycle.value
+}
+
+const hasScheduledChange = computed(() => !!currentPlan.value?.pending_plan)
+
+/**
+ * What clicking this plan will actually do, so the button never lies about it.
+ */
+function planButtonLabel(plan: SubscriptionPlanItem): string {
+  if (!currentPlan.value) return 'Subscribe Now'
+  if (isScheduledPlan(plan)) return 'Scheduled'
+  if (isCurrentPlan(plan)) return hasScheduledChange.value ? 'Keep This Plan' : 'Current Plan'
+  return 'Switch at Renewal'
+}
+
+function planButtonDisabled(plan: SubscriptionPlanItem): boolean {
+  if (scheduling.value) return true
+  if (isScheduledPlan(plan)) return true
+  // Selecting the current plan is only meaningful as "cancel my scheduled change".
+  return isCurrentPlan(plan) && !hasScheduledChange.value
+}
+
+/**
+ * Choosing a plan means one of two things.
+ *
+ * With no active subscription — or while still on a free trial — there are no paid days to
+ * protect, so checkout opens straight away. Otherwise the change is booked for the end of
+ * the current term and nothing is charged. The backend replies with `requires_checkout`
+ * when it decides the switch should happen immediately after all.
+ */
+async function selectPlan(plan: SubscriptionPlanItem) {
+  if (!currentPlan.value) {
+    openCheckout(plan)
+    return
+  }
+
+  scheduling.value = true
+  try {
+    const res = await subService.schedulePlanChange({
+      plan_uuid: plan.uuid,
+      billing_cycle: browseBillingCycle.value,
+    })
+
+    if (res.requires_checkout) {
+      openCheckout(plan)
+      return
+    }
+
+    alert(res.message)
+
+    if (res.success) {
+      await loadOwnerSubscription()
+      viewMode.value = 'current'
+    }
+  } catch (err: any) {
+    alert(err.response?._data?.message || 'Could not update your plan. Please try again.')
+  } finally {
+    scheduling.value = false
+  }
 }
 
 /**
@@ -487,16 +558,16 @@ onMounted(async () => {
 
             <!-- Subscribe Button -->
             <button
-              @click="openCheckout(plan)"
+              @click="selectPlan(plan)"
               class="w-full mt-8 py-3.5 rounded-xl font-display font-semibold text-sm transition-all duration-300"
               :class="
-                currentPlan?.plan?.uuid === plan.uuid && currentPlan?.billing_cycle === browseBillingCycle 
+                planButtonDisabled(plan)
                   ? 'bg-[#EEDFC4] text-[#7D5A50] cursor-not-allowed'
                   : 'bg-[#FFF8EA] text-[#3B1F0E] border border-[#3B1F0E] hover:bg-[#3B1F0E] hover:text-[#FDF3E7] group-hover:bg-[#3B1F0E] group-hover:text-[#FDF3E7] shadow-[4px_4px_0px_0px_#3B1F0E] hover:shadow-[2px_2px_0px_0px_#3B1F0E] hover:translate-x-[2px] hover:translate-y-[2px]'
               "
-              :disabled="currentPlan?.plan?.uuid === plan.uuid && currentPlan?.billing_cycle === browseBillingCycle"
+              :disabled="planButtonDisabled(plan)"
             >
-              {{ currentPlan?.plan?.uuid === plan.uuid && currentPlan?.billing_cycle === browseBillingCycle ? 'Current Plan' : 'Subscribe Now' }}
+              {{ planButtonLabel(plan) }}
             </button>
           </div>
         </div>

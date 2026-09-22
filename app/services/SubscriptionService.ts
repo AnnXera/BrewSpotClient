@@ -149,6 +149,20 @@ export class SubscriptionService extends BaseService {
     return this.post<{ success: boolean; message: string }>('/owner/subscriptions/cancel', params)
   }
 
+  /**
+   * POST /api/owner/subscriptions/schedule-change
+   *
+   * Books a plan change for the end of the current term — nothing is charged. Selecting
+   * the plan already held cancels a booked change instead. `requires_checkout` comes back
+   * when the switch should happen immediately (no active subscription, or still on trial).
+   */
+  async schedulePlanChange(params: { plan_uuid: string; billing_cycle: 'monthly' | 'yearly' | 'daily' }) {
+    return this.post<{ success: boolean; message: string; requires_checkout?: boolean }>(
+      '/owner/subscriptions/schedule-change',
+      params
+    )
+  }
+
   // ─── ADMIN: FEATURES CATALOG ───────────────────────────────────────────────
 
   /**
