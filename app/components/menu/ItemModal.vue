@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, nextTick } from 'vue'
 import { useMenuService } from '~/composables/useMenuService'
 import { INGREDIENT_UNITS } from '~/utils/constants'
 
@@ -31,8 +31,15 @@ const isSubmitting = ref(false)
 
 const isEditMode = computed(() => !!props.item)
 
+const isDirty = ref(false)
+const errors = ref({
+  menu_name: '',
+  base_price: ''
+})
+
 watch(() => props.show, (newVal) => {
   if (newVal) {
+    errors.value = { menu_name: '', base_price: '' }
     if (props.item) {
       form.value = {
         menu_name: props.item.menu_name || '',
@@ -59,8 +66,24 @@ watch(() => props.show, (newVal) => {
       picturePreview.value = null
     }
     pictureFile.value = null
+    nextTick(() => {
+      isDirty.value = false
+    })
   }
 })
+
+watch(form, () => { isDirty.value = true }, { deep: true })
+watch(pictureFile, () => { isDirty.value = true })
+
+const handleClose = () => {
+  if (isDirty.value) {
+    if (window.confirm('You have unsaved changes. Are you sure you want to discard them?')) {
+      emit('close')
+    }
+  } else {
+    emit('close')
+  }
+}
 
 const triggerFileInput = () => {
   fileInput.value?.click()
@@ -74,8 +97,22 @@ const onFileChange = (e: Event) => {
   }
 }
 
+const ingredientInputs = ref<HTMLInputElement[]>([])
+
+const setIngredientInputRef = (el: any, index: number) => {
+  if (el) ingredientInputs.value[index] = el as HTMLInputElement
+}
+
 const addIngredient = () => {
   form.value.recipes.push({ ingredient_name: '', quantity: '', unit: INGREDIENT_UNITS[0] })
+}
+
+const handleEnterOnIngredient = async (index: number) => {
+  if (index === form.value.recipes.length - 1) {
+    addIngredient()
+    await nextTick()
+    ingredientInputs.value[form.value.recipes.length - 1]?.focus()
+  }
 }
 
 const removeIngredient = (index: number) => {
@@ -86,10 +123,19 @@ const removeIngredient = (index: number) => {
 }
 
 const saveItem = async () => {
-  if (!form.value.menu_name || !form.value.base_price) {
-    alert('Item name and price are required.')
-    return
+  errors.value = { menu_name: '', base_price: '' }
+  let hasError = false
+
+  if (!form.value.menu_name) {
+    errors.value.menu_name = 'Item name is required.'
+    hasError = true
   }
+  if (!form.value.base_price) {
+    errors.value.base_price = 'Price is required.'
+    hasError = true
+  }
+
+  if (hasError) return
 
   isSubmitting.value = true
   try {
@@ -142,7 +188,7 @@ const saveItem = async () => {
     <!-- Overlay -->
     <div 
       class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
-      @click="$emit('close')"
+      @click="handleClose"
     ></div>
 
     <!-- Modal Content -->
@@ -154,8 +200,9 @@ const saveItem = async () => {
           {{ isEditMode ? 'Edit Item' : 'Add Item' }}
         </h2>
         <button 
-          @click="$emit('close')"
-          class="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F5] text-[#7D5A50] hover:bg-[#EEDFC4] transition-colors"
+          @click="handleClose"
+          class="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F5] text-[#7D5A50] hover:bg-[#EEDFC4] transition-colors focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/40"
+          title="Close Modal"
         >
           <Icon name="heroicons:x-mark" class="w-5 h-5" />
         </button>
@@ -169,8 +216,9 @@ const saveItem = async () => {
           
           <!-- Image Upload -->
           <div class="w-full md:w-1/3 flex flex-col gap-2">
-            <div 
-              class="relative w-full aspect-[4/3] rounded-2xl bg-[#FBF2E1] border-2 border-dashed border-[#EEDFC4] overflow-hidden group cursor-pointer"
+            <button 
+              type="button"
+              class="relative w-full aspect-[4/3] rounded-2xl bg-[#FBF2E1] border-2 border-dashed border-[#EEDFC4] overflow-hidden group cursor-pointer focus:outline-none focus-visible:ring-4 focus-visible:ring-[#B4846C]/40"
               @click="triggerFileInput"
             >
               <img 
@@ -185,7 +233,7 @@ const saveItem = async () => {
               </div>
               
               <!-- Edit icon floating -->
-              <div class="absolute top-2 right-2 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow hover:bg-gray-50 transition-colors">
+              <div class="absolute top-2 right-2 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow group-hover:bg-gray-50 transition-colors">
                 <Icon name="heroicons:pencil" class="w-4 h-4 text-[#7D5A50]" />
               </div>
 
@@ -193,7 +241,7 @@ const saveItem = async () => {
               <div class="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span class="bg-white/90 text-[#3B1F0E] px-3 py-1 rounded-lg text-sm font-bold shadow-sm">Change Image</span>
               </div>
-            </div>
+            </button>
             <input 
               type="file" 
               ref="fileInput" 
@@ -215,9 +263,13 @@ const saveItem = async () => {
                   v-model="form.menu_name"
                   type="text" 
                   placeholder="e.g. Caramel Macchiato"
-                  class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent transition-shadow"
+                  :class="[
+                    'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow',
+                    errors.menu_name ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
+                  ]"
                 />
               </div>
+              <p v-if="errors.menu_name" class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.menu_name }}</p>
             </div>
 
             <div class="flex flex-col sm:flex-row gap-5">
@@ -250,9 +302,13 @@ const saveItem = async () => {
                     type="number" 
                     step="0.01"
                     placeholder="0.00"
-                    class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent transition-shadow"
+                    :class="[
+                      'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow',
+                      errors.base_price ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
+                    ]"
                   />
                 </div>
+                <p v-if="errors.base_price" class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.base_price }}</p>
               </div>
             </div>
           </div>
@@ -273,15 +329,8 @@ const saveItem = async () => {
 
         <!-- Recipe Section -->
         <div>
-          <div class="flex items-center justify-between mb-6">
+          <div class="mb-4">
             <h3 class="text-2xl font-display font-bold text-[#3B1F0E]">Recipe</h3>
-            <button 
-              @click="addIngredient"
-              class="flex items-center gap-2 bg-[#7D5A50] text-white px-5 py-2.5 rounded-xl font-bold hover:bg-[#6A4B42] transition-colors shadow-sm"
-            >
-              <Icon name="heroicons:plus" class="w-5 h-5" />
-              Add Ingredient
-            </button>
           </div>
 
           <!-- Recipe Table Headers (visible on md+) -->
@@ -289,7 +338,7 @@ const saveItem = async () => {
             <span class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">Ingredient</span>
             <span class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">Amount</span>
             <span class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">Unit</span>
-            <span class="w-10"></span> <!-- spacer for delete button -->
+            <span class="w-8"></span> <!-- Spacer for subtle delete button -->
           </div>
 
           <!-- Recipe Rows -->
@@ -303,9 +352,11 @@ const saveItem = async () => {
               <div class="w-full">
                 <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Ingredient</label>
                 <input 
+                  :ref="(el) => setIngredientInputRef(el, index)"
                   v-model="recipe.ingredient_name"
                   type="text" 
                   placeholder="e.g. Coffee"
+                  @keydown.enter.prevent="handleEnterOnIngredient(index)"
                   class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent"
                 />
               </div>
@@ -318,6 +369,7 @@ const saveItem = async () => {
                   type="number" 
                   step="0.1"
                   placeholder="e.g. 2"
+                  @keydown.enter.prevent="handleEnterOnIngredient(index)"
                   class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent"
                 />
               </div>
@@ -328,6 +380,7 @@ const saveItem = async () => {
                 <div class="relative">
                   <select 
                     v-model="recipe.unit"
+                    @keydown.enter.prevent="handleEnterOnIngredient(index)"
                     class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl pl-4 pr-10 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent"
                   >
                     <option v-for="unit in INGREDIENT_UNITS" :key="unit" :value="unit">
@@ -344,14 +397,22 @@ const saveItem = async () => {
               <div class="w-full md:w-auto flex justify-end md:justify-center mt-2 md:mt-0">
                 <button 
                   @click="removeIngredient(index)"
-                  class="w-10 h-10 flex items-center justify-center rounded-xl bg-[#FDE8E8] text-[#D9534F] hover:bg-[#FCD6D6] transition-colors"
+                  class="w-8 h-8 flex items-center justify-center rounded-lg text-[#D9534F] bg-[#fef8f0] hover:bg-[#FDE8E8] transition-colors focus:outline-none focus:ring-2 focus:ring-[#D9534F]/40"
                   title="Remove Ingredient"
                 >
-                  <Icon name="heroicons:trash" class="w-5 h-5" />
+                  <Icon name="heroicons:trash" class="w-4 h-4" />
                 </button>
               </div>
             </div>
           </div>
+
+          <!-- Add Row Button -->
+          <button 
+            @click="addIngredient"
+            class="w-full mt-4 flex items-center justify-center py-3 rounded-xl border border-[#EEDFC4] bg-[#fef8f0]/30 hover:bg-[#EEDFC4]/30 text-[#B4846C] transition-colors focus:outline-none focus:ring-2 focus:ring-[#B4846C]"
+          >
+            <Icon name="heroicons:plus" class="w-5 h-5" />
+          </button>
         </div>
 
       </div>
@@ -361,7 +422,7 @@ const saveItem = async () => {
         <button 
           @click="saveItem"
           :disabled="isSubmitting"
-          class="bg-[#3B1F0E] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#2A160A] transition-colors shadow-md disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+          class="bg-[#3B1F0E] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#2A160A] transition-colors shadow-md disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#3B1F0E]/40 focus-visible:ring-offset-2"
         >
           <Icon v-if="isSubmitting" name="heroicons:arrow-path" class="w-5 h-5 animate-spin" />
           {{ isSubmitting ? 'Saving...' : 'Confirm' }}

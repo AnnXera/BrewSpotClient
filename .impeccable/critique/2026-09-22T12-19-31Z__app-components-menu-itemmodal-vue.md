@@ -10,6 +10,7 @@ target_fingerprint: "sha256:2357bdff53a40c06017fc7e420c0b0b96647de15d2c027a6897c
 target_path: "C:\\Users\\ASUS\\Documents\\BrewspotCode\\client\\app\\components\\menu\\ItemModal.vue"
 timestamp: 2026-09-22T12-19-31Z
 slug: app-components-menu-itemmodal-vue
+closed: true
 ---
 Method: ⚠️ DEGRADED: single-context (no sub-agent tool exposed)
 
