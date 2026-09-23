@@ -28,11 +28,11 @@ const getImageUrl = () => {
 
 <template>
   <div 
-    class="bg-white rounded-2xl border border-[#EEDFC4] flex flex-col group hover:shadow-md transition-shadow cursor-pointer p-3 pb-5 h-[278px]"
+    class="bg-white rounded-2xl border border-[#EEDFC4] flex flex-col group hover:shadow-md transition-shadow cursor-pointer p-3 h-[300px]"
     @click="$emit('edit', item.uuid || item.id || '')"
   >
     <!-- Image Area -->
-    <div class="h-[140px] w-full bg-[#FBF2E1] relative shrink-0 rounded-xl overflow-hidden mb-4">
+    <div class="h-[140px] w-full bg-[#FBF2E1] relative shrink-0 rounded-xl overflow-hidden mb-[9px]">
       <img 
         v-if="item.picture" 
         :src="getImageUrl() || ''" 
@@ -57,24 +57,24 @@ const getImageUrl = () => {
     <!-- Content Area -->
     <div class="flex flex-col flex-1 px-1">
       <div class="flex items-start justify-between gap-2 mb-1">
-        <h3 class="font-display font-bold text-lg text-[#3B1F0E] truncate">
+        <h3 class="font-display font-bold text-[16px] text-[#3B1F0E] truncate">
           {{ item.menu_name }}
         </h3>
-        <span v-if="item.base_price" class="font-display font-bold text-lg text-[#3B1F0E] whitespace-nowrap">
-          P {{ Number(item.base_price).toFixed(2) }}
+        <span v-if="item.base_price" class="font-display font-bold text-[16px] text-[#3B1F0E] whitespace-nowrap">
+          ₱{{ Number(item.base_price).toFixed(2) }}
         </span>
       </div>
       
-      <p class="font-sans text-xs text-[#B4846C] leading-snug line-clamp-2 mb-4">
+      <p class="font-sans text-xs text-[#B4846C] leading-snug line-clamp-3 mb-4">
         {{ item.description || 'No description provided' }}
       </p>
 
       <div class="flex-1"></div>
 
-      <p class="font-sans text-xs text-[#B4846C] leading-snug line-clamp-1 mt-auto">
+      <p class="font-sans text-xs text-[#757575]/70 leading-snug line-clamp-2 mt-auto">
         <template v-if="item.recipes_preview">
           {{ item.recipes_preview }}
-          <span v-if="item.recipes_remaining_count > 0" class="inline-flex items-center justify-center bg-[#F5F5F5] text-[#7D5A50] text-[10px] font-bold px-1.5 py-0.5 rounded ml-1">+{{ item.recipes_remaining_count }}</span>
+          <span v-if="item.recipes_remaining_count > 0" class="inline-flex items-center justify-center bg-[#EDEDED] text-[#757575]/70 text-[8px] font-bold px-[5px] py-[2.5px] rounded-full ml-1 align-middle">+{{ item.recipes_remaining_count }}</span>
         </template>
         <template v-else>
           No recipes added

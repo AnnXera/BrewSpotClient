@@ -61,7 +61,7 @@ onMounted(async () => {
       categories.forEach((cat: any) => {
         updatedChildren.push({
           label: cat.name || 'Category',
-          to: `/owner/menu-management?category=${cat.uuid || cat.id}`
+          to: `/owner/menu-management/category/${cat.uuid || cat.id}`
         })
       })
       
@@ -75,25 +75,25 @@ onMounted(async () => {
 function isActive(link: NavLink) {
   if (link.isHeader) return false
   
+  // If the link itself has a query string, check if the path and query match
+  if (link.to && link.to.includes('?')) {
+    const [path, query] = link.to.split('?')
+    if (route.path !== path) return false
+    
+    const queryParams = new URLSearchParams(query)
+    for (const [key, val] of queryParams) {
+      if (route.query[key] !== val) return false
+    }
+    return true
+  }
+
   // Exact match or prefix match for normal links
   if (route.path === link.to) return true
-  if (link.to !== '/' && route.path.startsWith(link.to + '/')) return true
+  if (link.to && link.to !== '/' && route.path.startsWith(link.to + '/')) return true
   
   // Check children for query match
   if (link.children) {
-    return link.children.some(child => {
-      if (child.isHeader) return false
-      if (child.to.includes('?')) {
-        const [path, query] = child.to.split('?')
-        const queryParams = new URLSearchParams(query)
-        let isMatch = route.path === path
-        for (const [key, val] of queryParams) {
-           if (route.query[key] !== val) isMatch = false
-        }
-        return isMatch
-      }
-      return route.path === child.to || (child.to !== '/' && route.path.startsWith(child.to + '/'))
-    })
+    return link.children.some(child => isActive(child))
   }
   return false
 }

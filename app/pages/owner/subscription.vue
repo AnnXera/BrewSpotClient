@@ -409,18 +409,29 @@ onMounted(async () => {
 
             <div
               v-if="currentPlan?.renewal_opens_at"
-              class="flex items-start gap-2 mb-6 p-3 rounded-xl font-sans text-xs leading-relaxed"
+              class="flex items-start gap-3 mb-6 p-4 rounded-xl font-sans text-xs leading-relaxed"
               :class="isRenewalOpen ? 'bg-[#FFF8EA] border border-[#D9B98D] text-[#8F5B12]' : 'bg-[#FFFDF9] border border-[#F3E7D2] text-[#7D5A50]'"
             >
-              <Icon :name="isRenewalOpen ? 'heroicons:bell-alert' : 'heroicons:information-circle'" class="w-4 h-4 shrink-0 mt-0.5" />
-              <span v-if="isRenewalOpen">
-                Your paid days are used up — you have until <strong>{{ formatDate(currentPlan?.end_date) }}</strong> to pay
-                for your next term. Your remaining day carries over, so you lose nothing by renewing now.
-              </span>
-              <span v-else>
-                You're not charged automatically. Renewal opens on
-                <strong>{{ formatDate(currentPlan?.renewal_opens_at) }}</strong>, once your paid days run out.
-              </span>
+              <Icon :name="isRenewalOpen ? 'heroicons:bell-alert' : 'heroicons:information-circle'" class="w-5 h-5 shrink-0 mt-0.5" />
+              <div class="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div v-if="isRenewalOpen">
+                  Your paid days are used up — you have until <strong>{{ formatDate(currentPlan?.end_date) }}</strong> to pay
+                  for your next term. Your remaining day carries over, so you lose nothing by renewing now.
+                </div>
+                <div v-else>
+                  You're not charged automatically. Renewal opens on
+                  <strong>{{ formatDate(currentPlan?.renewal_opens_at) }}</strong>, once your paid days run out.
+                </div>
+                
+                <button
+                  v-if="isRenewalOpen"
+                  @click="browseBillingCycle = currentPlan.billing_cycle === 'yearly' ? 'yearly' : 'monthly'; openCheckout(currentPlan.plan)"
+                  class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
+                >
+                  <Icon name="heroicons:credit-card" class="w-4 h-4" />
+                  Renew Now
+                </button>
+              </div>
             </div>
 
             <!-- Plan Features List -->

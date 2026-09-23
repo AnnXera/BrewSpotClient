@@ -5,6 +5,7 @@ import MenuToolbar from '~/components/menu/MenuToolbar.vue'
 import ItemCard from '~/components/menu/ItemCard.vue'
 import EmptyState from '~/components/menu/EmptyState.vue'
 import ItemModal from '~/components/menu/ItemModal.vue'
+import AddEditItemToCategory from '~/components/menu/AddEditItemToCategory.vue'
 
 definePageMeta({
   layout: 'owner',
@@ -14,31 +15,40 @@ const route = useRoute()
 const router = useRouter()
 const menuService = useMenuService()
 
+const currentCategoryUuid = computed(() => route.params.uuid as string)
+
 const items = ref<any[]>([])
+const allCafeItems = ref<any[]>([])
 const categories = ref<any[]>([])
+const currentCategory = ref<any>(null)
 const isLoading = ref(true)
 
 async function fetchData() {
   isLoading.value = true
   try {
-    const [itemsRes, catsRes] = await Promise.all([
+    const [res, allItemsRes, catRes] = await Promise.all([
+      menuService.getMenuItems({ category_uuid: currentCategoryUuid.value }),
       menuService.getMenuItems(),
       menuService.getMenuCategories()
     ])
-    items.value = (itemsRes.items as any)?.data || itemsRes.items || []
     
-    const fetchedCats = (catsRes.categories as any)?.data || catsRes.categories || []
-    categories.value = [
-      ...fetchedCats,
-      {
-        id: 'uncategorized',
+    items.value = res.items?.data || res.items || []
+    allCafeItems.value = allItemsRes.items?.data || allItemsRes.items || []
+    
+    const allCats = catRes.categories?.data || catRes.categories || []
+    categories.value = allCats
+    
+    if (currentCategoryUuid.value === 'uncategorized') {
+      currentCategory.value = {
         uuid: 'uncategorized',
         name: 'Uncategorized',
-        description: 'Items that do not belong to any category',
+        description: 'Items that do not belong to any category'
       }
-    ]
+    } else {
+      currentCategory.value = allCats.find((c: any) => c.uuid === currentCategoryUuid.value || c.id == currentCategoryUuid.value)
+    }
   } catch (error) {
-    console.error('Failed to fetch all items', error)
+    console.error('Failed to fetch data', error)
   } finally {
     isLoading.value = false
   }
@@ -46,9 +56,17 @@ async function fetchData() {
 
 onMounted(fetchData)
 
-const isItemModalOpen = computed(() => {
-  return route.query.action === 'add-item' || route.query.action === 'edit-item'
+const pageTitle = computed(() => currentCategory.value?.name || 'Category Items')
+const pageSubtitle = computed(() => currentCategory.value?.description || 'Manage items for this category.')
+
+const breadcrumbs = computed(() => {
+  return [
+    { label: 'Menu Management', to: '/owner/menu-management' },
+    { label: currentCategory.value?.name || 'Category' }
+  ]
 })
+
+const isItemModalOpen = computed(() => route.query.action === 'add-item' || route.query.action === 'edit-item')
 
 const itemToEdit = computed(() => {
   if (route.query.action === 'edit-item' && route.query.item) {
@@ -58,7 +76,7 @@ const itemToEdit = computed(() => {
 })
 
 function handleAddAction() {
-  router.push({ query: { ...route.query, action: 'add-item' } })
+  router.push({ query: { ...route.query, action: 'assign-items' } })
 }
 
 function handleEditItem(itemUuid: string) {
@@ -87,10 +105,29 @@ function handleDeleteItem(itemUuid: string) {
   }
 }
 
-const breadcrumbs = [
-  { label: 'Menu Management', to: '/owner/menu-management' },
-  { label: 'Menu Items' }
-]
+const isAssignItemsModalOpen = computed(() => route.query.action === 'assign-items')
+
+function closeAssignItemsModal() {
+  const newQuery = { ...route.query }
+  delete newQuery.action
+  router.push({ query: newQuery })
+}
+
+async function onAssignItemsConfirm(selectedItemUuids: string[]) {
+  try {
+    const formData = new FormData()
+    formData.append('name', currentCategory.value.name)
+    formData.append('items', JSON.stringify(selectedItemUuids))
+    formData.append('_method', 'PATCH')
+    
+    await menuService.updateMenuCategory(currentCategory.value.uuid, formData)
+    fetchData()
+    closeAssignItemsModal()
+  } catch (error) {
+    console.error('Failed to update category items', error)
+    alert('Failed to update category items. Please try again.')
+  }
+}
 
 const links = [
   { label: 'Dashboard', to: '/owner/dashboard', icon: 'squares-2x2' },
@@ -105,8 +142,8 @@ const links = [
     <NavBar :links="links" />
     <main class="flex-1 p-4 md:p-6 lg:p-10 max-w-7xl mx-auto w-full">
       <MenuPageHeader 
-        title="Menu Items"
-        subtitle="View and manage all items across all categories."
+        :title="pageTitle"
+        :subtitle="pageSubtitle"
         :breadcrumbs="breadcrumbs"
       />
 
@@ -128,6 +165,7 @@ const links = [
           </div>
 
           <template v-else>
+            <!-- Items Grid -->
             <div v-if="items.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               <ItemCard 
                 v-for="item in items" 
@@ -140,11 +178,11 @@ const links = [
 
             <EmptyState 
               v-else
-              title="No Items Yet"
-              message="You haven't added any menu items yet."
+              title="No Items Found"
+              message="This category doesn't have any items yet. Add your first item now."
               actionLabel="Add Item"
               icon="heroicons:plus-circle"
-              @action="() => {}"
+              @action="handleAddAction"
             />
           </template>
         </div>
@@ -168,6 +206,14 @@ const links = [
       :categories="categories"
       @close="closeItemModal"
       @saved="onItemSaved"
+    />
+
+    <AddEditItemToCategory
+      :show="isAssignItemsModalOpen"
+      :category="currentCategory"
+      :items="allCafeItems"
+      @close="closeAssignItemsModal"
+      @confirm="onAssignItemsConfirm"
     />
   </div>
 </template>

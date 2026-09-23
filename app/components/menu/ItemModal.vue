@@ -2,6 +2,7 @@
 import { ref, watch, computed, nextTick } from 'vue'
 import { useMenuService } from '~/composables/useMenuService'
 import { INGREDIENT_UNITS } from '~/utils/constants'
+import { parseQuantity, formatQuantity } from '~/utils/fraction'
 
 const props = defineProps<{
   show: boolean
@@ -21,7 +22,7 @@ const form = ref({
   category_uuid: '',
   base_price: '',
   description: '',
-  recipes: [] as { ingredient_name: string; quantity: string; unit: string }[]
+  recipes: [] as { ingredient_name: string; quantity_display: string; unit: string }[]
 })
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -49,10 +50,10 @@ watch(() => props.show, (newVal) => {
         recipes: props.item.recipes?.length 
           ? props.item.recipes.map((r: any) => ({
               ingredient_name: r.ingredient_name,
-              quantity: r.quantity,
+              quantity_display: formatQuantity(r.quantity),
               unit: r.unit
             })) 
-          : [{ ingredient_name: '', quantity: '', unit: INGREDIENT_UNITS[0] }]
+          : [{ ingredient_name: '', quantity_display: '', unit: INGREDIENT_UNITS[0] }]
       }
       picturePreview.value = props.item.picture || null
     } else {
@@ -61,7 +62,7 @@ watch(() => props.show, (newVal) => {
         category_uuid: 'uncategorized',
         base_price: '',
         description: '',
-        recipes: [{ ingredient_name: '', quantity: '', unit: INGREDIENT_UNITS[0] }]
+        recipes: [{ ingredient_name: '', quantity_display: '', unit: INGREDIENT_UNITS[0] }]
       }
       picturePreview.value = null
     }
@@ -104,7 +105,7 @@ const setIngredientInputRef = (el: any, index: number) => {
 }
 
 const addIngredient = () => {
-  form.value.recipes.push({ ingredient_name: '', quantity: '', unit: INGREDIENT_UNITS[0] })
+  form.value.recipes.push({ ingredient_name: '', quantity_display: '', unit: INGREDIENT_UNITS[0] })
 }
 
 const handleEnterOnIngredient = async (index: number) => {
@@ -163,7 +164,12 @@ const saveItem = async () => {
       formData.append('picture', pictureFile.value)
     }
 
-    formData.append('recipes', JSON.stringify(form.value.recipes))
+    const recipesToSave = form.value.recipes.map(r => ({
+      ingredient_name: r.ingredient_name,
+      quantity: parseQuantity(r.quantity_display),
+      unit: r.unit
+    }))
+    formData.append('recipes', JSON.stringify(recipesToSave))
 
     if (isEditMode.value) {
       formData.append('_method', 'PATCH')
@@ -280,7 +286,6 @@ const saveItem = async () => {
                     v-model="form.category_uuid"
                     class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl pl-4 pr-10 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent transition-shadow"
                   >
-                    <option value="uncategorized">Uncategorized</option>
                     <option v-for="cat in categories" :key="cat.uuid" :value="cat.uuid">
                       {{ cat.name }}
                     </option>
@@ -365,10 +370,9 @@ const saveItem = async () => {
               <div class="w-full">
                 <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Amount</label>
                 <input 
-                  v-model="recipe.quantity"
-                  type="number" 
-                  step="0.1"
-                  placeholder="e.g. 2"
+                  v-model="recipe.quantity_display"
+                  type="text" 
+                  placeholder="e.g. 1/4 or 2.5"
                   @keydown.enter.prevent="handleEnterOnIngredient(index)"
                   class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent"
                 />

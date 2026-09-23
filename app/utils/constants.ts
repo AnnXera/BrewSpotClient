@@ -10,5 +10,9 @@ export const INGREDIENT_UNITS = [
     'cups',
     'pieces',
     'oz',
-    'lb'
+    'lb',
+    'to taste',
+    'as needed',
+    'dash',
+    'pinch'
 ];

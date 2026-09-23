@@ -3,9 +3,8 @@ import { useMenuService } from '~/composables/useMenuService'
 import MenuPageHeader from '~/components/menu/MenuPageHeader.vue'
 import MenuToolbar from '~/components/menu/MenuToolbar.vue'
 import CategoryCard from '~/components/menu/CategoryCard.vue'
-import ItemCard from '~/components/menu/ItemCard.vue'
 import EmptyState from '~/components/menu/EmptyState.vue'
-import ItemModal from '~/components/menu/ItemModal.vue'
+import CategoryModal from '~/components/menu/CategoryModal.vue'
 
 definePageMeta({
   layout: 'owner',
@@ -15,47 +14,27 @@ const route = useRoute()
 const router = useRouter()
 const menuService = useMenuService()
 
-const isCategoryView = computed(() => !!route.query.category)
-const currentCategoryUuid = computed(() => route.query.category as string)
-
 const categories = ref<any[]>([])
 const items = ref<any[]>([])
-const currentCategory = ref<any>(null)
 const isLoading = ref(true)
 
 async function fetchData() {
   isLoading.value = true
   try {
-    if (isCategoryView.value) {
-      // Fetch items for this category
-      const res = await menuService.getMenuItems({ category_uuid: currentCategoryUuid.value })
-      items.value = res.items?.data || res.items || []
-      
-      if (currentCategoryUuid.value === 'uncategorized') {
-        currentCategory.value = {
-          uuid: 'uncategorized',
-          name: 'Uncategorized',
-          description: 'Items that do not belong to any category'
-        }
-      } else {
-        const catRes = await menuService.getMenuCategories()
-        const allCats = catRes.categories?.data || catRes.categories || []
-        currentCategory.value = allCats.find((c: any) => c.uuid === currentCategoryUuid.value || c.id == currentCategoryUuid.value)
+    const res = await menuService.getMenuCategories()
+    const fetchedCats = res.categories?.data || res.categories || []
+    categories.value = [
+      ...fetchedCats,
+      {
+        id: 'uncategorized',
+        uuid: 'uncategorized',
+        name: 'Uncategorized',
+        description: 'Items that do not belong to any category',
       }
-    } else {
-      // Fetch all categories
-      const res = await menuService.getMenuCategories()
-      const fetchedCats = res.categories?.data || res.categories || []
-      categories.value = [
-        ...fetchedCats,
-        {
-          id: 'uncategorized',
-          uuid: 'uncategorized',
-          name: 'Uncategorized',
-          description: 'Items that do not belong to any category',
-        }
-      ]
-    }
+    ]
+
+    const itemsRes = await menuService.getMenuItems()
+    items.value = itemsRes.items?.data || itemsRes.items || []
   } catch (error) {
     console.error('Failed to fetch data', error)
   } finally {
@@ -63,65 +42,54 @@ async function fetchData() {
   }
 }
 
-watch(() => route.query.category, fetchData, { immediate: true })
+onMounted(fetchData)
 
-const pageTitle = computed(() => {
-  if (isCategoryView.value) return currentCategory.value?.name || 'Category Items'
-  return 'Menu Management'
-})
-
-const pageSubtitle = computed(() => {
-  if (isCategoryView.value) return currentCategory.value?.description || 'Manage items for this category.'
-  return 'Add, edit, and delete your menu category and items'
-})
-
-const breadcrumbs = computed(() => {
-  if (isCategoryView.value) {
-    return [
-      { label: 'Menu Management', to: '/owner/menu-management' },
-      { label: currentCategory.value?.name || 'Category' }
-    ]
-  }
-  return undefined
-})
+const pageTitle = computed(() => 'Menu Management')
+const pageSubtitle = computed(() => 'Add, edit, and delete your menu category and items')
 
 function handleCategoryClick(id: string | number) {
-  router.push({ path: '/owner/menu-management', query: { category: id } })
+  router.push({ path: `/owner/menu-management/category/${id}` })
 }
 
-const isItemModalOpen = computed(() => {
-  return route.query.action === 'add-item' || route.query.action === 'edit-item'
+function handleAddAction() {
+  router.push({ query: { ...route.query, action: 'add-category' } })
+}
+
+const isCategoryModalOpen = computed(() => {
+  return route.query.action === 'add-category' || route.query.action === 'edit-category'
 })
 
-const itemToEdit = computed(() => {
-  if (route.query.action === 'edit-item' && route.query.item) {
-    return items.value.find(i => i.uuid === route.query.item) || null
+const categoryToEdit = computed(() => {
+  if (route.query.action === 'edit-category' && route.query.category_id) {
+    return categories.value.find(c => c.uuid === route.query.category_id) || null
   }
   return null
 })
 
-function handleAddAction() {
-  if (isCategoryView.value) {
-    router.push({ query: { ...route.query, action: 'add-item' } })
-  } else {
-    // TODO: Add category action
-    console.log('Add category clicked')
-  }
+function handleEditCategory(catUuid: string) {
+  router.push({ query: { ...route.query, action: 'edit-category', category_id: catUuid } })
 }
 
-function handleEditItem(itemUuid: string) {
-  router.push({ query: { ...route.query, action: 'edit-item', item: itemUuid } })
-}
-
-function closeItemModal() {
+function closeCategoryModal() {
   const newQuery = { ...route.query }
   delete newQuery.action
-  delete newQuery.item
+  delete newQuery.category_id
   router.push({ query: newQuery })
 }
 
-function onItemSaved() {
+function onCategorySaved() {
   fetchData()
+}
+
+function handleDeleteCategory(catUuid: string) {
+  if (window.confirm('Are you sure you want to delete this category?')) {
+    menuService.deleteMenuCategory(catUuid)
+      .then(() => fetchData())
+      .catch((error) => {
+        console.error('Failed to delete category', error)
+        alert('Failed to delete category. Please try again.')
+      })
+  }
 }
 
 const links = [
@@ -139,7 +107,6 @@ const links = [
       <MenuPageHeader 
         :title="pageTitle"
         :subtitle="pageSubtitle"
-        :breadcrumbs="breadcrumbs"
       />
 
       <div class="bg-white rounded-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
@@ -147,8 +114,8 @@ const links = [
         <!-- Toolbar Section -->
         <div class="p-4 sm:p-6 border-b border-[#EEDFC4]">
           <MenuToolbar 
-            :searchPlaceholder="isCategoryView ? 'Search Item' : 'Search Category'"
-            :addButtonLabel="isCategoryView ? '+ Add Item' : '+ Add Category'"
+            searchPlaceholder="Search Category"
+            addButtonLabel="+ Add Category"
             @add="handleAddAction"
           />
         </div>
@@ -161,45 +128,24 @@ const links = [
 
           <template v-else>
             <!-- Categories Grid -->
-            <div v-if="!isCategoryView && categories.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div v-if="categories.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               <CategoryCard 
                 v-for="cat in categories" 
                 :key="cat.id" 
                 :category="cat"
                 @click="handleCategoryClick"
-                @edit="() => {}"
-                @delete="() => {}"
+                @edit="handleEditCategory(cat.uuid || cat.id)"
+                @delete="handleDeleteCategory(cat.uuid || cat.id)"
               />
             </div>
 
-            <!-- Items Grid -->
-            <div v-else-if="isCategoryView && items.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              <ItemCard 
-                v-for="item in items" 
-                :key="item.id" 
-                :item="item"
-                @edit="handleEditItem(item.uuid)"
-                @delete="() => {}"
-              />
-            </div>
-
-            <!-- Empty States -->
             <EmptyState 
-              v-else-if="!isCategoryView"
+              v-else
               title="No Categories Yet"
               message="Create your first category to start building your menu."
               actionLabel="Create Category"
               icon="heroicons:folder-plus"
-              @action="() => {}"
-            />
-
-            <EmptyState 
-              v-else
-              title="No Items Found"
-              message="This category doesn't have any items yet. Add your first item now."
-              actionLabel="Add Item"
-              icon="heroicons:plus-circle"
-              @action="() => {}"
+              @action="handleAddAction"
             />
           </template>
         </div>
@@ -217,12 +163,12 @@ const links = [
       </div>
     </main>
 
-    <ItemModal 
-      :show="isItemModalOpen"
-      :item="itemToEdit"
-      :categories="categories"
-      @close="closeItemModal"
-      @saved="onItemSaved"
+    <CategoryModal
+      :show="isCategoryModalOpen"
+      :category="categoryToEdit"
+      :items="items"
+      @close="closeCategoryModal"
+      @saved="onCategorySaved"
     />
   </div>
 </template>
