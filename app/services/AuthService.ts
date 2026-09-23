@@ -146,6 +146,10 @@ export class AuthService extends BaseService {
         return this.post<SimpleResponse>(`/auth/register/${userUuid}`, payload)
     }
 
+    uploadTempFile(payload: FormData) {
+        return this.post<{ success: boolean; path?: string; message?: string }>('/upload/temp', payload)
+    }
+
     setupPassword(uuid: string, password: string, passwordConfirmation: string) {
         return this.post<SetupPasswordResponse>(`/auth/setup-password/${uuid}`, {
             password,

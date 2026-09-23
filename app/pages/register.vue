@@ -1,6 +1,6 @@
 <!-- Unified Step-by-Step Business Registration Wizard -->
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import logoFull from '~/assets/images/logo-with-tag.svg'
 
 const authService = useAuthService()
@@ -20,7 +20,7 @@ const inputs = ref<HTMLInputElement[]>([])
 const otpCode = computed(() => digits.value.join(''))
 const cooldown = ref(0)
 
-// Step 3: Personal Information
+// Step 3: Your Details
 const userUuid = ref('')
 const firstname = ref('')
 const middlename = ref('')
@@ -72,31 +72,16 @@ function cleanMobileDigits(val: string): string {
 
 function cleanLandlineDigits(val: string): string {
   let cleaned = val.replace(/\D/g, '')
-  if (cleaned.startsWith('63')) {
-    cleaned = '0' + cleaned.slice(2)
-  }
-  return cleaned
+  return cleaned.slice(0, 10)
 }
 
 function isValidPhLandline(val: string): boolean {
   const digits = cleanLandlineDigits(val)
-  if (/^02\d{8}$/.test(digits)) return true
-  if (/^0[3-8]\d{8}$/.test(digits)) return true
-  if (/^0[2-8]\d{7,8}$/.test(digits)) return true
-  return false
+  return /^082\d{7}$/.test(digits)
 }
 
 function formatLandlineForBackend(val: string): string {
-  const digits = cleanLandlineDigits(val)
-  let core = digits.startsWith('0') ? digits.slice(1) : digits
-  if (core.length > 9) {
-    core = core.slice(0, 9)
-  } else {
-    while (core.length < 9) {
-      core = core + '0'
-    }
-  }
-  return `+639${core}`
+  return cleanLandlineDigits(val)
 }
 
 function syncPhoneNumber() {
@@ -169,8 +154,10 @@ const idType = ref('drivers_license')
 const isBackIdRequired = computed(() => idType.value !== 'passport')
 const governmentIdFile = ref<File | null>(null)
 const governmentIdFileName = ref('')
+const governmentIdFilePath = ref('')
 const governmentIdFileBack = ref<File | null>(null)
 const governmentIdFileBackName = ref('')
+const governmentIdFileBackPath = ref('')
 const fieldErrors = ref<Record<string, string>>({})
 
 function clearFieldError(field: string) {
@@ -261,8 +248,10 @@ const dtiSecFile = ref<File | null>(null)
 
 const birFileName = ref('')
 const birFileSize = ref('')
+const birFilePath = ref('')
 const dtiSecFileName = ref('')
 const dtiSecFileSize = ref('')
+const dtiSecFilePath = ref('')
 
 // BIR Certificate Additional Details
 const birRegisteredAt = ref('')
@@ -303,6 +292,61 @@ function formatBytes(bytes: number): string {
 
 function goLogin() {
   navigateTo('/login')
+}
+
+function clearAllInputs() {
+  // Step 1
+  email.value = ''
+  // Step 2
+  digits.value = ['', '', '', '', '', '']
+  cooldown.value = 0
+  // Step 3
+  userUuid.value = ''
+  firstname.value = ''
+  middlename.value = ''
+  lastname.value = ''
+  username.value = ''
+  phoneType.value = 'mobile'
+  mobileDigits.value = ''
+  landlineDigits.value = ''
+  phoneNumber.value = ''
+  ownerAddress.value = ''
+  idType.value = 'drivers_license'
+  governmentIdFile.value = null
+  governmentIdFileName.value = ''
+  governmentIdFilePath.value = ''
+  governmentIdFileBack.value = null
+  governmentIdFileBackName.value = ''
+  governmentIdFileBackPath.value = ''
+  // Step 4
+  businessSubPage.value = 1
+  cafeName.value = ''
+  cafeDocType.value = 'DTI'
+  branchName.value = ''
+  address.value = ''
+  cafePhoneType.value = 'mobile'
+  cafeMobileDigits.value = ''
+  cafeLandlineDigits.value = ''
+  cafePhone.value = ''
+  cafeEmail.value = ''
+  birFile.value = null
+  birFileName.value = ''
+  birFileSize.value = ''
+  birFilePath.value = ''
+  dtiSecFile.value = null
+  dtiSecFileName.value = ''
+  dtiSecFileSize.value = ''
+  dtiSecFilePath.value = ''
+  birRegisteredAt.value = ''
+  birExpiredAt.value = ''
+  tinNumber.value = ''
+  vat.value = 'non-vat'
+  // Errors & state
+  error.value = ''
+  success.value = ''
+  fieldErrors.value = {}
+  // Clear draft
+  sessionStorage.removeItem('registrationDraft')
 }
 
 function isValidEmail(emailStr: string): boolean {
@@ -415,7 +459,7 @@ function isValidFileType(file: File): boolean {
 }
 
 // Step 3: Personal Info
-function handleGovIdChange(event: Event) {
+async function handleGovIdChange(event: Event) {
   error.value = ''
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -425,6 +469,7 @@ function handleGovIdChange(event: Event) {
       input.value = ''
       governmentIdFile.value = null
       governmentIdFileName.value = ''
+      governmentIdFilePath.value = ''
       return
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -432,14 +477,33 @@ function handleGovIdChange(event: Event) {
       input.value = ''
       governmentIdFile.value = null
       governmentIdFileName.value = ''
+      governmentIdFilePath.value = ''
       return
     }
-    governmentIdFile.value = file
-    governmentIdFileName.value = file.name
+    
+    loading.value = true
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await authService.uploadTempFile(formData)
+      if (res.success && res.path) {
+        governmentIdFilePath.value = res.path
+        governmentIdFile.value = file
+        governmentIdFileName.value = file.name
+      } else {
+        error.value = res.message || 'Failed to upload Government ID (Front).'
+        input.value = ''
+      }
+    } catch (e: any) {
+      error.value = extractErrorMessage(e, 'Upload failed.')
+      input.value = ''
+    } finally {
+      loading.value = false
+    }
   }
 }
 
-function handleGovIdBackChange(event: Event) {
+async function handleGovIdBackChange(event: Event) {
   error.value = ''
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -449,6 +513,7 @@ function handleGovIdBackChange(event: Event) {
       input.value = ''
       governmentIdFileBack.value = null
       governmentIdFileBackName.value = ''
+      governmentIdFileBackPath.value = ''
       return
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -456,10 +521,29 @@ function handleGovIdBackChange(event: Event) {
       input.value = ''
       governmentIdFileBack.value = null
       governmentIdFileBackName.value = ''
+      governmentIdFileBackPath.value = ''
       return
     }
-    governmentIdFileBack.value = file
-    governmentIdFileBackName.value = file.name
+    
+    loading.value = true
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await authService.uploadTempFile(formData)
+      if (res.success && res.path) {
+        governmentIdFileBackPath.value = res.path
+        governmentIdFileBack.value = file
+        governmentIdFileBackName.value = file.name
+      } else {
+        error.value = res.message || 'Failed to upload Government ID (Back).'
+        input.value = ''
+      }
+    } catch (e: any) {
+      error.value = extractErrorMessage(e, 'Upload failed.')
+      input.value = ''
+    } finally {
+      loading.value = false
+    }
   }
 }
 
@@ -534,6 +618,13 @@ async function checkPhoneAvailability() {
 
 async function checkCafeEmailAvailability() {
   if (!cafeEmail.value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cafeEmail.value.trim())) return
+
+  // Client-side guard: café email must differ from personal email
+  if (cafeEmail.value.trim().toLowerCase() === email.value.trim().toLowerCase()) {
+    fieldErrors.value.cafe_email = 'The café email must be different from your personal email.'
+    return
+  }
+
   try {
     const res = await authService.validateRegistrationStep(userUuid.value, { cafe_email: cafeEmail.value.trim() })
     const errMsg = res.errors?.cafe_email?.[0]
@@ -634,7 +725,7 @@ async function handleNextToBusiness() {
       error.value = Object.values(fieldErrors.value)[0] || 'Please resolve the errors above.'
       return
     }
-    error.value = extractErrorMessage(e, 'Validation failed. Please check your personal details.')
+    error.value = extractErrorMessage(e, 'Please check the highlighted fields and try again.')
     return
   } finally {
     loading.value = false
@@ -683,6 +774,11 @@ async function nextBusinessSubPage() {
     error.value = 'Please enter a valid Café Email address.'
     return
   }
+  if (cafeEmail.value.trim().toLowerCase() === email.value.trim().toLowerCase()) {
+    fieldErrors.value.cafe_email = 'The café email must be different from your personal email.'
+    error.value = 'The café email must be different from your personal email.'
+    return
+  }
 
   loading.value = true
   try {
@@ -712,7 +808,7 @@ async function nextBusinessSubPage() {
       error.value = Object.values(fieldErrors.value)[0] || 'Please resolve the errors above.'
       return
     }
-    error.value = extractErrorMessage(e, 'Validation failed. Please check your café details.')
+    error.value = extractErrorMessage(e, 'Please check the highlighted fields and try again.')
     return
   } finally {
     loading.value = false
@@ -726,7 +822,7 @@ function prevBusinessSubPage() {
   businessSubPage.value = 1
 }
 
-function onBirChange(event: Event) {
+async function onBirChange(event: Event) {
   error.value = ''
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -743,9 +839,29 @@ function onBirChange(event: Event) {
       clearBirFile()
       return
     }
-    birFile.value = file
-    birFileName.value = file.name
-    birFileSize.value = formatBytes(file.size)
+    
+    loading.value = true
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await authService.uploadTempFile(formData)
+      if (res.success && res.path) {
+        birFilePath.value = res.path
+        birFile.value = file
+        birFileName.value = file.name
+        birFileSize.value = formatBytes(file.size)
+      } else {
+        error.value = res.message || 'Failed to upload BIR Certificate.'
+        input.value = ''
+        clearBirFile()
+      }
+    } catch (e: any) {
+      error.value = extractErrorMessage(e, 'Upload failed.')
+      input.value = ''
+      clearBirFile()
+    } finally {
+      loading.value = false
+    }
   }
 }
 
@@ -753,9 +869,10 @@ function clearBirFile() {
   birFile.value = null
   birFileName.value = ''
   birFileSize.value = ''
+  birFilePath.value = ''
 }
 
-function onDtiSecChange(event: Event) {
+async function onDtiSecChange(event: Event) {
   error.value = ''
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -772,9 +889,29 @@ function onDtiSecChange(event: Event) {
       clearDtiSecFile()
       return
     }
-    dtiSecFile.value = file
-    dtiSecFileName.value = file.name
-    dtiSecFileSize.value = formatBytes(file.size)
+    
+    loading.value = true
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await authService.uploadTempFile(formData)
+      if (res.success && res.path) {
+        dtiSecFilePath.value = res.path
+        dtiSecFile.value = file
+        dtiSecFileName.value = file.name
+        dtiSecFileSize.value = formatBytes(file.size)
+      } else {
+        error.value = res.message || `Failed to upload ${cafeDocType.value} Document.`
+        input.value = ''
+        clearDtiSecFile()
+      }
+    } catch (e: any) {
+      error.value = extractErrorMessage(e, 'Upload failed.')
+      input.value = ''
+      clearDtiSecFile()
+    } finally {
+      loading.value = false
+    }
   }
 }
 
@@ -782,6 +919,7 @@ function clearDtiSecFile() {
   dtiSecFile.value = null
   dtiSecFileName.value = ''
   dtiSecFileSize.value = ''
+  dtiSecFilePath.value = ''
 }
 
 async function handleFinalSubmit() {
@@ -789,7 +927,7 @@ async function handleFinalSubmit() {
   success.value = ''
 
   if (!userUuid.value) {
-    error.value = 'Invalid registration session. Please restart registration.'
+    error.value = 'Your session has expired. Please restart the registration process.'
     return
   }
 
@@ -825,7 +963,7 @@ async function handleFinalSubmit() {
       return
     }
     if (!birExpiredAt.value) {
-      fieldErrors.value.bir_expired_at = 'BIR Expiration Date is required.'
+      fieldErrors.value.bir_expired_at = 'BIR Expiration Date (if applicable) is required.'
       error.value = 'Please enter the BIR Expiration Date.'
       return
     }
@@ -866,9 +1004,9 @@ async function handleFinalSubmit() {
     payload.append('phone_number', phoneNumber.value)
     payload.append('owner_address', ownerAddress.value)
     payload.append('id_type', idType.value || 'drivers_license')
-    payload.append('file', governmentIdFile.value)
-    if (isBackIdRequired.value && governmentIdFileBack.value) {
-      payload.append('file_back', governmentIdFileBack.value)
+    payload.append('file', governmentIdFilePath.value)
+    if (isBackIdRequired.value && governmentIdFileBackPath.value) {
+      payload.append('file_back', governmentIdFileBackPath.value)
     }
 
     payload.append('cafe_name', cafeName.value)
@@ -878,8 +1016,8 @@ async function handleFinalSubmit() {
     payload.append('cafe_phonenumber', cafePhone.value)
     payload.append('cafe_email', cafeEmail.value)
 
-    payload.append('bir_file', birFile.value!)
-    payload.append('dti_sec_file', dtiSecFile.value!)
+    payload.append('bir_file', birFilePath.value)
+    payload.append('dti_sec_file', dtiSecFilePath.value)
     payload.append('bir_registered_at', birRegisteredAt.value)
     if (birExpiredAt.value) {
       payload.append('bir_expired_at', birExpiredAt.value)
@@ -889,6 +1027,7 @@ async function handleFinalSubmit() {
 
     const res = await authService.register(userUuid.value, payload)
     if (res.success) {
+      clearAllInputs()
       currentStep.value = 5
     } else {
       error.value = res.message || 'Registration failed.'
@@ -925,6 +1064,124 @@ async function handleFinalSubmit() {
     loading.value = false
   }
 }
+
+// Data Loss Prevention & Drafting
+function saveDraft() {
+  const draft = {
+    email: email.value,
+    firstname: firstname.value,
+    middlename: middlename.value,
+    lastname: lastname.value,
+    username: username.value,
+    phoneType: phoneType.value,
+    mobileDigits: mobileDigits.value,
+    landlineDigits: landlineDigits.value,
+    ownerAddress: ownerAddress.value,
+    idType: idType.value,
+    cafeName: cafeName.value,
+    cafeDocType: cafeDocType.value,
+    branchName: branchName.value,
+    address: address.value,
+    cafePhoneType: cafePhoneType.value,
+    cafeMobileDigits: cafeMobileDigits.value,
+    cafeLandlineDigits: cafeLandlineDigits.value,
+    cafeEmail: cafeEmail.value,
+    birRegisteredAt: birRegisteredAt.value,
+    birExpiredAt: birExpiredAt.value,
+    tinNumber: tinNumber.value,
+    vat: vat.value,
+    governmentIdFilePath: governmentIdFilePath.value,
+    governmentIdFileBackPath: governmentIdFileBackPath.value,
+    birFilePath: birFilePath.value,
+    dtiSecFilePath: dtiSecFilePath.value,
+    // File names for display
+    governmentIdFileName: governmentIdFileName.value,
+    governmentIdFileBackName: governmentIdFileBackName.value,
+    birFileName: birFileName.value,
+    dtiSecFileName: dtiSecFileName.value
+  }
+  sessionStorage.setItem('registrationDraft', JSON.stringify(draft))
+}
+
+function restoreDraft() {
+  const saved = sessionStorage.getItem('registrationDraft')
+  if (saved) {
+    try {
+      const draft = JSON.parse(saved)
+      if (draft.email) email.value = draft.email
+      if (draft.firstname) firstname.value = draft.firstname
+      if (draft.middlename) middlename.value = draft.middlename
+      if (draft.lastname) lastname.value = draft.lastname
+      if (draft.username) username.value = draft.username
+      if (draft.phoneType) phoneType.value = draft.phoneType
+      if (draft.mobileDigits) mobileDigits.value = draft.mobileDigits
+      if (draft.landlineDigits) landlineDigits.value = draft.landlineDigits
+      if (draft.ownerAddress) ownerAddress.value = draft.ownerAddress
+      if (draft.idType) idType.value = draft.idType
+      if (draft.cafeName) cafeName.value = draft.cafeName
+      if (draft.cafeDocType) cafeDocType.value = draft.cafeDocType
+      if (draft.branchName) branchName.value = draft.branchName
+      if (draft.address) address.value = draft.address
+      if (draft.cafePhoneType) cafePhoneType.value = draft.cafePhoneType
+      if (draft.cafeMobileDigits) cafeMobileDigits.value = draft.cafeMobileDigits
+      if (draft.cafeLandlineDigits) cafeLandlineDigits.value = draft.cafeLandlineDigits
+      if (draft.cafeEmail) cafeEmail.value = draft.cafeEmail
+      if (draft.birRegisteredAt) birRegisteredAt.value = draft.birRegisteredAt
+      if (draft.birExpiredAt) birExpiredAt.value = draft.birExpiredAt
+      if (draft.tinNumber) tinNumber.value = draft.tinNumber
+      if (draft.vat) vat.value = draft.vat
+      
+      // File paths and names
+      if (draft.governmentIdFilePath) {
+        governmentIdFilePath.value = draft.governmentIdFilePath
+        governmentIdFileName.value = draft.governmentIdFileName || 'Uploaded File'
+        // Mock a File object so validation passes
+        governmentIdFile.value = new File([''], governmentIdFileName.value, { type: 'application/octet-stream' })
+      }
+      if (draft.governmentIdFileBackPath) {
+        governmentIdFileBackPath.value = draft.governmentIdFileBackPath
+        governmentIdFileBackName.value = draft.governmentIdFileBackName || 'Uploaded File'
+        governmentIdFileBack.value = new File([''], governmentIdFileBackName.value, { type: 'application/octet-stream' })
+      }
+      if (draft.birFilePath) {
+        birFilePath.value = draft.birFilePath
+        birFileName.value = draft.birFileName || 'Uploaded File'
+        birFile.value = new File([''], birFileName.value, { type: 'application/octet-stream' })
+      }
+      if (draft.dtiSecFilePath) {
+        dtiSecFilePath.value = draft.dtiSecFilePath
+        dtiSecFileName.value = draft.dtiSecFileName || 'Uploaded File'
+        dtiSecFile.value = new File([''], dtiSecFileName.value, { type: 'application/octet-stream' })
+      }
+    } catch (e) {
+      console.warn('Failed to parse draft from sessionStorage', e)
+    }
+  }
+}
+
+watch(
+  [email, firstname, middlename, lastname, username, phoneType, mobileDigits, landlineDigits, ownerAddress, idType, cafeName, cafeDocType, branchName, address, cafePhoneType, cafeMobileDigits, cafeLandlineDigits, cafeEmail, birRegisteredAt, birExpiredAt, tinNumber, vat, governmentIdFilePath, governmentIdFileBackPath, birFilePath, dtiSecFilePath],
+  () => {
+    saveDraft()
+  },
+  { deep: true }
+)
+
+function handleBeforeUnload(e: BeforeUnloadEvent) {
+  if (currentStep.value > 1 && currentStep.value < 5) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
+
+onMounted(() => {
+  restoreDraft()
+  window.addEventListener('beforeunload', handleBeforeUnload)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+})
 </script>
 
 <template>
@@ -983,8 +1240,40 @@ async function handleFinalSubmit() {
 
           <div>
             <h1 class="text-3xl font-bold text-[#2d201b]">Register your business</h1>
-            <p class="text-gray-600 text-sm mt-1">
-              Enter your email address to receive a verification code before completing registration.
+            <p class="text-gray-600 text-sm mt-1 mb-6">
+              Create your BrewSpot account. We'll need a few documents to verify your business.
+            </p>
+          </div>
+
+          <!-- Onboarding Checklist -->
+          <div class="bg-[#7B5A50]/5 border border-[#7B5A50]/20 rounded-lg p-5">
+            <h3 class="font-semibold text-[#2d201b] text-sm mb-3 flex items-center gap-2">
+              <Icon name="heroicons:document-text" class="w-5 h-5 text-[#7B5A50]" />
+              What you'll need
+            </h3>
+            <ul class="text-sm text-gray-700 space-y-2.5">
+              <li class="flex items-start gap-2">
+                <Icon name="heroicons:check-circle" class="w-4 h-4 text-[#7B5A50] mt-0.5 shrink-0" />
+                <span>Valid Government ID (Front & Back required for some)</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <Icon name="heroicons:check-circle" class="w-4 h-4 text-[#7B5A50] mt-0.5 shrink-0" />
+                <span>BIR Certificate of Registration (Form 2303)</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <Icon name="heroicons:check-circle" class="w-4 h-4 text-[#7B5A50] mt-0.5 shrink-0" />
+                <span>DTI Business Name Registration or SEC Certificate</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <Icon name="heroicons:check-circle" class="w-4 h-4 text-[#7B5A50] mt-0.5 shrink-0" />
+                <span>Basic business details (TIN, address, contacts)</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="pt-2 border-t border-gray-100">
+            <p class="text-gray-600 text-sm font-medium mb-4">
+              Please enter your email to receive a secure verification code.
             </p>
           </div>
 
@@ -999,10 +1288,11 @@ async function handleFinalSubmit() {
 
           <form @submit.prevent="handleSendCode" class="space-y-4">
             <div>
-              <label class="block text-sm font-medium mb-1.5 text-[#2d201b]">Email Address *</label>
+              <label class="block text-sm font-medium mb-1.5 text-[#2d201b]">Email Address</label>
               <input
                 v-model="email"
                 type="email"
+                maxlength="255"
                 placeholder="Enter your email"
                 class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                 required
@@ -1016,7 +1306,7 @@ async function handleFinalSubmit() {
                 class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 <span v-if="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                {{ loading ? 'Sending Code...' : 'Send Verification Code' }}
+                {{ loading ? 'Sending Code...' : 'Continue with Email' }}
               </button>
             </div>
 
@@ -1045,7 +1335,7 @@ async function handleFinalSubmit() {
           </button>
 
           <div>
-            <h1 class="text-3xl font-bold text-[#2d201b]">Check your inbox</h1>
+            <h1 class="text-3xl font-bold text-[#2d201b]">Verify your email</h1>
             <p class="text-gray-600 text-sm mt-2 leading-relaxed">
               We sent a 6-digit code to <span class="font-semibold text-[#2d201b]">{{ email }}</span>. Enter it below to continue.
             </p>
@@ -1104,10 +1394,10 @@ async function handleFinalSubmit() {
           <button
             type="button"
             class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
-            @click="currentStep = 2"
+            @click="currentStep = 1"
           >
             <Icon name="heroicons:chevron-left" class="w-4 h-4" />
-            Back to Verification
+            Change Email Address
           </button>
 
           <div>
@@ -1128,7 +1418,7 @@ async function handleFinalSubmit() {
           <form @submit.prevent="handleNextToBusiness" class="space-y-4">
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">First Name *</label>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">First Name</label>
                 <input
                   v-model="firstname"
                   type="text"
@@ -1139,7 +1429,7 @@ async function handleFinalSubmit() {
                 />
               </div>
               <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Last Name *</label>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Last Name</label>
                 <input
                   v-model="lastname"
                   type="text"
@@ -1235,7 +1525,7 @@ async function handleFinalSubmit() {
 
               <!-- ID Type (5 cols on sm) -->
               <div class="col-span-12 sm:col-span-5 space-y-1">
-                <label class="block text-sm font-medium text-[#2d201b]">ID Type *</label>
+                <label class="block text-sm font-medium text-[#2d201b]">ID Type</label>
                 <select
                   v-model="idType"
                   class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm font-medium text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20 cursor-pointer"
@@ -1268,29 +1558,60 @@ async function handleFinalSubmit() {
                 {{ isBackIdRequired ? 'Government ID (Front & Back) *' : 'Passport (Photo / Bio-page) *' }}
               </label>
               <div :class="isBackIdRequired ? 'grid grid-cols-2 gap-3' : ''">
-                <div>
-                  <input
-                    type="file"
-                    @change="handleGovIdChange"
-                    accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                    class="w-full text-sm text-[#2d201b] border border-gray-300 rounded-md bg-white p-2 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
-                    required
-                  />
-                  <p v-if="governmentIdFileName" class="mt-1 text-xs text-[#7B5A50] truncate font-medium">
-                    {{ isBackIdRequired ? `Front: ${governmentIdFileName}` : `File: ${governmentIdFileName}` }}
-                  </p>
+                <!-- Front ID -->
+                <div class="bg-white rounded-lg p-3 border transition shadow-sm" :class="governmentIdFilePath ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="font-semibold text-xs text-[#2d201b]">{{ isBackIdRequired ? 'Front ID' : 'ID File' }} <span class="text-red-500">*</span></label>
+                    <span v-if="governmentIdFilePath" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
+                  </div>
+                  <div v-if="!governmentIdFilePath">
+                    <input
+                      type="file"
+                      @change="handleGovIdChange"
+                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                      required
+                    />
+                  </div>
+                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
+                    <div class="truncate mr-2">
+                      <p class="font-medium truncate text-xs">{{ governmentIdFileName || 'Uploaded File' }}</p>
+                    </div>
+                    <button
+                      type="button"
+                      @click="governmentIdFile = null; governmentIdFileName = ''; governmentIdFilePath = ''; saveDraft()"
+                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
+                      title="Remove file"
+                    >&times;</button>
+                  </div>
                 </div>
-                <div v-if="isBackIdRequired">
-                  <input
-                    type="file"
-                    @change="handleGovIdBackChange"
-                    accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                    class="w-full text-sm text-[#2d201b] border border-gray-300 rounded-md bg-white p-2 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
-                    :required="isBackIdRequired"
-                  />
-                  <p v-if="governmentIdFileBackName" class="mt-1 text-xs text-[#7B5A50] truncate font-medium">
-                    Back: {{ governmentIdFileBackName }}
-                  </p>
+
+                <!-- Back ID -->
+                <div v-if="isBackIdRequired" class="bg-white rounded-lg p-3 border transition shadow-sm" :class="governmentIdFileBackPath ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="font-semibold text-xs text-[#2d201b]">Back ID <span class="text-red-500">*</span></label>
+                    <span v-if="governmentIdFileBackPath" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
+                  </div>
+                  <div v-if="!governmentIdFileBackPath">
+                    <input
+                      type="file"
+                      @change="handleGovIdBackChange"
+                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                      required
+                    />
+                  </div>
+                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
+                    <div class="truncate mr-2">
+                      <p class="font-medium truncate text-xs">{{ governmentIdFileBackName || 'Uploaded File' }}</p>
+                    </div>
+                    <button
+                      type="button"
+                      @click="governmentIdFileBack = null; governmentIdFileBackName = ''; governmentIdFileBackPath = ''; saveDraft()"
+                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
+                      title="Remove file"
+                    >&times;</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1341,7 +1662,7 @@ async function handleFinalSubmit() {
             <form @submit.prevent="nextBusinessSubPage" class="space-y-4">
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Café / Business Name *</label>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Business Name</label>
                   <input
                     v-model="cafeName"
                     type="text"
@@ -1365,7 +1686,7 @@ async function handleFinalSubmit() {
               <div class="grid grid-cols-12 gap-3 items-start">
                 <!-- Branch Name (5 cols on sm) -->
                 <div class="col-span-12 sm:col-span-5 space-y-1">
-                  <label class="block text-sm font-medium text-[#2d201b]">Branch Name *</label>
+                  <label class="block text-sm font-medium text-[#2d201b]">Branch Name</label>
                   <input
                     v-model="branchName"
                     type="text"
@@ -1427,7 +1748,7 @@ async function handleFinalSubmit() {
               </div>
 
               <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Address *</label>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Address</label>
                 <input
                   v-model="address"
                   type="text"
@@ -1599,7 +1920,7 @@ async function handleFinalSubmit() {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
                   <!-- TIN Number -->
                   <div class="space-y-1">
-                    <label class="block font-semibold text-[#2d201b]">TIN Number *</label>
+                    <label class="block font-semibold text-[#2d201b]">TIN</label>
                     <input
                       v-model="tinNumber"
                       type="text"
@@ -1619,7 +1940,7 @@ async function handleFinalSubmit() {
 
                   <!-- VAT Status Option Buttons -->
                   <div class="space-y-1">
-                    <label class="block font-semibold text-[#2d201b]">VAT Type *</label>
+                    <label class="block font-semibold text-[#2d201b]">VAT Registration Type</label>
                     <div class="grid grid-cols-2 gap-2 h-10">
                       <button
                         type="button"
@@ -1651,7 +1972,7 @@ async function handleFinalSubmit() {
 
                   <!-- BIR Registered Date -->
                   <div class="space-y-1">
-                    <label class="block font-semibold text-[#2d201b]">BIR Registered Date *</label>
+                    <label class="block font-semibold text-[#2d201b]">BIR Registration Date</label>
                     <input
                       v-model="birRegisteredAt"
                       type="date"
