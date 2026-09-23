@@ -29,11 +29,18 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value))
 }
 
+const docError = ref('')
+
 async function viewDocument(url: string) {
-  const newTab = window.open('', '_blank')
+  docError.value = ''
+
   const config = useRuntimeConfig()
   const token = useCookie<string | null>('auth_token')
   const origin = config.public.apiBase.replace(/\/api\/?$/, '')
+
+  // Open the tab synchronously on the user gesture so popup blockers don't interfere.
+  // We redirect it to the blob URL once the fetch completes.
+  const newTab = window.open('', '_blank')
 
   try {
     const response = await fetch(`${origin}${url}`, {
@@ -43,7 +50,11 @@ async function viewDocument(url: string) {
       },
     })
 
-    if (!response.ok) throw new Error(`Request failed: ${response.status}`)
+    if (!response.ok) {
+      newTab?.close()
+      docError.value = `Could not load document (server returned ${response.status}).`
+      return
+    }
 
     const blob = await response.blob()
     const objectUrl = URL.createObjectURL(blob)
@@ -51,11 +62,20 @@ async function viewDocument(url: string) {
     if (newTab) {
       newTab.location.href = objectUrl
     } else {
-      window.open(objectUrl, '_blank')
+      // Popup was blocked — fall back to same-tab download
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = ''
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
     }
-  } catch (e) {
+
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000)
+  } catch (e: any) {
     newTab?.close()
-    console.error('Failed to load document', e)
+    docError.value = 'Failed to load document. Please try again.'
+    console.error('viewDocument error:', e)
   }
 }
 
@@ -88,6 +108,18 @@ function viewCafePicture() {
                 <div v-if="loading" class="p-10 flex flex-col items-center justify-center gap-3 text-[#3B1F0E]/50">
                     <Icon name="heroicons:arrow-path" class="w-6 h-6 animate-spin text-[#B4846C]" />
                     <span class="font-sans text-sm">Loading application…</span>
+                </div>
+
+                <!-- Document load error banner -->
+                <div
+                    v-if="docError"
+                    class="mx-6 mt-4 flex items-start gap-3 rounded-xl bg-[#FDE8E8] border border-[#F5C6CB] px-4 py-3 font-sans text-[13px] text-[#842029]"
+                >
+                    <Icon name="heroicons:exclamation-triangle" class="w-4 h-4 mt-0.5 shrink-0 text-[#DC3545]" />
+                    <span class="flex-1">{{ docError }}</span>
+                    <button type="button" class="shrink-0 text-[#DC3545] hover:opacity-70 transition-opacity" @click="docError = ''">
+                        <Icon name="heroicons:x-mark" class="w-4 h-4" />
+                    </button>
                 </div>
 
                 <template v-else-if="ownerDetails && approval">
@@ -387,30 +419,57 @@ function viewCafePicture() {
                                     <div
                                         v-for="doc in relevantBranch?.documents ?? []"
                                         :key="doc.branch_doc_id"
-                                        class="flex items-center justify-between bg-white border border-[#EDD8CC] rounded-[12px] px-[12px] py-[12px]"
+                                        class="bg-white border border-[#EDD8CC] rounded-[12px] overflow-hidden"
                                     >
-                                        <div class="flex items-center gap-3 font-display">
-                                            <div class="w-[36px] h-[36px] rounded-[8px] bg-[#FFF8EA] flex items-center justify-center shrink-0">
-                                                <Icon
-                                                    name="heroicons:document-text"
-                                                    class="w-[20px] h-[20px] text-[#7D5A50]"
-                                                />
+                                        <div class="flex items-center justify-between px-[12px] py-[12px]">
+                                            <div class="flex items-center gap-3 font-display">
+                                                <div class="w-[36px] h-[36px] rounded-[8px] bg-[#FFF8EA] flex items-center justify-center shrink-0">
+                                                    <Icon
+                                                        name="heroicons:document-text"
+                                                        class="w-[20px] h-[20px] text-[#7D5A50]"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <p class="text-[14px] font-semibold text-[#3D2B24] capitalize">
+                                                        {{ doc.doc_type }}
+                                                    </p>
+                                                </div>
                                             </div>
 
-                                            <div>
-                                                <p class="text-[14px] font-semibold text-[#3D2B24] capitalize">
-                                                    {{ doc.doc_type }}
-                                                </p>
-                                            </div>
+                                            <button
+                                                type="button"
+                                                class="cursor-pointer font-semibold text-[14px] text-[#FFF0D1] rounded-[10px] border px-[20px] py-[6px] bg-[#7D5A50] hover:opacity-90 transition-opacity"
+                                                @click="viewDocument(doc.download_url)"
+                                            >
+                                                View
+                                            </button>
                                         </div>
 
-                                        <button
-                                            type="button"
-                                            class="cursor-pointer font-semibold text-[14px] text-[#FFF0D1] rounded-[10px] border px-[20px] py-[6px] bg-[#7D5A50]"
-                                            @click="viewDocument(doc.download_url)"
+                                        <!-- Additional details for BIR -->
+                                        <div 
+                                            v-if="doc.doc_type?.toUpperCase() === 'BIR'" 
+                                            class="border-t border-[#EDD8CC] bg-[#FAFAF8] px-[16px] py-[16px] font-display text-[13px]"
                                         >
-                                            View
-                                        </button>
+                                            <div class="grid grid-cols-2 gap-y-[16px] gap-x-[16px]">
+                                                <div>
+                                                    <p class="text-[#9E7060] font-semibold mb-1 text-[12px] uppercase tracking-wide">TIN Number</p>
+                                                    <p class="text-[#3B1F0E] font-medium">{{ doc.tin_number || '—' }}</p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-[#9E7060] font-semibold mb-1 text-[12px] uppercase tracking-wide">VAT Type</p>
+                                                    <p class="text-[#3B1F0E] font-medium capitalize">{{ doc.vat ? doc.vat.replace('-', ' ') : '—' }}</p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-[#9E7060] font-semibold mb-1 text-[12px] uppercase tracking-wide">Date Registered</p>
+                                                    <p class="text-[#3B1F0E] font-medium">{{ formatDate(doc.registered_at) }}</p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-[#9E7060] font-semibold mb-1 text-[12px] uppercase tracking-wide">Expiry Date</p>
+                                                    <p class="text-[#3B1F0E] font-medium">{{ formatDate(doc.expired_at) }}</p>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

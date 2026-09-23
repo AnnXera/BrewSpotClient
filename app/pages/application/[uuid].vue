@@ -197,48 +197,48 @@ function goLogin() {
 
           <!-- Progress Stepper Tracker -->
           <div>
-            <div class="grid grid-cols-3 gap-2 relative">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-2 relative">
               <!-- Step 1: Submitted -->
-              <div class="flex flex-col items-center text-center space-y-2">
-                <div class="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold shadow">
+              <div class="flex flex-row sm:flex-col items-center sm:text-center space-x-3 sm:space-x-0 sm:space-y-2">
+                <div class="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold shadow shrink-0">
                   ✓
                 </div>
-                <div>
+                <div class="flex-1 text-left sm:text-center">
                   <p class="text-xs font-bold text-[#2d201b]">1. Submitted</p>
-                  <p class="text-[0.68rem] text-gray-500 hidden sm:block">{{ formatDate(application.user.created_at) }}</p>
+                  <p class="text-xs text-gray-500">{{ formatDate(application.user.created_at) }}</p>
                 </div>
               </div>
 
               <!-- Step 2: Under Review -->
-              <div class="flex flex-col items-center text-center space-y-2">
+              <div class="flex flex-row sm:flex-col items-center sm:text-center space-x-3 sm:space-x-0 sm:space-y-2">
                 <div
-                  class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shadow"
+                  class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shadow shrink-0"
                   :class="application.user.status === 'approved' || application.user.status === 'active' ? 'bg-emerald-600 text-white' : application.user.status === 'rejected' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white animate-pulse'"
                 >
                   <span v-if="application.user.status === 'approved' || application.user.status === 'active'">✓</span>
                   <span v-else-if="application.user.status === 'rejected'">✕</span>
                   <span v-else>2</span>
                 </div>
-                <div>
+                <div class="flex-1 text-left sm:text-center">
                   <p class="text-xs font-bold text-[#2d201b]">2. Admin Review</p>
-                  <p class="text-[0.68rem] text-gray-500 hidden sm:block">
+                  <p class="text-xs text-gray-500">
                     {{ application.user.status === 'pending_approval' ? 'In progress' : (application.approval?.reviewed_at ? formatDate(application.approval.reviewed_at) : 'Completed') }}
                   </p>
                 </div>
               </div>
 
               <!-- Step 3: Activation -->
-              <div class="flex flex-col items-center text-center space-y-2">
+              <div class="flex flex-row sm:flex-col items-center sm:text-center space-x-3 sm:space-x-0 sm:space-y-2">
                 <div
-                  class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shadow"
-                  :class="application.user.status === 'approved' || application.user.status === 'active' ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-500'"
+                  class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shadow shrink-0"
+                  :class="application.user.status === 'approved' || application.user.status === 'active' ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-600'"
                 >
                   <span v-if="application.user.status === 'approved' || application.user.status === 'active'">✓</span>
                   <span v-else>3</span>
                 </div>
-                <div>
+                <div class="flex-1 text-left sm:text-center">
                   <p class="text-xs font-bold text-[#2d201b]">3. Password Setup</p>
-                  <p class="text-[0.68rem] text-gray-500 hidden sm:block">
+                  <p class="text-xs text-gray-500">
                     {{ application.user.status === 'approved' ? 'Ready to setup' : 'After approval' }}
                   </p>
                 </div>
@@ -432,7 +432,7 @@ function goLogin() {
               </div>
               <div>
                 <h2 class="text-base font-bold text-[#2d201b]">Submitted Documents Checklist</h2>
-                <p class="text-[0.7rem] text-gray-500">All 5 mandatory documents attached for compliance verification</p>
+                <p class="text-[0.7rem] text-gray-500">All 3 mandatory documents attached for compliance verification</p>
               </div>
             </div>
             <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
@@ -469,43 +469,15 @@ function goLogin() {
               <span class="text-[0.65rem] font-bold text-emerald-700 uppercase">Attached</span>
             </div>
 
-            <!-- 3. Mayor's Permit -->
+            <!-- 3. DTI / SEC Document -->
             <div class="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/30 flex items-start justify-between">
               <div class="flex items-start gap-2.5">
                 <div class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
                   <Icon name="heroicons:check" class="w-4 h-4 font-bold" />
                 </div>
                 <div>
-                  <p class="font-bold text-xs text-[#2d201b]">3. Mayor's Permit</p>
-                  <p class="text-[0.7rem] text-gray-600 mt-0.5">LGU Business Clearance</p>
-                </div>
-              </div>
-              <span class="text-[0.65rem] font-bold text-emerald-700 uppercase">Attached</span>
-            </div>
-
-            <!-- 4. DTI / SEC Document -->
-            <div class="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/30 flex items-start justify-between">
-              <div class="flex items-start gap-2.5">
-                <div class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
-                  <Icon name="heroicons:check" class="w-4 h-4 font-bold" />
-                </div>
-                <div>
-                  <p class="font-bold text-xs text-[#2d201b]">4. {{ application.cafe?.doc_type || 'DTI/SEC' }} Document</p>
+                  <p class="font-bold text-xs text-[#2d201b]">3. {{ application.cafe?.doc_type || 'DTI/SEC' }} Document</p>
                   <p class="text-[0.7rem] text-gray-600 mt-0.5">Business Name Certificate</p>
-                </div>
-              </div>
-              <span class="text-[0.65rem] font-bold text-emerald-700 uppercase">Attached</span>
-            </div>
-
-            <!-- 5. Sanitary Permit -->
-            <div class="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/30 flex items-start justify-between">
-              <div class="flex items-start gap-2.5">
-                <div class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
-                  <Icon name="heroicons:check" class="w-4 h-4 font-bold" />
-                </div>
-                <div>
-                  <p class="font-bold text-xs text-[#2d201b]">5. Sanitary Permit</p>
-                  <p class="text-[0.7rem] text-gray-600 mt-0.5">Health & Safety Clearance</p>
                 </div>
               </div>
               <span class="text-[0.65rem] font-bold text-emerald-700 uppercase">Attached</span>
