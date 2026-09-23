@@ -62,18 +62,51 @@ function cleanMobileDigits(val: string): string {
   let cleaned = val.replace(/\D/g, '')
   if (cleaned.startsWith('639')) {
     cleaned = cleaned.slice(2)
-  } else if (cleaned.startsWith('0')) {
+  } else if (cleaned.startsWith('09')) {
+    cleaned = cleaned.slice(1)
+  } else if (cleaned.startsWith('0') && cleaned.length > 1) {
     cleaned = cleaned.replace(/^0+/, '')
   }
   return cleaned.slice(0, 10)
 }
 
+function cleanLandlineDigits(val: string): string {
+  let cleaned = val.replace(/\D/g, '')
+  if (cleaned.startsWith('63')) {
+    cleaned = '0' + cleaned.slice(2)
+  }
+  return cleaned
+}
+
+function isValidPhLandline(val: string): boolean {
+  const digits = cleanLandlineDigits(val)
+  if (/^02\d{8}$/.test(digits)) return true
+  if (/^0[3-8]\d{8}$/.test(digits)) return true
+  if (/^0[2-8]\d{7,8}$/.test(digits)) return true
+  return false
+}
+
+function formatLandlineForBackend(val: string): string {
+  const digits = cleanLandlineDigits(val)
+  let core = digits.startsWith('0') ? digits.slice(1) : digits
+  if (core.length > 9) {
+    core = core.slice(0, 9)
+  } else {
+    while (core.length < 9) {
+      core = core + '0'
+    }
+  }
+  return `+639${core}`
+}
+
 function syncPhoneNumber() {
+  clearFieldError('phone_number')
   if (phoneType.value === 'mobile') {
     mobileDigits.value = cleanMobileDigits(mobileDigits.value)
     phoneNumber.value = mobileDigits.value ? `+63${mobileDigits.value}` : ''
   } else {
-    phoneNumber.value = landlineDigits.value.trim()
+    const cleaned = cleanLandlineDigits(landlineDigits.value)
+    phoneNumber.value = cleaned ? formatLandlineForBackend(cleaned) : ''
   }
 }
 
@@ -91,7 +124,7 @@ function onMobileInput(event: Event) {
 
 function onLandlineInput(event: Event) {
   const target = event.target as HTMLInputElement
-  landlineDigits.value = target.value.replace(/[^\d\s\-()]/g, '')
+  landlineDigits.value = target.value.replace(/[^\d\s\-()]/g, '').slice(0, 15)
   syncPhoneNumber()
 }
 
@@ -100,33 +133,34 @@ function isValidPhPhone(phoneStr: string): boolean {
   if (digits.startsWith('639') && digits.length === 12) return true
   if (digits.startsWith('09') && digits.length === 11) return true
   if (digits.startsWith('9') && digits.length === 10) return true
-  if (digits.startsWith('0') && digits.length >= 9 && digits.length <= 11) return true
+  if (digits.startsWith('0') && digits.length >= 7 && digits.length <= 11) return true
   return false
 }
 
 function validatePhoneNumber(): boolean {
   if (phoneType.value === 'mobile') {
-    const cleaned = mobileDigits.value.replace(/\D/g, '')
+    const cleaned = cleanMobileDigits(mobileDigits.value)
     if (!cleaned) {
-      error.value = 'Please enter your PH mobile phone number.'
+      fieldErrors.value.phone_number = 'Personal phone number is required.'
       return false
     }
     if (!/^9\d{9}$/.test(cleaned)) {
-      error.value = 'Invalid PH mobile number format. Must be 10 digits starting with 9 (e.g., 9171234567).'
+      fieldErrors.value.phone_number = 'Personal phone number must be 10 digits starting with 9 (e.g., 9123456789).'
       return false
     }
+    delete fieldErrors.value.phone_number
     phoneNumber.value = `+63${cleaned}`
   } else {
-    const digitsOnly = landlineDigits.value.replace(/\D/g, '')
-    if (!digitsOnly) {
-      error.value = 'Please enter your telephone number.'
+    if (!landlineDigits.value.trim()) {
+      fieldErrors.value.phone_number = 'Personal landline number is required.'
       return false
     }
-    if (!/^0\d{8,10}$/.test(digitsOnly)) {
-      error.value = 'Invalid PH telephone format. Must include area code starting with 0 (e.g., 082-123-4567 or 02-8123-4567).'
+    if (!isValidPhLandline(landlineDigits.value)) {
+      fieldErrors.value.phone_number = 'Invalid PH landline format. Include area code (e.g., 082-299-1234 or 02-8123-4567).'
       return false
     }
-    phoneNumber.value = landlineDigits.value.trim()
+    delete fieldErrors.value.phone_number
+    phoneNumber.value = formatLandlineForBackend(landlineDigits.value)
   }
   return true
 }
@@ -165,11 +199,13 @@ const cafePhone = ref('')
 const cafeEmail = ref('')
 
 function syncCafePhone() {
+  clearFieldError('cafe_phonenumber')
   if (cafePhoneType.value === 'mobile') {
     cafeMobileDigits.value = cleanMobileDigits(cafeMobileDigits.value)
     cafePhone.value = cafeMobileDigits.value ? `+63${cafeMobileDigits.value}` : ''
   } else {
-    cafePhone.value = cafeLandlineDigits.value.trim()
+    const cleaned = cleanLandlineDigits(cafeLandlineDigits.value)
+    cafePhone.value = cleaned ? formatLandlineForBackend(cleaned) : ''
   }
 }
 
@@ -187,58 +223,73 @@ function onCafeMobileInput(event: Event) {
 
 function onCafeLandlineInput(event: Event) {
   const target = event.target as HTMLInputElement
-  cafeLandlineDigits.value = target.value.replace(/[^\d\s\-()]/g, '')
+  cafeLandlineDigits.value = target.value.replace(/[^\d\s\-()]/g, '').slice(0, 15)
   syncCafePhone()
 }
 
 function validateCafePhone(): boolean {
   if (cafePhoneType.value === 'mobile') {
-    const cleaned = cafeMobileDigits.value.replace(/\D/g, '')
+    const cleaned = cleanMobileDigits(cafeMobileDigits.value)
     if (!cleaned) {
-      error.value = 'Please enter your branch mobile phone number.'
+      fieldErrors.value.cafe_phonenumber = 'Branch phone number is required.'
       return false
     }
     if (!/^9\d{9}$/.test(cleaned)) {
-      error.value = 'Invalid Branch mobile phone format. Must be 10 digits starting with 9 (e.g., 9171234567).'
+      fieldErrors.value.cafe_phonenumber = 'Branch phone number must be 10 digits starting with 9 (e.g., 9123456789).'
       return false
     }
+    delete fieldErrors.value.cafe_phonenumber
     cafePhone.value = `+63${cleaned}`
   } else {
-    const digitsOnly = cafeLandlineDigits.value.replace(/\D/g, '')
-    if (!digitsOnly) {
-      error.value = 'Please enter your branch telephone number.'
+    if (!cafeLandlineDigits.value.trim()) {
+      fieldErrors.value.cafe_phonenumber = 'Branch landline number is required.'
       return false
     }
-    if (!/^0\d{8,10}$/.test(digitsOnly)) {
-      error.value = 'Invalid Branch telephone format. Must include area code starting with 0 (e.g., 082-123-4567 or 02-8123-4567).'
+    if (!isValidPhLandline(cafeLandlineDigits.value)) {
+      fieldErrors.value.cafe_phonenumber = 'Invalid PH landline format. Include area code (e.g., 082-299-1234 or 02-8123-4567).'
       return false
     }
-    cafePhone.value = cafeLandlineDigits.value.trim()
+    delete fieldErrors.value.cafe_phonenumber
+    cafePhone.value = formatLandlineForBackend(cafeLandlineDigits.value)
   }
   return true
 }
 
-// 4 Required Business Files
+// 2 Required Business Files
 const birFile = ref<File | null>(null)
-const mayorsFile = ref<File | null>(null)
 const dtiSecFile = ref<File | null>(null)
-const sanitaryFile = ref<File | null>(null)
 
 const birFileName = ref('')
 const birFileSize = ref('')
-const mayorsFileName = ref('')
-const mayorsFileSize = ref('')
 const dtiSecFileName = ref('')
 const dtiSecFileSize = ref('')
-const sanitaryFileName = ref('')
-const sanitaryFileSize = ref('')
+
+// BIR Certificate Additional Details
+const birRegisteredAt = ref('')
+const birExpiredAt = ref('')
+const tinNumber = ref('')
+const vat = ref<'vat-registered' | 'non-vat'>('non-vat')
+
+function formatTinNumber(val: string): string {
+  const raw = val.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 16)
+  const parts: string[] = []
+  for (let i = 0; i < raw.length; i += 4) {
+    parts.push(raw.slice(i, i + 4))
+  }
+  return parts.join('-')
+}
+
+function onTinInput(event: Event) {
+  clearFieldError('tin_number')
+  const target = event.target as HTMLInputElement
+  tinNumber.value = formatTinNumber(target.value)
+  target.value = tinNumber.value
+}
 
 const uploadedCount = computed(() => {
   let count = 0
   if (birFile.value) count++
-  if (mayorsFile.value) count++
   if (dtiSecFile.value) count++
-  if (sanitaryFile.value) count++
   return count
 })
 
@@ -461,11 +512,9 @@ async function checkUsernameAvailability() {
 }
 
 async function checkPhoneAvailability() {
+  syncPhoneNumber()
   if (!phoneNumber.value.trim()) return
-  if (!/^09\d{9}$/.test(phoneNumber.value)) {
-    fieldErrors.value.phone_number = 'Personal contact number must start with 09 and be 11 digits long (e.g., 09123456789).'
-    return
-  }
+  if (!validatePhoneNumber()) return
   try {
     const res = await authService.validateRegistrationStep(userUuid.value, { phone_number: phoneNumber.value.trim() })
     const errMsg = res.errors?.phone_number?.[0]
@@ -503,11 +552,9 @@ async function checkCafeEmailAvailability() {
 }
 
 async function checkCafePhoneAvailability() {
+  syncCafePhone()
   if (!cafePhone.value.trim()) return
-  if (!/^09\d{9}$/.test(cafePhone.value)) {
-    fieldErrors.value.cafe_phonenumber = 'Branch phone number must start with 09 and be 11 digits long (e.g., 09123456789).'
-    return
-  }
+  if (!validateCafePhone()) return
   try {
     const res = await authService.validateRegistrationStep(userUuid.value, {
       cafe_phonenumber: cafePhone.value.trim(),
@@ -532,13 +579,12 @@ async function handleNextToBusiness() {
   error.value = ''
   fieldErrors.value = {}
 
-  if (!firstname.value || !lastname.value || !username.value || !phoneNumber.value || !ownerAddress.value) {
+  if (!firstname.value || !lastname.value || !username.value || !ownerAddress.value) {
     error.value = 'Please complete all required personal fields.'
     return
   }
-  if (!/^09\d{9}$/.test(phoneNumber.value)) {
-    fieldErrors.value.phone_number = 'Personal contact number must start with 09 and be 11 digits long (e.g., 09123456789).'
-    error.value = 'Please correct the phone number format.'
+  if (!validatePhoneNumber()) {
+    error.value = fieldErrors.value.phone_number || 'Please correct your personal contact number.'
     return
   }
   if (cafePhone.value.trim()) {
@@ -615,14 +661,8 @@ async function nextBusinessSubPage() {
     error.value = 'Branch Address is required.'
     return
   }
-  if (!cafePhone.value.trim()) {
-    fieldErrors.value.cafe_phonenumber = 'Branch Phone Number is required.'
-    error.value = 'Branch Phone Number is required.'
-    return
-  }
-  if (!/^09\d{9}$/.test(cafePhone.value)) {
-    fieldErrors.value.cafe_phonenumber = 'Branch phone number must start with 09 and be 11 digits long (e.g., 09123456789).'
-    error.value = 'Branch phone number must start with 09 and be 11 digits long (e.g., 09123456789).'
+  if (!validateCafePhone()) {
+    error.value = fieldErrors.value.cafe_phonenumber || 'Please correct the branch phone number.'
     return
   }
   const normPersonal = normalizePhoneNumber(phoneNumber.value)
@@ -715,35 +755,6 @@ function clearBirFile() {
   birFileSize.value = ''
 }
 
-function onMayorsChange(event: Event) {
-  error.value = ''
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (file) {
-    if (!isValidFileType(file)) {
-      error.value = "Mayor's Permit must be a JPG, JPEG, PNG, or PDF file."
-      input.value = ''
-      clearMayorsFile()
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      error.value = "Mayor's Permit file size must not exceed 5MB."
-      input.value = ''
-      clearMayorsFile()
-      return
-    }
-    mayorsFile.value = file
-    mayorsFileName.value = file.name
-    mayorsFileSize.value = formatBytes(file.size)
-  }
-}
-
-function clearMayorsFile() {
-  mayorsFile.value = null
-  mayorsFileName.value = ''
-  mayorsFileSize.value = ''
-}
-
 function onDtiSecChange(event: Event) {
   error.value = ''
   const input = event.target as HTMLInputElement
@@ -773,35 +784,6 @@ function clearDtiSecFile() {
   dtiSecFileSize.value = ''
 }
 
-function onSanitaryChange(event: Event) {
-  error.value = ''
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (file) {
-    if (!isValidFileType(file)) {
-      error.value = 'Sanitary Permit must be a JPG, JPEG, PNG, or PDF file.'
-      input.value = ''
-      clearSanitaryFile()
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      error.value = 'Sanitary Permit file size must not exceed 5MB.'
-      input.value = ''
-      clearSanitaryFile()
-      return
-    }
-    sanitaryFile.value = file
-    sanitaryFileName.value = file.name
-    sanitaryFileSize.value = formatBytes(file.size)
-  }
-}
-
-function clearSanitaryFile() {
-  sanitaryFile.value = null
-  sanitaryFileName.value = ''
-  sanitaryFileSize.value = ''
-}
-
 async function handleFinalSubmit() {
   error.value = ''
   success.value = ''
@@ -813,13 +795,45 @@ async function handleFinalSubmit() {
 
   const missingDocs: string[] = []
   if (!birFile.value) missingDocs.push('1. BIR Certificate')
-  if (!mayorsFile.value) missingDocs.push("2. Mayor's Permit")
-  if (!dtiSecFile.value) missingDocs.push(`3. ${cafeDocType.value} Document`)
-  if (!sanitaryFile.value) missingDocs.push('4. Sanitary Permit')
+  if (!dtiSecFile.value) missingDocs.push(`2. ${cafeDocType.value} Document`)
 
   if (missingDocs.length > 0) {
     error.value = `Missing required documents:\n${missingDocs.join(', ')}`
     return
+  }
+
+  if (birFile.value) {
+    if (!tinNumber.value.trim()) {
+      fieldErrors.value.tin_number = 'TIN Number is required.'
+      error.value = 'Please enter the TIN Number.'
+      return
+    }
+    const tinRaw = tinNumber.value.replace(/[^a-zA-Z0-9]/g, '')
+    if (tinRaw.length < 12) {
+      fieldErrors.value.tin_number = 'TIN Number must follow format XXXX-XXXX-XXXX-XXXX.'
+      error.value = 'TIN Number must follow format XXXX-XXXX-XXXX-XXXX.'
+      return
+    }
+    if (!vat.value) {
+      fieldErrors.value.vat = 'VAT Type is required.'
+      error.value = 'Please select VAT or Non-VAT.'
+      return
+    }
+    if (!birRegisteredAt.value) {
+      fieldErrors.value.bir_registered_at = 'BIR Registered Date is required.'
+      error.value = 'Please enter the BIR Registered Date.'
+      return
+    }
+    if (!birExpiredAt.value) {
+      fieldErrors.value.bir_expired_at = 'BIR Expiration Date is required.'
+      error.value = 'Please enter the BIR Expiration Date.'
+      return
+    }
+    if (new Date(birExpiredAt.value) < new Date(birRegisteredAt.value)) {
+      fieldErrors.value.bir_expired_at = 'BIR Expiration Date cannot be before BIR Registered Date.'
+      error.value = 'BIR Expiration Date cannot be before BIR Registered Date.'
+      return
+    }
   }
 
   if (!governmentIdFile.value || (isBackIdRequired.value && !governmentIdFileBack.value)) {
@@ -829,12 +843,12 @@ async function handleFinalSubmit() {
     return
   }
 
-  if (!/^09\d{9}$/.test(phoneNumber.value)) {
-    error.value = 'Personal contact number must start with 09 and be 11 digits long (e.g., 09123456789).'
+  if (!validatePhoneNumber()) {
+    error.value = fieldErrors.value.phone_number || 'Please correct your personal contact number.'
     return
   }
-  if (!/^09\d{9}$/.test(cafePhone.value)) {
-    error.value = 'Branch phone number must start with 09 and be 11 digits long (e.g., 09123456789).'
+  if (!validateCafePhone()) {
+    error.value = fieldErrors.value.cafe_phonenumber || 'Please correct the branch phone number.'
     return
   }
   if (phoneNumber.value === cafePhone.value) {
@@ -865,9 +879,13 @@ async function handleFinalSubmit() {
     payload.append('cafe_email', cafeEmail.value)
 
     payload.append('bir_file', birFile.value!)
-    payload.append('mayors_permit_file', mayorsFile.value!)
     payload.append('dti_sec_file', dtiSecFile.value!)
-    payload.append('sanitary_permit_file', sanitaryFile.value!)
+    payload.append('bir_registered_at', birRegisteredAt.value)
+    if (birExpiredAt.value) {
+      payload.append('bir_expired_at', birExpiredAt.value)
+    }
+    payload.append('tin_number', tinNumber.value.trim())
+    payload.append('vat', vat.value)
 
     const res = await authService.register(userUuid.value, payload)
     if (res.success) {
@@ -1164,33 +1182,63 @@ async function handleFinalSubmit() {
               </div>
             </div>
 
-            <div class="grid grid-cols-12 gap-2.5">
-              <!-- Contact No. (7 of 12 cols - extended width so all input numbers fit) -->
-              <div class="col-span-7">
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Contact No. *</label>
-                <input
-                  v-model="phoneNumber"
-                  type="tel"
-                  inputmode="numeric"
-                  maxlength="11"
-                  placeholder="09123456789"
-                  :class="[
-                    'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
-                    fieldErrors.phone_number
-                      ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
-                      : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
-                  ]"
-                  required
-                  @input="onPhoneNumberInput"
-                  @blur="checkPhoneAvailability"
-                />
-                <p v-if="fieldErrors.phone_number" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.phone_number }}</p>
+            <div class="grid grid-cols-12 gap-3 items-start">
+              <!-- Contact No. (7 cols on sm) -->
+              <div class="col-span-12 sm:col-span-7 space-y-1">
+                <label class="block text-sm font-medium text-[#2d201b]">Contact No. *</label>
+                <div
+                  class="flex items-center rounded-md border bg-white overflow-hidden transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
+                  :class="fieldErrors.phone_number ? 'border-red-500' : 'border-gray-300'"
+                >
+                  <!-- Box-type Type Selector beside input number -->
+                  <div class="relative bg-gray-100 border-r border-gray-300 shrink-0 h-full flex items-center">
+                    <select
+                      v-model="phoneType"
+                      @change="onPhoneTypeChange"
+                      class="h-full bg-transparent text-[#2d201b] font-semibold text-xs pl-3 pr-7 outline-none cursor-pointer appearance-none z-10"
+                    >
+                      <option value="mobile">Phone (+63)</option>
+                      <option value="telephone">Landline</option>
+                    </select>
+                    <Icon name="heroicons:chevron-down" class="w-3.5 h-3.5 text-gray-500 absolute right-2 pointer-events-none" />
+                  </div>
+
+                  <!-- Mobile Input (10 digits starting with 9) -->
+                  <input
+                    v-if="phoneType === 'mobile'"
+                    v-model="mobileDigits"
+                    type="tel"
+                    inputmode="numeric"
+                    maxlength="10"
+                    placeholder="9123456789"
+                    class="w-full h-full px-3 text-sm text-[#2d201b] bg-transparent outline-none"
+                    required
+                    @input="onMobileInput"
+                    @blur="checkPhoneAvailability"
+                  />
+
+                  <!-- Landline Input -->
+                  <input
+                    v-else
+                    v-model="landlineDigits"
+                    type="tel"
+                    placeholder="082-299-1234 or 02-8123-4567"
+                    maxlength="15"
+                    class="w-full h-full px-3 text-sm text-[#2d201b] bg-transparent outline-none"
+                    required
+                    @input="onLandlineInput"
+                    @blur="checkPhoneAvailability"
+                  />
+                </div>
+                <p v-if="fieldErrors.phone_number" class="text-xs text-red-600 font-medium">{{ fieldErrors.phone_number }}</p>
               </div>
-              <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">ID Type *</label>
+
+              <!-- ID Type (5 cols on sm) -->
+              <div class="col-span-12 sm:col-span-5 space-y-1">
+                <label class="block text-sm font-medium text-[#2d201b]">ID Type *</label>
                 <select
                   v-model="idType"
-                  class="w-full h-11 rounded-md border border-gray-300 px-2 outline-none transition bg-white text-xs font-medium text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20 truncate"
+                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm font-medium text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20 cursor-pointer"
                 >
                   <option value="drivers_license">Driver's License</option>
                   <option value="passport">Passport</option>
@@ -1200,6 +1248,7 @@ async function handleFinalSubmit() {
                   <option value="pagibig">Pag-IBIG ID</option>
                   <option value="voters_id">Voter's ID</option>
                 </select>
+                <p v-if="fieldErrors.id_type" class="text-xs text-red-600 font-medium">{{ fieldErrors.id_type }}</p>
               </div>
             </div>
 
@@ -1313,10 +1362,10 @@ async function handleFinalSubmit() {
                 </div>
               </div>
 
-              <div class="grid grid-cols-12 gap-2.5">
-                <!-- Branch Name (5 of 12 cols) -->
-                <div class="col-span-5">
-                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Name *</label>
+              <div class="grid grid-cols-12 gap-3 items-start">
+                <!-- Branch Name (5 cols on sm) -->
+                <div class="col-span-12 sm:col-span-5 space-y-1">
+                  <label class="block text-sm font-medium text-[#2d201b]">Branch Name *</label>
                   <input
                     v-model="branchName"
                     type="text"
@@ -1326,26 +1375,54 @@ async function handleFinalSubmit() {
                   />
                 </div>
 
-                <!-- Branch Phone (7 of 12 cols - extended width so all input numbers fit) -->
-                <div class="col-span-7">
-                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Phone *</label>
-                  <input
-                    v-model="cafePhone"
-                    type="tel"
-                    inputmode="numeric"
-                    maxlength="11"
-                    placeholder="09123456789"
-                    :class="[
-                      'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
-                      fieldErrors.cafe_phonenumber
-                        ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
-                        : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
-                    ]"
-                    required
-                    @input="onCafePhoneInput"
-                    @blur="checkCafePhoneAvailability"
-                  />
-                  <p v-if="fieldErrors.cafe_phonenumber" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.cafe_phonenumber }}</p>
+                <!-- Branch Phone (7 cols on sm) -->
+                <div class="col-span-12 sm:col-span-7 space-y-1">
+                  <label class="block text-sm font-medium text-[#2d201b]">Branch Phone *</label>
+                  <div
+                    class="flex items-center rounded-md border bg-white overflow-hidden transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
+                    :class="fieldErrors.cafe_phonenumber ? 'border-red-500' : 'border-gray-300'"
+                  >
+                    <!-- Box-type Type Selector beside input number -->
+                    <div class="relative bg-gray-100 border-r border-gray-300 shrink-0 h-full flex items-center">
+                      <select
+                        v-model="cafePhoneType"
+                        @change="onCafePhoneTypeChange"
+                        class="h-full bg-transparent text-[#2d201b] font-semibold text-xs pl-3 pr-7 outline-none cursor-pointer appearance-none z-10"
+                      >
+                        <option value="mobile">Phone (+63)</option>
+                        <option value="telephone">Landline</option>
+                      </select>
+                      <Icon name="heroicons:chevron-down" class="w-3.5 h-3.5 text-gray-500 absolute right-2 pointer-events-none" />
+                    </div>
+
+                    <!-- Mobile Input (10 digits starting with 9) -->
+                    <input
+                      v-if="cafePhoneType === 'mobile'"
+                      v-model="cafeMobileDigits"
+                      type="tel"
+                      inputmode="numeric"
+                      maxlength="10"
+                      placeholder="9123456789"
+                      class="w-full h-full px-3 text-sm text-[#2d201b] bg-transparent outline-none"
+                      required
+                      @input="onCafeMobileInput"
+                      @blur="checkCafePhoneAvailability"
+                    />
+
+                    <!-- Landline Input -->
+                    <input
+                      v-else
+                      v-model="cafeLandlineDigits"
+                      type="tel"
+                      placeholder="082-299-1234 or 02-8123-4567"
+                      maxlength="15"
+                      class="w-full h-full px-3 text-sm text-[#2d201b] bg-transparent outline-none"
+                      required
+                      @input="onCafeLandlineInput"
+                      @blur="checkCafePhoneAvailability"
+                    />
+                  </div>
+                  <p v-if="fieldErrors.cafe_phonenumber" class="text-xs text-red-600 font-medium">{{ fieldErrors.cafe_phonenumber }}</p>
                 </div>
               </div>
 
@@ -1391,7 +1468,7 @@ async function handleFinalSubmit() {
             </form>
           </div>
 
-          <!-- Page 2: 4 Required Business Documents -->
+          <!-- Page 2: 2 Required Business Documents & BIR Details -->
           <div v-else class="space-y-4">
             <button
               type="button"
@@ -1408,7 +1485,7 @@ async function handleFinalSubmit() {
                 <span class="text-xs bg-[#7B5A50]/10 text-[#7B5A50] px-2.5 py-0.5 rounded-full font-semibold">Page 2 of 2</span>
               </div>
               <h1 class="text-2xl font-bold text-[#2d201b] mt-0.5">Required Requirements</h1>
-              <p class="text-gray-600 text-sm mt-1">Upload the 4 required business documents below.</p>
+              <p class="text-gray-600 text-sm mt-1">Upload the 2 required business documents below.</p>
             </div>
 
             <!-- Upload Progress Card -->
@@ -1416,19 +1493,19 @@ async function handleFinalSubmit() {
               <div class="flex items-center space-x-2.5">
                 <div
                   class="w-6 h-6 rounded-full text-white flex items-center justify-center text-xs font-bold transition-colors"
-                  :class="uploadedCount === 4 ? 'bg-emerald-600' : 'bg-[#7B5A50]'"
+                  :class="uploadedCount === 2 ? 'bg-emerald-600' : 'bg-[#7B5A50]'"
                 >
                   {{ uploadedCount }}
                 </div>
                 <span class="text-xs font-semibold text-[#2d201b]">
-                  {{ uploadedCount === 4 ? 'All 4 requirements uploaded ✓' : `${uploadedCount} of 4 requirements uploaded` }}
+                  {{ uploadedCount === 2 ? 'All 2 requirements uploaded ✓' : `${uploadedCount} of 2 requirements uploaded` }}
                 </span>
               </div>
               <div class="w-24 bg-gray-200 rounded-full h-2 overflow-hidden">
                 <div
                   class="h-full transition-all duration-300"
-                  :class="uploadedCount === 4 ? 'bg-emerald-600' : 'bg-[#7B5A50]'"
-                  :style="{ width: `${(uploadedCount / 4) * 100}%` }"
+                  :class="uploadedCount === 2 ? 'bg-emerald-600' : 'bg-[#7B5A50]'"
+                  :style="{ width: `${(uploadedCount / 2) * 100}%` }"
                 ></div>
               </div>
             </div>
@@ -1442,7 +1519,7 @@ async function handleFinalSubmit() {
               <span class="font-medium whitespace-pre-line">{{ error }}</span>
             </div>
 
-            <form @submit.prevent="handleFinalSubmit" class="space-y-3">
+            <form @submit.prevent="handleFinalSubmit" class="space-y-4">
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 <!-- 1. BIR Certificate -->
                 <div
@@ -1476,45 +1553,13 @@ async function handleFinalSubmit() {
                   </div>
                 </div>
 
-                <!-- 2. Mayor's Permit -->
-                <div
-                  class="bg-white rounded-lg p-3 border transition shadow-sm"
-                  :class="mayorsFile ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'"
-                >
-                  <div class="flex items-center justify-between mb-1.5">
-                    <label class="font-semibold text-xs text-[#2d201b]">2. Mayor's Permit <span class="text-red-500">*</span></label>
-                    <span v-if="mayorsFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
-                  </div>
-                  <div v-if="!mayorsFile">
-                    <input
-                      type="file"
-                      @change="onMayorsChange"
-                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
-                      required
-                    />
-                  </div>
-                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
-                    <div class="truncate mr-2">
-                      <p class="font-medium truncate text-xs">{{ mayorsFileName }}</p>
-                      <p class="text-[0.65rem] text-emerald-700">{{ mayorsFileSize }}</p>
-                    </div>
-                    <button
-                      type="button"
-                      @click="clearMayorsFile"
-                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
-                      title="Remove file"
-                    >&times;</button>
-                  </div>
-                </div>
-
-                <!-- 3. DTI or SEC Document -->
+                <!-- 2. DTI or SEC Document -->
                 <div
                   class="bg-white rounded-lg p-3 border transition shadow-sm"
                   :class="dtiSecFile ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'"
                 >
                   <div class="flex items-center justify-between mb-1.5">
-                    <label class="font-semibold text-xs text-[#2d201b]">3. {{ cafeDocType }} Document <span class="text-red-500">*</span></label>
+                    <label class="font-semibold text-xs text-[#2d201b]">2. {{ cafeDocType }} Document <span class="text-red-500">*</span></label>
                     <span v-if="dtiSecFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
                   </div>
                   <div v-if="!dtiSecFile">
@@ -1539,36 +1584,106 @@ async function handleFinalSubmit() {
                     >&times;</button>
                   </div>
                 </div>
+              </div>
 
-                <!-- 4. Sanitary Permit -->
-                <div
-                  class="bg-white rounded-lg p-3 border transition shadow-sm"
-                  :class="sanitaryFile ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'"
-                >
-                  <div class="flex items-center justify-between mb-1.5">
-                    <label class="font-semibold text-xs text-[#2d201b]">4. Sanitary Permit <span class="text-red-500">*</span></label>
-                    <span v-if="sanitaryFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
-                  </div>
-                  <div v-if="!sanitaryFile">
+              <!-- BIR Registration Details Form (Visible once BIR File is uploaded) -->
+              <div v-if="birFile" class="bg-white border border-[#7B5A50]/20 rounded-lg p-4 space-y-3.5 shadow-sm">
+                <div class="flex items-center gap-2 border-b border-gray-100 pb-2">
+                  <Icon name="heroicons:clipboard-document-check" class="w-5 h-5 text-[#7B5A50]" />
+                  <h3 class="text-sm font-bold text-[#2d201b]">BIR Registration Details</h3>
+                  <span class="text-[0.65rem] bg-[#7B5A50]/10 text-[#7B5A50] font-semibold px-2 py-0.5 rounded-full ml-auto">
+                    Required Information
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                  <!-- TIN Number -->
+                  <div class="space-y-1">
+                    <label class="block font-semibold text-[#2d201b]">TIN Number *</label>
                     <input
-                      type="file"
-                      @change="onSanitaryChange"
-                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                      v-model="tinNumber"
+                      type="text"
+                      placeholder="XXXX-XXXX-XXXX-XXXX"
+                      maxlength="19"
+                      :class="[
+                        'w-full h-10 rounded-md border px-3 outline-none transition bg-white text-xs text-[#2d201b] font-mono tracking-wider',
+                        fieldErrors.tin_number
+                          ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                          : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
+                      ]"
                       required
+                      @input="onTinInput"
                     />
+                    <p v-if="fieldErrors.tin_number" class="text-[0.7rem] text-red-600 font-medium">{{ fieldErrors.tin_number }}</p>
                   </div>
-                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
-                    <div class="truncate mr-2">
-                      <p class="font-medium truncate text-xs">{{ sanitaryFileName }}</p>
-                      <p class="text-[0.65rem] text-emerald-700">{{ sanitaryFileSize }}</p>
+
+                  <!-- VAT Status Option Buttons -->
+                  <div class="space-y-1">
+                    <label class="block font-semibold text-[#2d201b]">VAT Type *</label>
+                    <div class="grid grid-cols-2 gap-2 h-10">
+                      <button
+                        type="button"
+                        @click="vat = 'vat-registered'; clearFieldError('vat')"
+                        :class="[
+                          'rounded-md text-xs font-semibold transition flex items-center justify-center border',
+                          vat === 'vat-registered'
+                            ? 'bg-[#7B5A50] text-white border-[#7B5A50] shadow-sm'
+                            : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
+                        ]"
+                      >
+                        VAT
+                      </button>
+                      <button
+                        type="button"
+                        @click="vat = 'non-vat'; clearFieldError('vat')"
+                        :class="[
+                          'rounded-md text-xs font-semibold transition flex items-center justify-center border',
+                          vat === 'non-vat'
+                            ? 'bg-[#7B5A50] text-white border-[#7B5A50] shadow-sm'
+                            : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
+                        ]"
+                      >
+                        Non-VAT
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      @click="clearSanitaryFile"
-                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
-                      title="Remove file"
-                    >&times;</button>
+                    <p v-if="fieldErrors.vat" class="text-[0.7rem] text-red-600 font-medium">{{ fieldErrors.vat }}</p>
+                  </div>
+
+                  <!-- BIR Registered Date -->
+                  <div class="space-y-1">
+                    <label class="block font-semibold text-[#2d201b]">BIR Registered Date *</label>
+                    <input
+                      v-model="birRegisteredAt"
+                      type="date"
+                      :class="[
+                        'w-full h-10 rounded-md border px-3 outline-none transition bg-white text-xs text-[#2d201b]',
+                        fieldErrors.bir_registered_at
+                          ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                          : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
+                      ]"
+                      required
+                      @change="clearFieldError('bir_registered_at')"
+                    />
+                    <p v-if="fieldErrors.bir_registered_at" class="text-[0.7rem] text-red-600 font-medium">{{ fieldErrors.bir_registered_at }}</p>
+                  </div>
+
+                  <!-- BIR Expiration Date (Required) -->
+                  <div class="space-y-1">
+                    <label class="block font-semibold text-[#2d201b]">BIR Expiration Date *</label>
+                    <input
+                      v-model="birExpiredAt"
+                      type="date"
+                      :min="birRegisteredAt || undefined"
+                      :class="[
+                        'w-full h-10 rounded-md border px-3 outline-none transition bg-white text-xs text-[#2d201b]',
+                        fieldErrors.bir_expired_at
+                          ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                          : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
+                      ]"
+                      required
+                      @change="clearFieldError('bir_expired_at')"
+                    />
+                    <p v-if="fieldErrors.bir_expired_at" class="text-[0.7rem] text-red-600 font-medium">{{ fieldErrors.bir_expired_at }}</p>
                   </div>
                 </div>
               </div>
@@ -1583,7 +1698,7 @@ async function handleFinalSubmit() {
                 </button>
                 <button
                   type="submit"
-                  :disabled="loading || uploadedCount < 4"
+                  :disabled="loading || uploadedCount < 2 || (!!birFile && (!tinNumber || !birRegisteredAt || !birExpiredAt || !vat))"
                   class="w-2/3 h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <span v-if="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>

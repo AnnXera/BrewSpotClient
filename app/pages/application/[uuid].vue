@@ -95,10 +95,13 @@ function formatIdType(type?: string | null): string {
   const map: Record<string, string> = {
     drivers_license: "Driver's License",
     passport: 'Passport',
-    umid: 'UMID',
-    national_id: 'Philippine National ID (PhilSys)',
-    postal_id: 'Postal ID',
+    national_id: 'National ID',
+    sss: 'SSS ID',
+    philhealth: 'PhilHealth ID',
+    pagibig: 'Pag-IBIG ID',
     voters_id: "Voter's ID",
+    umid: 'UMID',
+    postal_id: 'Postal ID',
     prc_id: 'PRC ID',
   }
   return map[type] || type.replace(/_/g, ' ').toUpperCase()

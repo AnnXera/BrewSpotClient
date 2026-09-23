@@ -14,6 +14,7 @@ const emit = defineEmits<{
   (e: 'toggleSelectAll', checked: boolean): void
   (e: 'bulkAction', action: string): void
   (e: 'cancelSelection'): void
+  (e: 'openAddBranch'): void
 }>()
 </script>
 
@@ -25,7 +26,7 @@ const emit = defineEmits<{
           type="checkbox" 
           :checked="selectedCount === totalCount && totalCount > 0" 
           @change="emit('toggleSelectAll', ($event.target as HTMLInputElement).checked)" 
-          class="w-5 h-5 rounded border-[#EEDFC4] text-[#805B4C] focus:ring-[#805B4C]" 
+          class="w-5 h-5 rounded border-[#EEDFC4] text-[#7D5A50] focus:ring-[#7D5A50]" 
         />
         <span class="text-[#3D2B24] font-semibold text-sm">{{ selectedCount }} selected</span>
       </div>
@@ -34,14 +35,14 @@ const emit = defineEmits<{
         <button 
           @click="emit('bulkAction', 'active')" 
           :disabled="bulkLoading" 
-          class="px-4 py-2 text-sm font-medium rounded-lg border border-[#EEDFC4] text-[#3D2B24] hover:bg-[#FDF3E7] disabled:opacity-50"
+          class="px-4 py-2 text-sm font-medium rounded-xl border border-[#EEDFC4] text-[#3D2B24] hover:bg-[#FDF3E7] disabled:opacity-50"
         >
           Mark Active
         </button>
         <button 
           @click="emit('bulkAction', 'inactive')" 
           :disabled="bulkLoading" 
-          class="px-4 py-2 text-sm font-medium rounded-lg border border-[#EEDFC4] text-[#3D2B24] hover:bg-[#FDF3E7] disabled:opacity-50"
+          class="px-4 py-2 text-sm font-medium rounded-xl border border-[#EEDFC4] text-[#3D2B24] hover:bg-[#FDF3E7] disabled:opacity-50"
         >
           Mark Inactive
         </button>
@@ -60,8 +61,9 @@ const emit = defineEmits<{
     </template>
 
     <template v-else>
-      <div class="relative flex-1 max-w-sm">
-        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+      <!-- Search Input -->
+      <div class="relative flex-1 max-w-md">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
           <Icon name="heroicons:magnifying-glass" class="h-5 w-5 text-[#B4846C]" />
         </div>
         <input
@@ -70,34 +72,34 @@ const emit = defineEmits<{
           type="text"
           aria-label="Search owner or cafe"
           placeholder="Search owner or cafe"
-          class="block w-full pl-10 pr-3 py-2 border border-[#EEDFC4] rounded-lg bg-[#FDF8F3] text-sm placeholder-[#B4846C]/60 text-[#3B1F0E] focus:outline-none focus:ring-1 focus:ring-[#B4846C] focus:border-[#B4846C]"
+          class="block w-full pl-10 pr-4 py-2.5 border border-[#EEDFC4] rounded-xl bg-[#FDF8F3] text-sm placeholder-[#B4846C]/60 text-[#3B1F0E] focus:outline-none focus:ring-1 focus:ring-[#7D5A50] focus:border-[#7D5A50]"
         />
       </div>
       
-      <div class="relative w-48">
+      <!-- Status Dropdown -->
+      <div class="relative w-44">
         <select
           :value="status"
           @change="emit('update:status', ($event.target as HTMLSelectElement).value)"
           aria-label="Filter by status"
-          class="block w-full pl-3 pr-10 py-2 border border-[#EEDFC4] rounded-lg bg-[#FDF8F3] text-sm text-[#B4846C]/60 appearance-none focus:outline-none focus:ring-1 focus:ring-[#B4846C] focus:border-[#B4846C]"
+          class="block w-full pl-3.5 pr-10 py-2.5 border border-[#EEDFC4] rounded-xl bg-[#FDF8F3] text-sm text-[#B4846C] appearance-none focus:outline-none focus:ring-1 focus:ring-[#7D5A50] focus:border-[#7D5A50]"
         >
-          <option value="">All Statuses</option>
+          <option value="">Status</option>
           <option value="active">Active</option>
-          <option value="suspended">Suspended</option>
+          <option value="pending">Pending</option>
           <option value="inactive">Inactive</option>
         </select>
-        <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
           <Icon name="heroicons:chevron-down" class="h-5 w-5 text-[#B4846C]" />
         </div>
       </div>
 
+      <!-- Add Branch Button -->
       <div class="ml-auto">
         <button
           type="button"
-          :disabled="!canAddBranch"
-          :title="!canAddBranch ? 'Upgrade your plan to add more branches' : ''"
-          class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-white font-sans font-medium text-sm transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-[#805B4C]/40"
-          :class="canAddBranch ? 'bg-[#805B4C] hover:bg-[#6B4A3A]' : 'bg-[#BCA08B] opacity-70 cursor-not-allowed'"
+          @click="emit('openAddBranch')"
+          class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-white font-bold text-sm bg-[#7D5A50] hover:bg-[#65463D] transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/40"
         >
           <Icon name="heroicons:plus" class="w-4 h-4" />
           <span>Add Branch</span>
