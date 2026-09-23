@@ -18,6 +18,35 @@ const categories = ref<any[]>([])
 const items = ref<any[]>([])
 const isLoading = ref(true)
 
+const searchQuery = ref('')
+const sortBy = ref('name-asc')
+
+const sortOptions = [
+  { label: 'Alphabetically: A to Z', value: 'name-asc' },
+  { label: 'Alphabetically: Z to A', value: 'name-desc' },
+]
+
+const filteredAndSortedCategories = computed(() => {
+  let result = [...categories.value]
+  
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase()
+    result = result.filter(cat => 
+      (cat.name || '').toLowerCase().includes(q)
+    )
+  }
+  
+  result.sort((a, b) => {
+    const nameA = (a.name || '').toLowerCase()
+    const nameB = (b.name || '').toLowerCase()
+    if (sortBy.value === 'name-asc') return nameA.localeCompare(nameB)
+    if (sortBy.value === 'name-desc') return nameB.localeCompare(nameA)
+    return 0
+  })
+  
+  return result
+})
+
 async function fetchData() {
   isLoading.value = true
   try {
@@ -122,6 +151,9 @@ const links = [
           <MenuToolbar 
             searchPlaceholder="Search Category"
             addButtonLabel="+ Add Category"
+            v-model="searchQuery"
+            v-model:sortValue="sortBy"
+            :sortOptions="sortOptions"
             @add="handleAddAction"
           />
         </div>
@@ -134,9 +166,9 @@ const links = [
 
           <template v-else>
             <!-- Categories Grid -->
-            <div v-if="categories.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div v-if="filteredAndSortedCategories.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               <CategoryCard 
-                v-for="cat in categories" 
+                v-for="cat in filteredAndSortedCategories" 
                 :key="cat.id" 
                 :category="cat"
                 @click="handleCategoryClick"

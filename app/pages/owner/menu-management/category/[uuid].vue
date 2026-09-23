@@ -23,6 +23,42 @@ const categories = ref<any[]>([])
 const currentCategory = ref<any>(null)
 const isLoading = ref(true)
 
+const searchQuery = ref('')
+const sortBy = ref('name-asc')
+
+const sortOptions = [
+  { label: 'Alphabetically: A to Z', value: 'name-asc' },
+  { label: 'Alphabetically: Z to A', value: 'name-desc' },
+  { label: 'Price: Low to High', value: 'price-asc' },
+  { label: 'Price: High to Low', value: 'price-desc' },
+]
+
+const filteredAndSortedItems = computed(() => {
+  let result = [...items.value]
+  
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase()
+    result = result.filter(item => 
+      (item.menu_name || '').toLowerCase().includes(q)
+    )
+  }
+  
+  result.sort((a, b) => {
+    if (sortBy.value === 'name-asc') return (a.menu_name || '').localeCompare(b.menu_name || '')
+    if (sortBy.value === 'name-desc') return (b.menu_name || '').localeCompare(a.menu_name || '')
+    
+    const priceA = parseFloat(a.base_price) || 0
+    const priceB = parseFloat(b.base_price) || 0
+    
+    if (sortBy.value === 'price-asc') return priceA - priceB
+    if (sortBy.value === 'price-desc') return priceB - priceA
+    
+    return 0
+  })
+  
+  return result
+})
+
 async function fetchData() {
   isLoading.value = true
   try {
@@ -66,7 +102,8 @@ const breadcrumbs = computed(() => {
   ]
 })
 
-const isItemModalOpen = computed(() => route.query.action === 'add-item' || route.query.action === 'edit-item')
+const showInnerItemModal = ref(false)
+const isItemModalOpen = computed(() => route.query.action === 'add-item' || route.query.action === 'edit-item' || showInnerItemModal.value)
 
 const itemToEdit = computed(() => {
   if (route.query.action === 'edit-item' && route.query.item) {
@@ -84,6 +121,10 @@ function handleEditItem(itemUuid: string) {
 }
 
 function closeItemModal() {
+  if (showInnerItemModal.value) {
+    showInnerItemModal.value = false
+    return
+  }
   const newQuery = { ...route.query }
   delete newQuery.action
   delete newQuery.item
@@ -111,6 +152,10 @@ function closeAssignItemsModal() {
   const newQuery = { ...route.query }
   delete newQuery.action
   router.push({ query: newQuery })
+}
+
+function openAddItemModal() {
+  showInnerItemModal.value = true
 }
 
 async function onAssignItemsConfirm(selectedItemUuids: string[]) {
@@ -154,6 +199,9 @@ const links = [
           <MenuToolbar 
             searchPlaceholder="Search Item"
             addButtonLabel="+ Add Item"
+            v-model="searchQuery"
+            v-model:sortValue="sortBy"
+            :sortOptions="sortOptions"
             @add="handleAddAction"
           />
         </div>
@@ -166,9 +214,9 @@ const links = [
 
           <template v-else>
             <!-- Items Grid -->
-            <div v-if="items.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div v-if="filteredAndSortedItems.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               <ItemCard 
-                v-for="item in items" 
+                v-for="item in filteredAndSortedItems" 
                 :key="item.id" 
                 :item="item"
                 @edit="handleEditItem(item.uuid)"
@@ -204,6 +252,7 @@ const links = [
       :show="isItemModalOpen"
       :item="itemToEdit"
       :categories="categories"
+      :defaultCategoryUuid="currentCategoryUuid"
       @close="closeItemModal"
       @saved="onItemSaved"
     />
@@ -214,6 +263,7 @@ const links = [
       :items="allCafeItems"
       @close="closeAssignItemsModal"
       @confirm="onAssignItemsConfirm"
+      @add-item="openAddItemModal"
     />
   </div>
 </template>

@@ -8,6 +8,7 @@ const props = defineProps<{
   show: boolean
   item: any | null
   categories: any[]
+  defaultCategoryUuid?: string
 }>()
 
 const emit = defineEmits<{
@@ -59,7 +60,7 @@ watch(() => props.show, (newVal) => {
     } else {
       form.value = {
         menu_name: '',
-        category_uuid: 'uncategorized',
+        category_uuid: props.defaultCategoryUuid || 'uncategorized',
         base_price: '',
         description: '',
         recipes: [{ ingredient_name: '', quantity_display: '', unit: INGREDIENT_UNITS[0] }]
@@ -190,7 +191,7 @@ const saveItem = async () => {
 </script>
 
 <template>
-  <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div v-if="show" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
     <!-- Overlay -->
     <div 
       class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"

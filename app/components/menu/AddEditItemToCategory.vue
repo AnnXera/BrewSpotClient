@@ -10,6 +10,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'confirm', selectedItemUuids: string[]): void
+  (e: 'add-item'): void
 }>()
 
 const selectedItems = ref<string[]>([])
@@ -29,13 +30,24 @@ watch(() => props.show, (newVal) => {
   }
 })
 
+watch(() => props.items, (newItems, oldItems) => {
+  if (props.show && props.category && oldItems) {
+    // Find newly added items
+    const addedItems = newItems.filter(item => !oldItems.some(old => old.uuid === item.uuid))
+    addedItems.forEach(item => {
+      if (item.category_uuid === props.category.uuid && !selectedItems.value.includes(item.uuid)) {
+        selectedItems.value.push(item.uuid)
+      }
+    })
+  }
+})
+
 const filteredItems = computed(() => {
   let list = props.items || []
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     list = list.filter(i => 
-      (i.menu_name || '').toLowerCase().includes(q) || 
-      (i.description || '').toLowerCase().includes(q)
+      (i.menu_name || '').toLowerCase().includes(q)
     )
   }
   return list
@@ -110,7 +122,7 @@ const confirmSelection = () => {
               <Icon name="heroicons:bars-3-bottom-left" class="w-5 h-5" />
               <span class="font-bold text-sm">Sort by</span>
             </button>
-            <button class="flex items-center gap-2 bg-[#7D5A50] hover:bg-[#5C4033] text-white px-5 py-3 rounded-xl font-bold transition-colors">
+            <button @click="emit('add-item')" class="flex items-center gap-2 bg-[#7D5A50] hover:bg-[#5C4033] text-white px-5 py-3 rounded-xl font-bold transition-colors">
               <Icon name="heroicons:plus" class="w-5 h-5" />
               <span class="font-bold text-sm">Add Item</span>
             </button>
