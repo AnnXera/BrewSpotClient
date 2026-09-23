@@ -21,20 +21,26 @@ const isLoading = ref(true)
 async function fetchData() {
   isLoading.value = true
   try {
-    const res = await menuService.getMenuCategories()
-    const fetchedCats = res.categories?.data || res.categories || []
-    categories.value = [
-      ...fetchedCats,
-      {
+    const [catsRes, itemsRes] = await Promise.all([
+      menuService.getMenuCategories(),
+      menuService.getMenuItems()
+    ])
+
+    const fetchedCats = catsRes.categories?.data || catsRes.categories || []
+    items.value = itemsRes.items?.data || itemsRes.items || []
+
+    const hasUncategorizedItems = items.value.some((item: any) => !item.category_uuid)
+
+    categories.value = [...fetchedCats]
+    
+    if (hasUncategorizedItems) {
+      categories.value.push({
         id: 'uncategorized',
         uuid: 'uncategorized',
         name: 'Uncategorized',
         description: 'Items that do not belong to any category',
-      }
-    ]
-
-    const itemsRes = await menuService.getMenuItems()
-    items.value = itemsRes.items?.data || itemsRes.items || []
+      })
+    }
   } catch (error) {
     console.error('Failed to fetch data', error)
   } finally {
