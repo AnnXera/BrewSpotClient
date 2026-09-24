@@ -61,7 +61,11 @@ export class MenuService extends BaseService {
     }
 
     getCategoryBranchesStatus(uuid: string) {
-        return this.get<{ success: boolean; statuses: any[] }>(`/owner/menu-categories/${uuid}/branches-status`)
+        return this.get<{
+            success: boolean
+            category: { uuid: string; name: string; is_available: boolean }
+            branches: Array<{ branch_uuid: string; branch_name: string; is_available: boolean; has_override: boolean }>
+        }>(`/owner/menu-categories/${uuid}/branches-status`)
     }
 
     updateCategoryBranch(categoryUuid: string, branchUuid: string, payload: Record<string, any>) {

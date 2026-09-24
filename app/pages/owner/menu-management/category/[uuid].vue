@@ -6,6 +6,7 @@ import ItemCard from '~/components/menu/ItemCard.vue'
 import EmptyState from '~/components/menu/EmptyState.vue'
 import ItemModal from '~/components/menu/ItemModal.vue'
 import AddEditItemToCategory from '~/components/menu/AddEditItemToCategory.vue'
+import CategoryBranchesPanel from '~/components/menu/CategoryBranchesPanel.vue'
 
 definePageMeta({
   layout: 'owner',
@@ -192,7 +193,8 @@ const links = [
         :breadcrumbs="breadcrumbs"
       />
 
-      <div class="bg-white rounded-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
+      <div class="flex flex-col lg:flex-row gap-6 items-start">
+      <div class="flex-1 min-w-0 w-full bg-white rounded-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
         
         <!-- Toolbar Section -->
         <div class="p-4 sm:p-6 border-b border-[#EEDFC4]">
@@ -214,7 +216,7 @@ const links = [
 
           <template v-else>
             <!-- Items Grid -->
-            <div v-if="filteredAndSortedItems.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div v-if="filteredAndSortedItems.length > 0" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
               <ItemCard 
                 v-for="item in filteredAndSortedItems" 
                 :key="item.id" 
@@ -245,6 +247,12 @@ const links = [
             <Icon name="heroicons:chevron-right" class="w-5 h-5 text-[#B4846C] group-hover:text-[#7D5A50]" />
           </button>
         </div>
+      </div>
+
+      <CategoryBranchesPanel
+        v-if="currentCategoryUuid !== 'uncategorized'"
+        :category-uuid="currentCategoryUuid"
+      />
       </div>
     </main>
 
