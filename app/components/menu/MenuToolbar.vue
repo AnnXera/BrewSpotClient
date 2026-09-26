@@ -3,7 +3,7 @@ import { ref } from 'vue'
 
 defineProps<{
   searchPlaceholder: string
-  addButtonLabel: string
+  addButtonLabel?: string
   modelValue?: string
   sortValue?: string
   sortOptions?: { label: string, value: string }[]
@@ -42,7 +42,8 @@ const selectSort = (value: string) => {
       
       <!-- Sort Dropdown -->
       <div v-if="sortOptions && sortOptions.length > 0" class="relative">
-        <button 
+        <button
+          type="button"
           @click="isSortOpen = !isSortOpen"
           class="h-[42px] px-4 bg-[#FDF8F3] border border-[#EEDFC4] text-[#7D5A50] rounded-xl flex items-center gap-2 hover:bg-[#F5EAD4] transition-colors shrink-0 outline-none"
         >
@@ -63,7 +64,8 @@ const selectSort = (value: string) => {
           class="absolute top-full left-0 mt-2 w-[220px] bg-white border border-[#EEDFC4] rounded-2xl shadow-xl z-50 py-2 flex flex-col overflow-hidden"
         >
           <button
-            v-for="opt in sortOptions" 
+            v-for="opt in sortOptions"
+            type="button"
             :key="opt.value"
             @click="selectSort(opt.value)"
             class="w-full text-left px-5 py-3 text-sm transition-colors"
@@ -76,7 +78,9 @@ const selectSort = (value: string) => {
     </div>
 
     <!-- Add Button -->
-    <button 
+    <button
+      v-if="addButtonLabel"
+      type="button"
       @click="$emit('add')"
       class="w-full sm:w-auto h-[42px] bg-[#7D5A50] text-[#FDF8F3] rounded-xl px-5 py-2 flex items-center justify-center text-sm font-semibold hover:bg-[#6A4B42] transition-colors shrink-0"
     >

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useMenuService } from '~/composables/useMenuService'
+import { useMenuItemSort } from '~/composables/useMenuItemSort'
 import MenuPageHeader from '~/components/menu/MenuPageHeader.vue'
 import MenuToolbar from '~/components/menu/MenuToolbar.vue'
 import ItemCard from '~/components/menu/ItemCard.vue'
@@ -18,41 +19,7 @@ const items = ref<any[]>([])
 const categories = ref<any[]>([])
 const isLoading = ref(true)
 
-const searchQuery = ref('')
-const sortBy = ref('name-asc')
-
-const sortOptions = [
-  { label: 'Alphabetically: A to Z', value: 'name-asc' },
-  { label: 'Alphabetically: Z to A', value: 'name-desc' },
-  { label: 'Price: Low to High', value: 'price-asc' },
-  { label: 'Price: High to Low', value: 'price-desc' },
-]
-
-const filteredAndSortedItems = computed(() => {
-  let result = [...items.value]
-  
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    result = result.filter(item => 
-      (item.menu_name || '').toLowerCase().includes(q)
-    )
-  }
-  
-  result.sort((a, b) => {
-    if (sortBy.value === 'name-asc') return (a.menu_name || '').localeCompare(b.menu_name || '')
-    if (sortBy.value === 'name-desc') return (b.menu_name || '').localeCompare(a.menu_name || '')
-    
-    const priceA = parseFloat(a.base_price) || 0
-    const priceB = parseFloat(b.base_price) || 0
-    
-    if (sortBy.value === 'price-asc') return priceA - priceB
-    if (sortBy.value === 'price-desc') return priceB - priceA
-    
-    return 0
-  })
-  
-  return result
-})
+const { searchQuery, sortBy, sortOptions, filteredAndSortedItems } = useMenuItemSort(items)
 
 async function fetchData() {
   isLoading.value = true
@@ -97,8 +64,8 @@ function handleAddAction() {
   router.push({ query: { ...route.query, action: 'add-item' } })
 }
 
-function handleEditItem(itemUuid: string) {
-  router.push({ query: { ...route.query, action: 'edit-item', item: itemUuid } })
+function viewItem(itemUuid: string) {
+  router.push(`/owner/menu-management/item/${itemUuid}`)
 }
 
 function closeItemModal() {
@@ -172,7 +139,7 @@ const links = [
                 v-for="item in filteredAndSortedItems" 
                 :key="item.id" 
                 :item="item"
-                @edit="handleEditItem(item.uuid)"
+                @view="viewItem(item.uuid)"
                 @delete="handleDeleteItem(item.uuid)"
               />
             </div>

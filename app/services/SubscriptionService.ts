@@ -56,6 +56,8 @@ export interface SubscriptionItem {
   cancel_at_period_end: boolean
   plan?: SubscriptionPlanItem
   pending_plan?: SubscriptionPlanItem | null
+  /** Set when the gateway bills the owner automatically. */
+  gateway_subscription_id?: string | null
   payment_gateway?: string
   payment_method?: string
   created_at: string | null

@@ -1,3 +1,8 @@
+// Keeps only what parseQuantity understands: digits, ".", "/" and single spaces (for "1 1/2").
+export function sanitizeQuantity(value: string): string {
+  return value.replace(/[^0-9./ ]/g, '').replace(/ {2,}/g, ' ').replace(/^ /, '');
+}
+
 export function parseQuantity(value: string | number): number {
   if (typeof value === 'number') return value;
   if (!value) return 0;

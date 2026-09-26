@@ -40,11 +40,11 @@ function statusColor(status: string) {
     @keydown.enter="emit('view', branch.uuid)"
     class="flex flex-col lg:flex-row lg:items-center justify-between border border-[#F3E7D2] rounded-[20px] p-5 sm:p-6 bg-white hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30 group gap-4"
   >
-    <div class="flex items-start sm:items-center gap-4 w-full lg:w-auto">
+    <div class="flex items-start sm:items-center w-full lg:w-auto">
       <!-- Checkbox selection -->
       <div 
         class="flex items-center transition-all duration-300 ease-out overflow-hidden self-center" 
-        :class="selected ? 'w-6 opacity-100 mr-1' : 'w-0 opacity-0 group-hover:w-6 group-hover:opacity-100 group-hover:mr-1'"
+        :class="selected ? 'w-6 opacity-100 mr-4' : 'w-0 opacity-0 group-hover:w-6 group-hover:opacity-100 group-hover:mr-4'"
       >
         <input 
           type="checkbox" 
@@ -56,7 +56,7 @@ function statusColor(status: string) {
       </div>
 
       <!-- Thumbnail image / fallback initial icon box -->
-      <div class="w-16 h-16 shrink-0 bg-gradient-to-br from-[#7D5A50] to-[#B4846C] rounded-2xl overflow-hidden shadow-sm flex items-center justify-center text-white font-extrabold text-xl relative group-hover:scale-105 transition-transform duration-300">
+      <div class="w-16 h-16 shrink-0 mr-4 bg-gradient-to-br from-[#7D5A50] to-[#B4846C] rounded-2xl overflow-hidden shadow-sm flex items-center justify-center text-white font-extrabold text-xl relative group-hover:scale-105 transition-transform duration-300">
         <img 
           v-if="branch.cafe_picture && !imageError" 
           :src="branch.cafe_picture" 

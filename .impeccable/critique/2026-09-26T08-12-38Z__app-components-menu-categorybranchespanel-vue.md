@@ -10,6 +10,7 @@ target_fingerprint: "sha256:c1f4fa0170ffa8502f9c29036e0d3b673f2cd4f49931dae1f548
 target_path: "C:\\Users\\ASUS\\Documents\\BrewspotCode\\client\\app\\components\\menu\\CategoryBranchesPanel.vue"
 timestamp: 2026-09-26T08-12-38Z
 slug: app-components-menu-categorybranchespanel-vue
+closed: true
 ---
 # Critique: CategoryBranchesPanel.vue (category branch card)
 

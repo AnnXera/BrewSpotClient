@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, toRef, computed } from 'vue'
+import { useMenuItemSort } from '~/composables/useMenuItemSort'
+import MenuToolbar from '~/components/menu/MenuToolbar.vue'
+import CategoryMoveWarning from '~/components/menu/CategoryMoveWarning.vue'
+import { useCategoryMoves } from '~/composables/useCategoryMoves'
 
 const props = defineProps<{
   show: boolean
@@ -14,12 +18,19 @@ const emit = defineEmits<{
 }>()
 
 const selectedItems = ref<string[]>([])
-const searchQuery = ref('')
+const { searchQuery, sortBy, sortOptions, filteredAndSortedItems: filteredItems } = useMenuItemSort(toRef(props, 'items'))
 const isSubmitting = ref(false)
+
+const { otherCategoryName, movedItems } = useCategoryMoves(
+  toRef(props, 'items'),
+  selectedItems,
+  computed(() => props.category?.uuid),
+)
 
 watch(() => props.show, (newVal) => {
   if (newVal) {
     searchQuery.value = ''
+    sortBy.value = 'name-asc'
     if (props.category) {
       selectedItems.value = props.items
         .filter(i => i.category_uuid === props.category.uuid)
@@ -40,17 +51,6 @@ watch(() => props.items, (newItems, oldItems) => {
       }
     })
   }
-})
-
-const filteredItems = computed(() => {
-  let list = props.items || []
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    list = list.filter(i => 
-      (i.menu_name || '').toLowerCase().includes(q)
-    )
-  }
-  return list
 })
 
 const toggleItem = (uuid: string) => {
@@ -105,29 +105,14 @@ const confirmSelection = () => {
       <div class="flex-1 overflow-y-auto p-8 flex flex-col gap-8">
         
         <!-- Search Toolbar -->
-        <div class="flex items-center justify-between gap-4">
-          <div class="relative flex-1 max-w-2xl">
-            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Icon name="heroicons:magnifying-glass" class="w-5 h-5 text-[#B4846C]/60" />
-            </div>
-            <input 
-              v-model="searchQuery"
-              type="text" 
-              placeholder="Search Item"
-              class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent transition-shadow"
-            />
-          </div>
-          <div class="flex items-center gap-3">
-            <button class="flex items-center gap-2 text-[#7D5A50] hover:text-[#3B1F0E] px-4 py-3 rounded-xl border border-[#EEDFC4] hover:bg-[#fef8f0] transition-colors bg-[#fef8f0]">
-              <Icon name="heroicons:bars-3-bottom-left" class="w-5 h-5" />
-              <span class="font-bold text-sm">Sort by</span>
-            </button>
-            <button @click="emit('add-item')" class="flex items-center gap-2 bg-[#7D5A50] hover:bg-[#5C4033] text-white px-5 py-3 rounded-xl font-bold transition-colors">
-              <Icon name="heroicons:plus" class="w-5 h-5" />
-              <span class="font-bold text-sm">Add Item</span>
-            </button>
-          </div>
-        </div>
+        <MenuToolbar
+          v-model="searchQuery"
+          v-model:sortValue="sortBy"
+          searchPlaceholder="Search Item"
+          addButtonLabel="+ Add Item"
+          :sortOptions="sortOptions"
+          @add="emit('add-item')"
+        />
 
         <!-- Items Grid -->
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 pb-6">
@@ -153,6 +138,14 @@ const confirmSelection = () => {
                 <Icon name="heroicons:photo" class="w-12 h-12" />
               </div>
               
+              <!-- Already in another category: selecting it moves it here -->
+              <span
+                v-if="otherCategoryName(item)"
+                class="absolute top-2 left-2 max-w-[calc(100%-3rem)] truncate rounded-full bg-white/95 border border-[#EEDFC4] px-2.5 py-1 text-[11px] font-semibold text-[#7D5A50] shadow-sm"
+              >
+                In {{ otherCategoryName(item) }}
+              </span>
+
               <!-- Checkbox -->
               <div 
                 class="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center shadow-sm transition-colors border-2"
@@ -200,7 +193,8 @@ const confirmSelection = () => {
       </div>
 
       <!-- Footer -->
-      <div class="px-8 py-5 border-t border-[#EEDFC4] flex justify-end bg-white">
+      <div class="px-8 py-5 border-t border-[#EEDFC4] flex flex-col sm:flex-row sm:items-center justify-end gap-3 bg-white">
+        <CategoryMoveWarning :items="movedItems" class="sm:mr-auto" />
         <button 
           @click="confirmSelection"
           :disabled="isSubmitting"

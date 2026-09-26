@@ -16,7 +16,6 @@ const links = [
 
 const ownerService = useOwnerProfileService()
 const { hasFeature, fetchCurrentSubscription } = usePlanFeature()
-const authStore = useAuthStore()
 
 // State
 const branches = ref<BranchSummary[]>([])
@@ -32,7 +31,7 @@ const search = ref('')
 const status = ref('')
 
 // Business Info
-const cafeName = computed(() => authStore.user?.business_name || authStore.user?.name || 'La Vida Cafe')
+const cafeName = ref('')
 
 // Modal Controls
 const isAddBranchOpen = ref(false)
@@ -96,6 +95,9 @@ async function fetchBranches() {
   loading.value = true
   try {
     const res = await ownerService.getBranches(perPage, currentPage.value, search.value, status.value)
+    if (res.success && res.cafe_name) {
+      cafeName.value = res.cafe_name
+    }
     if (res.success && res.branches?.data) {
       branches.value = res.branches.data
       currentPage.value = res.branches.current_page
@@ -244,7 +246,7 @@ function viewDetails(uuid: string) {
       <!-- Header Row: Cafe Title + Chosen Opening Hours Badge + Operating Hours Action Button -->
       <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 class="font-display text-3xl sm:text-4xl font-extrabold text-[#3D2B24] tracking-tight">{{ cafeName }}</h1>
+          <h1 class="font-display text-3xl sm:text-4xl font-extrabold text-[#3D2B24] tracking-tight">{{ cafeName || 'Cafe Management' }}</h1>
           <p class="text-xs sm:text-sm text-[#9E7060] mt-1 font-medium">Manage your cafe branches, store details, and general operating hours.</p>
         </div>
 

@@ -2,7 +2,7 @@
 import { ref, watch, computed, nextTick } from 'vue'
 import { useMenuService } from '~/composables/useMenuService'
 import { INGREDIENT_UNITS } from '~/utils/constants'
-import { parseQuantity, formatQuantity } from '~/utils/fraction'
+import { parseQuantity, formatQuantity, sanitizeQuantity } from '~/utils/fraction'
 
 const props = defineProps<{
   show: boolean
@@ -32,6 +32,9 @@ const pictureFile = ref<File | null>(null)
 const isSubmitting = ref(false)
 
 const isEditMode = computed(() => !!props.item)
+
+// Some pages pass an "Uncategorized" pseudo-category; the select always offers its own.
+const realCategories = computed(() => props.categories.filter(cat => cat.uuid !== 'uncategorized'))
 
 const isDirty = ref(false)
 const errors = ref({
@@ -115,6 +118,14 @@ const handleEnterOnIngredient = async (index: number) => {
     await nextTick()
     ingredientInputs.value[form.value.recipes.length - 1]?.focus()
   }
+}
+
+const onQuantityInput = (recipe: { quantity_display: string }, event: Event) => {
+  const input = event.target as HTMLInputElement
+  const clean = sanitizeQuantity(input.value)
+  recipe.quantity_display = clean
+  // Write back directly: if only a rejected character was typed, the model is unchanged and Vue won't re-render.
+  if (input.value !== clean) input.value = clean
 }
 
 const removeIngredient = (index: number) => {
@@ -287,7 +298,8 @@ const saveItem = async () => {
                     v-model="form.category_uuid"
                     class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl pl-4 pr-10 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent transition-shadow"
                   >
-                    <option v-for="cat in categories" :key="cat.uuid" :value="cat.uuid">
+                    <option value="uncategorized">Uncategorized</option>
+                    <option v-for="cat in realCategories" :key="cat.uuid" :value="cat.uuid">
                       {{ cat.name }}
                     </option>
                   </select>
@@ -370,9 +382,11 @@ const saveItem = async () => {
               <!-- Amount -->
               <div class="w-full">
                 <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Amount</label>
-                <input 
-                  v-model="recipe.quantity_display"
-                  type="text" 
+                <input
+                  :value="recipe.quantity_display"
+                  @input="onQuantityInput(recipe, $event)"
+                  type="text"
+                  inputmode="decimal"
                   placeholder="e.g. 1/4 or 2.5"
                   @keydown.enter.prevent="handleEnterOnIngredient(index)"
                   class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent"

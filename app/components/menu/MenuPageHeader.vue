@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useOperatingHours } from '~/composables/useOperatingHours'
+import MenuBreadcrumbs from '~/components/menu/MenuBreadcrumbs.vue'
 
 defineProps<{
   title: string
@@ -14,25 +15,7 @@ const { formattedSummary, isOpenNow } = useOperatingHours()
   <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
     <div class="flex flex-col gap-1">
       <!-- Breadcrumbs -->
-      <nav v-if="breadcrumbs && breadcrumbs.length" class="flex items-center gap-2 mb-1">
-        <template v-for="(crumb, index) in breadcrumbs" :key="index">
-          <NuxtLink 
-            v-if="crumb.to" 
-            :to="crumb.to" 
-            class="text-sm font-sans text-[#7D5A50] hover:text-[#3B1F0E] transition-colors"
-          >
-            {{ crumb.label }}
-          </NuxtLink>
-          <span v-else class="text-sm font-sans font-medium text-[#3B1F0E]">
-            {{ crumb.label }}
-          </span>
-          <Icon 
-            v-if="index < breadcrumbs.length - 1" 
-            name="heroicons:chevron-right" 
-            class="w-4 h-4 text-[#7D5A50]" 
-          />
-        </template>
-      </nav>
+      <MenuBreadcrumbs v-if="breadcrumbs && breadcrumbs.length" :items="breadcrumbs" class="mb-1" />
       
       <h1 class="font-display text-[32px] font-bold text-[#3B1F0E] leading-tight">
         {{ title }}

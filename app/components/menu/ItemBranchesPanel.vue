@@ -3,30 +3,31 @@ import { useMenuService } from '~/composables/useMenuService'
 import BranchAvailabilityPanel from '~/components/menu/BranchAvailabilityPanel.vue'
 
 const props = defineProps<{
-  categoryUuid: string
+  itemUuid: string
 }>()
 
 const menuService = useMenuService()
 
 async function load() {
-  const res = await menuService.getCategoryBranchesStatus(props.categoryUuid)
+  const res = await menuService.getItemBranchesStatus(props.itemUuid)
   return {
-    defaultAvailable: res.category ? Boolean(res.category.is_available) : null,
-    name: res.category?.name || '',
+    defaultAvailable: res.item ? Boolean(res.item.is_available) : null,
+    name: res.item?.name || '',
     branches: res.branches || [],
   }
 }
 
 async function update(branchUuid: string, next: boolean) {
-  const res = await menuService.updateCategoryBranch(props.categoryUuid, branchUuid, { is_available: next })
+  const res = await menuService.updateItemBranch(props.itemUuid, branchUuid, { is_available: next })
   return res.branch
 }
 </script>
 
 <template>
   <BranchAvailabilityPanel
-    :source-key="categoryUuid"
-    subject="category"
+    :source-key="itemUuid"
+    subject="item"
+    variant="card"
     :load="load"
     :update="update"
   />

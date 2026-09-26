@@ -18,12 +18,40 @@ export interface BranchSummary {
     amenities?: string[]
 }
 
+export interface BranchDocument {
+    branch_doc_id: number
+    doc_type: string
+    download_url: string
+    registered_at: string | null
+    expired_at: string | null
+    tin_number: string | null
+    vat: string | null
+    uploaded_at: string | null
+}
+
+export interface BranchDetail {
+    uuid: string
+    branch_name: string
+    cafe_name?: string | null
+    cafe_picture_url: string | null
+    cafe_email: string | null
+    cafe_phonenumber: string | null
+    address: string | null
+    branch_type: string
+    status: string
+    documents?: BranchDocument[]
+}
+
 export class OwnerProfileService extends BaseService {
+    getBranch(uuid: string) {
+        return this.get<{ success: boolean; message?: string; branch?: BranchDetail }>(`/owner/branches/${uuid}`)
+    }
+
     getBranches(perPage = 6, page = 1, search = '', status = '') {
         const params: Record<string, any> = { per_page: perPage, page }
         if (search) params.search = search
         if (status) params.status = status
-        return this.get<{ success: boolean; branches: Paginated<BranchSummary> }>('/owner/branches', params)
+        return this.get<{ success: boolean; cafe_name: string | null; branches: Paginated<BranchSummary> }>('/owner/branches', params)
     }
 
     createBranch(payload: { branch_name: string; branch_type: string; address: string; phone_number?: string; opening_hours?: any }) {

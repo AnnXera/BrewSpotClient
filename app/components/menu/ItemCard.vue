@@ -14,7 +14,7 @@ const props = defineProps<{
 }>()
 
 defineEmits<{
-  (e: 'edit', id: string | number): void
+  (e: 'view', id: string | number): void
   (e: 'delete', id: string | number): void
 }>()
 
@@ -29,7 +29,7 @@ const getImageUrl = () => {
 <template>
   <div 
     class="bg-white rounded-2xl border border-[#EEDFC4] flex flex-col group hover:shadow-md transition-shadow cursor-pointer p-3 h-[300px]"
-    @click="$emit('edit', item.uuid || item.id || '')"
+    @click="$emit('view', item.uuid || item.id || '')"
   >
     <!-- Image Area -->
     <div class="h-[140px] w-full bg-[#FBF2E1] relative shrink-0 rounded-xl overflow-hidden mb-[9px]">
