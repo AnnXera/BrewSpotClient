@@ -188,6 +188,29 @@ function isScheduledPlan(plan: SubscriptionPlanItem): boolean {
 const hasScheduledChange = computed(() => !!currentPlan.value?.pending_plan)
 
 /**
+ * Whether the owner pays for the next term by hand from this page.
+ *
+ * A gateway-billed subscription renews on its own, so it gets no pay buttons — the same
+ * rule the renewal banner follows.
+ */
+const canPayNextTerm = computed(() => isRenewalOpen.value && !currentPlan.value?.gateway_subscription_id)
+
+/**
+ * Pay for the next term, into whichever plan it will be on: the booked change when there
+ * is one, otherwise the current plan again. The browse toggle is aligned to that term's
+ * cycle so the checkout modal prices it correctly.
+ */
+function payNextTerm() {
+  const sub = currentPlan.value
+  const plan = sub?.pending_plan ?? sub?.plan
+  if (!sub || !plan) return
+
+  const cycle = sub.pending_plan ? (sub.pending_billing_cycle ?? sub.billing_cycle) : sub.billing_cycle
+  browseBillingCycle.value = cycle === 'yearly' ? 'yearly' : 'monthly'
+  openCheckout(plan)
+}
+
+/**
  * Whether the owner's paid days have run out, leaving only the term's grace day.
  *
  * Nothing is chargeable before this point — not a renewal, not an upgrade — so the plan
@@ -423,9 +446,10 @@ onMounted(async () => {
                   <strong>{{ formatDate(currentPlan?.renewal_opens_at) }}</strong>, once your paid days run out.
                 </div>
                 
+                <!-- A booked change is paid for from the Next Plan card instead. -->
                 <button
-                  v-if="isRenewalOpen"
-                  @click="browseBillingCycle = currentPlan.billing_cycle === 'yearly' ? 'yearly' : 'monthly'; openCheckout(currentPlan.plan)"
+                  v-if="canPayNextTerm && !hasScheduledChange"
+                  @click="payNextTerm"
                   class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
                 >
                   <Icon name="heroicons:credit-card" class="w-4 h-4" />
@@ -491,10 +515,22 @@ onMounted(async () => {
             <p class="font-sans text-sm text-[#7D5A50] mb-6">
               Takes effect when your current term ends on <strong>{{ formatDate(currentPlan?.end_date) }}</strong>.
               You'll keep using your current plan's features until then — no charge has been made for this plan yet.
-              <template v-if="currentPlan?.renewal_opens_at">
+              <template v-if="isRenewalOpen">
+                Payment for it is open now.
+              </template>
+              <template v-else-if="currentPlan?.renewal_opens_at">
                 You can pay for it from <strong>{{ formatDate(currentPlan?.renewal_opens_at) }}</strong>.
               </template>
             </p>
+
+            <button
+              v-if="canPayNextTerm"
+              @click="payNextTerm"
+              class="w-full sm:w-auto mb-6 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
+            >
+              <Icon name="heroicons:credit-card" class="w-4 h-4" />
+              Pay Now
+            </button>
 
             <div class="pt-4 border-t border-[#EEDFC4]">
               <span class="font-sans text-xs uppercase font-bold text-[#8B6656] block mb-2 tracking-wider">
