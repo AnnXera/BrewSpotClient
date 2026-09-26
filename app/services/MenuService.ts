@@ -69,6 +69,10 @@ export class MenuService extends BaseService {
     }
 
     updateCategoryBranch(categoryUuid: string, branchUuid: string, payload: Record<string, any>) {
-        return this.patch<{ success: boolean; message: string }>(`/owner/menu-categories/${categoryUuid}/branches/${branchUuid}`, payload)
+        return this.patch<{
+            success: boolean
+            message: string
+            branch: { branch_uuid: string; branch_name: string; is_available: boolean; has_override: boolean }
+        }>(`/owner/menu-categories/${categoryUuid}/branches/${branchUuid}`, payload)
     }
 }
