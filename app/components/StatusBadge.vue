@@ -27,6 +27,7 @@ const classes = computed(() => {
     case 'success':
       return 'bg-[#D4EDDA] text-[#28A745]'
     case 'suspended':
+    case 'terminated':
     case 'rejected':
     case 'cancelled':
     case 'failed':

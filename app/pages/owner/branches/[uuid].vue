@@ -269,12 +269,9 @@ onMounted(fetchBranch)
           </section>
         </div>
 
-        <!-- Employees Tab -->
-        <div v-else class="mt-4 bg-white border border-[#EDD8CC] rounded-2xl p-10 flex flex-col items-center gap-2 text-center">
-          <Icon name="heroicons:user-group" class="w-10 h-10 text-[#9E7060]" />
-          <p class="text-base font-semibold text-[#3D2B24]">Employees</p>
-          <p class="text-sm text-[#9E7060]">Branch employee management is not available yet.</p>
-        </div>
+        <!-- Employees Tab (Add Employee / View Positions / View Details are wired up with the modals and details page later) -->
+        <EmployeesTab v-else :branch-uuid="branch.uuid" />
+
       </template>
     </main>
   </div>

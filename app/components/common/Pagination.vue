@@ -12,6 +12,10 @@
 
     <span class="font-display font-medium text-xs sm:text-sm text-[#7D5A50]">
       Page {{ page }} of {{ Math.max(1, lastPage) }}
+      <template v-if="total !== undefined && total > 0">
+        <span class="text-[#9E7060]/70 mx-1">·</span>
+        <span class="text-[#9E7060]">Showing {{ from }}–{{ to }} of {{ total }}</span>
+      </template>
     </span>
 
     <button
@@ -29,6 +33,10 @@
 interface Props {
   page: number
   lastPage: number
+  // Optional "Showing x–y of z" summary; omitted by pages that don't pass it.
+  total?: number
+  from?: number | null
+  to?: number | null
 }
 
 const props = defineProps<Props>()
