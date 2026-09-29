@@ -4,7 +4,8 @@ import { BaseService } from './BaseService'
 import type { Paginated } from './OwnerManagementService'
 
 export type EmploymentStatus = 'active' | 'inactive' | 'suspended' | 'terminated'
-export type StaffRole = 'Manager' | 'Cashier'
+// Staff = records only (e.g. barista, kitchen staff): no login, no PIN, not on the register.
+export type StaffRole = 'Manager' | 'Cashier' | 'Staff'
 
 export interface StaffScheduleDay {
     day_of_week: number
@@ -49,6 +50,34 @@ export interface BranchStaffStats {
     terminated: number
 }
 
+export interface StaffScheduleInput {
+    day_of_week: number // 0 = Sunday … 6 = Saturday
+    is_day_off: boolean
+    start_time?: string | null // "HH:mm"
+    end_time?: string | null
+}
+
+export interface CreateStaffPayload {
+    firstname: string
+    middlename?: string | null
+    lastname: string
+    phone_number: string
+    email: string
+    address: string
+    role: StaffRole
+    pin?: string // required for Manager/Cashier, ignored for Staff
+    schedule?: StaffScheduleInput[]
+}
+
+export interface CreateStaffResponse {
+    success: boolean
+    message: string
+    staff?: StaffMember
+    // Non-blocking, e.g. "Sunday: the cafe is closed, but a shift is scheduled."
+    warnings?: string[]
+    errors?: Record<string, string[]>
+}
+
 export interface BranchStaffFilters {
     search?: string
     status?: EmploymentStatus | ''
@@ -76,6 +105,10 @@ export class StaffService extends BaseService {
             if (value !== '' && value !== undefined && value !== null) params[key] = value
         }
         return this.get<{ success: boolean; message?: string; staff: Paginated<StaffMember> }>(this.base(branchUuid), params)
+    }
+
+    createBranchStaff(branchUuid: string, payload: CreateStaffPayload) {
+        return this.post<CreateStaffResponse>(this.base(branchUuid), payload as unknown as Record<string, any>)
     }
 
     getBranchStaffStats(branchUuid: string) {

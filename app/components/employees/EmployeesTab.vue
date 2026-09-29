@@ -1,5 +1,5 @@
 <!-- app/components/employees/EmployeesTab.vue -->
-<!-- Employees tab of a branch (owner side). Modals come later; the buttons emit events for now. -->
+<!-- Employees tab of a branch (owner side). View Positions / View Details emit events until those screens exist. -->
 <script setup lang="ts">
 import type { BranchStaffStats, EmploymentStatus, StaffMember, StaffRole } from '~/services/StaffService'
 
@@ -9,9 +9,18 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'view-employee': [member: StaffMember]
-  'add-employee': []
   'view-positions': []
 }>()
+
+const showAddModal = ref(false)
+// Shown after a successful save; warnings are non-blocking (e.g. shift outside opening hours).
+const notice = ref<{ message: string; warnings: string[] } | null>(null)
+
+function onEmployeeSaved(result: { message: string; warnings: string[] }) {
+  showAddModal.value = false
+  notice.value = { message: result.message, warnings: result.warnings }
+  refresh()
+}
 
 const staffService = useStaffService('owner')
 
@@ -29,6 +38,7 @@ const positionOptions: { value: StaffRole | ''; label: string }[] = [
   { value: '', label: 'All positions' },
   { value: 'Manager', label: 'Manager' },
   { value: 'Cashier', label: 'Cashier' },
+  { value: 'Staff', label: 'Staff' },
 ]
 
 const search = ref('')
@@ -169,6 +179,23 @@ onBeforeUnmount(() => {
         <EmployeesStatCard label="Terminated" :value="stats?.terminated" />
       </div>
 
+      <!-- Saved notice -->
+      <div v-if="notice" class="bg-[#D4EDDA]/60 border border-[#28A745]/30 rounded-xl p-4 flex items-start gap-3 text-[#1E7B34]">
+        <Icon name="heroicons:check-circle" class="w-5 h-5 shrink-0 mt-0.5" />
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold">{{ notice.message }}</p>
+          <ul v-if="notice.warnings.length" class="mt-1.5 space-y-0.5 text-sm text-[#8A5A00]">
+            <li v-for="warning in notice.warnings" :key="warning" class="flex items-start gap-1.5">
+              <Icon name="heroicons:exclamation-triangle" class="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{{ warning }}</span>
+            </li>
+          </ul>
+        </div>
+        <button type="button" aria-label="Dismiss" class="p-1 rounded hover:bg-black/5" @click="notice = null">
+          <Icon name="heroicons:x-mark" class="w-4 h-4" />
+        </button>
+      </div>
+
       <!-- Error -->
       <div v-if="errorMessage" class="bg-red-50 text-red-800 border border-red-200 rounded-xl p-4 flex items-center gap-3">
         <Icon name="heroicons:exclamation-triangle" class="w-5 h-5 shrink-0" />
@@ -239,7 +266,7 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-[10px] bg-[#7D5A50] font-display font-semibold text-sm text-[#FFF0D1] whitespace-nowrap hover:bg-[#6B4A40] transition-colors focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-              @click="emit('add-employee')"
+              @click="showAddModal = true"
             >
               <Icon name="heroicons:plus" class="w-4 h-4" />
               Add Employee
@@ -255,7 +282,7 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="mt-3 inline-flex items-center gap-2 px-4 py-3 rounded-[10px] bg-[#7D5A50] font-display font-semibold text-sm text-[#FFF0D1] hover:bg-[#6B4A40] transition-colors"
-            @click="emit('add-employee')"
+            @click="showAddModal = true"
           >
             <Icon name="heroicons:plus" class="w-4 h-4" />
             Add Employee
@@ -352,5 +379,12 @@ onBeforeUnmount(() => {
         </template>
       </div>
     </template>
+
+    <EmployeesFormModal
+      :show="showAddModal"
+      :branch-uuid="branchUuid"
+      @close="showAddModal = false"
+      @saved="onEmployeeSaved"
+    />
   </div>
 </template>

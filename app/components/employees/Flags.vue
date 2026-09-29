@@ -21,7 +21,7 @@ const chips = computed(() => {
     list.push({ label: 'PIN locked', tone: 'danger', title: 'Too many wrong PIN attempts — reset the PIN to unlock' })
   } else if (props.member.pin_must_change) {
     list.push({ label: 'Temporary PIN', tone: 'warn', title: 'Must choose a new PIN the first time they use it' })
-  } else if (!props.member.pin_set) {
+  } else if (!props.member.pin_set && props.member.role !== 'Staff') {
     list.push({ label: 'No PIN', tone: 'warn', title: 'Cannot sign in on the register until a PIN is set' })
   }
 
