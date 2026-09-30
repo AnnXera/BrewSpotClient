@@ -21,9 +21,23 @@ const invalidMessage = ref('')
 const error = ref('')
 const isLoading = ref(false)
 
+// Managers continue to the PIN page (their PIN approves voids/refunds). Both
+// are sent together there, so the account only activates once both are set.
+const needsPin = ref(false)
+const draft = useSetupPasswordDraft()
+
 const authService = useAuthService()
 
 onMounted(async () => {
+  // Coming back from the PIN page: keep what they already typed.
+  if (draft.value?.uuid === uuid) {
+    password.value = draft.value.password
+    passwordConfirmation.value = draft.value.passwordConfirmation
+  }
+
+  const notice = route.query.error
+  if (typeof notice === 'string') error.value = notice
+
   try {
     const res = await authService.checkSetupStatus(uuid)
 
@@ -37,6 +51,8 @@ onMounted(async () => {
       invalidMessage.value = res.message || 'This link is invalid or has expired.'
       return
     }
+
+    needsPin.value = res.role === 'Manager'
   } catch (e: any) {
     const data = e?.data
     if (data?.already_active) {
@@ -72,6 +88,12 @@ async function handleSubmit() {
   }
   if (!passwordsMatch.value) {
     error.value = 'Passwords do not match.'
+    return
+  }
+
+  if (needsPin.value) {
+    draft.value = { uuid, password: password.value, passwordConfirmation: passwordConfirmation.value }
+    navigateTo(`/setup-password/${uuid}/pin`)
     return
   }
 
@@ -168,9 +190,15 @@ async function handleSubmit() {
 
       <!-- Normal Setup Form -->
       <div v-else class="w-full max-w-sm space-y-6">
+        <p v-if="needsPin" class="text-xs font-semibold uppercase tracking-wide text-[#7B5A50]">
+          Step 1 of 2
+        </p>
+
         <div>
           <h1 class="text-3xl font-bold text-[#2d201b]">Set your password</h1>
-          <p class="text-gray-600 text-sm mt-1">Create a password to activate your account.</p>
+          <p class="text-gray-600 text-sm mt-1">
+            {{ needsPin ? 'You\'ll use this to sign in to your branch dashboard.' : 'Create a password to activate your account.' }}
+          </p>
         </div>
 
         <div
@@ -255,10 +283,12 @@ async function handleSubmit() {
               :disabled="isLoading"
             >
               <span v-if="isLoading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              {{ isLoading ? "Activating..." : "Activate Account" }}
+              <template v-if="needsPin">Continue</template>
+              <template v-else>{{ isLoading ? "Activating..." : "Activate Account" }}</template>
             </button>
           </div>
         </form>
+
       </div>
     </section>
   </div>

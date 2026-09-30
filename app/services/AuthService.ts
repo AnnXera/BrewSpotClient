@@ -150,10 +150,12 @@ export class AuthService extends BaseService {
         return this.post<{ success: boolean; path?: string; message?: string }>('/upload/temp', payload)
     }
 
-    setupPassword(uuid: string, password: string, passwordConfirmation: string) {
+    // pin/pinConfirmation are required for managers and ignored for everyone else.
+    setupPassword(uuid: string, password: string, passwordConfirmation: string, pin?: string, pinConfirmation?: string) {
         return this.post<SetupPasswordResponse>(`/auth/setup-password/${uuid}`, {
             password,
             password_confirmation: passwordConfirmation,
+            ...(pin !== undefined && { pin, pin_confirmation: pinConfirmation }),
         })
     }
 

@@ -47,6 +47,7 @@ onMounted(async () => {
     // Synchronously set up the dropdown structure to prevent layout stutter
     const baseMenuChildren: NavLink[] = [
       { label: 'Menu Items', to: '/owner/menu-management/items' },
+      { label: 'Ingredients', to: '/owner/menu-management/ingredients' },
       { label: 'CATEGORIES', to: '', isHeader: true }
     ]
     dynamicLinks.value[menuIndex].isDropdown = true
@@ -411,35 +412,7 @@ function toggleDropdown(link: NavLink) {
                 </NuxtLink>
               </template>
             </nav>
-
-            <div class="flex-1" />
-
-            <div class="h-px bg-[#B4846C] mb-6" />
-
-            <!-- Profile + logout -->
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-12 h-12 rounded-full bg-[#3B1F0E] flex items-center justify-center shrink-0">
-                <span class="font-display font-semibold text-[#FFF0D1]" style="font-size: 19.69px">
-                  {{ initials }}
-                </span>
-              </div>
-              <div class="flex flex-col items-start min-w-0">
-                <span class="font-display font-semibold text-base text-[#FFF0D1] truncate">
-                  {{ displayName }}
-                </span>
-                <span class="font-sans font-normal text-xs text-[#FFF0D1] truncate">
-                  {{ displayRole }}
-                </span>
-              </div>
-            </div>
-
-            <button
-              class="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#8B6656] transition-colors"
-              @click="handleLogout"
-            >
-              <Icon name="heroicons:arrow-right-start-on-rectangle" class="w-5 h-5 text-[#FDE8E8] shrink-0" />
-              <span class="font-sans text-sm font-medium text-[#FDE8E8]">Logout</span>
-            </button>
+            <!-- Profile and logout live in the top bar's avatar menu on mobile. -->
           </aside>
         </Transition>
       </div>

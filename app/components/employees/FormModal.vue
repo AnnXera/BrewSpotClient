@@ -19,7 +19,7 @@ const positionOptions: { value: StaffRole; label: string; hint: string }[] = [
   {
     value: 'Manager',
     label: 'Manager',
-    hint: 'Manages the branch dashboard and approves voids/refunds. They\'ll get an email to set a password, and must replace this PIN the first time they use it.',
+    hint: 'Manages the branch dashboard and approves voids/refunds. They\'ll get an email to set their own password and PIN.',
   },
   {
     value: 'Cashier',
@@ -63,7 +63,8 @@ const scheduleErrors = ref<Record<number, string>>({})
 const serverError = ref('')
 const saving = ref(false)
 
-const usesPin = computed(() => form.value.role === 'Manager' || form.value.role === 'Cashier')
+// Managers choose their own PIN when they set up their password.
+const usesPin = computed(() => form.value.role === 'Cashier')
 const positionHint = computed(() => positionOptions.find(o => o.value === form.value.role)?.hint ?? '')
 
 watch(() => props.show, (open) => {
@@ -93,7 +94,7 @@ function onPhoneInput(event: Event) {
 
 function onPinInput(event: Event) {
   const input = event.target as HTMLInputElement
-  form.value.pin = input.value.replace(/\D/g, '').slice(0, 6)
+  form.value.pin = input.value.replace(/\D/g, '').slice(0, 4)
   input.value = form.value.pin
 }
 
@@ -109,7 +110,7 @@ function validate() {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) e.email = 'Enter a valid email address.'
   if (!f.address.trim()) e.address = 'Address is required.'
   if (!f.role) e.role = 'Select a position.'
-  if (usesPin.value && !/^\d{4,6}$/.test(f.pin)) e.pin = 'PIN must be 4 to 6 digits.'
+  if (usesPin.value && !/^\d{4}$/.test(f.pin)) e.pin = 'PIN must be exactly 4 digits.'
 
   const se: Record<number, string> = {}
   for (const day of f.schedule) {
@@ -341,7 +342,7 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
                 <span v-if="errors.role" class="font-sans text-xs text-red-600">{{ errors.role }}</span>
               </label>
 
-              <!-- PIN (Manager / Cashier only) -->
+              <!-- PIN (Cashier only) -->
               <label v-if="usesPin" class="flex flex-col gap-1.5 sm:w-[173px] sm:shrink-0">
                 <span :class="labelClass">PIN*</span>
                 <div :class="fieldClass('pin')">
@@ -351,8 +352,7 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
                     type="text"
                     inputmode="numeric"
                     autocomplete="off"
-                    placeholder="4–6 digits"
-                    maxlength="6"
+                    placeholder="4 digits"
                     :class="inputClass"
                     @input="onPinInput"
                   />

@@ -16,6 +16,23 @@ export interface Paginated<T> {
     total: number
 }
 
+export interface Ingredient {
+    uuid: string
+    name: string
+    unit: string
+    is_measured: boolean
+    is_active: boolean
+    used_in: number // number of menu items using it
+}
+
+export interface IngredientPayload {
+    name?: string
+    unit?: string
+    is_active?: boolean
+}
+
+type IngredientResponse = { success: boolean; message: string; ingredient?: Ingredient; errors?: Record<string, string[]> }
+
 export class MenuService extends BaseService {
     // --- Menu Categories ---
 
@@ -33,6 +50,25 @@ export class MenuService extends BaseService {
 
     deleteMenuCategory(uuid: string) {
         return this.delete<{ success: boolean; message: string }>(`/owner/menu-categories/${uuid}`)
+    }
+
+    // --- Ingredients (one list per cafe, used by recipes) ---
+
+    // Active only (recipe picker) unless includeRetired (Ingredients page).
+    getIngredients(options: { search?: string; includeRetired?: boolean } = {}) {
+        const params: Record<string, any> = {}
+        if (options.search) params.search = options.search
+        if (options.includeRetired) params.include_retired = 1
+        return this.get<{ success: boolean; ingredients: Ingredient[] }>('/owner/ingredients', params)
+    }
+
+    createIngredient(payload: IngredientPayload) {
+        return this.post<IngredientResponse>('/owner/ingredients', payload)
+    }
+
+    // Rename, change unit (only while unused), or retire/restore via is_active.
+    updateIngredient(uuid: string, payload: IngredientPayload) {
+        return this.patch<IngredientResponse>(`/owner/ingredients/${uuid}`, payload)
     }
 
     // --- Menu Items ---

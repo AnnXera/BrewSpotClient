@@ -3,6 +3,16 @@ import { ref, watch, computed, nextTick } from 'vue'
 import { useMenuService } from '~/composables/useMenuService'
 import { INGREDIENT_UNITS } from '~/utils/constants'
 import { parseQuantity, formatQuantity, sanitizeQuantity } from '~/utils/fraction'
+import type { Ingredient } from '~/services/MenuService'
+import IngredientPicker from '~/components/menu/IngredientPicker.vue'
+
+interface RecipeRow {
+  // Set when the row uses one of the cafe's existing ingredients; its unit is then fixed.
+  ingredient_uuid: string | null
+  ingredient_name: string
+  quantity_display: string
+  unit: string
+}
 
 const props = defineProps<{
   show: boolean
@@ -23,8 +33,58 @@ const form = ref({
   category_uuid: '',
   base_price: '',
   description: '',
-  recipes: [] as { ingredient_name: string; quantity_display: string; unit: string }[]
+  recipes: [] as RecipeRow[]
 })
+
+function emptyRow(): RecipeRow {
+  return { ingredient_uuid: null, ingredient_name: '', quantity_display: '', unit: INGREDIENT_UNITS[0] }
+}
+
+// The cafe's ingredient list, loaded each time the modal opens.
+const ingredients = ref<Ingredient[]>([])
+
+async function loadIngredients() {
+  try {
+    const res = await menuService.getIngredients()
+    ingredients.value = res.ingredients ?? []
+  } catch (e) {
+    // The picker still works without suggestions; new names are matched server-side.
+    console.error('Failed to load ingredients', e)
+    ingredients.value = []
+  }
+}
+
+// Same rule as the server's Ingredient::normalize().
+const normalizeName = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase()
+
+function usedNamesExcept(index: number) {
+  return form.value.recipes
+    .filter((r, i) => i !== index && r.ingredient_name.trim())
+    .map(r => normalizeName(r.ingredient_name))
+}
+
+// Server-side recipe errors, keyed by row index.
+const serverRowErrors = ref<Record<number, string>>({})
+
+const rowErrors = computed(() => {
+  const result: Record<number, string> = { ...serverRowErrors.value }
+  const seen = new Set<string>()
+
+  form.value.recipes.forEach((r, i) => {
+    const key = normalizeName(r.ingredient_name)
+    if (!key) return
+    if (seen.has(key)) result[i] = `${r.ingredient_name.trim()} is already in this recipe.`
+    seen.add(key)
+  })
+
+  return result
+})
+
+function onPick(recipe: RecipeRow, index: number, ingredient: Ingredient | null) {
+  recipe.ingredient_uuid = ingredient?.uuid ?? null
+  if (ingredient) recipe.unit = ingredient.unit
+  delete serverRowErrors.value[index]
+}
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const picturePreview = ref<string | null>(null)
@@ -45,6 +105,8 @@ const errors = ref({
 watch(() => props.show, (newVal) => {
   if (newVal) {
     errors.value = { menu_name: '', base_price: '' }
+    serverRowErrors.value = {}
+    loadIngredients()
     if (props.item) {
       form.value = {
         menu_name: props.item.menu_name || '',
@@ -52,12 +114,13 @@ watch(() => props.show, (newVal) => {
         base_price: props.item.base_price || '',
         description: props.item.description || '',
         recipes: props.item.recipes?.length 
-          ? props.item.recipes.map((r: any) => ({
+          ? props.item.recipes.map((r: any): RecipeRow => ({
+              ingredient_uuid: r.ingredient_uuid ?? null,
               ingredient_name: r.ingredient_name,
               quantity_display: formatQuantity(r.quantity),
               unit: r.unit
-            })) 
-          : [{ ingredient_name: '', quantity_display: '', unit: INGREDIENT_UNITS[0] }]
+            }))
+          : [emptyRow()]
       }
       picturePreview.value = props.item.picture || null
     } else {
@@ -66,7 +129,7 @@ watch(() => props.show, (newVal) => {
         category_uuid: props.defaultCategoryUuid || 'uncategorized',
         base_price: '',
         description: '',
-        recipes: [{ ingredient_name: '', quantity_display: '', unit: INGREDIENT_UNITS[0] }]
+        recipes: [emptyRow()]
       }
       picturePreview.value = null
     }
@@ -102,14 +165,14 @@ const onFileChange = (e: Event) => {
   }
 }
 
-const ingredientInputs = ref<HTMLInputElement[]>([])
+const ingredientInputs = ref<{ focus: () => void }[]>([])
 
 const setIngredientInputRef = (el: any, index: number) => {
-  if (el) ingredientInputs.value[index] = el as HTMLInputElement
+  if (el) ingredientInputs.value[index] = el
 }
 
 const addIngredient = () => {
-  form.value.recipes.push({ ingredient_name: '', quantity_display: '', unit: INGREDIENT_UNITS[0] })
+  form.value.recipes.push(emptyRow())
 }
 
 const handleEnterOnIngredient = async (index: number) => {
@@ -130,6 +193,7 @@ const onQuantityInput = (recipe: { quantity_display: string }, event: Event) => 
 
 const removeIngredient = (index: number) => {
   form.value.recipes.splice(index, 1)
+  serverRowErrors.value = {} // row indexes shifted
   if (form.value.recipes.length === 0) {
     addIngredient() // always keep one empty row
   }
@@ -147,6 +211,8 @@ const saveItem = async () => {
     errors.value.base_price = 'Price is required.'
     hasError = true
   }
+
+  if (Object.keys(rowErrors.value).length) hasError = true
 
   if (hasError) return
 
@@ -176,8 +242,9 @@ const saveItem = async () => {
       formData.append('picture', pictureFile.value)
     }
 
+    // An existing ingredient goes by uuid; a new one by name (the server adds it to the list).
     const recipesToSave = form.value.recipes.map(r => ({
-      ingredient_name: r.ingredient_name,
+      ...(r.ingredient_uuid ? { ingredient_uuid: r.ingredient_uuid } : { ingredient_name: r.ingredient_name }),
       quantity: parseQuantity(r.quantity_display),
       unit: r.unit
     }))
@@ -192,7 +259,20 @@ const saveItem = async () => {
 
     emit('saved')
     emit('close')
-  } catch (error) {
+  } catch (error: any) {
+    const serverErrors = error?.data?.errors as Record<string, string[]> | undefined
+    const rowMessages: Record<number, string> = {}
+
+    for (const [field, messages] of Object.entries(serverErrors ?? {})) {
+      const match = field.match(/^recipes\.(\d+)\./)
+      if (match) rowMessages[Number(match[1])] ??= messages[0]
+    }
+
+    if (Object.keys(rowMessages).length) {
+      serverRowErrors.value = rowMessages
+      return
+    }
+
     console.error('Error saving item:', error)
     alert('Failed to save item. Please try again.')
   } finally {
@@ -369,14 +449,16 @@ const saveItem = async () => {
               <!-- Ingredient Name -->
               <div class="w-full">
                 <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Ingredient</label>
-                <input 
+                <IngredientPicker
                   :ref="(el) => setIngredientInputRef(el, index)"
-                  v-model="recipe.ingredient_name"
-                  type="text" 
-                  placeholder="e.g. Coffee"
-                  @keydown.enter.prevent="handleEnterOnIngredient(index)"
-                  class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent"
+                  v-model:name="recipe.ingredient_name"
+                  :ingredients="ingredients"
+                  :used-names="usedNamesExcept(index)"
+                  :invalid="!!rowErrors[index]"
+                  @pick="onPick(recipe, index, $event)"
+                  @enter="handleEnterOnIngredient(index)"
                 />
+                <p v-if="rowErrors[index]" class="text-red-500 text-xs font-bold mt-1 ml-1">{{ rowErrors[index] }}</p>
               </div>
 
               <!-- Amount -->
@@ -397,10 +479,13 @@ const saveItem = async () => {
               <div class="w-full relative">
                 <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Unit</label>
                 <div class="relative">
+                  <!-- An existing ingredient is always measured in its own unit. -->
                   <select 
                     v-model="recipe.unit"
+                    :disabled="!!recipe.ingredient_uuid"
+                    :title="recipe.ingredient_uuid ? `${recipe.ingredient_name} is measured in ${recipe.unit}` : undefined"
                     @keydown.enter.prevent="handleEnterOnIngredient(index)"
-                    class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl pl-4 pr-10 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent"
+                    class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl pl-4 pr-10 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <option v-for="unit in INGREDIENT_UNITS" :key="unit" :value="unit">
                       {{ unit }}

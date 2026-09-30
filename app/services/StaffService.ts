@@ -65,7 +65,7 @@ export interface CreateStaffPayload {
     email: string
     address: string
     role: StaffRole
-    pin?: string // required for Manager/Cashier, ignored for Staff
+    pin?: string // required for Cashier; managers set their own during password setup
     schedule?: StaffScheduleInput[]
 }
 
