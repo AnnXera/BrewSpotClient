@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useOperatingHours } from '~/composables/useOperatingHours'
 
 const props = defineProps<{
   show: boolean
   saving?: boolean
+  backendErrors?: Record<string, string[]>
 }>()
 
 const emit = defineEmits<{
@@ -14,7 +15,7 @@ const emit = defineEmits<{
 
 const { formattedSummary } = useOperatingHours()
 
-const activeTab = ref<'details' | 'manager' | 'amenities'>('details')
+const currentStep = ref(1)
 
 const form = ref({
   branch_name: '',
@@ -26,12 +27,19 @@ const form = ref({
   manager_phone: '',
   seating_capacity: 40,
   has_drivethru: false,
-  status: 'active',
   use_general_hours: true,
   custom_open_time: '07:00',
   custom_close_time: '22:00',
-  amenities: ['High-speed WiFi', 'Airconditioned', 'Power Outlets']
+  amenities: ['High-speed WiFi', 'Airconditioned', 'Power Outlets'],
+  cafe_email: '',
+  cafe_phonenumber: '',
+  tin_number: '',
+  vat: 'vat-registered',
+  bir_registered_at: '',
+  bir_expired_at: ''
 })
+const birFile = ref<File | null>(null)
+const cafePicture = ref<File | null>(null)
 
 const errors = ref<Record<string, string>>({})
 
@@ -45,6 +53,14 @@ const availableAmenities = [
   'Drive-Thru Window'
 ]
 
+const hasBackendErrors = computed(() => Object.keys(props.backendErrors || {}).length > 0)
+
+watch(() => props.backendErrors, (newVal) => {
+  if (newVal && Object.keys(newVal).length > 0) {
+    currentStep.value = 1
+  }
+}, { deep: true })
+
 function toggleAmenity(amenity: string) {
   const index = form.value.amenities.indexOf(amenity)
   if (index > -1) {
@@ -54,17 +70,51 @@ function toggleAmenity(amenity: string) {
   }
 }
 
-function validate() {
+function validateStep(step: number): boolean {
   errors.value = {}
-  if (!form.value.branch_name.trim()) errors.value.branch_name = 'Branch name is required'
-  if (!form.value.address.trim()) errors.value.address = 'Branch address is required'
-  if (form.value.seating_capacity < 1) errors.value.seating_capacity = 'Must be at least 1 seat'
+  if (step === 1) {
+    if (!form.value.branch_name.trim()) errors.value.branch_name = 'Branch name is required'
+    if (!form.value.address.trim()) errors.value.address = 'Branch address is required'
+  } else if (step === 3) {
+    if (form.value.seating_capacity < 1) errors.value.seating_capacity = 'Must be at least 1 seat'
+  } else if (step === 4) {
+    if (!form.value.cafe_email.trim()) errors.value.cafe_email = 'Cafe email is required'
+    if (!form.value.cafe_phonenumber.trim()) errors.value.cafe_phonenumber = 'Phone number is required'
+    if (!form.value.tin_number.trim()) errors.value.tin_number = 'TIN number is required'
+    if (!form.value.bir_registered_at.trim()) errors.value.bir_registered_at = 'BIR Registration date is required'
+    if (!birFile.value) errors.value.bir_file = 'BIR File is required'
+  }
   return Object.keys(errors.value).length === 0
 }
 
+function nextStep() {
+  if (validateStep(currentStep.value)) {
+    currentStep.value++
+  }
+}
+
+function prevStep() {
+  currentStep.value--
+}
+
+function handleFileChange(e: Event, type: 'bir' | 'picture') {
+  const target = e.target as HTMLInputElement
+  if (target.files && target.files[0]) {
+    if (type === 'bir') birFile.value = target.files[0]
+    if (type === 'picture') cafePicture.value = target.files[0]
+  }
+}
+
 function handleSubmit() {
-  if (!validate()) return
-  emit('save', { ...form.value })
+  if (!validateStep(4)) return
+  const formData = new FormData()
+  Object.keys(form.value).forEach(key => {
+    formData.append(key, (form.value as any)[key])
+  })
+  if (birFile.value) formData.append('bir_file', birFile.value)
+  if (cafePicture.value) formData.append('cafe_picture', cafePicture.value)
+
+  emit('save', formData as any)
 }
 </script>
 
@@ -77,8 +127,9 @@ function handleSubmit() {
     leave-from-class="opacity-100"
     leave-to-class="opacity-0"
   >
-    <div v-if="show" class="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div class="bg-white border border-[#EEDFC4] rounded-[24px] max-w-2xl w-full p-4 sm:p-6 shadow-2xl flex flex-col max-h-[90vh] my-auto">
+    <div v-if="show" class="fixed inset-0 z-[999] flex items-center justify-center p-4 overflow-y-auto">
+      <div class="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" @click="emit('close')"></div>
+      <div class="relative bg-white border border-[#EEDFC4] rounded-3xl w-full max-w-[806px] p-4 sm:p-6 shadow-2xl flex flex-col max-h-[90vh] my-auto">
         <!-- Modal Header -->
         <div class="flex items-center justify-between border-b border-[#F3E7D2] pb-4">
           <div class="flex items-center gap-3">
@@ -95,38 +146,24 @@ function handleSubmit() {
           </button>
         </div>
 
-        <!-- Navigation Tabs -->
-        <div class="flex border-b border-[#F3E7D2] gap-4">
-          <button
-            type="button"
-            @click="activeTab = 'details'"
-            class="pb-2 text-xs font-extrabold transition-colors border-b-2"
-            :class="activeTab === 'details' ? 'border-[#7D5A50] text-[#7D5A50]' : 'border-transparent text-[#9E7060] hover:text-[#3D2B24]'"
-          >
-            1. Branch Info
-          </button>
-          <button
-            type="button"
-            @click="activeTab = 'manager'"
-            class="pb-2 text-xs font-extrabold transition-colors border-b-2"
-            :class="activeTab === 'manager' ? 'border-[#7D5A50] text-[#7D5A50]' : 'border-transparent text-[#9E7060] hover:text-[#3D2B24]'"
-          >
-            2. Manager & Operating Hours
-          </button>
-          <button
-            type="button"
-            @click="activeTab = 'amenities'"
-            class="pb-2 text-xs font-extrabold transition-colors border-b-2"
-            :class="activeTab === 'amenities' ? 'border-[#7D5A50] text-[#7D5A50]' : 'border-transparent text-[#9E7060] hover:text-[#3D2B24]'"
-          >
-            3. Capacity & Amenities
-          </button>
+        <!-- Backend Errors Alert -->
+        <div v-if="hasBackendErrors" class="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs shrink-0">
+          <p class="font-bold mb-2 text-sm flex items-center gap-2">
+            <Icon name="heroicons:exclamation-triangle" class="w-5 h-5 text-red-500" />
+            Please correct the following errors:
+          </p>
+          <ul class="list-disc pl-8 space-y-1">
+            <template v-for="(msgs, field) in backendErrors" :key="field">
+              <li v-for="msg in msgs" :key="msg">{{ msg }}</li>
+            </template>
+          </ul>
         </div>
 
         <!-- Form Fields -->
-        <form @submit.prevent="handleSubmit" class="flex-1 overflow-y-auto py-3 space-y-4 pr-1">
-          <!-- TAB 1: Branch Details -->
-          <div v-show="activeTab === 'details'" class="space-y-4">
+        <form @submit.prevent="handleSubmit" class="flex-1 overflow-y-auto py-3 pr-1">
+          <!-- SECTION 1: Branch Details -->
+          <div v-show="currentStep === 1" class="space-y-4">
+            <h3 class="text-sm font-extrabold text-[#7D5A50] uppercase tracking-wider">1. Branch Info</h3>
             <div>
               <label class="block text-xs font-bold text-[#3D2B24] mb-1">Branch Name *</label>
               <input
@@ -138,30 +175,16 @@ function handleSubmit() {
               <p v-if="errors.branch_name" class="text-xs text-red-600 mt-1 font-medium">{{ errors.branch_name }}</p>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-bold text-[#3D2B24] mb-1">Branch Type *</label>
-                <select
-                  v-model="form.branch_type"
-                  class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]"
-                >
-                  <option value="MAIN">MAIN (Headquarters)</option>
-                  <option value="SIDE">SIDE (Secondary Branch)</option>
-                  <option value="KIOSK">KIOSK (Express Counter)</option>
-                </select>
-              </div>
-
-              <div>
-                <label class="block text-xs font-bold text-[#3D2B24] mb-1">Initial Status</label>
-                <select
-                  v-model="form.status"
-                  class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]"
-                >
-                  <option value="active">Active</option>
-                  <option value="pending_approval">Pending Approval</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
+            <div>
+              <label class="block text-xs font-bold text-[#3D2B24] mb-1">Branch Type *</label>
+              <select
+                v-model="form.branch_type"
+                class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]"
+              >
+                <option value="MAIN">MAIN (Headquarters)</option>
+                <option value="SIDE">SIDE (Secondary Branch)</option>
+                <option value="KIOSK">KIOSK (Express Counter)</option>
+              </select>
             </div>
 
             <div>
@@ -186,8 +209,9 @@ function handleSubmit() {
             </div>
           </div>
 
-          <!-- TAB 2: Manager & Operating Hours -->
-          <div v-show="activeTab === 'manager'" class="space-y-4">
+          <!-- SECTION 2: Manager & Operating Hours -->
+          <div v-show="currentStep === 2" class="space-y-4">
+            <h3 class="text-sm font-extrabold text-[#7D5A50] uppercase tracking-wider">2. Manager & Operating Hours</h3>
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">Branch Manager Name</label>
@@ -266,8 +290,9 @@ function handleSubmit() {
             </div>
           </div>
 
-          <!-- TAB 3: Capacity & Amenities -->
-          <div v-show="activeTab === 'amenities'" class="space-y-4">
+          <!-- SECTION 3: Capacity & Amenities -->
+          <div v-show="currentStep === 3" class="space-y-4">
+            <h3 class="text-sm font-extrabold text-[#7D5A50] uppercase tracking-wider">3. Capacity & Amenities</h3>
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">Seating Capacity (Guests)</label>
@@ -312,21 +337,68 @@ function handleSubmit() {
             </div>
           </div>
 
+          <!-- SECTION 4: Legal Docs -->
+          <div v-show="currentStep === 4" class="space-y-4">
+            <h3 class="text-sm font-extrabold text-[#7D5A50] uppercase tracking-wider">4. Legal Docs</h3>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-[#3D2B24] mb-1">Cafe Email *</label>
+                <input type="email" v-model="form.cafe_email" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]" />
+                <p v-if="errors.cafe_email" class="text-xs text-red-600 mt-1 font-medium">{{ errors.cafe_email }}</p>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#3D2B24] mb-1">Cafe Phone Number *</label>
+                <input type="text" v-model="form.cafe_phonenumber" placeholder="+639..." class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]" />
+                <p v-if="errors.cafe_phonenumber" class="text-xs text-red-600 mt-1 font-medium">{{ errors.cafe_phonenumber }}</p>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#3D2B24] mb-1">TIN Number *</label>
+                <input type="text" v-model="form.tin_number" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]" />
+                <p v-if="errors.tin_number" class="text-xs text-red-600 mt-1 font-medium">{{ errors.tin_number }}</p>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#3D2B24] mb-1">VAT Status *</label>
+                <select v-model="form.vat" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]">
+                  <option value="vat-registered">VAT Registered</option>
+                  <option value="non-vat">Non-VAT</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#3D2B24] mb-1">BIR Registered Date *</label>
+                <input type="date" v-model="form.bir_registered_at" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]" />
+                <p v-if="errors.bir_registered_at" class="text-xs text-red-600 mt-1 font-medium">{{ errors.bir_registered_at }}</p>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#3D2B24] mb-1">BIR Expiry Date</label>
+                <input type="date" v-model="form.bir_expired_at" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#3D2B24] mb-1">BIR File *</label>
+                <input type="file" @change="e => handleFileChange(e, 'bir')" class="w-full text-xs" accept=".jpg,.jpeg,.png,.pdf" />
+                <p v-if="errors.bir_file" class="text-xs text-red-600 mt-1 font-medium">{{ errors.bir_file }}</p>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#3D2B24] mb-1">Cafe Picture</label>
+                <input type="file" @change="e => handleFileChange(e, 'picture')" class="w-full text-xs" accept=".jpg,.jpeg,.png,.webp" />
+              </div>
+            </div>
+          </div>
+
           <!-- Actions -->
-          <div class="flex items-center justify-between pt-4 border-t border-[#F3E7D2]">
+          <div class="flex items-center justify-between pt-4 mt-6 border-t border-[#F3E7D2]">
             <div class="flex items-center gap-2">
               <button
-                v-if="activeTab !== 'details'"
+                v-if="currentStep > 1"
                 type="button"
-                @click="activeTab = activeTab === 'amenities' ? 'manager' : 'details'"
+                @click="prevStep"
                 class="px-4 py-2 rounded-xl border border-[#EEDFC4] text-[#7D5A50] font-bold text-xs hover:bg-[#FDF3E7] transition"
               >
                 Back
               </button>
               <button
-                v-if="activeTab !== 'amenities'"
+                v-if="currentStep < 4"
                 type="button"
-                @click="activeTab = activeTab === 'details' ? 'manager' : 'amenities'"
+                @click="nextStep"
                 class="px-4 py-2 rounded-xl bg-[#FDF8F3] border border-[#EEDFC4] text-[#7D5A50] font-bold text-xs hover:bg-[#FCDEC0]/40 transition"
               >
                 Next Step
@@ -342,7 +414,9 @@ function handleSubmit() {
                 Cancel
               </button>
               <button
-                type="submit"
+                v-if="currentStep === 4"
+                type="button"
+                @click="handleSubmit"
                 :disabled="saving"
                 class="px-6 py-2.5 rounded-xl bg-[#7D5A50] text-white font-bold text-sm hover:bg-[#65463D] transition shadow-md flex items-center gap-2 disabled:opacity-50"
               >

@@ -54,7 +54,7 @@ export class OwnerProfileService extends BaseService {
         return this.get<{ success: boolean; cafe_name: string | null; branches: Paginated<BranchSummary> }>('/owner/branches', params)
     }
 
-    createBranch(payload: { branch_name: string; branch_type: string; address: string; phone_number?: string; opening_hours?: any }) {
+    createBranch(payload: FormData | Record<string, any>) {
         return this.post<{ success: boolean; message: string; branch?: any }>('/owner/branches', payload)
     }
 
@@ -62,7 +62,11 @@ export class OwnerProfileService extends BaseService {
         return this.patch<{ success: boolean; message: string; branch?: any }>(`/owner/branches/${uuid}`, payload)
     }
 
+    getOperatingHours() {
+        return this.get<{ success: boolean; data?: any }>('/owner/opening-hours')
+    }
+
     updateOperatingHours(payload: { opening_hours: any; apply_to_all?: boolean }) {
-        return this.post<{ success: boolean; message: string }>('/owner/operating-hours', payload)
+        return this.put<{ success: boolean; message: string }>('/owner/opening-hours', payload)
     }
 }

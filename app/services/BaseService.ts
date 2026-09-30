@@ -16,6 +16,10 @@ export abstract class BaseService {
         return this.client<T>(url, { method: 'PATCH', body })
     }
 
+    protected put<T = any>(url: string, body?: Record<string, any> | FormData) {
+        return this.client<T>(url, { method: 'PUT', body })
+    }
+
     protected delete<T = any>(url: string) {
         return this.client<T>(url, { method: 'DELETE' })
     }

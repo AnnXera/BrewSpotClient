@@ -21,7 +21,7 @@ const { hasFeature, fetchCurrentSubscription } = usePlanFeature()
 const branches = ref<BranchSummary[]>([])
 const loading = ref(false)
 const errorMessage = ref('')
-const { formattedSummary, isOpenNow } = useOperatingHours()
+const { formattedSummary, isOpenNow, setOperatingHours } = useOperatingHours()
 
 const currentPage = ref(1)
 const lastPage = ref(1)
@@ -39,6 +39,7 @@ const isOperatingHoursOpen = ref(false)
 const savingBranch = ref(false)
 const savingHours = ref(false)
 const toastMessage = ref('')
+const backendErrors = ref<Record<string, string[]>>({})
 
 function showToast(msg: string) {
   toastMessage.value = msg
@@ -47,45 +48,18 @@ function showToast(msg: string) {
   }, 4000)
 }
 
-// Fallback Realistic Branch Data (Matching user mockup if backend database is empty)
-const fallbackBranches: BranchSummary[] = [
-  {
-    uuid: 'branch-main-001',
-    branch_name: 'La Vida Cafe - Main HQ',
-    branch_type: 'MAIN',
-    address: '214 Caffeine Blvd, Roast District, Brew City',
-    cafe_picture: null,
-    status: 'active',
-    seating_capacity: 45,
-    manager_name: 'Juan Dela Cruz',
-    manager_phone: '+63 917 123 4567'
-  },
-  {
-    uuid: 'branch-side-002',
-    branch_name: 'La Vida Cafe - Brew City',
-    branch_type: 'SIDE',
-    address: '78 Latte Lane, Espresso Heights, Metro City',
-    cafe_picture: null,
-    status: 'active',
-    seating_capacity: 30,
-    manager_name: 'Maria Santos',
-    manager_phone: '+63 918 987 6543'
-  }
-]
+// No mock data - relies on actual API responses
 
 // Computed Summary Metrics
-const totalBranchesCount = computed(() => branches.value.length || fallbackBranches.length)
+const totalBranchesCount = computed(() => branches.value.length)
 const activeBranchesCount = computed(() => {
-  const source = branches.value.length ? branches.value : fallbackBranches
-  return source.filter(b => (b.status || '').toLowerCase() === 'active').length
+  return branches.value.filter(b => (b.status || '').toLowerCase() === 'active').length
 })
 const inactiveBranchesCount = computed(() => {
-  const source = branches.value.length ? branches.value : fallbackBranches
-  return source.filter(b => (b.status || '').toLowerCase() === 'inactive' || (b.status || '').toLowerCase() === 'suspended').length
+  return branches.value.filter(b => (b.status || '').toLowerCase() === 'inactive' || (b.status || '').toLowerCase() === 'suspended').length
 })
 const pendingBranchesCount = computed(() => {
-  const source = branches.value.length ? branches.value : fallbackBranches
-  return source.filter(b => (b.status || '').toLowerCase().includes('pending')).length
+  return branches.value.filter(b => (b.status || '').toLowerCase().includes('pending')).length
 })
 
 const canAddBranch = computed(() => true)
@@ -103,61 +77,54 @@ async function fetchBranches() {
       currentPage.value = res.branches.current_page
       lastPage.value = res.branches.last_page
     } else {
-      branches.value = fallbackBranches
+      branches.value = []
+    }
+
+    try {
+      const hoursRes = await ownerService.getOperatingHours()
+      if (hoursRes.success && hoursRes.data) {
+        setOperatingHours(hoursRes.data)
+      }
+    } catch (e) {
+      console.warn('Could not fetch operating hours from backend:', e)
     }
   } catch (e) {
-    // Graceful fallback to rich mock data
-    branches.value = fallbackBranches
+    branches.value = []
+    errorMessage.value = 'Failed to load branches.'
   } finally {
     loading.value = false
   }
 }
 
 // Handle Add Branch Creation
-async function handleCreateBranch(data: any) {
+async function handleCreateBranch(data: FormData | any) {
   savingBranch.value = true
+  backendErrors.value = {}
   try {
     const res = await ownerService.createBranch(data)
     if (res.success) {
-      showToast(`Branch "${data.branch_name}" added successfully!`)
+      const bName = data instanceof FormData ? data.get('branch_name') : data.branch_name;
+      showToast(`Branch "${bName}" added successfully!`)
+      isAddBranchOpen.value = false
       fetchBranches()
     } else {
-      // Local addition for instant UX responsiveness
-      const newBranch: BranchSummary = {
-        uuid: `branch-new-${Date.now()}`,
-        branch_name: data.branch_name,
-        branch_type: data.branch_type || 'SIDE',
-        address: data.address,
-        cafe_picture: null,
-        status: data.status || 'active',
-        seating_capacity: data.seating_capacity || 40,
-        manager_name: data.manager_name || 'Branch Manager',
-        manager_phone: data.manager_phone || data.phone_number || null,
-        manager_email: data.manager_email || null,
-        amenities: data.amenities || []
-      }
-      branches.value.unshift(newBranch)
-      showToast(`Branch "${data.branch_name}" created successfully!`)
+      errorMessage.value = res.message || 'Failed to add branch.'
+      isAddBranchOpen.value = false
     }
-  } catch (e) {
-    const newBranch: BranchSummary = {
-      uuid: `branch-new-${Date.now()}`,
-      branch_name: data.branch_name,
-      branch_type: data.branch_type || 'SIDE',
-      address: data.address,
-      cafe_picture: null,
-      status: data.status || 'active',
-      seating_capacity: data.seating_capacity || 40,
-      manager_name: data.manager_name || 'Branch Manager',
-      manager_phone: data.manager_phone || data.phone_number || null,
-      manager_email: data.manager_email || null,
-      amenities: data.amenities || []
+  } catch (e: any) {
+    const errorData = e.response?._data || e.response?.data || e.data;
+    if (errorData && errorData.errors) {
+      backendErrors.value = errorData.errors
+      // Do not close modal on validation errors
+    } else if (errorData && errorData.message) {
+      errorMessage.value = errorData.message
+      isAddBranchOpen.value = false
+    } else {
+      errorMessage.value = 'An error occurred while creating the branch.'
+      isAddBranchOpen.value = false
     }
-    branches.value.unshift(newBranch)
-    showToast(`Branch "${data.branch_name}" created!`)
   } finally {
     savingBranch.value = false
-    isAddBranchOpen.value = false
   }
 }
 
@@ -166,7 +133,7 @@ async function handleSaveOperatingHours(payload: any) {
   savingHours.value = true
   try {
     const res = await ownerService.updateOperatingHours(payload)
-    showToast(payload.applyToAll ? 'General operating hours updated across all branches!' : 'Operating hours updated!')
+    showToast(payload.apply_to_all ? 'General operating hours updated across all branches!' : 'Operating hours updated!')
   } catch (e) {
     showToast('General operating hours configured for all branches!')
   } finally {
@@ -251,11 +218,9 @@ function viewDetails(uuid: string) {
         </div>
 
         <div class="flex flex-wrap items-center gap-3 shrink-0">
-          <!-- Active Operating Hours Display Badge (Outside Button) -->
+          <!-- Active Operating Hours Display Badge (Static Design) -->
           <div 
-            @click="isOperatingHoursOpen = true"
-            title="Click to modify general operating hours"
-            class="cursor-pointer group flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white border border-[#EEDFC4] shadow-xs hover:border-[#7D5A50] hover:shadow-sm transition-all"
+            class="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white border border-[#EEDFC4] shadow-xs"
           >
             <div class="w-8 h-8 rounded-lg bg-[#7D5A50]/10 flex items-center justify-center text-[#7D5A50]">
               <Icon name="heroicons:clock" class="w-5 h-5" />
@@ -271,7 +236,7 @@ function viewDetails(uuid: string) {
                   {{ isOpenNow ? 'Open Now' : 'Closed' }}
                 </span>
               </div>
-              <p class="text-xs font-extrabold text-[#3D2B24] mt-0.5 group-hover:text-[#7D5A50] transition-colors">
+              <p class="text-xs font-extrabold text-[#3D2B24] mt-0.5">
                 {{ formattedSummary }}
               </p>
             </div>
@@ -379,6 +344,7 @@ function viewDetails(uuid: string) {
       <CafeManagementAddBranchModal
         :show="isAddBranchOpen"
         :saving="savingBranch"
+        :backend-errors="backendErrors"
         @close="isAddBranchOpen = false"
         @save="handleCreateBranch"
       />

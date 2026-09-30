@@ -39,6 +39,9 @@ onUnmounted(() => {
 // Navigation state for mobile menu
 const isMobileMenuOpen = ref(false)
 
+// Chat Widget state
+const isChatOpen = ref(false)
+
 // Active preview tab for interactive demo (matches Admin Dashboard navigation)
 const activeTab = ref<'approvals' | 'owners' | 'subscriptions' | 'sales'>('sales')
 
@@ -211,6 +214,13 @@ const faqs = [
           </template>
           <template v-else>
             <button
+              @click="goLogin"
+              class="h-10 px-4 rounded-xl text-[#FFF8EA] hover:bg-[#65463D]/70 font-semibold text-sm transition flex items-center justify-center gap-2 border border-[#FFF8EA]/30 hover:border-[#FCDEC0] hover:text-[#FCDEC0]"
+            >
+              <Icon name="heroicons:arrow-right-start-on-rectangle" class="w-4 h-4 text-[#FCDEC0]" />
+              <span>Sign In</span>
+            </button>
+            <button
               @click="goRegister"
               class="h-10 px-5 rounded-xl bg-[#FFF8EA] text-[#7D5A50] font-bold text-sm hover:bg-[#FCDEC0] transition flex items-center justify-center gap-2 shadow-md"
             >
@@ -260,6 +270,13 @@ const faqs = [
             </template>
             <template v-else>
               <button
+                @click="goLogin(); isMobileMenuOpen = false"
+                class="w-full h-11 px-5 rounded-xl border border-[#FFF8EA]/40 text-[#FFF8EA] font-semibold text-sm hover:bg-[#7D5A50] transition flex items-center justify-center gap-2"
+              >
+                <Icon name="heroicons:arrow-right-start-on-rectangle" class="w-4 h-4 text-[#FCDEC0]" />
+                <span>Sign In</span>
+              </button>
+              <button
                 @click="goRegister(); isMobileMenuOpen = false"
                 class="w-full h-11 px-5 rounded-xl bg-[#FFF8EA] text-[#7D5A50] font-bold text-sm hover:bg-[#FCDEC0] transition flex items-center justify-center gap-2"
               >
@@ -304,20 +321,13 @@ const faqs = [
           </p>
 
           <!-- Call to Action Buttons (Sleek & Balanced Dimensions) -->
-          <div class="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
+          <div class="pt-4 flex items-center justify-center w-full sm:w-auto">
             <button
               @click="goRegister"
-              class="w-full sm:w-auto h-11 sm:h-12 px-6 sm:px-7 rounded-xl bg-[#7D5A50] text-[#FFF8EA] font-bold text-sm sm:text-base hover:bg-[#65463D] transition flex items-center justify-center gap-2.5 shadow-xl transform hover:-translate-y-0.5 border border-[#B4846C]"
+              class="w-full sm:w-auto h-11 sm:h-12 px-7 sm:px-8 rounded-xl bg-[#7D5A50] text-[#FFF8EA] font-bold text-sm sm:text-base hover:bg-[#65463D] transition flex items-center justify-center gap-2.5 shadow-xl transform hover:-translate-y-0.5 border border-[#B4846C]"
             >
               <span>Create Account</span>
               <Icon name="heroicons:arrow-right" class="w-4 h-4 sm:w-5 sm:h-5 text-[#FCDEC0]" />
-            </button>
-            <button
-              @click="goLogin"
-              class="w-full sm:w-auto h-11 sm:h-12 px-6 sm:px-7 rounded-xl bg-[#000000]/40 text-[#FFF8EA] border border-[#FCDEC0]/50 hover:border-[#FCDEC0] font-semibold text-sm sm:text-base hover:bg-[#000000]/60 backdrop-blur-md transition flex items-center justify-center gap-2.5 shadow-lg"
-            >
-              <Icon name="heroicons:arrow-right-start-on-rectangle" class="w-4 h-4 sm:w-5 sm:h-5 text-[#FCDEC0]" />
-              <span>Sign In</span>
             </button>
           </div>
 
@@ -824,15 +834,15 @@ const faqs = [
       </div>
     </section>
 
-    <!-- SECTION 7: CALL TO ACTION & FOOTER -->
-    <section id="cta" class="min-h-screen py-20 flex flex-col justify-between bg-[#FFF8EA] text-[#2D201B] relative overflow-hidden">
+    <!-- SECTION 8: CALL TO ACTION & FOOTER -->
+    <section id="cta" class="pt-24 flex flex-col justify-between bg-[#FFF8EA] text-[#2D201B] relative overflow-hidden">
       <!-- Main CTA Box -->
-      <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 w-full my-auto">
-        <div class="rounded-3xl bg-gradient-to-r from-[#7D5A50] via-[#B4846C] to-[#7D5A50] text-[#FFF8EA] p-12 sm:p-16 text-center space-y-8 shadow-2xl relative overflow-hidden">
+      <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 w-full mb-24">
+        <div class="rounded-3xl bg-gradient-to-r from-[#7D5A50] via-[#B4846C] to-[#7D5A50] text-[#FFF8EA] p-8 sm:p-10 text-center space-y-6 shadow-2xl relative overflow-hidden">
           <div class="absolute -top-12 -right-12 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
           <div class="absolute -bottom-12 -left-12 w-64 h-64 bg-[#FCDEC0]/20 rounded-full blur-3xl"></div>
 
-          <div class="max-w-2xl mx-auto space-y-4 relative z-10">
+          <div class="max-w-2xl mx-auto space-y-3 relative z-10">
             <h2 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight">Ready to Transform Your Coffee Shop?</h2>
             <p class="text-base sm:text-lg text-[#FFF8EA]/90 font-normal">Join hundreds of successful cafes using BrewSpot to boost daily orders, seat guests faster, and increase profitability.</p>
           </div>
@@ -886,6 +896,69 @@ const faqs = [
         </div>
       </footer>
     </section>
+
+    <!-- Floating Customer Agent / Chat Widget -->
+    <div class="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+      <!-- Chat Window -->
+      <transition
+        enter-active-class="transition duration-300 ease-out"
+        enter-from-class="opacity-0 translate-y-8 scale-95"
+        enter-to-class="opacity-100 translate-y-0 scale-100"
+        leave-active-class="transition duration-200 ease-in"
+        leave-from-class="opacity-100 translate-y-0 scale-100"
+        leave-to-class="opacity-0 translate-y-8 scale-95"
+      >
+        <div v-if="isChatOpen" class="w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-[#E5B299] overflow-hidden mb-4 flex flex-col">
+          <!-- Header -->
+          <div class="bg-[#7D5A50] p-4 text-[#FFF8EA] flex justify-between items-center">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-[#FCDEC0] flex items-center justify-center text-[#7D5A50]">
+                <Icon name="heroicons:chat-bubble-left-ellipsis-solid" class="w-6 h-6" />
+              </div>
+              <div>
+                <h3 class="font-bold text-sm">BrewSpot Support</h3>
+                <p class="text-xs text-[#FFF8EA]/80">We typically reply in minutes</p>
+              </div>
+            </div>
+            <button @click="isChatOpen = false" class="text-[#FFF8EA] hover:text-[#FCDEC0] transition">
+              <Icon name="heroicons:x-mark" class="w-6 h-6" />
+            </button>
+          </div>
+          <!-- Body -->
+          <div class="p-5 bg-[#FFF8EA]/30">
+            <form @submit.prevent="" class="space-y-4">
+              <div class="space-y-1">
+                <label for="chat-name" class="block text-xs font-semibold text-[#2D201B]">Name</label>
+                <input type="text" id="chat-name" placeholder="Your name" class="w-full px-3 py-2 text-sm rounded-lg border border-[#E5B299] focus:ring-2 focus:ring-[#7D5A50] focus:border-transparent outline-none transition bg-white">
+              </div>
+              <div class="space-y-1">
+                <label for="chat-email" class="block text-xs font-semibold text-[#2D201B]">Email</label>
+                <input type="email" id="chat-email" placeholder="you@example.com" class="w-full px-3 py-2 text-sm rounded-lg border border-[#E5B299] focus:ring-2 focus:ring-[#7D5A50] focus:border-transparent outline-none transition bg-white">
+              </div>
+              <div class="space-y-1">
+                <label for="chat-message" class="block text-xs font-semibold text-[#2D201B]">Message</label>
+                <textarea id="chat-message" rows="3" placeholder="How can we help?" class="w-full px-3 py-2 text-sm rounded-lg border border-[#E5B299] focus:ring-2 focus:ring-[#7D5A50] focus:border-transparent outline-none transition bg-white resize-none"></textarea>
+              </div>
+              <button type="submit" class="w-full h-10 rounded-lg bg-[#7D5A50] text-[#FFF8EA] font-bold text-sm hover:bg-[#65463D] transition shadow-md flex items-center justify-center gap-2">
+                <span>Send Message</span>
+                <Icon name="heroicons:paper-airplane" class="w-4 h-4 text-[#FCDEC0]" />
+              </button>
+            </form>
+          </div>
+        </div>
+      </transition>
+      
+      <!-- Toggle Button -->
+      <button 
+        @click="isChatOpen = !isChatOpen"
+        :class="[
+          'w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-transform duration-300 hover:scale-110 z-50',
+          isChatOpen ? 'bg-[#2D201B] text-[#FFF8EA]' : 'bg-[#7D5A50] text-[#FFF8EA]'
+        ]"
+      >
+        <Icon :name="isChatOpen ? 'heroicons:chevron-down' : 'heroicons:chat-bubble-oval-left-ellipsis-solid'" class="w-7 h-7" />
+      </button>
+    </div>
   </div>
 </template>
 
