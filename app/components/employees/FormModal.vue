@@ -52,6 +52,7 @@ function emptyForm() {
     email: '',
     address: '',
     role: '' as StaffRole | '',
+    hired_at: new Date().toISOString().split('T')[0],
     pin: '',
     schedule: defaultSchedule(),
   }
@@ -110,6 +111,7 @@ function validate() {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) e.email = 'Enter a valid email address.'
   if (!f.address.trim()) e.address = 'Address is required.'
   if (!f.role) e.role = 'Select a position.'
+  if (!f.hired_at) e.hired_at = 'Hired date is required.'
   if (usesPin.value && !/^\d{4}$/.test(f.pin)) e.pin = 'PIN must be exactly 4 digits.'
 
   const se: Record<number, string> = {}
@@ -157,6 +159,7 @@ async function submit() {
     email: f.email.trim(),
     address: f.address.trim(),
     role: f.role as StaffRole,
+    hired_at: f.hired_at || undefined,
     schedule: f.schedule.map(day => ({
       day_of_week: day.day_of_week,
       is_day_off: day.is_day_off,
@@ -340,6 +343,16 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
                   <Icon name="heroicons:chevron-down" class="w-4 h-4 text-[#7D5A50] absolute right-3 pointer-events-none" />
                 </div>
                 <span v-if="errors.role" class="font-sans text-xs text-red-600">{{ errors.role }}</span>
+              </label>
+
+              <!-- Hired At -->
+              <label class="flex flex-col gap-1.5 flex-1 min-w-0">
+                <span :class="labelClass">Hired At*</span>
+                <div :class="fieldClass('hired_at')">
+                  <Icon name="heroicons:calendar" class="w-4 h-4 shrink-0 text-[#7D5A50]" />
+                  <input v-model="form.hired_at" type="date" :class="inputClass" />
+                </div>
+                <span v-if="errors.hired_at" class="font-sans text-xs text-red-600">{{ errors.hired_at }}</span>
               </label>
 
               <!-- PIN (Cashier only) -->
