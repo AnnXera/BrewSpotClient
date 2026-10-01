@@ -17,9 +17,6 @@ const emit = defineEmits<{
   reject: []
 }>()
 
-// Snapshot payload returns a single cafe/branch scoped to this approval
-// row (including archived data), not an array of the owner's current
-// cafes — so no searching/first-of-array here.
 const primaryCafe = computed(() => props.ownerDetails?.cafe ?? null)
 
 const relevantBranch = computed(() => props.ownerDetails?.branch ?? null)
@@ -38,8 +35,6 @@ async function viewDocument(url: string) {
   const token = useCookie<string | null>('auth_token')
   const origin = config.public.apiBase.replace(/\/api\/?$/, '')
 
-  // Open the tab synchronously on the user gesture so popup blockers don't interfere.
-  // We redirect it to the blob URL once the fetch completes.
   const newTab = window.open('', '_blank')
 
   try {
@@ -62,7 +57,6 @@ async function viewDocument(url: string) {
     if (newTab) {
       newTab.location.href = objectUrl
     } else {
-      // Popup was blocked — fall back to same-tab download
       const a = document.createElement('a')
       a.href = objectUrl
       a.download = ''
@@ -79,9 +73,6 @@ async function viewDocument(url: string) {
   }
 }
 
-// cafe_picture lives on cafe_branches.cafe_picture (public disk), not in
-// branch.documents — served by the unauthenticated GET /api/branch-picture/{uuid}
-// route, so it can't reuse viewDocument()'s authenticated-fetch logic.
 function viewCafePicture() {
   if (!relevantBranch.value?.uuid) return
 

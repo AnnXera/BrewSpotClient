@@ -111,6 +111,16 @@ export class StaffService extends BaseService {
         return this.post<CreateStaffResponse>(this.base(branchUuid), payload as unknown as Record<string, any>)
     }
 
+    // One employee as seen from this branch (details page).
+    getBranchStaff(branchUuid: string, userUuid: string) {
+        return this.get<{ success: boolean; message?: string; staff?: StaffMember }>(`${this.base(branchUuid)}/${userUuid}`)
+    }
+
+    // Ends their employment at this branch only.
+    terminateBranchStaff(branchUuid: string, userUuid: string) {
+        return this.post<{ success: boolean; message: string }>(`${this.base(branchUuid)}/${userUuid}/terminate`)
+    }
+
     getBranchStaffStats(branchUuid: string) {
         return this.get<{ success: boolean; message?: string; stats: BranchStaffStats }>(`${this.base(branchUuid)}/stats`)
     }

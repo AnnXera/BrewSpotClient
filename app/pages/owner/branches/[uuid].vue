@@ -13,6 +13,7 @@ const links = [
 ]
 
 const route = useRoute()
+const router = useRouter()
 const ownerService = useOwnerProfileService()
 
 const branch = ref<BranchDetail | null>(null)
@@ -27,6 +28,31 @@ watch(() => route.query.tab, (newTab) => {
     activeTab.value = newTab
   }
 })
+
+// ?employee=<uuid> opens that employee's details inside the Employees tab,
+// so the view survives a refresh and the browser Back button returns to the list.
+const viewedEmployee = computed(() =>
+  typeof route.query.employee === 'string' ? route.query.employee : null
+)
+
+function viewEmployee(uuid: string) {
+  router.push({ query: { ...route.query, tab: 'employees', employee: uuid } })
+}
+
+function backToEmployees() {
+  const query = { ...route.query, tab: 'employees' }
+  delete query.employee
+  router.push({ query })
+}
+
+function selectTab(tab: 'details' | 'employees') {
+  activeTab.value = tab
+  if (viewedEmployee.value) {
+    const query = { ...route.query, tab }
+    delete query.employee
+    router.replace({ query })
+  }
+}
 
 const isMain = computed(() => (branch.value?.branch_type || '').toLowerCase() === 'main')
 
@@ -129,7 +155,7 @@ onMounted(fetchBranch)
           :class="activeTab === 'details'
             ? 'text-[#3B1F0E] font-bold'
             : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
-          @click="activeTab = 'details'"
+          @click="selectTab('details')"
         >
           Branch Details
           <span
@@ -146,7 +172,7 @@ onMounted(fetchBranch)
           :class="activeTab === 'employees'
             ? 'text-[#3B1F0E] font-bold'
             : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
-          @click="activeTab = 'employees'"
+          @click="selectTab('employees')"
         >
           Employees
           <span
@@ -269,8 +295,14 @@ onMounted(fetchBranch)
           </section>
         </div>
 
-        <!-- Employees Tab (Add Employee / View Positions / View Details are wired up with the modals and details page later) -->
-        <EmployeesTab v-else :branch-uuid="branch.uuid" />
+        <!-- Employees Tab: the list, or one employee's details -->
+        <EmployeesDetails
+          v-else-if="viewedEmployee"
+          :branch-uuid="branch.uuid"
+          :employee-uuid="viewedEmployee"
+          @back="backToEmployees"
+        />
+        <EmployeesTab v-else :branch-uuid="branch.uuid" @view-employee="viewEmployee($event.uuid)" />
 
       </template>
     </main>

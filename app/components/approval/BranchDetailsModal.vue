@@ -63,8 +63,6 @@ async function viewDocument(url: string) {
   }
 }
 
-// cafe_picture is a public-disk column, not a BranchDocument row — served by
-// the unauthenticated GET /api/branch-picture/{uuid} route.
 function cafePictureUrl(branchUuid?: string | null) {
   if (!branchUuid) return null
   const config = useRuntimeConfig()
