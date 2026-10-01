@@ -256,7 +256,7 @@ onMounted(async () => {
       </div>
 
       <!-- Combined Search/Tabs + Table Card -->
-      <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden">
+      <div :class="['bg-white border border-[#EEDFC4] overflow-hidden', approvals.length > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
 
         <!-- Search + Status Tabs Bar -->
         <div class="flex items-center gap-[24px] px-[20px] py-[18px] border-b border-[#F3E7D2]">
@@ -393,7 +393,10 @@ onMounted(async () => {
             </tbody>
           </table>
         </div>
-
+      </div>
+      
+      <!-- Pagination (Separate Frame) -->
+      <div v-if="approvals.length > 0" class="bg-white rounded-b-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
         <CommonPagination :page="currentPage" :last-page="lastPage" @change="goToPage" />
       </div>
     </main>

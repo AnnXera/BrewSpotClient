@@ -95,7 +95,7 @@ function onPhoneInput(event: Event) {
 
 function onPinInput(event: Event) {
   const input = event.target as HTMLInputElement
-  form.value.pin = input.value.replace(/\D/g, '').slice(0, 4)
+  form.value.pin = input.value.replace(/\D/g, '').slice(0, 6)
   input.value = form.value.pin
 }
 
@@ -112,7 +112,7 @@ function validate() {
   if (!f.address.trim()) e.address = 'Address is required.'
   if (!f.role) e.role = 'Select a position.'
   if (!f.hired_at) e.hired_at = 'Hired date is required.'
-  if (usesPin.value && !/^\d{4}$/.test(f.pin)) e.pin = 'PIN must be exactly 4 digits.'
+  if (usesPin.value && !/^\d{6}$/.test(f.pin)) e.pin = 'PIN must be exactly 6 digits.'
 
   const se: Record<number, string> = {}
   for (const day of f.schedule) {
@@ -365,7 +365,7 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
                     type="text"
                     inputmode="numeric"
                     autocomplete="off"
-                    placeholder="4 digits"
+                    placeholder="6 digits"
                     :class="inputClass"
                     @input="onPinInput"
                   />

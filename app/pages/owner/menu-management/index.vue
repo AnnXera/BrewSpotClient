@@ -5,6 +5,7 @@ import MenuToolbar from '~/components/menu/MenuToolbar.vue'
 import CategoryCard from '~/components/menu/CategoryCard.vue'
 import EmptyState from '~/components/menu/EmptyState.vue'
 import CategoryModal from '~/components/menu/CategoryModal.vue'
+import Pagination from '~/components/common/Pagination.vue'
 
 definePageMeta({
   layout: 'owner',
@@ -45,6 +46,23 @@ const filteredAndSortedCategories = computed(() => {
   })
   
   return result
+})
+
+const currentPage = ref(1)
+const itemsPerPage = ref(12)
+
+const paginatedCategories = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value
+  return filteredAndSortedCategories.value.slice(start, start + itemsPerPage.value)
+})
+
+const lastPage = computed(() => Math.max(1, Math.ceil(filteredAndSortedCategories.value.length / itemsPerPage.value)))
+const totalItems = computed(() => filteredAndSortedCategories.value.length)
+const fromItem = computed(() => totalItems.value === 0 ? 0 : (currentPage.value - 1) * itemsPerPage.value + 1)
+const toItem = computed(() => Math.min(currentPage.value * itemsPerPage.value, totalItems.value))
+
+watch([searchQuery, sortBy], () => {
+  currentPage.value = 1
 })
 
 async function fetchData() {
@@ -144,7 +162,7 @@ const links = [
         :subtitle="pageSubtitle"
       />
 
-      <div class="bg-white rounded-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
+      <div :class="['bg-white border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm', filteredAndSortedCategories.length > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
         
         <!-- Toolbar Section -->
         <div class="p-4 sm:p-6 border-b border-[#EEDFC4]">
@@ -159,22 +177,24 @@ const links = [
         </div>
 
         <!-- Content Section -->
-        <div class="p-4 sm:p-6 min-h-[400px]">
+        <div class="p-4 sm:p-6">
           <div v-if="isLoading" class="flex justify-center py-20">
             <Icon name="heroicons:arrow-path" class="w-8 h-8 text-[#7D5A50] animate-spin" />
           </div>
 
           <template v-else>
             <!-- Categories Grid -->
-            <div v-if="filteredAndSortedCategories.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              <CategoryCard 
-                v-for="cat in filteredAndSortedCategories" 
-                :key="cat.id" 
-                :category="cat"
+            <div v-if="filteredAndSortedCategories.length > 0">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <CategoryCard 
+                  v-for="cat in paginatedCategories" 
+                  :key="cat.id" 
+                  :category="cat"
                 @click="handleCategoryClick"
                 @edit="handleEditCategory(cat.uuid || cat.id)"
                 @delete="handleDeleteCategory(cat.uuid || cat.id)"
               />
+              </div>
             </div>
 
             <EmptyState 
@@ -187,17 +207,18 @@ const links = [
             />
           </template>
         </div>
-
-        <!-- Pagination -->
-        <div class="p-4 border-t border-[#EEDFC4] flex justify-center items-center gap-6">
-          <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#FBF2E1] transition-colors group">
-            <Icon name="heroicons:chevron-left" class="w-5 h-5 text-[#B4846C] group-hover:text-[#7D5A50]" />
-          </button>
-          <span class="text-sm font-bold text-[#7D5A50]">Page 1 of 1</span>
-          <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#FBF2E1] transition-colors group">
-            <Icon name="heroicons:chevron-right" class="w-5 h-5 text-[#B4846C] group-hover:text-[#7D5A50]" />
-          </button>
-        </div>
+      </div>
+      
+      <!-- Pagination (Separate Frame) -->
+      <div v-if="filteredAndSortedCategories.length > 0" class="bg-white rounded-b-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
+        <Pagination
+          :page="currentPage"
+          :last-page="lastPage"
+          :total="totalItems"
+          :from="fromItem"
+          :to="toItem"
+          @change="page => currentPage = page"
+        />
       </div>
     </main>
 

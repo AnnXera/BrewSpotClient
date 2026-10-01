@@ -71,6 +71,10 @@ export class MenuService extends BaseService {
         return this.patch<IngredientResponse>(`/owner/ingredients/${uuid}`, payload)
     }
 
+    deleteIngredient(uuid: string) {
+        return this.delete<{ success: boolean; message: string }>(`/owner/ingredients/${uuid}`)
+    }
+
     // --- Menu Items ---
 
     getMenuItems(params?: Record<string, any>) {

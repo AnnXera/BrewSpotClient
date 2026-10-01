@@ -2,7 +2,7 @@
 <template>
   <div>
     <!-- Main Payment History Card Container -->
-    <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden shadow-sm">
+    <div :class="['bg-white border border-[#EEDFC4] overflow-hidden shadow-sm', filteredHistory.length > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
       <!-- Top Feature Bar: Search, Filters & Export CSV -->
       <div v-if="showControls" class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-6 border-b border-[#F3E7D2]">
         <!-- Search Input -->
@@ -171,31 +171,15 @@
           </tbody>
         </table>
       </div>
+    </div>
 
-      <!-- Centered Pagination Bar -->
-      <div class="border-t border-[#F3E7D2] px-6 py-4 flex items-center justify-center gap-4 bg-white">
-        <button
-          type="button"
-          class="p-1 text-[#8B6656] hover:text-[#3B1F0E] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          :disabled="currentPage <= 1 || loading"
-          @click="currentPage--"
-        >
-          <Icon name="heroicons:chevron-left" class="w-5 h-5 stroke-[2.5]" />
-        </button>
-
-        <span class="font-sans text-[13px] font-medium text-[#8B6656]">
-          Page {{ currentPage }} of {{ lastPage }}
-        </span>
-
-        <button
-          type="button"
-          class="p-1 text-[#8B6656] hover:text-[#3B1F0E] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          :disabled="currentPage >= lastPage || loading"
-          @click="currentPage++"
-        >
-          <Icon name="heroicons:chevron-right" class="w-5 h-5 stroke-[2.5]" />
-        </button>
-      </div>
+    <!-- Pagination (Separate Frame) -->
+    <div v-if="filteredHistory.length > 0" class="bg-white rounded-b-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
+      <CommonPagination
+        :page="currentPage"
+        :last-page="lastPage"
+        @change="(p) => (currentPage = p)"
+      />
     </div>
 
     <!-- Notification Toast for Copy Action -->

@@ -11,7 +11,7 @@ definePageMeta({
 const route = useRoute()
 const uuid = route.params.uuid as string
 
-const PIN_LENGTH = 4
+const PIN_LENGTH = 6
 
 const pin = ref('')
 const pinConfirmation = ref('')
@@ -179,7 +179,7 @@ async function handleSubmit() {
                 :type="showPin ? 'text' : 'password'"
                 inputmode="numeric"
                 autocomplete="off"
-                placeholder="Enter a 4-digit PIN"
+                placeholder="Enter a 6-digit PIN"
                 class="w-full h-11 rounded-md border pl-3 pr-10 outline-none transition bg-white text-sm tracking-widest border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                 @input="onPinInput"
               />

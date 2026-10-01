@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import { INGREDIENT_UNITS } from '~/utils/constants'
 import type { Ingredient, IngredientPayload } from '~/services/MenuService'
+import ConfirmModal from '~/components/common/ConfirmModal.vue'
 
 const props = defineProps<{
   show: boolean
@@ -19,6 +20,15 @@ const menuService = useMenuService()
 const form = ref({ name: '', unit: INGREDIENT_UNITS[0] })
 const errors = ref<{ name?: string; unit?: string; general?: string }>({})
 const isSubmitting = ref(false)
+
+const confirmModal = ref({
+  show: false,
+  title: '',
+  message: '',
+  confirmText: '',
+  isDestructive: false,
+  onConfirm: () => {}
+})
 
 const isEditMode = computed(() => !!props.ingredient)
 
@@ -73,10 +83,19 @@ function toggleActive() {
   const retiring = props.ingredient.is_active
   if (retiring && props.ingredient.used_in > 0) {
     const items = props.ingredient.used_in === 1 ? '1 menu item' : `${props.ingredient.used_in} menu items`
-    const ok = window.confirm(
-      `${props.ingredient.name} is used in ${items}. Those recipes keep it, but it won't show when adding new recipes. Retire it?`
-    )
-    if (!ok) return
+    
+    confirmModal.value = {
+      show: true,
+      title: 'Retire Ingredient?',
+      message: `${props.ingredient.name} is used in ${items}. Those recipes keep it, but it won't show when adding new recipes. Retire it?`,
+      confirmText: 'Retire',
+      isDestructive: true,
+      onConfirm: () => {
+        confirmModal.value.show = false
+        save({ is_active: !retiring })
+      }
+    }
+    return
   }
 
   save({ is_active: !retiring })
@@ -188,5 +207,15 @@ function toggleActive() {
         </button>
       </div>
     </div>
+
+    <ConfirmModal
+      :show="confirmModal.show"
+      :title="confirmModal.title"
+      :message="confirmModal.message"
+      :confirmText="confirmModal.confirmText"
+      :isDestructive="confirmModal.isDestructive"
+      @close="confirmModal.show = false"
+      @confirm="confirmModal.onConfirm"
+    />
   </div>
 </template>

@@ -8,6 +8,7 @@ import EmptyState from '~/components/menu/EmptyState.vue'
 import ItemModal from '~/components/menu/ItemModal.vue'
 import AddEditItemToCategory from '~/components/menu/AddEditItemToCategory.vue'
 import CategoryBranchesPanel from '~/components/menu/CategoryBranchesPanel.vue'
+import Pagination from '~/components/common/Pagination.vue'
 
 definePageMeta({
   layout: 'owner',
@@ -26,6 +27,23 @@ const currentCategory = ref<any>(null)
 const isLoading = ref(true)
 
 const { searchQuery, sortBy, sortOptions, filteredAndSortedItems } = useMenuItemSort(items)
+
+const currentPage = ref(1)
+const itemsPerPage = ref(12)
+
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value
+  return filteredAndSortedItems.value.slice(start, start + itemsPerPage.value)
+})
+
+const lastPage = computed(() => Math.max(1, Math.ceil(filteredAndSortedItems.value.length / itemsPerPage.value)))
+const totalItems = computed(() => filteredAndSortedItems.value.length)
+const fromItem = computed(() => totalItems.value === 0 ? 0 : (currentPage.value - 1) * itemsPerPage.value + 1)
+const toItem = computed(() => Math.min(currentPage.value * itemsPerPage.value, totalItems.value))
+
+watch([searchQuery, sortBy], () => {
+  currentPage.value = 1
+})
 
 async function fetchData() {
   isLoading.value = true
@@ -161,7 +179,7 @@ const links = [
       />
 
       <div class="flex flex-col lg:flex-row gap-6 items-start">
-      <div class="flex-1 min-w-0 w-full bg-white rounded-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
+      <div :class="['flex-1 min-w-0 w-full bg-white border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm', filteredAndSortedItems.length > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
         
         <!-- Toolbar Section -->
         <div class="p-4 sm:p-6 border-b border-[#EEDFC4]">
@@ -176,21 +194,23 @@ const links = [
         </div>
 
         <!-- Content Section -->
-        <div class="p-4 sm:p-6 min-h-[400px]">
+        <div class="p-4 sm:p-6">
           <div v-if="isLoading" class="flex justify-center py-20">
             <Icon name="heroicons:arrow-path" class="w-8 h-8 text-[#7D5A50] animate-spin" />
           </div>
 
           <template v-else>
             <!-- Items Grid -->
-            <div v-if="filteredAndSortedItems.length > 0" :class="['grid gap-6', currentCategoryUuid === 'uncategorized' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3']">
-              <ItemCard 
-                v-for="item in filteredAndSortedItems" 
-                :key="item.id" 
-                :item="item"
-                @view="viewItem(item.uuid)"
-                @delete="handleDeleteItem(item.uuid)"
-              />
+            <div v-if="filteredAndSortedItems.length > 0">
+              <div :class="['grid gap-6', currentCategoryUuid === 'uncategorized' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3']">
+                <ItemCard 
+                  v-for="item in paginatedItems" 
+                  :key="item.id" 
+                  :item="item"
+                  @view="viewItem(item.uuid)"
+                  @delete="handleDeleteItem(item.uuid)"
+                />
+              </div>
             </div>
 
             <EmptyState 
@@ -203,17 +223,18 @@ const links = [
             />
           </template>
         </div>
-
-        <!-- Pagination -->
-        <div class="p-4 border-t border-[#EEDFC4] flex justify-center items-center gap-6">
-          <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#FBF2E1] transition-colors group">
-            <Icon name="heroicons:chevron-left" class="w-5 h-5 text-[#B4846C] group-hover:text-[#7D5A50]" />
-          </button>
-          <span class="text-sm font-bold text-[#7D5A50]">Page 1 of 1</span>
-          <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#FBF2E1] transition-colors group">
-            <Icon name="heroicons:chevron-right" class="w-5 h-5 text-[#B4846C] group-hover:text-[#7D5A50]" />
-          </button>
-        </div>
+      </div>
+      
+      <!-- Pagination (Separate Frame) -->
+      <div v-if="filteredAndSortedItems.length > 0" class="bg-white rounded-b-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
+        <Pagination
+          :page="currentPage"
+          :last-page="lastPage"
+          :total="totalItems"
+          :from="fromItem"
+          :to="toItem"
+          @change="page => currentPage = page"
+        />
       </div>
 
       <CategoryBranchesPanel

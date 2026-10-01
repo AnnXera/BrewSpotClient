@@ -266,7 +266,7 @@ onMounted(() => {
       </div>
 
       <!-- Main Content Card -->
-      <div class="bg-white border border-[#EEDFC4] rounded-[20px] overflow-hidden shadow-sm transition-shadow hover:shadow-md">
+      <div :class="['bg-white border border-[#EEDFC4] overflow-hidden shadow-sm transition-shadow hover:shadow-md', owners.length > 0 ? 'rounded-t-[20px] border-b-0' : 'rounded-[20px]']">
         <OwnerManagementFilterBar
           v-model:search="search"
           v-model:status="status"
@@ -336,7 +336,10 @@ onMounted(() => {
             </tbody>
           </table>
         </div>
-
+      </div>
+      
+      <!-- Pagination (Separate Frame) -->
+      <div v-if="owners.length > 0" class="bg-white rounded-b-[20px] border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
         <CommonPagination :page="currentPage" :last-page="lastPage" @change="goToPage" />
       </div>
     </main>

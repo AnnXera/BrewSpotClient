@@ -303,7 +303,7 @@ onMounted(fetchOwner)
 
         <!-- BRANCHES TAB -->
         <template v-else>
-          <div class="bg-white border border-[#EEDFC4] rounded-2xl md:rounded-3xl shadow-sm overflow-hidden">
+          <div :class="['bg-white border border-[#EEDFC4] shadow-sm overflow-hidden', filteredBranches.length > 0 ? 'rounded-t-2xl md:rounded-t-3xl border-b-0' : 'rounded-2xl md:rounded-3xl']">
             <!-- Filter Bar -->
             <div class="flex flex-col border-b border-[#F3E7D2]
                         min-[360px]:px-[12px] min-[360px]:py-[14px] min-[360px]:gap-[12px]
@@ -361,8 +361,10 @@ onMounted(fetchOwner)
                 @view-details="openBranchDetails"
               />
             </div>
+          </div>
 
-            <!-- Pagination Bar -->
+          <!-- Pagination Bar -->
+          <div v-if="filteredBranches.length > 0" class="bg-white rounded-b-2xl md:rounded-b-3xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
             <CommonPagination
               :page="branchPage"
               :last-page="totalBranchPages"

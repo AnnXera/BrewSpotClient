@@ -1,30 +1,26 @@
 <!-- app/components/common/Pagination.vue -->
 <template>
-  <div class="flex items-center justify-center gap-4 p-4 sm:p-5 border-t border-[#F0E6D8]">
+  <div class="flex items-center justify-center gap-[6px] h-[56px] w-full">
     <button
       type="button"
-      class="p-1.5 text-[#9E7060] disabled:opacity-30 disabled:cursor-not-allowed hover:text-[#3D2B24] transition-colors"
+      class="p-1 text-[#9E7060] disabled:opacity-30 disabled:cursor-not-allowed hover:text-[#3D2B24] transition-colors flex items-center justify-center"
       :disabled="page <= 1"
       @click="prev"
     >
-      <Icon name="heroicons:chevron-left-20-solid" class="w-5 h-5 sm:w-6 sm:h-6" />
+      <Icon name="heroicons:chevron-left" class="w-[16px] h-[16px]" />
     </button>
 
-    <span class="font-display font-medium text-xs sm:text-sm text-[#7D5A50]">
+    <span class="font-display font-bold text-[14px] text-[#7D5A50] flex items-center">
       Page {{ page }} of {{ Math.max(1, lastPage) }}
-      <template v-if="total !== undefined && total > 0">
-        <span class="text-[#9E7060]/70 mx-1">·</span>
-        <span class="text-[#9E7060]">Showing {{ from }}–{{ to }} of {{ total }}</span>
-      </template>
     </span>
 
     <button
       type="button"
-      class="p-1.5 text-[#9E7060] disabled:opacity-30 disabled:cursor-not-allowed hover:text-[#3D2B24] transition-colors"
+      class="p-1 text-[#9E7060] disabled:opacity-30 disabled:cursor-not-allowed hover:text-[#3D2B24] transition-colors flex items-center justify-center"
       :disabled="page >= Math.max(1, lastPage)"
       @click="next"
     >
-      <Icon name="heroicons:chevron-right-20-solid" class="w-5 h-5 sm:w-6 sm:h-6" />
+      <Icon name="heroicons:chevron-right" class="w-[16px] h-[16px]" />
     </button>
   </div>
 </template>

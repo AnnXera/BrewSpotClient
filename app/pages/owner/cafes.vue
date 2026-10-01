@@ -2,6 +2,7 @@
 import type { BranchSummary } from '~/services/OwnerProfileService'
 import { usePlanFeature } from '~/composables/usePlanFeature'
 import { useOperatingHours, type DaySchedule } from '~/composables/useOperatingHours'
+import Pagination from '~/components/common/Pagination.vue'
 
 definePageMeta({
   role: 'Cafe Owner',
@@ -273,7 +274,7 @@ function viewDetails(uuid: string) {
       </div>
 
       <!-- Main Container with Filter Bar and Branch List -->
-      <div class="bg-white border border-[#EEDFC4] rounded-[24px] shadow-sm flex flex-col overflow-hidden">
+      <div :class="['bg-white border border-[#EEDFC4] shadow-sm flex flex-col overflow-hidden', branches.length > 0 ? 'rounded-t-[24px] border-b-0' : 'rounded-[24px]']">
         <!-- Filter Bar -->
         <CafeManagementCafeFilterBar 
           v-model:search="search"
@@ -289,7 +290,7 @@ function viewDetails(uuid: string) {
         />
 
         <!-- List Content -->
-        <div class="p-6 flex flex-col gap-4 min-h-[300px]">
+        <div class="p-6 flex flex-col gap-4">
           <div v-if="errorMessage" class="bg-red-50 text-red-800 border border-red-200 rounded-xl p-4 flex items-center gap-3">
             <Icon name="heroicons:exclamation-triangle" class="w-5 h-5 shrink-0" />
             <span class="text-sm font-medium">{{ errorMessage }}</span>
@@ -311,29 +312,15 @@ function viewDetails(uuid: string) {
             />
           </template>
         </div>
-
-        <!-- Pagination -->
-        <div class="border-t border-[#EEDFC4] p-4 flex items-center justify-center bg-[#FDF8F3]">
-          <div class="flex items-center gap-6 text-[#9E7060] text-sm font-semibold">
-            <button
-              @click="goToPage(currentPage - 1)"
-              :disabled="currentPage === 1"
-              aria-label="Previous page"
-              class="disabled:opacity-40 disabled:cursor-not-allowed hover:text-[#3D2B24] transition-colors p-1"
-            >
-              <Icon name="heroicons:chevron-left" class="w-5 h-5" />
-            </button>
-            <span>Page {{ currentPage }} of {{ lastPage }}</span>
-            <button
-              @click="goToPage(currentPage + 1)"
-              :disabled="currentPage === lastPage"
-              aria-label="Next page"
-              class="disabled:opacity-40 disabled:cursor-not-allowed hover:text-[#3D2B24] transition-colors p-1"
-            >
-              <Icon name="heroicons:chevron-right" class="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+      </div>
+      
+      <!-- Pagination (Separate Frame) -->
+      <div v-if="branches.length > 0" class="bg-white rounded-b-[24px] border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
+        <Pagination
+          :page="currentPage"
+          :last-page="lastPage"
+          @change="goToPage"
+        />
       </div>
 
       <!-- Interactive Modals -->
