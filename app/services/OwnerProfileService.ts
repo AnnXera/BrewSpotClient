@@ -2,6 +2,19 @@
 import { BaseService } from './BaseService'
 import type { Paginated } from './OwnerManagementService'
 
+// Opening hours as the API sends them. Times are HH:MM; a close time at or
+// before the open time means the cafe closes after midnight.
+export interface ApiOpeningHour {
+    day_of_week: string
+    is_closed: boolean
+    is_24_hours: boolean
+    open_time: string | null
+    close_time: string | null
+    closes_after_midnight: boolean
+}
+
+export type ApiOpeningHourInput = Omit<ApiOpeningHour, 'closes_after_midnight'>
+
 export interface BranchSummary {
     uuid: string
     branch_name: string
@@ -62,11 +75,12 @@ export class OwnerProfileService extends BaseService {
         return this.patch<{ success: boolean; message: string; branch?: any }>(`/owner/branches/${uuid}`, payload)
     }
 
+    // The cafe's week (Monday first). useOperatingHours converts it for the UI.
     getOperatingHours() {
-        return this.get<{ success: boolean; data?: any }>('/owner/opening-hours')
+        return this.get<{ success: boolean; data?: ApiOpeningHour[] }>('/owner/opening-hours')
     }
 
-    updateOperatingHours(payload: { opening_hours: any; apply_to_all?: boolean }) {
-        return this.put<{ success: boolean; message: string }>('/owner/opening-hours', payload)
+    updateOperatingHours(hours: ApiOpeningHourInput[]) {
+        return this.put<{ success: boolean; message: string; data?: ApiOpeningHour[] }>('/owner/opening-hours', { hours })
     }
 }

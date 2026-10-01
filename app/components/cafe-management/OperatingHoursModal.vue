@@ -1,34 +1,33 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { useOperatingHours, sanitizeSchedule, type DaySchedule } from '~/composables/useOperatingHours'
+import { useOperatingHours, sanitizeSchedule, DEFAULT_SCHEDULE, type DaySchedule } from '~/composables/useOperatingHours'
 
 const props = defineProps<{
   show: boolean
   saving?: boolean
+  error?: string
 }>()
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'save', payload: { opening_hours: DaySchedule[]; apply_to_all: boolean }): void
+  (e: 'save', schedule: DaySchedule[]): void
 }>()
 
-const { operatingHours, setOperatingHours, resetToDefault, formatTime12h } = useOperatingHours()
+const { operatingHours, formatTime12h } = useOperatingHours()
 
-const applyToAll = ref(true)
 const weekSchedule = ref<DaySchedule[]>([])
+const localError = ref('')
 
-// Custom inputs for batch applying custom opening hours
 const customOpenTime = ref('08:00')
 const customCloseTime = ref('22:00')
 
 watch(() => props.show, (newVal) => {
   if (newVal) {
-    const raw = operatingHours.value
-    weekSchedule.value = sanitizeSchedule(raw)
+    weekSchedule.value = sanitizeSchedule(operatingHours.value)
+    localError.value = ''
   }
 }, { immediate: true })
 
-// Apply custom owner-entered time to all open days
 function applyCustomTime() {
   weekSchedule.value.forEach(item => {
     item.isOpen = true
@@ -38,7 +37,6 @@ function applyCustomTime() {
   })
 }
 
-// Bulk toggle all open/closed
 function toggleAllDays(isOpen: boolean) {
   weekSchedule.value.forEach(item => {
     item.isOpen = isOpen
@@ -46,18 +44,26 @@ function toggleAllDays(isOpen: boolean) {
 }
 
 function handleResetDefaults() {
-  resetToDefault()
-  weekSchedule.value = sanitizeSchedule(operatingHours.value)
+  weekSchedule.value = sanitizeSchedule(DEFAULT_SCHEDULE)
+}
+
+function closesAfterMidnight(item: DaySchedule) {
+  return item.isOpen && !item.is24Hours && !!item.openTime && !!item.closeTime && item.closeTime < item.openTime
 }
 
 const activeDay = ref<string | null>(null)
 
 function handleSave() {
-  setOperatingHours(weekSchedule.value)
-  emit('save', {
-    opening_hours: JSON.parse(JSON.stringify(weekSchedule.value)),
-    apply_to_all: applyToAll.value
-  })
+  localError.value = ''
+
+  const sameTimes = weekSchedule.value.find(d => d.isOpen && !d.is24Hours && d.openTime === d.closeTime)
+  if (sameTimes) {
+    localError.value = `${sameTimes.day}: opening and closing time can't be the same. Use 24 Hours instead.`
+    activeDay.value = sameTimes.day
+    return
+  }
+
+  emit('save', JSON.parse(JSON.stringify(weekSchedule.value)))
 }
 </script>
 
@@ -145,7 +151,7 @@ function handleSave() {
                   <span v-if="!item.isOpen" class="text-xs font-bold text-red-500 bg-red-50 px-3 py-1 rounded-lg">Closed</span>
                   <span v-else-if="item.is24Hours" class="text-xs font-bold text-[#B4846C] bg-white px-3 py-1 rounded-lg border border-[#EEDFC4]">24 Hours</span>
                   <span v-else class="text-xs font-bold text-[#B4846C] bg-white px-3 py-1 rounded-lg border border-[#EEDFC4]">
-                    {{ formatTime12h(item.openTime) }} - {{ formatTime12h(item.closeTime) }}
+                    {{ formatTime12h(item.openTime) }} - {{ formatTime12h(item.closeTime) }}<template v-if="closesAfterMidnight(item)"> (next day)</template>
                   </span>
                   <Icon 
                     name="heroicons:chevron-down" 
@@ -180,17 +186,11 @@ function handleSave() {
           </div>
         </div>
 
-        <hr class="border-[#EEDFC4]" />
-
-        <!-- Apply to All Checkbox -->
-        <label class="flex items-center gap-3 cursor-pointer p-4 bg-[#fef8f0] border border-[#EEDFC4] rounded-xl">
-          <input type="checkbox" v-model="applyToAll" class="w-4 h-4 rounded border-[#EEDFC4] text-[#7D5A50] focus:ring-[#7D5A50]" />
-          <div class="flex flex-col">
-            <span class="text-sm font-bold text-[#3B1F0E]">Apply globally</span>
-            <span class="text-[11px] text-[#B4846C]">Use this schedule for all active branches.</span>
-          </div>
-        </label>
       </div>
+
+      <p v-if="localError || error" class="px-6 md:px-8 pb-4 text-sm font-bold text-red-600 whitespace-pre-line">
+        {{ localError || error }}
+      </p>
 
       <!-- Footer -->
       <div class="flex items-center justify-between px-6 md:px-8 py-5 border-t border-[#EEDFC4] shrink-0 bg-[#FAFAF8] rounded-b-3xl">

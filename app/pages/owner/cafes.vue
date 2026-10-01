@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { BranchSummary } from '~/services/OwnerProfileService'
 import { usePlanFeature } from '~/composables/usePlanFeature'
-import { useOperatingHours } from '~/composables/useOperatingHours'
+import { useOperatingHours, type DaySchedule } from '~/composables/useOperatingHours'
 
 definePageMeta({
   role: 'Cafe Owner',
@@ -21,7 +21,7 @@ const { hasFeature, fetchCurrentSubscription } = usePlanFeature()
 const branches = ref<BranchSummary[]>([])
 const loading = ref(false)
 const errorMessage = ref('')
-const { formattedSummary, isOpenNow, setOperatingHours } = useOperatingHours()
+const { formattedSummary, isOpenNow, saveOperatingHours } = useOperatingHours()
 
 const currentPage = ref(1)
 const lastPage = ref(1)
@@ -38,6 +38,7 @@ const isAddBranchOpen = ref(false)
 const isOperatingHoursOpen = ref(false)
 const savingBranch = ref(false)
 const savingHours = ref(false)
+const hoursError = ref('')
 const toastMessage = ref('')
 const backendErrors = ref<Record<string, string[]>>({})
 
@@ -79,15 +80,6 @@ async function fetchBranches() {
     } else {
       branches.value = []
     }
-
-    try {
-      const hoursRes = await ownerService.getOperatingHours()
-      if (hoursRes.success && hoursRes.data) {
-        setOperatingHours(hoursRes.data)
-      }
-    } catch (e) {
-      console.warn('Could not fetch operating hours from backend:', e)
-    }
   } catch (e) {
     branches.value = []
     errorMessage.value = 'Failed to load branches.'
@@ -128,17 +120,21 @@ async function handleCreateBranch(data: FormData | any) {
   }
 }
 
-// Handle General Operating Hours Save
-async function handleSaveOperatingHours(payload: any) {
+// Opening hours are cafe-wide: one week shared by every branch.
+async function handleSaveOperatingHours(schedule: DaySchedule[]) {
   savingHours.value = true
+  hoursError.value = ''
   try {
-    const res = await ownerService.updateOperatingHours(payload)
-    showToast(payload.apply_to_all ? 'General operating hours updated across all branches!' : 'Operating hours updated!')
-  } catch (e) {
-    showToast('General operating hours configured for all branches!')
+    await saveOperatingHours(schedule)
+    isOperatingHoursOpen.value = false
+    showToast('Operating hours updated for all branches.')
+  } catch (e: any) {
+    const errors = e?.data?.errors as Record<string, string[]> | undefined
+    hoursError.value = errors
+      ? Object.values(errors).flat().join('\n')
+      : (e?.data?.message ?? 'Could not save operating hours. Please try again.')
   } finally {
     savingHours.value = false
-    isOperatingHoursOpen.value = false
   }
 }
 
@@ -352,7 +348,8 @@ function viewDetails(uuid: string) {
       <CafeManagementOperatingHoursModal
         :show="isOperatingHoursOpen"
         :saving="savingHours"
-        @close="isOperatingHoursOpen = false"
+        :error="hoursError"
+        @close="isOperatingHoursOpen = false; hoursError = ''"
         @save="handleSaveOperatingHours"
       />
     </main>
