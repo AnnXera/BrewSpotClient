@@ -199,6 +199,13 @@ const removeIngredient = (index: number) => {
   }
 }
 
+// The recipe can be long; bring the first row with an error into view so Confirm never looks like it did nothing.
+const bodyEl = ref<HTMLElement | null>(null)
+const scrollToFirstError = async () => {
+  await nextTick()
+  bodyEl.value?.querySelector('[data-row-error]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
 const saveItem = async () => {
   errors.value = { menu_name: '', base_price: '' }
   let hasError = false
@@ -214,7 +221,10 @@ const saveItem = async () => {
 
   if (Object.keys(rowErrors.value).length) hasError = true
 
-  if (hasError) return
+  if (hasError) {
+    scrollToFirstError()
+    return
+  }
 
   isSubmitting.value = true
   try {
@@ -270,6 +280,7 @@ const saveItem = async () => {
 
     if (Object.keys(rowMessages).length) {
       serverRowErrors.value = rowMessages
+      scrollToFirstError()
       return
     }
 
@@ -307,7 +318,7 @@ const saveItem = async () => {
       </div>
 
       <!-- Body (Scrollable) -->
-      <div class="flex-1 overflow-y-auto p-8 space-y-8">
+      <div ref="bodyEl" class="flex-1 overflow-y-auto p-8 space-y-8">
         
         <!-- Top Section: Image & Basic Info -->
         <div class="flex flex-col md:flex-row gap-8">
@@ -458,7 +469,7 @@ const saveItem = async () => {
                   @pick="onPick(recipe, index, $event)"
                   @enter="handleEnterOnIngredient(index)"
                 />
-                <p v-if="rowErrors[index]" class="text-red-500 text-xs font-bold mt-1 ml-1">{{ rowErrors[index] }}</p>
+                <p v-if="rowErrors[index]" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ rowErrors[index] }}</p>
               </div>
 
               <!-- Amount -->
