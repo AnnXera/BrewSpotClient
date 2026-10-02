@@ -58,7 +58,7 @@ const filteredAndSorted = computed(() => {
 })
 
 const currentPage = ref(1)
-const itemsPerPage = ref(24) // 24 is a good grid number (divisible by 2, 3, 4)
+const itemsPerPage = ref(15) // divisible by 3, so the 3-column grid fills whole rows
 
 const paginatedIngredients = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage.value
@@ -112,40 +112,6 @@ function closeModal() {
   delete newQuery.action
   delete newQuery.ingredient
   router.push({ query: newQuery })
-}
-
-function toggleActive(ingredient: Ingredient) {
-  const retiring = ingredient.is_active
-
-  if (retiring && ingredient.used_in > 0) {
-    const items = ingredient.used_in === 1 ? '1 menu item' : `${ingredient.used_in} menu items`
-    
-    confirmModal.value = {
-      show: true,
-      title: 'Retire Ingredient?',
-      message: `${ingredient.name} is used in ${items}. Those recipes keep it, but it won't show when adding new recipes. Retire it?`,
-      confirmText: 'Retire',
-      isDestructive: true,
-      onConfirm: async () => {
-        confirmModal.value.show = false
-        await executeToggle(ingredient, retiring)
-      }
-    }
-    return
-  }
-
-  executeToggle(ingredient, retiring)
-}
-
-async function executeToggle(ingredient: Ingredient, retiring: boolean) {
-  try {
-    await menuService.updateIngredient(ingredient.uuid, { is_active: !retiring })
-    await fetchData()
-  } catch (error) {
-    console.error('Failed to update ingredient', error)
-    errorMessage.value = 'Failed to update ingredient. Please try again.'
-    setTimeout(() => { errorMessage.value = '' }, 4000)
-  }
 }
 
 function toggleSelection(uuid: string, isSelected: boolean) {
@@ -272,14 +238,13 @@ const links = [
 
           <template v-else>
             <div v-if="filteredAndSorted.length > 0">
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 <IngredientCard
                   v-for="ingredient in paginatedIngredients"
                   :key="ingredient.uuid"
                   :ingredient="ingredient"
                   :selected="selectedUuids.has(ingredient.uuid)"
                   @edit="editIngredient(ingredient.uuid)"
-                  @toggle-active="toggleActive(ingredient)"
                   @update:selected="(val) => toggleSelection(ingredient.uuid, val)"
                 />
               </div>

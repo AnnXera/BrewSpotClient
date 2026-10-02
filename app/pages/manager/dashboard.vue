@@ -6,6 +6,7 @@ definePageMeta({
 // Dashboard stays first; add other manager pages below it as they're built.
 const links = [
   { label: 'Dashboard', to: '/manager/dashboard', icon: 'squares-2x2' },
+  { label: 'Servings', to: '/manager/servings', icon: 'cake' },
 ]
 </script>
 

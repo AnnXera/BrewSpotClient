@@ -35,12 +35,13 @@ export function parseQuantity(value: string | number): number {
   return parseFloat(str) || 0;
 }
 
-export function formatQuantity(value: number | string): string {
+// `tolerance` is how far a decimal may be from a fraction and still show as it
+// (use 0.01 for values already rounded to 2 places, e.g. 0.33 -> 1/3).
+export function formatQuantity(value: number | string, tolerance = 1.0E-6): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(num) || num === 0) return '';
   
   // Find common fractions
-  const tolerance = 1.0E-6;
   const whole = Math.floor(num);
   const decimal = num - whole;
   
