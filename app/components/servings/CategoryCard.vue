@@ -3,6 +3,7 @@
 import type { ServingCategorySummary } from '~/services/ServingService'
 
 const props = defineProps<{ category: ServingCategorySummary }>()
+defineEmits<{ select: [] }>()
 
 // Ring around the picture shows how much of today's servings is left.
 const RADIUS = 34
@@ -15,7 +16,14 @@ const soldOut = computed(() => props.category.status === 'sold_out')
 </script>
 
 <template>
-  <div class="bg-white border border-[#3D2B24] rounded-2xl px-[22px] py-[18px] flex items-center gap-4">
+  <div
+    role="button"
+    tabindex="0"
+    class="bg-white border border-[#3D2B24] rounded-2xl px-[22px] py-[18px] flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+    @click="$emit('select')"
+    @keydown.enter.prevent="$emit('select')"
+    @keydown.space.prevent="$emit('select')"
+  >
     <div class="relative shrink-0 size-[70px]">
       <img
         v-if="category.picture"

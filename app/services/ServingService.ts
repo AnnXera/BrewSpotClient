@@ -25,6 +25,28 @@ export interface ServingCategorySummary {
     status: 'available' | 'sold_out'
 }
 
+export type ServingItemSort = 'name' | 'stock_desc' | 'stock_asc'
+export type ServingItemStatus = 'available' | 'sold_out' | 'unavailable' | 'branch_unavailable'
+
+// One item on a category page: today's daily limit and what is left of it.
+export interface CategoryServingItem {
+    uuid: string
+    menu_name: string
+    picture: string | null
+    status: ServingItemStatus
+    daily_limit: number
+    servings_sold: number
+    available_stock: number
+    enabled: boolean // the eye: offered today
+    editable: boolean // false when the item is switched off for this branch
+}
+
+export interface CategoryServingChange {
+    menu_item_uuid: string
+    daily_limit: number
+    enabled: boolean
+}
+
 export interface IngredientUsage {
     name: string
     unit: string
@@ -77,6 +99,22 @@ export class ServingService extends BaseService {
     categories(branchUuid: string, params: ServingListParams = {}) {
         return this.get<{ success: boolean; date: string; categories: Paginated<ServingCategorySummary> }>(
             `${this.base(branchUuid)}/categories`, this.clean(params))
+    }
+
+    // 'uncategorized' = items without a category.
+    categoryItems(branchUuid: string, categoryUuid: string, params: ServingListParams = {}) {
+        return this.get<{
+            success: boolean
+            date: string
+            category: { uuid: string | null; name: string }
+            items: Paginated<CategoryServingItem>
+        }>(`${this.base(branchUuid)}/categories/${categoryUuid}/items`, this.clean(params))
+    }
+
+    // Save Changes: all rows apply together or none do (422 with per-row `errors` keyed "items.N.field").
+    saveCategoryItems(branchUuid: string, categoryUuid: string, items: CategoryServingChange[]) {
+        return this.put<{ success: boolean; message: string; errors?: Record<string, string[]> }>(
+            `${this.base(branchUuid)}/categories/${categoryUuid}/items`, { items } as Record<string, any>)
     }
 
     ingredientsUsed(branchUuid: string, params: ServingListParams = {}) {

@@ -18,6 +18,11 @@ const links = [
   { label: 'Servings', to: '/manager/servings', icon: 'cake' },
 ]
 
+// Opens the category's items; the branch rides along since a manager can have several.
+function openCategory(c: ServingCategorySummary) {
+  navigateTo({ path: `/manager/servings/${c.uuid ?? 'uncategorized'}`, query: { branch: branchUuid.value } })
+}
+
 const CATEGORIES_PER_PAGE = 6
 const REFRESH_MS = 30_000
 
@@ -27,13 +32,7 @@ const branches = ref<ManagedBranch[]>([])
 const branchUuid = ref('')
 
 // Live clock in the header
-const now = ref(new Date())
-const timeLabel = computed(() =>
-  now.value.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(' ', '').toUpperCase(),
-)
-const dateLabel = computed(() =>
-  now.value.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
-)
+const { timeLabel, dateLabel } = useNowClock()
 
 // Categories
 const categorySearch = ref('')
@@ -125,18 +124,20 @@ watch(branchUuid, async () => {
   loading.value = false
 })
 
-let clockTimer: ReturnType<typeof setInterval> | undefined
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 
 onMounted(async () => {
-  clockTimer = setInterval(() => (now.value = new Date()), 1000)
   refreshTimer = setInterval(loadAll, REFRESH_MS)
 
   try {
     const res = await service.managedBranches()
     branches.value = res.branches
     if (!res.branches.length) errorMessage.value = 'You are not assigned to a branch yet.'
-    else branchUuid.value = res.branches[0]!.uuid
+    else {
+      // Coming back from a category page keeps the branch that was open.
+      const wanted = typeof useRoute().query.branch === 'string' ? useRoute().query.branch : ''
+      branchUuid.value = res.branches.find((b) => b.uuid === wanted)?.uuid ?? res.branches[0]!.uuid
+    }
   } catch (e: any) {
     failure(e, 'Could not load your branches.')
   }
@@ -144,7 +145,6 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  clearInterval(clockTimer)
   clearInterval(refreshTimer)
   clearTimeout(searchTimer)
 })
@@ -211,7 +211,12 @@ onBeforeUnmount(() => {
               No categories are visible at this branch.
             </p>
             <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-6">
-              <ServingsCategoryCard v-for="c in categories" :key="c.uuid ?? 'uncategorized'" :category="c" />
+              <ServingsCategoryCard
+                v-for="c in categories"
+                :key="c.uuid ?? 'uncategorized'"
+                :category="c"
+                @select="openCategory(c)"
+              />
             </div>
           </div>
 
