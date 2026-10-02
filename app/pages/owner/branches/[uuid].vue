@@ -40,17 +40,15 @@ function viewEmployee(uuid: string) {
 }
 
 function backToEmployees() {
-  const query = { ...route.query, tab: 'employees' }
-  delete query.employee
-  router.push({ query })
+  const { employee, ...restQuery } = route.query
+  router.push({ query: { ...restQuery, tab: 'employees' } })
 }
 
 function selectTab(tab: 'details' | 'employees') {
   activeTab.value = tab
   if (viewedEmployee.value) {
-    const query = { ...route.query, tab }
-    delete query.employee
-    router.replace({ query })
+    const { employee, ...restQuery } = route.query
+    router.replace({ query: { ...restQuery, tab } })
   }
 }
 

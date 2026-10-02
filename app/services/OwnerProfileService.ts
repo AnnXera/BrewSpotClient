@@ -83,4 +83,13 @@ export class OwnerProfileService extends BaseService {
     updateOperatingHours(hours: ApiOpeningHourInput[]) {
         return this.put<{ success: boolean; message: string; data?: ApiOpeningHour[] }>('/owner/opening-hours', { hours })
     }
+
+    getDashboardStats() {
+        return this.get<{ 
+            success: boolean; 
+            total_earnings?: number; 
+            detailed_stats?: { today_revenue: number, today_orders: number, avg_order_value: number, active_customers: number };
+            chart_data?: { month: string, revenue: number }[]
+        }>('/owner/dashboard-stats')
+    }
 }
