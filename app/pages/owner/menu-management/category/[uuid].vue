@@ -9,6 +9,7 @@ import ItemModal from '~/components/menu/ItemModal.vue'
 import AddEditItemToCategory from '~/components/menu/AddEditItemToCategory.vue'
 import CategoryBranchesPanel from '~/components/menu/CategoryBranchesPanel.vue'
 import Pagination from '~/components/common/Pagination.vue'
+import CategoryModal from '~/components/menu/CategoryModal.vue'
 
 definePageMeta({
   layout: 'owner',
@@ -132,6 +133,25 @@ function handleDeleteItem(itemUuid: string) {
   }
 }
 
+const isRealCategory = computed(() => currentCategoryUuid.value !== 'uncategorized')
+const isCategoryModalOpen = ref(false)
+const isDeletingCategory = ref(false)
+
+async function handleDeleteCategory() {
+  if (!currentCategory.value || isDeletingCategory.value) return
+  if (!window.confirm(`Delete the category "${currentCategory.value.name}"?`)) return
+  isDeletingCategory.value = true
+  try {
+    await menuService.deleteMenuCategory(currentCategory.value.uuid)
+    await router.push('/owner/menu-management')
+  } catch (error) {
+    console.error('Failed to delete category', error)
+    alert('Failed to delete category. Please try again.')
+  } finally {
+    isDeletingCategory.value = false
+  }
+}
+
 const isAssignItemsModalOpen = computed(() => route.query.action === 'assign-items')
 
 function closeAssignItemsModal() {
@@ -176,10 +196,34 @@ const links = [
         :title="pageTitle"
         :subtitle="pageSubtitle"
         :breadcrumbs="breadcrumbs"
-      />
+      >
+        <template v-if="isRealCategory && currentCategory" #title-actions>
+          <button
+            type="button"
+            class="w-9 h-9 rounded-full bg-white border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center hover:bg-[#F5EAD4] transition-colors"
+            title="Edit Category"
+            aria-label="Edit category"
+            @click="isCategoryModalOpen = true"
+          >
+            <Icon name="heroicons:pencil-square" class="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            class="w-9 h-9 rounded-full bg-[#FDE8E8] text-[#D9534F] flex items-center justify-center hover:bg-[#FAD4D4] transition-colors disabled:opacity-50"
+            title="Delete Category"
+            aria-label="Delete category"
+            :disabled="isDeletingCategory"
+            @click="handleDeleteCategory"
+          >
+            <Icon name="heroicons:trash" class="w-5 h-5" />
+          </button>
+        </template>
+      </MenuPageHeader>
 
       <div class="flex flex-col lg:flex-row gap-6 items-start">
-      <div :class="['flex-1 min-w-0 w-full bg-white border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm', filteredAndSortedItems.length > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
+      <!-- Card and its pagination stack in one column; the branches panel sits beside them -->
+      <div class="flex-1 min-w-0 w-full flex flex-col">
+      <div :class="['w-full bg-white border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm', filteredAndSortedItems.length > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
         
         <!-- Toolbar Section -->
         <div class="p-4 sm:p-6 border-b border-[#EEDFC4]">
@@ -236,6 +280,7 @@ const links = [
           @change="page => currentPage = page"
         />
       </div>
+      </div>
 
       <CategoryBranchesPanel
         v-if="currentCategoryUuid !== 'uncategorized'"
@@ -251,6 +296,14 @@ const links = [
       :defaultCategoryUuid="currentCategoryUuid"
       @close="closeItemModal"
       @saved="onItemSaved"
+    />
+
+    <CategoryModal
+      :show="isCategoryModalOpen"
+      :category="currentCategory"
+      :items="allCafeItems"
+      @close="isCategoryModalOpen = false"
+      @saved="fetchData"
     />
 
     <AddEditItemToCategory

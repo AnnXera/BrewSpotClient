@@ -3,6 +3,7 @@ import { useMenuService } from '~/composables/useMenuService'
 import ItemBranchesPanel from '~/components/menu/ItemBranchesPanel.vue'
 import ItemModal from '~/components/menu/ItemModal.vue'
 import MenuBreadcrumbs from '~/components/menu/MenuBreadcrumbs.vue'
+import { formatQuantity } from '~/utils/fraction'
 
 definePageMeta({
   role: 'Cafe Owner',
@@ -189,7 +190,7 @@ onMounted(fetchItem)
             >
               <p class="min-w-0 break-words">{{ recipe.ingredient_name }}</p>
               <div class="flex items-center shrink-0 w-[180px] sm:w-[249px] text-center">
-                <p class="flex-1">{{ Number(recipe.quantity) }}</p>
+                <p class="flex-1">{{ formatQuantity(recipe.quantity, 0.01) || Number(recipe.quantity) }}</p>
                 <p class="w-[95px]">{{ recipe.unit }}</p>
               </div>
             </div>

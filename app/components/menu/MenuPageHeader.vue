@@ -17,9 +17,12 @@ const { formattedSummary, isOpenNow } = useOperatingHours()
       <!-- Breadcrumbs -->
       <MenuBreadcrumbs v-if="breadcrumbs && breadcrumbs.length" :items="breadcrumbs" class="mb-1" />
       
-      <h1 class="font-display text-[32px] font-bold text-[#3B1F0E] leading-tight">
-        {{ title }}
-      </h1>
+      <div class="flex items-center gap-3 flex-wrap">
+        <h1 class="font-display text-[32px] font-bold text-[#3B1F0E] leading-tight">
+          {{ title }}
+        </h1>
+        <slot name="title-actions" />
+      </div>
       <p v-if="subtitle" class="font-sans text-base text-[#7D5A50]">
         {{ subtitle }}
       </p>
