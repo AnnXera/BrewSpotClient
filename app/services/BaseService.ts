@@ -1,5 +1,5 @@
 //app/services/BaseService.ts
-import type { $Fetch } from 'ofetch'
+import type { $Fetch } from 'nitropack'
 
 export abstract class BaseService {
     constructor(protected readonly client: $Fetch) { }
@@ -14,6 +14,10 @@ export abstract class BaseService {
 
     protected patch<T = any>(url: string, body?: Record<string, any>) {
         return this.client<T>(url, { method: 'PATCH', body })
+    }
+
+    protected put<T = any>(url: string, body?: Record<string, any> | FormData) {
+        return this.client<T>(url, { method: 'PUT', body })
     }
 
     protected delete<T = any>(url: string) {

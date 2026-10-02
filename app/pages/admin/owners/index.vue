@@ -117,6 +117,10 @@ async function fetchOwners() {
   }
 }
 
+async function refreshData() {
+  await Promise.all([fetchStats(), fetchOwners()])
+}
+
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 watch(search, () => {
   if (searchTimeout) clearTimeout(searchTimeout)
@@ -211,27 +215,58 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row min-h-screen bg-[#FDF3E7]">
+  <div class="flex flex-col min-h-screen bg-[#FDF3E7]
+              md:flex-row">
     <NavBar :links="links" />
 
-    <main class="flex-1 p-12">
+    <main class="flex-1 p-3.5
+                min-[360px]:p-4
+                sm:p-6
+                md:p-12">
       <!-- Header -->
-      <header class="mb-8">
-        <h1 class="font-display text-[26px] leading-[39px] font-bold text-[#3D2B24]">Owner Management</h1>
-        <p class="font-sans text-[14px] leading-[21px] text-[#9E7060] mt-[2px]">
-          Manage all registered cafe owners across the platform.
-        </p>
-      </header>
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4
+                  min-[360px]:mb-5
+                  sm:mb-6
+                  md:mb-8">
+        <div>
+          <h1 class="font-display text-2xl font-extrabold text-[#3D2B24] tracking-tight
+                     min-[360px]:text-3xl
+                     sm:text-[32px] sm:leading-[40px]">
+            Owner Management
+          </h1>
+          <p class="font-sans text-[13px] text-[#9E7060] mt-1
+                    min-[360px]:text-sm
+                    sm:text-[15px]">
+            Manage all registered cafe owners.
+          </p>
+        </div>
 
-      <!-- Stat cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-        <OwnerManagementStatCard :value="stats?.total_owners" label="Total Owners" />
-        <OwnerManagementStatCard :value="stats?.active" label="Active" color="#2E9E5B" />
-        <OwnerManagementStatCard :value="stats?.inactive_or_suspended" label="Inactive/Suspended" color="#D9622B" />
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 px-[16px] py-[8px] rounded-lg bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-medium text-[14px] hover:bg-[#FDF3E7] hover:border-[#D9C4B8] hover:shadow-md hover:-translate-y-[1px] active:translate-y-[1px] active:shadow-sm transition-all shadow-sm self-start sm:self-auto cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
+          :disabled="loading"
+          @click="refreshData"
+        >
+          <Icon name="heroicons:arrow-path" class="w-4 h-4" :class="{ 'animate-spin': loading }" />
+          <span>Refresh</span>
+        </button>
       </div>
 
-      <!-- Table card -->
-      <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden">
+      <!-- Stat cards -->
+      <div class="grid grid-cols-2 gap-2.5 mb-4
+                  min-[360px]:gap-3 min-[360px]:mb-5
+                  sm:gap-4
+                  md:grid-cols-3 md:gap-6 md:mb-8">
+        <div class="col-span-2
+                    md:col-span-1">
+          <OwnerManagementStatCard :value="stats?.total_owners" label="Total Owners" />
+        </div>
+        <OwnerManagementStatCard :value="stats?.active" label="Active" color="#2E9E5B" />
+        <OwnerManagementStatCard :value="stats?.inactive_or_suspended" label="Suspended/ Inactive" color="#D9622B" />
+      </div>
+
+      <!-- Main Content Card -->
+      <div :class="['bg-white border border-[#EEDFC4] overflow-hidden shadow-sm transition-shadow hover:shadow-md', owners.length > 0 ? 'rounded-t-[20px] border-b-0' : 'rounded-[20px]']">
         <OwnerManagementFilterBar
           v-model:search="search"
           v-model:status="status"
@@ -240,8 +275,30 @@ onMounted(() => {
           :total="total"
         />
 
-        <!-- Table -->
-        <div class="overflow-x-auto">
+        <!-- Mobile Card List View (visible on small screens) -->
+        <div class="block
+                    md:hidden">
+          <div v-if="loading" class="p-8 flex flex-col items-center justify-center gap-2 text-[#3B1F0E]/50">
+            <Icon name="heroicons:arrow-path" class="w-5 h-5 animate-spin text-[#B4846C]" />
+            <span class="font-sans text-sm">Loading owners…</span>
+          </div>
+          <div v-else-if="!owners.length" class="p-8 text-center font-sans text-sm text-[#3B1F0E]/50">
+            No owners found.
+          </div>
+          <OwnerManagementMobileCard
+            v-for="(owner, index) in owners"
+            :key="owner.uuid"
+            :owner="owner"
+            :index="index"
+            :status-change-loading="statusChangeLoading === owner.uuid"
+            @view="viewOwner"
+            @status-change="requestStatusChange"
+          />
+        </div>
+
+        <!-- Desktop Table View (visible on medium screens and up) -->
+        <div class="hidden overflow-x-auto
+                    md:block">
           <table class="w-full text-left">
             <thead>
               <tr class="bg-[#FBF2E1] border-b border-[#F3E7D2]">
@@ -255,8 +312,11 @@ onMounted(() => {
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="6" class="px-6 py-10 text-center font-sans text-sm text-[#3B1F0E]/50">
-                  Loading owners…
+                <td colspan="6" class="px-6 py-10 text-center">
+                  <div class="flex flex-col items-center justify-center gap-2 text-[#3B1F0E]/50">
+                    <Icon name="heroicons:arrow-path" class="w-5 h-5 animate-spin text-[#B4846C]" />
+                    <span class="font-sans text-sm">Loading owners…</span>
+                  </div>
                 </td>
               </tr>
               <tr v-else-if="!owners.length">
@@ -276,21 +336,24 @@ onMounted(() => {
             </tbody>
           </table>
         </div>
-
+      </div>
+      
+      <!-- Pagination (Separate Frame) -->
+      <div v-if="owners.length > 0" class="bg-white rounded-b-[20px] border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
         <CommonPagination :page="currentPage" :last-page="lastPage" @change="goToPage" />
       </div>
     </main>
-  </div>
 
-  <ConfirmDialog
-    :open="!!confirmDialog"
-    :title="confirmDialog?.newStatus === 'suspended' ? 'Suspend this owner?' : 'Reactivate this owner?'"
-    :message="confirmDialog?.newStatus === 'suspended'
-      ? `This will suspend ${confirmDialog?.owner.name}, deactivate their branches, and cancel their active subscription. This action can be reversed later.`
-      : `This will reactivate ${confirmDialog?.owner.name} and restore their branches.`"
-    :confirm-label="confirmDialog?.newStatus === 'suspended' ? 'Suspend' : 'Reactivate'"
-    :danger="confirmDialog?.newStatus === 'suspended'"
-    @confirm="confirmStatusChange"
-    @cancel="cancelStatusChange"
-  />
+    <ConfirmDialog
+      :open="!!confirmDialog"
+      :title="confirmDialog?.newStatus === 'suspended' ? 'Suspend this owner?' : 'Reactivate this owner?'"
+      :message="confirmDialog?.newStatus === 'suspended'
+        ? `This will suspend ${confirmDialog?.owner.name}, deactivate their branches, and cancel their active subscription. This action can be reversed later.`
+        : `This will reactivate ${confirmDialog?.owner.name} and restore their branches.`"
+      :confirm-label="confirmDialog?.newStatus === 'suspended' ? 'Suspend' : 'Reactivate'"
+      :danger="confirmDialog?.newStatus === 'suspended'"
+      @confirm="confirmStatusChange"
+      @cancel="cancelStatusChange"
+    />
+  </div>
 </template>

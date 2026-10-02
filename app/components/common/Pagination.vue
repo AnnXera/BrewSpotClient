@@ -1,33 +1,38 @@
 <!-- app/components/common/Pagination.vue -->
 <template>
-  <div v-if="lastPage > 1" class="flex items-center justify-center gap-4 p-5">
+  <div class="flex items-center justify-center gap-[6px] h-[56px] w-full">
     <button
-      class="p-2 text-[#9E7060] disabled:opacity-30 hover:text-[#3B1F0E] transition-colors"
-      :disabled="page === 1"
+      type="button"
+      class="p-1 text-[#9E7060] disabled:opacity-30 disabled:cursor-not-allowed hover:text-[#3D2B24] transition-colors flex items-center justify-center"
+      :disabled="page <= 1"
       @click="prev"
     >
-      <Icon name="heroicons:chevron-left-20-solid" class="w-6 h-6" />
+      <Icon name="heroicons:chevron-left" class="w-[16px] h-[16px]" />
     </button>
 
-    <span class="font-sans text-sm font-medium text-[#3B1F0E]">Page {{ page }} of {{ lastPage }}</span>
+    <span class="font-display font-bold text-[14px] text-[#7D5A50] flex items-center">
+      Page {{ page }} of {{ Math.max(1, lastPage) }}
+    </span>
 
     <button
-      class="p-2 text-[#9E7060] disabled:opacity-30 hover:text-[#3B1F0E] transition-colors"
-      :disabled="page === lastPage"
+      type="button"
+      class="p-1 text-[#9E7060] disabled:opacity-30 disabled:cursor-not-allowed hover:text-[#3D2B24] transition-colors flex items-center justify-center"
+      :disabled="page >= Math.max(1, lastPage)"
       @click="next"
     >
-      <Icon name="heroicons:chevron-right-20-solid" class="w-6 h-6" />
+      <Icon name="heroicons:chevron-right" class="w-[16px] h-[16px]" />
     </button>
   </div>
 </template>
 
-<!-- Generic "Page X of Y" pagination, styled after the original
-     owner-detail/PaymentHistoryTable.vue pattern. Use this on any
-     page/table instead of re-implementing prev/next controls. -->
 <script setup lang="ts">
 interface Props {
   page: number
   lastPage: number
+  // Optional "Showing x–y of z" summary; omitted by pages that don't pass it.
+  total?: number
+  from?: number | null
+  to?: number | null
 }
 
 const props = defineProps<Props>()
@@ -41,6 +46,6 @@ function prev() {
 }
 
 function next() {
-  if (props.page < props.lastPage) emit('change', props.page + 1)
+  if (props.page < Math.max(1, props.lastPage)) emit('change', props.page + 1)
 }
 </script>

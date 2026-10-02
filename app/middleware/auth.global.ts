@@ -2,8 +2,6 @@
 import { useAuthStore } from "~/stores/auth"
 import { getRedirectForRole } from "~/utils/roleRedirects"
 
-let isInitialPageLoad = true
-
 export default defineNuxtRouteMiddleware((to) => {
     const token = useCookie<string | null>('auth_token')
     const authStore = useAuthStore()
@@ -11,6 +9,11 @@ export default defineNuxtRouteMiddleware((to) => {
     const userRoleCookie = useCookie<string | null>('user_role')
     if (!authStore.role && userRoleCookie.value) {
         authStore.role = userRoleCookie.value
+    }
+
+    const userDataCookie = useCookie<any>('user_data')
+    if (!authStore.user && userDataCookie.value) {
+        authStore.user = userDataCookie.value
     }
 
     // 1. Obsolete/removed step extensions automatically redirect to /login immediately without rendering
@@ -25,26 +28,17 @@ export default defineNuxtRouteMiddleware((to) => {
         return navigateTo('/login', { replace: true })
     }
 
-    const publicRoutes = ['/login', '/verify-login-code', '/register', '/setup-password']
-    const isPublic = publicRoutes.some((p) => to.path.startsWith(p))
-
-    // 2. On browser refresh or direct URL load for unauthenticated users, redirect immediately to /login
-    const isFresh = isInitialPageLoad
-    if (import.meta.client) {
-        isInitialPageLoad = false
-    }
-
-    if (!token.value && isFresh && to.path !== '/login') {
-        return navigateTo('/login', { replace: true })
-    }
+    const publicRoutes = ['/', '/login', '/verify-login-code', '/register', '/setup-password', '/application', '/unauthorized']
+    const isPublic = publicRoutes.some((p) => p === '/' ? to.path === '/' : (to.path === p || to.path.startsWith(p + '/')))
 
     // 3. Protect authenticated routes for unauthenticated users
     if (!token.value && !isPublic) {
         return navigateTo('/login', { replace: true })
     }
 
-    // 4. Redirect logged-in users trying to access login/register back to their dashboard
-    if (token.value && authStore.role && isPublic) {
+    // 4. Redirect logged-in users trying to access auth pages (login/register) back to their dashboard
+    const authPagesOnly = ['/login', '/verify-login-code', '/register', '/setup-password']
+    if (token.value && authStore.role && authPagesOnly.some((p) => to.path === p || to.path.startsWith(p + '/'))) {
         return navigateTo(getRedirectForRole(authStore.role), { replace: true })
     }
 

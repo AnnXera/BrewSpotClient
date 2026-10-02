@@ -11,7 +11,7 @@ interface User {
 
 export const useAuthStore = defineStore('auth', {
     state: () => ({
-        user: null as User | null,
+        user: (useCookie<User | null>('user_data').value) ?? null,
         role: (useCookie<string | null>('user_role').value) ?? null,
         registrationEmail: '',
         registrationUserUuid: '',
@@ -27,6 +27,8 @@ export const useAuthStore = defineStore('auth', {
             this.role = role
             const userRole = useCookie<string | null>('user_role', { maxAge: 60 * 60 * 24 * 7 })
             userRole.value = role
+            const userData = useCookie<User | null>('user_data', { maxAge: 60 * 60 * 24 * 7 })
+            userData.value = user
         },
         setRegistrationEmail(email: string) {
             this.registrationEmail = email
@@ -45,6 +47,8 @@ export const useAuthStore = defineStore('auth', {
             this.registrationUserUuid = ''
             const userRole = useCookie<string | null>('user_role')
             userRole.value = null
+            const userData = useCookie<User | null>('user_data')
+            userData.value = null
         },
     },
 })

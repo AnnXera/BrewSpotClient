@@ -63,8 +63,6 @@ async function viewDocument(url: string) {
   }
 }
 
-// cafe_picture is a public-disk column, not a BranchDocument row — served by
-// the unauthenticated GET /api/branch-picture/{uuid} route.
 function cafePictureUrl(branchUuid?: string | null) {
   if (!branchUuid) return null
   const config = useRuntimeConfig()
@@ -90,7 +88,10 @@ function viewCafePicture() {
 
         <!-- Scrollable Content -->
         <div class="flex-1 min-h-0 overflow-y-auto">
-          <div v-if="loading" class="p-10 text-center font-sans text-sm text-[#3B1F0E]/50">Loading application…</div>
+          <div v-if="loading" class="p-10 flex flex-col items-center justify-center gap-3 text-[#3B1F0E]/50">
+            <Icon name="heroicons:arrow-path" class="w-6 h-6 animate-spin text-[#B4846C]" />
+            <span class="font-sans text-sm">Loading application…</span>
+          </div>
 
           <template v-else-if="ownerDetails && approval">
             <div class="p-6">

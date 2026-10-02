@@ -38,7 +38,79 @@ interface SimpleResponse {
     retry_after_seconds?: number
 }
 
+interface CheckSetupStatusResponse {
+    success: boolean
+    status?: string
+    already_active?: boolean
+    message?: string
+    email?: string
+    role?: string
+}
+
+interface SetupPasswordResponse {
+    success: boolean
+    message: string
+    already_active?: boolean
+    user?: User
+}
+
+export interface ApplicationDetails {
+    user: {
+        uuid: string
+        firstname: string
+        middlename?: string | null
+        lastname: string
+        username: string
+        email: string
+        phone_number: string
+        address: string
+        status: string
+        created_at: string
+    }
+    cafe?: {
+        uuid: string
+        cafe_name: string
+        doc_type?: string
+    } | null
+    branch?: {
+        uuid: string
+        branch_name: string
+        address: string
+        cafe_email: string
+        cafe_phonenumber: string
+        branch_type: string
+        status: string
+    } | null
+    documents: {
+        government_id: { type?: string; uploaded: boolean; has_back?: boolean }
+        cafe_document: { type?: string; uploaded: boolean }
+        bir: { type: string; uploaded: boolean }
+        mayors_permit: { type: string; uploaded: boolean }
+        sanitary_permit: { type: string; uploaded: boolean }
+    }
+    approval: {
+        status: string
+        reason?: string | null
+        submitted_at: string
+        reviewed_at?: string | null
+    }
+}
+
+export interface ApplicationDetailsResponse {
+    success: boolean
+    message?: string
+    application?: ApplicationDetails
+}
+
 export class AuthService extends BaseService {
+    getApplicationDetails(uuid: string) {
+        return this.get<ApplicationDetailsResponse>(`/auth/application/${uuid}`)
+    }
+
+    checkSetupStatus(uuid: string) {
+        return this.get<CheckSetupStatusResponse>(`/auth/setup-password/${uuid}`)
+    }
+
     login(email: string, password: string) {
         return this.post<LoginResponse>('/auth/login', { email, password })
     }
@@ -63,8 +135,28 @@ export class AuthService extends BaseService {
         return this.post<SimpleResponse>('/auth/resend-code', { email })
     }
 
+    validateRegistrationStep(userUuid: string, data: Record<string, any>) {
+        return this.post<{ success: boolean; errors?: Record<string, string[]>; message?: string }>(
+            `/auth/validate-registration-step/${userUuid}`,
+            data
+        )
+    }
+
     register(userUuid: string, payload: FormData) {
         return this.post<SimpleResponse>(`/auth/register/${userUuid}`, payload)
+    }
+
+    uploadTempFile(payload: FormData) {
+        return this.post<{ success: boolean; path?: string; message?: string }>('/upload/temp', payload)
+    }
+
+    // pin/pinConfirmation are required for managers and ignored for everyone else.
+    setupPassword(uuid: string, password: string, passwordConfirmation: string, pin?: string, pinConfirmation?: string) {
+        return this.post<SetupPasswordResponse>(`/auth/setup-password/${uuid}`, {
+            password,
+            password_confirmation: passwordConfirmation,
+            ...(pin !== undefined && { pin, pin_confirmation: pinConfirmation }),
+        })
     }
 
     logout() {

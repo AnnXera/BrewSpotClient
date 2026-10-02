@@ -15,6 +15,7 @@ const links = [
 ]
 
 const ownerService = useOwnerManagementService()
+const route = useRoute()
 
 type RegistrationTab = 'owner' | 'branch'
 type StatusTab = 'general' | 'pending_approval' | 'approved' | 'rejected'
@@ -63,6 +64,10 @@ async function fetchApprovals() {
   } finally {
     loading.value = false
   }
+}
+
+async function refreshData() {
+  await Promise.all([fetchStats(), fetchApprovals()])
 }
 
 function switchRegistrationTab(tab: RegistrationTab) {
@@ -143,36 +148,62 @@ async function handleDecision(status: 'approved' | 'rejected', reason?: string) 
     }
 
     closeModal()
-    await Promise.all([fetchStats(), fetchApprovals()])
+    rejectModalOpen.value = false
+    rejectReason.value = ''
+    fetchStats()
+    fetchApprovals()
   } catch (e) {
-    console.error('Failed to update approval decision', e)
+    console.error('Failed to update status', e)
   } finally {
     decisionLoading.value = false
   }
 }
 
-// Rejection reason prompt — collected before calling handleDecision('rejected', reason)
-const rejectReasonPrompt = ref(false)
+// Reject modal
+const rejectModalOpen = ref(false)
 const rejectReason = ref('')
 
-function requestReject() {
+function openRejectModal() {
   rejectReason.value = ''
-  rejectReasonPrompt.value = true
+  rejectModalOpen.value = true
 }
 
-function cancelReject() {
-  rejectReasonPrompt.value = false
+function closeRejectModal() {
+  rejectModalOpen.value = false
   rejectReason.value = ''
 }
 
 async function confirmReject() {
-  rejectReasonPrompt.value = false
   await handleDecision('rejected', rejectReason.value)
 }
 
-onMounted(() => {
+onMounted(async () => {
   fetchStats()
-  fetchApprovals()
+  await fetchApprovals()
+
+  if (route.query.uuid) {
+    const target = approvals.value.find((a) => a.uuid === route.query.uuid)
+    if (target) {
+      openDetails(target)
+    } else {
+      try {
+        const res = await ownerService.approvalSnapshot(route.query.uuid as string)
+        if (res.success) {
+          modalApproval.value = {
+            uuid: route.query.uuid as string,
+            status: 'pending_approval',
+            user: res.owner,
+            cafe: res.cafe,
+            branch: res.branch,
+          } as any
+          modalOwnerDetails.value = res
+          modalOpen.value = true
+        }
+      } catch (err) {
+        console.warn('Could not auto-open approval from query param:', err)
+      }
+    }
+  }
 })
 </script>
 
@@ -181,12 +212,25 @@ onMounted(() => {
     <NavBar :links="links" />
 
     <main class="flex-1 p-12">
-      <header class="mb-6">
-        <h1 class="font-display text-[26px] leading-[39px] font-bold text-[#3D2B24]">Approval Status</h1>
-        <p class="font-sans text-[14px] leading-[21px] text-[#9E7060] mt-[2px]">
-          Review and manage owner applications by approval status.
-        </p>
-      </header>
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 class="font-display text-[26px] leading-[39px] font-bold text-[#3D2B24]">Approval Status</h1>
+          <p class="font-sans text-[14px] leading-[21px] text-[#9E7060] mt-[2px]">
+            Review and manage owner applications by approval status.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 px-[16px] py-[8px] rounded-[8px] bg-white border border-[#EDD8CC] text-[#7D5A50] font-display font-medium text-[14px] hover:bg-[#FBF2E1] transition-colors shadow-sm self-start sm:self-auto cursor-pointer"
+          :disabled="loading"
+          @click="refreshData"
+        >
+          <Icon name="heroicons:arrow-path" class="w-4 h-4" :class="{ 'animate-spin': loading }" />
+          <span>Refresh</span>
+        </button>
+      </div>
 
       <!-- Owner Registration / Branch Registration -->
       <div class="relative flex items-center mb-6 border-b border-[#EEDFC4]">
@@ -212,7 +256,7 @@ onMounted(() => {
       </div>
 
       <!-- Combined Search/Tabs + Table Card -->
-      <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden">
+      <div :class="['bg-white border border-[#EEDFC4] overflow-hidden', approvals.length > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
 
         <!-- Search + Status Tabs Bar -->
         <div class="flex items-center gap-[24px] px-[20px] py-[18px] border-b border-[#F3E7D2]">
@@ -314,8 +358,11 @@ onMounted(() => {
 
             <tbody>
               <tr v-if="loading">
-                <td colspan="6" class="px-6 py-10 text-center font-sans text-sm text-[#3B1F0E]/50">
-                  Loading applications…
+                <td colspan="6" class="px-6 py-10 text-center">
+                  <div class="flex flex-col items-center justify-center gap-2 text-[#3B1F0E]/50">
+                    <Icon name="heroicons:arrow-path" class="w-5 h-5 animate-spin text-[#B4846C]" />
+                    <span class="font-sans text-sm">Loading applications…</span>
+                  </div>
                 </td>
               </tr>
               <tr v-else-if="!approvals.length">
@@ -346,77 +393,81 @@ onMounted(() => {
             </tbody>
           </table>
         </div>
-
+      </div>
+      
+      <!-- Pagination (Separate Frame) -->
+      <div v-if="approvals.length > 0" class="bg-white rounded-b-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
         <CommonPagination :page="currentPage" :last-page="lastPage" @change="goToPage" />
       </div>
     </main>
-  </div>
 
-  <ApprovalDetailsModal
-    v-if="registrationTab === 'owner'"
-    :open="modalOpen"
-    :loading="modalLoading"
-    :approval="modalApproval"
-    :owner-details="modalOwnerDetails"
-    :registration-type="registrationTab"
-    :decision-loading="decisionLoading"
-    @close="closeModal"
-    @approve="handleDecision('approved')"
-    @reject="requestReject"
-  />
+    <ApprovalDetailsModal
+      v-if="registrationTab === 'owner'"
+      :open="modalOpen"
+      :loading="modalLoading"
+      :approval="modalApproval"
+      :owner-details="modalOwnerDetails"
+      :registration-type="registrationTab"
+      :decision-loading="decisionLoading"
+      @close="closeModal"
+      @approve="handleDecision('approved')"
+      @reject="openRejectModal"
+    />
 
-  <!-- NOTE: same auto-import naming rule — app/components/approval/BranchDetailsModal.vue
-       resolves to <ApprovalBranchDetailsModal>, not <BranchDetailsModal>. -->
-  <ApprovalBranchDetailsModal
-    v-else
-    :open="modalOpen"
-    :loading="modalLoading"
-    :approval="modalApproval"
-    :owner-details="modalOwnerDetails"
-    :decision-loading="decisionLoading"
-    @close="closeModal"
-    @approve="handleDecision('approved')"
-    @reject="requestReject"
-  />
+    <!-- NOTE: same auto-import naming rule — app/components/approval/BranchDetailsModal.vue
+         resolves to <ApprovalBranchDetailsModal>, not <BranchDetailsModal>. -->
+    <ApprovalBranchDetailsModal
+      v-else
+      :open="modalOpen"
+      :loading="modalLoading"
+      :approval="modalApproval"
+      :owner-details="modalOwnerDetails"
+      :decision-loading="decisionLoading"
+      @close="closeModal"
+      @approve="handleDecision('approved')"
+      @reject="openRejectModal"
+    />
 
-  <!-- Rejection reason prompt -->
-  <Teleport to="body">
-    <div
-      v-if="rejectReasonPrompt"
-      class="fixed inset-0 z-[60] flex items-center justify-center bg-[#3B1F0E]/40 backdrop-blur-sm p-4"
-      @click.self="cancelReject"
-    >
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-        <h2 class="font-display text-lg font-semibold text-[#3B1F0E] mb-2">Reason for rejection</h2>
-        <p class="font-sans text-sm text-[#3B1F0E]/70 mb-4">
-          This reason will be included in the email sent to the owner.
-        </p>
+    <!-- Rejection reason prompt -->
+    <Teleport to="body">
+      <div
+        v-if="rejectModalOpen"
+        class="fixed inset-0 z-[60] flex items-center justify-center bg-[#3B1F0E]/40 backdrop-blur-sm p-4"
+        @click.self="closeRejectModal"
+      >
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+          <h2 class="font-display text-lg font-semibold text-[#3B1F0E] mb-2">Reason for rejection</h2>
+          <p class="font-sans text-sm text-[#3B1F0E]/70 mb-4">
+            This reason will be included in the email sent to the owner.
+          </p>
 
-        <textarea
-          v-model="rejectReason"
-          rows="4"
-          placeholder="e.g. Submitted documents are unclear or expired."
-          class="w-full rounded-xl border border-[#EDD8CC] px-4 py-3 font-sans text-sm text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30 resize-none"
-        />
+          <textarea
+            v-model="rejectReason"
+            rows="4"
+            placeholder="e.g. Submitted documents are unclear or expired."
+            class="w-full rounded-xl border border-[#EDD8CC] px-4 py-3 font-sans text-sm text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30 resize-none"
+          />
 
-        <div class="flex items-center justify-end gap-3 mt-6">
-          <button
-            type="button"
-            class="rounded-lg px-4 py-2 font-sans text-sm font-medium text-[#3B1F0E]/70 hover:bg-[#F3E7D2] transition-colors"
-            @click="cancelReject"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            :disabled="!rejectReason.trim()"
-            class="rounded-lg px-4 py-2 font-sans text-sm font-semibold bg-[#D9534F] text-white hover:bg-[#C24541] transition-colors disabled:opacity-50"
-            @click="confirmReject"
-          >
-            Reject &amp; Notify Owner
-          </button>
+          <div class="flex items-center justify-end gap-3 mt-6">
+            <button
+              type="button"
+              class="rounded-lg px-4 py-2 font-sans text-sm font-medium text-[#3B1F0E]/70 hover:bg-[#F3E7D2] transition-colors"
+              :disabled="decisionLoading"
+              @click="closeRejectModal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              :disabled="!rejectReason.trim() || decisionLoading"
+              class="rounded-lg px-4 py-2 font-sans text-sm font-semibold bg-[#D9534F] text-white hover:bg-[#C24541] transition-colors disabled:opacity-50"
+              @click="confirmReject"
+            >
+              {{ decisionLoading ? 'Rejecting...' : 'Reject & Notify Owner' }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  </Teleport>
+    </Teleport>
+  </div>
 </template>

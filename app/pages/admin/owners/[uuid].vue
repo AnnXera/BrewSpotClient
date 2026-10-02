@@ -26,7 +26,15 @@ const cafes = ref<any[]>([])
 const subscription = ref<any>(null)
 const paymentHistory = ref<any[]>([])
 
-const activeTab = ref<'profile' | 'branches'>('profile')
+const activeTab = ref<'profile' | 'branches'>(
+  route.query.tab === 'branches' ? 'branches' : 'profile'
+)
+
+watch(() => route.query.tab, (newTab) => {
+  if (newTab === 'branches' || newTab === 'profile') {
+    activeTab.value = newTab
+  }
+})
 
 async function fetchOwner() {
   loading.value = true
@@ -48,7 +56,60 @@ async function fetchOwner() {
 
 const primaryCafe = computed(() => cafes.value[0] ?? null)
 const primaryBranch = computed(() => primaryCafe.value?.branches?.[0] ?? null)
-const allBranches = computed(() => cafes.value.flatMap((c) => c.branches ?? []))
+const allBranches = computed(() =>
+  cafes.value.flatMap((c) =>
+    (c.branches ?? []).map((b: any) => ({
+      ...b,
+      cafe_name: c.cafe_name,
+    }))
+  )
+)
+
+const activeBranchesCount = computed(() =>
+  allBranches.value.filter(b => ['active', 'inactive'].includes(b.status)).length
+)
+
+const branchSearchQuery = ref('')
+const branchStatusFilter = ref('')
+
+const filteredBranches = computed(() => {
+  return allBranches.value.filter((branch) => {
+    const searchLower = branchSearchQuery.value.toLowerCase()
+    const matchesSearch = !searchLower || 
+      (branch.branch_name && branch.branch_name.toLowerCase().includes(searchLower)) || 
+      (branch.cafe_name && branch.cafe_name.toLowerCase().includes(searchLower)) ||
+      (branch.address && branch.address.toLowerCase().includes(searchLower))
+      
+    const matchesStatus = branchStatusFilter.value === '' || branch.status === branchStatusFilter.value
+    
+    return matchesSearch && matchesStatus
+  })
+})
+
+const branchPage = ref(1)
+const branchesPerPage = 5
+const totalBranchPages = computed(() => Math.max(1, Math.ceil(filteredBranches.value.length / branchesPerPage)))
+const paginatedBranches = computed(() => {
+  const start = (branchPage.value - 1) * branchesPerPage
+  return filteredBranches.value.slice(start, start + branchesPerPage)
+})
+
+watch([branchSearchQuery, branchStatusFilter], () => {
+  branchPage.value = 1
+})
+
+const selectedBranch = ref<any | null>(null)
+const branchModalOpen = ref(false)
+
+function openBranchDetails(branch: any) {
+  selectedBranch.value = branch
+  branchModalOpen.value = true
+}
+
+function closeBranchDetails() {
+  branchModalOpen.value = false
+  selectedBranch.value = null
+}
 
 async function viewDocument(url: string) {
   const newTab = window.open('', '_blank')
@@ -115,30 +176,39 @@ onMounted(fetchOwner)
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row min-h-screen bg-[#FDF3E7]">
+  <div class="flex flex-col min-h-screen bg-[#FDF3E7] md:flex-row">
     <NavBar :links="links" />
 
-    <main class="flex-1 p-12">
-      <div v-if="loading" class="font-sans text-sm text-[#3B1F0E]/50">Loading owner…</div>
+    <main class="flex-1 p-3.5 min-[360px]:p-4 sm:p-6 md:p-12">
+      <div v-if="loading" class="flex flex-col items-center justify-center py-20 gap-3 text-[#3B1F0E]/50">
+        <Icon name="heroicons:arrow-path" class="w-6 h-6 animate-spin text-[#B4846C]" />
+        <span class="font-sans text-sm">Loading owner…</span>
+      </div>
 
       <template v-else-if="owner">
         <!-- Breadcrumb -->
-        <div class="font-display text-[14px] mb-[6px]">
+        <div class="font-display text-[12px] min-[360px]:text-[13px] sm:text-[14px] mb-[6px]">
           <NuxtLink to="/admin/owners" class="text-[#9E7060] hover:underline">Owner Management</NuxtLink>
           <span class="text-[#9E7060] mx-1">/</span>
           <span class="text-[#3D2B24] font-semibold">Owner Details</span>
         </div>
 
         <!-- Header -->
-        <div class="flex items-center justify-between mb-[22px]">
-          <h1 class="font-display text-[32px] font-bold text-[#3D2B24]">
+        <div class="flex items-center justify-between gap-3 
+                    min-[360px]:mb-[8px]
+                    md:mb-[6px]">
+          <h1 class="font-display font-bold text-[#3D2B24] truncate
+                     min-[360px]:text-[24px]
+                     md:text-[32px]">
             {{ owner.firstname }} {{ owner.lastname }}
           </h1>
 
           <button
             v-if="owner.status === 'active'"
             type="button"
-            class="px-[12px] py-[12px] rounded-xl font-display text-[14px] font-semibold bg-[#FDE8E8] text-[#DC3545] border border-[#DC3545] hover:opacity-80 transition-opacity disabled:opacity-50 flex items-center justify-center"
+            class="px-2.5 py-1.5 rounded-lg font-display font-semibold bg-[#FDE8E8] text-[#DC3545] border border-[#DC3545] hover:opacity-80 transition-opacity disabled:opacity-50 shrink-0 flex items-center justify-center
+                   min-[360px]:px-3 min-[360px]:py-2 min-[360px]:rounded-[8px] min-[360px]:text-[10px]
+                   md:px-3 md:py-2 md:rounded-[12px] md:text-[14px]"
             :disabled="statusChangeLoading"
             @click="requestStatusChange('suspended')"
           >
@@ -147,7 +217,9 @@ onMounted(fetchOwner)
           <button
             v-else-if="owner.status === 'suspended'"
             type="button"
-            class="px-[12px] py-[12px] rounded-xl font-display text-[14px] font-semibold bg-[#E3F3E7] text-[#1F8A4C] hover:bg-[#D3ECD8] transition-colors disabled:opacity-50"
+            class="px-2.5 py-1.5 rounded-lg font-display font-semibold bg-[#E3F3E7] text-[#1F8A4C] border border-[#1F8A4C] hover:bg-[#D3ECD8] transition-colors disabled:opacity-50 shrink-0 flex items-center justify-center
+                   min-[360px]:px-3 min-[360px]:py-2 min-[360px]:rounded-[8px] min-[360px]:text-[10px]
+                   md:px-3 md:py-2 md:rounded-[12px] md:text-[14px]"
             :disabled="statusChangeLoading"
             @click="requestStatusChange('active')"
           >
@@ -156,11 +228,14 @@ onMounted(fetchOwner)
         </div>
 
         <!-- Tabs -->
-        <div class="relative flex items-center mb-[24px]">
-          
+        <div class="relative flex items-center 
+                    min-[360px]:mb-[16px]
+                    md:mb-[24px]">
           <button
             type="button"
-            class="px-[20px] py-[10px] font-display text-[16px] font-bold transition-colors relative z-10"
+            class="font-display font-bold transition-colors relative z-10
+                   min-[360px]:px-5 min-[360px]:py-3.5 min-[360px]:text-[14px]
+                   md:px-5 md:py-3.5 md:text-[16px]"
             :class="activeTab === 'profile'
               ? 'text-[#3B1F0E] font-bold'
               : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
@@ -175,13 +250,19 @@ onMounted(fetchOwner)
 
           <button
             type="button"
-            class="px-[20px] py-[10px] font-display text-[16px] transition-colors relative z-10"
+            class="font-display transition-colors relative z-10 flex items-center gap-2
+                   min-[360px]:px-5 min-[360px]:py-3.5 min-[360px]:text-[14px]
+                   md:px-5 md:py-3.5 md:text-[16px]"
             :class="activeTab === 'branches'
               ? 'text-[#3B1F0E] font-bold'
               : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
             @click="activeTab = 'branches'"
           >
-            Cafe Branches ({{ allBranches.length }})
+            Cafe Branches
+            <span
+              class="rounded-full px-2 py-0.5 text-[11px] font-bold"
+              :class="activeTab === 'branches' ? 'bg-[#3B1F0E] text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+            >{{ allBranches.length }}</span>
             <span
               v-if="activeTab === 'branches'"
               class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full"
@@ -194,9 +275,17 @@ onMounted(fetchOwner)
 
         <!-- PROFILE TAB -->
         <template v-if="activeTab === 'profile'">
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-[24px]">
-            <OwnerDetailAccountDetailsCard :owner="owner" :branch-count="allBranches.length" />
-            <OwnerDetailCafeDetailsCard :cafe="primaryCafe" :branch="primaryBranch" />
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 min-[360px]:gap-5 md:gap-6 mb-[20px] min-[360px]:mb-[24px]">
+            <OwnerDetailAccountDetailsCard
+              :owner="owner"
+              :branch-count="activeBranchesCount"
+              @go-to-branches="activeTab = 'branches'"
+            />
+            <OwnerDetailCafeDetailsCard
+              :cafe="primaryCafe"
+              :branch="primaryBranch"
+              @go-to-branches="activeTab = 'branches'"
+            />
             <OwnerDetailSubscriptionCard :subscription="subscription" />
           </div>
 
@@ -206,32 +295,103 @@ onMounted(fetchOwner)
             @view="viewDocument"
           />
 
-          <OwnerDetailPaymentHistoryTable :history="paymentHistory" />
+          <OwnerDetailPaymentHistoryTable 
+            :history="paymentHistory"
+            :owner-name="owner ? `${owner.firstname} ${owner.lastname}` : undefined"
+          />
         </template>
 
         <!-- BRANCHES TAB -->
         <template v-else>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <OwnerDetailBranchCard
-              v-for="branch in allBranches"
-              :key="branch.uuid"
-              :branch="branch"
+          <div :class="['bg-white border border-[#EEDFC4] shadow-sm overflow-hidden', filteredBranches.length > 0 ? 'rounded-t-2xl md:rounded-t-3xl border-b-0' : 'rounded-2xl md:rounded-3xl']">
+            <!-- Filter Bar -->
+            <div class="flex flex-col border-b border-[#F3E7D2]
+                        min-[360px]:px-[12px] min-[360px]:py-[14px] min-[360px]:gap-[12px]
+                        md:flex-row md:items-center md:p-6 md:gap-[24px]">
+              <!-- Search Input -->
+              <div class="relative flex-1 w-full min-w-0">
+                <Icon
+                  name="heroicons:magnifying-glass"
+                  class="text-[#3B1F0E]/40 absolute top-1/2 -translate-y-1/2
+                         min-[360px]:left-[10px] min-[360px]:w-[16px] min-[360px]:h-[16px]
+                         md:left-[12px] md:w-[24px] md:h-[24px]"
+                />
+                <input
+                  v-model="branchSearchQuery"
+                  type="text"
+                  placeholder="Search branches by name or address..."
+                  class="w-full rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] font-sans text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40
+                         min-[360px]:py-[10px] min-[360px]:text-[12px] min-[360px]:pl-[34px]
+                         md:py-[12px] md:text-[14px] md:pl-[48px]"
+                />
+              </div>
+
+              <!-- Dropdown -->
+              <div class="w-full md:w-auto">
+                <div class="relative w-full md:w-auto">
+                  <select
+                    v-model="branchStatusFilter"
+                    class="w-full appearance-none rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] pl-[12px] pr-[32px] font-sans text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40
+                           min-[360px]:py-[10px] min-[360px]:text-[12px]
+                           md:py-[12px] md:text-[14px] md:w-48"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="pending">Pending</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                  <Icon
+                    name="heroicons:chevron-down"
+                    class="w-[16px] h-[16px] text-[#3B1F0E]/40 absolute right-[12px] top-1/2 -translate-y-1/2 pointer-events-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div v-if="filteredBranches.length === 0" class="p-8 text-center font-sans text-sm text-[#9E7060]">
+              No branches found matching your criteria.
+            </div>
+
+            <div v-else class="p-4 sm:p-6 space-y-4">
+              <OwnerDetailBranchCard
+                v-for="branch in paginatedBranches"
+                :key="branch.uuid"
+                :branch="branch"
+                @view-details="openBranchDetails"
+              />
+            </div>
+          </div>
+
+          <!-- Pagination Bar -->
+          <div v-if="filteredBranches.length > 0" class="bg-white rounded-b-2xl md:rounded-b-3xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
+            <CommonPagination
+              :page="branchPage"
+              :last-page="totalBranchPages"
+              @change="(p) => (branchPage = p)"
             />
           </div>
         </template>
       </template>
     </main>
-  </div>
 
-  <ConfirmDialog
-    :open="!!confirmDialog"
-    :title="confirmDialog?.newStatus === 'suspended' ? 'Suspend this owner?' : 'Reactivate this owner?'"
-    :message="confirmDialog?.newStatus === 'suspended'
-      ? 'This will suspend this owner, deactivate their branches, and cancel their active subscription. This action can be reversed later.'
-      : 'This will reactivate this owner and restore their branches.'"
-    :confirm-label="confirmDialog?.newStatus === 'suspended' ? 'Suspend' : 'Reactivate'"
-    :danger="confirmDialog?.newStatus === 'suspended'"
-    @confirm="confirmStatusChange"
-    @cancel="cancelStatusChange"
-  />
+    <OwnerDetailBranchDetailsModal
+      :open="branchModalOpen"
+      :branch="selectedBranch"
+      :owner="owner"
+      @close="closeBranchDetails"
+    />
+
+    <ConfirmDialog
+      :open="!!confirmDialog"
+      :title="confirmDialog?.newStatus === 'suspended' ? 'Suspend this owner?' : 'Reactivate this owner?'"
+      :message="confirmDialog?.newStatus === 'suspended'
+        ? 'This will suspend this owner, deactivate their branches, and cancel their active subscription. This action can be reversed later.'
+        : 'This will reactivate this owner and restore their branches.'"
+      :confirm-label="confirmDialog?.newStatus === 'suspended' ? 'Suspend' : 'Reactivate'"
+      :danger="confirmDialog?.newStatus === 'suspended'"
+      @confirm="confirmStatusChange"
+      @cancel="cancelStatusChange"
+    />
+  </div>
 </template>

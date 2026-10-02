@@ -1,7 +1,7 @@
 <!-- components/StatusBadge.vue -->
 <template>
   <span
-    class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-display font-semibold text-[14px]"
+    class="inline-flex items-center gap-1.5 rounded-full px-2 min-[360px]:px-2.5 py-0.5 min-[360px]:py-1 font-display font-semibold text-xs min-[360px]:text-[13px] sm:text-[14px] shrink-0"
     :class="classes"
   >
     {{ label }}
@@ -27,6 +27,7 @@ const classes = computed(() => {
     case 'success':
       return 'bg-[#D4EDDA] text-[#28A745]'
     case 'suspended':
+    case 'terminated':
     case 'rejected':
     case 'cancelled':
     case 'failed':
