@@ -1,8 +1,9 @@
 <!-- pages/owner/subscription.vue -->
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import PaymentHistoryTable, { type PaymentTransaction } from '~/components/common/PaymentHistoryTable.vue'
 import CheckoutModal from '~/components/subscription/CheckoutModal.vue'
+import ConfirmDialog from '~/components/ConfirmDialog.vue'
 import type { SubscriptionPlanItem } from '~/services/SubscriptionService'
 
 definePageMeta({
@@ -37,21 +38,84 @@ const isCheckoutOpen = ref(false)
 const selectedPlanToCheckout = ref<SubscriptionPlanItem | null>(null)
 const scheduling = ref(false)
 
+// Set when the subscription itself could not be loaded. Kept apart from "the owner has no
+// subscription", which is a normal answer: showing the free-tier upsell for a failed request
+// would tell a paying customer they have nothing.
+const loadError = ref(false)
+const plansError = ref(false)
+
+type Notice = { kind: 'success' | 'error' | 'info'; message: string }
+const notice = ref<Notice | null>(null)
+let noticeTimer: ReturnType<typeof setTimeout> | undefined
+
+/**
+ * Report an outcome without a blocking browser dialog. Errors stay until dismissed so a
+ * failure can't be missed; confirmations clear themselves.
+ */
+function showNotice(message: string, kind: Notice['kind'] = 'success') {
+  clearTimeout(noticeTimer)
+  notice.value = { kind, message }
+  startNoticeTimer()
+}
+
+// Only routine confirmations clear themselves. Errors and the payment-return notices
+// (`info`) carry something the owner has to act on or be sure of, so they wait to be dismissed.
+function startNoticeTimer() {
+  clearTimeout(noticeTimer)
+  if (notice.value?.kind === 'success') {
+    noticeTimer = setTimeout(() => { notice.value = null }, 8000)
+  }
+}
+
+// Reading or focusing the message must not race the timer.
+function pauseNoticeTimer() {
+  clearTimeout(noticeTimer)
+}
+
+function dismissNotice() {
+  clearTimeout(noticeTimer)
+  notice.value = null
+}
+
+function errorMessage(err: any, fallback: string): string {
+  // No response at all means the request never reached the server.
+  if (!err?.response) return 'Could not reach the server. Check your connection and try again.'
+  return err.response._data?.message || fallback
+}
+
+/**
+ * The backend answers 404 with a body when the owner has no running term — that body carries
+ * the renewal offer, so it is a result, not a failure. Anything else propagates.
+ */
+async function fetchCurrentPlan() {
+  try {
+    return await subService.getCurrentPlan()
+  } catch (err: any) {
+    if (err?.response?.status === 404 && err.response._data) return err.response._data
+    throw err
+  }
+}
+
 async function loadOwnerSubscription() {
   loading.value = true
+  loadError.value = false
+  plansError.value = false
   try {
     const [planRes, historyRes, availableRes] = await Promise.all([
-      subService.getCurrentPlan().catch(() => null),
+      fetchCurrentPlan().catch(() => undefined),
       subService.getPlanHistory({ per_page: 20 }).catch(() => null),
-      subService.getAvailablePlans({ per_page: 50 }).catch(() => null)
+      subService.getAvailablePlans({ per_page: 50 }).catch(() => undefined)
     ])
 
-    if (planRes?.success && planRes.subscription) {
+    if (planRes === undefined) {
+      // Keep whatever was already on screen rather than blanking it on a failed refresh.
+      loadError.value = true
+    } else if (planRes.success && planRes.subscription) {
       currentPlan.value = planRes.subscription
       renewalOffer.value = null
     } else {
       currentPlan.value = null
-      renewalOffer.value = planRes?.renewal_offer ?? null
+      renewalOffer.value = planRes.renewal_offer ?? null
     }
 
     if (historyRes?.success && historyRes.history?.data?.length) {
@@ -69,14 +133,22 @@ async function loadOwnerSubscription() {
       history.value = []
     }
 
-    if (availableRes?.success && availableRes.plans?.data) {
+    if (availableRes === undefined) {
+      plansError.value = true
+    } else if (availableRes?.success && availableRes.plans?.data) {
       availablePlans.value = availableRes.plans.data
     }
 
   } catch (err) {
     console.warn('Owner subscription fetch:', err)
+    loadError.value = true
   } finally {
     loading.value = false
+  }
+
+  // A refresh that fails over data already on screen would otherwise go unnoticed.
+  if (loadError.value && (currentPlan.value || renewalOffer.value)) {
+    showNotice('Could not refresh your subscription. What you see may be out of date.', 'error')
   }
 }
 
@@ -187,13 +259,103 @@ function isScheduledPlan(plan: SubscriptionPlanItem): boolean {
 
 const hasScheduledChange = computed(() => !!currentPlan.value?.pending_plan)
 
+// The owner has told us not to renew. The subscription itself stays active until its end
+// date, so everything they paid for keeps working.
+const isCancelled = computed(() => !!currentPlan.value?.cancel_at_period_end)
+
+// Mirrors the backend: trials and gateway-billed subscriptions can't be cancelled here.
+const canCancelCurrent = computed(() => {
+  const sub = currentPlan.value
+  if (!sub || sub.cancel_at_period_end || sub.gateway_subscription_id) return false
+  if (sub.billing_cycle === 'trial') return false
+  return Number(sub.plan?.price ?? 0) > 0
+})
+
+// Why cancel isn't offered, for the cases where the owner would otherwise wonder.
+const cancelHint = computed(() => {
+  const sub = currentPlan.value
+  if (!sub || sub.cancel_at_period_end) return ''
+  if (sub.gateway_subscription_id) return 'This subscription is billed by your payment provider. Contact support to cancel it.'
+  if (sub.billing_cycle === 'trial' || Number(sub.plan?.price ?? 0) <= 0) {
+    return `Your free trial ends on ${formatDate(sub.end_date)} on its own, so there's nothing to cancel.`
+  }
+  return ''
+})
+
+const cancelling = ref(false)
+
+// Which cancellation the owner is being asked to confirm, if any.
+const pendingCancel = ref<'current' | 'next' | null>(null)
+
+async function runCancelAction(action: () => Promise<{ success: boolean; message: string }>) {
+  if (cancelling.value) return
+  cancelling.value = true
+  try {
+    const res = await action()
+    showNotice(res.message, res.success ? 'success' : 'error')
+    if (res.success) await loadOwnerSubscription()
+  } catch (err: any) {
+    showNotice(errorMessage(err, 'Could not update your subscription. Please try again.'), 'error')
+  } finally {
+    cancelling.value = false
+    pendingCancel.value = null
+  }
+}
+
+const cancelDialog = computed(() => {
+  const endsOn = formatDate(currentPlan.value?.end_date)
+
+  if (pendingCancel.value === 'next') {
+    return {
+      title: `Remove your scheduled switch to ${currentPlan.value?.pending_plan?.sub_name ?? 'the next plan'}?`,
+      message: `You'll stay on your ${currentPlan.value?.plan?.sub_name ?? 'current plan'}. Nothing has been charged for the next plan.`,
+      confirmLabel: 'Remove scheduled switch',
+      cancelLabel: 'Keep scheduled switch',
+      consequences: [] as string[],
+    }
+  }
+
+  const consequences = [
+    `Full access to every feature until ${endsOn}`,
+    'No further charges after that date',
+  ]
+  if (hasScheduledChange.value) consequences.push('Your scheduled next plan is cancelled too')
+  consequences.push(`You can resume any time before ${endsOn}`)
+
+  return {
+    title: 'Cancel your subscription?',
+    message: `Your ${currentPlan.value?.plan?.sub_name ?? 'plan'} will not renew.`,
+    confirmLabel: 'Cancel subscription',
+    cancelLabel: 'Keep subscription',
+    consequences,
+  }
+})
+
+function cancelCurrentPlan() {
+  pendingCancel.value = 'current'
+}
+
+function cancelNextPlan() {
+  pendingCancel.value = 'next'
+}
+
+function confirmCancel() {
+  const target = pendingCancel.value
+  if (!target) return
+  runCancelAction(() => subService.cancelPlan(target))
+}
+
+function resumePlan() {
+  runCancelAction(() => subService.resumePlan())
+}
+
 /**
  * Whether the owner pays for the next term by hand from this page.
  *
  * A gateway-billed subscription renews on its own, so it gets no pay buttons — the same
  * rule the renewal banner follows.
  */
-const canPayNextTerm = computed(() => isRenewalOpen.value && !currentPlan.value?.gateway_subscription_id)
+const canPayNextTerm = computed(() => isRenewalOpen.value && !currentPlan.value?.gateway_subscription_id && !isCancelled.value)
 
 /**
  * Pay for the next term, into whichever plan it will be on: the booked change when there
@@ -228,10 +390,13 @@ const isRenewalOpen = computed(() => {
 function planButtonLabel(plan: SubscriptionPlanItem): string {
   if (!currentPlan.value) return 'Subscribe Now'
   // Paid days are used up: every plan is now something the owner can pay for today.
-  if (isRenewalOpen.value) return isCurrentPlan(plan) ? 'Renew Now' : 'Pay & Switch Now'
-  if (isScheduledPlan(plan)) return 'Scheduled'
-  if (isCurrentPlan(plan)) return hasScheduledChange.value ? 'Keep This Plan' : 'Current Plan'
-  return 'Switch at Renewal'
+  if (isRenewalOpen.value) return isCurrentPlan(plan) ? 'Renew Now' : 'Switch & Pay Now'
+
+  // A date says when the change happens; "at renewal" leaves the owner to work it out.
+  const endDate = currentPlan.value.end_date ? formatDate(currentPlan.value.end_date) : null
+  if (isScheduledPlan(plan)) return endDate ? `Scheduled for ${endDate}` : 'Scheduled'
+  if (isCurrentPlan(plan)) return hasScheduledChange.value ? 'Stay on This Plan' : 'Current Plan'
+  return endDate ? `Switch on ${endDate}` : 'Switch at Renewal'
 }
 
 function planButtonDisabled(plan: SubscriptionPlanItem): boolean {
@@ -269,14 +434,14 @@ async function selectPlan(plan: SubscriptionPlanItem) {
       return
     }
 
-    alert(res.message)
+    showNotice(res.message, res.success ? 'success' : 'error')
 
     if (res.success) {
       await loadOwnerSubscription()
       viewMode.value = 'current'
     }
   } catch (err: any) {
-    alert(err.response?._data?.message || 'Could not update your plan. Please try again.')
+    showNotice(errorMessage(err, 'Could not update your plan. Please try again.'), 'error')
   } finally {
     scheduling.value = false
   }
@@ -292,11 +457,19 @@ function handleCheckoutReturn() {
 
   if (outcome === 'success') {
     viewMode.value = 'current'
-    alert('Payment received. Your subscription will activate as soon as PayMongo confirms the payment — this usually takes a few seconds.')
+    showNotice('Payment received. Your subscription will activate as soon as PayMongo confirms the payment — this usually takes a few seconds.', 'info')
   } else if (outcome === 'cancelled') {
-    alert('Checkout was cancelled. You have not been charged.')
+    showNotice('Checkout was cancelled. You have not been charged.', 'info')
+  } else {
+    return
   }
+
+  // Drop the flag so a refresh or back-navigation doesn't announce the same outcome again.
+  const { checkout: _checkout, ...rest } = route.query
+  navigateTo({ query: rest }, { replace: true })
 }
+
+onBeforeUnmount(() => clearTimeout(noticeTimer))
 
 /**
  * Renewal links from the expiration reminder email arrive as
@@ -357,10 +530,10 @@ onMounted(async () => {
           <button
             v-if="viewMode === 'current'"
             @click="viewMode = 'browse'"
-            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-lg shadow-[#3B1F0E]/20"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
           >
             <Icon name="heroicons:sparkles" class="w-5 h-5 text-[#F3E7D2]" />
-            Upgrade Plan
+            Change Plan
           </button>
           <button
             v-else
@@ -392,8 +565,16 @@ onMounted(async () => {
                   <span class="font-display text-2xl font-bold text-[#3B1F0E]">
                     {{ currentPlan?.plan?.sub_name || 'Active Plan' }}
                   </span>
+                  <!-- One status, so a cancelled plan never reads "Active" and "Cancelled" at once. -->
                   <span
-                    class="inline-flex items-center px-3 py-0.5 rounded-full font-display font-semibold text-xs bg-[#D4EDDA] text-[#28A745] capitalize"
+                    v-if="isCancelled"
+                    class="inline-flex items-center px-3 py-0.5 rounded-full font-display font-semibold text-xs bg-[#FFF8EA] border border-[#D9B98D] text-[#8F5B12]"
+                  >
+                    Cancelled · ends {{ formatDate(currentPlan?.end_date) }}
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex items-center px-3 py-0.5 rounded-full font-display font-semibold text-xs bg-[#D4EDDA] text-[#1E6B34] capitalize"
                   >
                     {{ currentPlan?.status || 'Active' }}
                   </span>
@@ -423,7 +604,7 @@ onMounted(async () => {
                 </span>
               </div>
               <div class="bg-[#FFFDF9] p-4 rounded-xl border border-[#F3E7D2]">
-                <span class="text-[#8B6656] block text-xs font-medium uppercase tracking-wider">Expires On</span>
+                <span class="text-[#8B6656] block text-xs font-medium uppercase tracking-wider">{{ isCancelled ? 'Ends On' : 'Expires On' }}</span>
                 <span class="font-semibold text-[#3B1F0E] mt-0.5 block">
                   {{ formatDate(currentPlan?.end_date) }}
                 </span>
@@ -431,7 +612,28 @@ onMounted(async () => {
             </div>
 
             <div
-              v-if="currentPlan?.renewal_opens_at"
+              v-if="isCancelled"
+              class="flex items-start gap-3 mb-6 p-4 rounded-xl bg-[#FFF8EA] border border-[#D9B98D] text-[#8F5B12] font-sans text-xs leading-relaxed"
+            >
+              <Icon name="heroicons:information-circle" class="w-5 h-5 shrink-0 mt-0.5" aria-hidden="true" />
+              <div class="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  Your subscription is cancelled and will not renew, so you won't be charged again. You keep full access to every feature until
+                  <strong>{{ formatDate(currentPlan?.end_date) }}</strong>.
+                </div>
+                <button
+                  @click="resumePlan"
+                  :disabled="cancelling"
+                  class="shrink-0 inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Icon name="heroicons:arrow-uturn-left" class="w-4 h-4" aria-hidden="true" />
+                  Resume Subscription
+                </button>
+              </div>
+            </div>
+
+            <div
+              v-else-if="currentPlan?.renewal_opens_at"
               class="flex items-start gap-3 mb-6 p-4 rounded-xl font-sans text-xs leading-relaxed"
               :class="isRenewalOpen ? 'bg-[#FFF8EA] border border-[#D9B98D] text-[#8F5B12]' : 'bg-[#FFFDF9] border border-[#F3E7D2] text-[#7D5A50]'"
             >
@@ -450,9 +652,9 @@ onMounted(async () => {
                 <button
                   v-if="canPayNextTerm && !hasScheduledChange"
                   @click="payNextTerm"
-                  class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
+                  class="shrink-0 inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
                 >
-                  <Icon name="heroicons:credit-card" class="w-4 h-4" />
+                  <Icon name="heroicons:credit-card" class="w-4 h-4" aria-hidden="true" />
                   Renew Now
                 </button>
               </div>
@@ -473,10 +675,37 @@ onMounted(async () => {
                   <span>{{ feat.name }}</span>
                 </span>
               </div>
-              <p v-else class="font-sans text-xs text-[#9E7060]">
+              <p v-else class="font-sans text-xs text-[#8B6656]">
                 Basic plan access (single branch only, no advanced features).
               </p>
             </div>
+
+            <!-- Manage footer: the reassurance sits with the action it qualifies, and the action
+                 stays quiet so it never competes with renewing. -->
+            <div
+              v-if="canCancelCurrent"
+              class="pt-3 mt-6 border-t border-[#F3E7D2] flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4"
+            >
+              <p class="font-sans text-xs text-[#8B6656]">
+                Cancelling keeps your access until {{ formatDate(currentPlan?.end_date) }}.
+              </p>
+              <button
+                @click="cancelCurrentPlan"
+                :disabled="cancelling"
+                class="self-start sm:self-auto -ml-3 sm:ml-0 inline-flex items-center gap-2 min-h-11 px-3 rounded-lg text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Icon name="heroicons:x-circle" class="w-4 h-4" aria-hidden="true" />
+                Cancel subscription
+              </button>
+            </div>
+
+            <!-- Say why there's no cancel button instead of leaving the owner to hunt for it. -->
+            <p
+              v-else-if="cancelHint"
+              class="pt-4 mt-6 border-t border-[#F3E7D2] font-sans text-xs text-[#8B6656]"
+            >
+              {{ cancelHint }}
+            </p>
           </div>
 
           <!-- Next Plan (scheduled, not yet active) -->
@@ -486,7 +715,7 @@ onMounted(async () => {
           >
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#EEDFC4] pb-6 mb-6">
               <div>
-                <span class="inline-flex items-center gap-1.5 font-sans text-xs uppercase font-bold text-[#B8752F] tracking-wider mb-2">
+                <span class="inline-flex items-center gap-1.5 font-sans text-xs uppercase font-bold text-[#8F5B12] tracking-wider mb-2">
                   <Icon name="heroicons:clock" class="w-4 h-4" />
                   Next Plan &mdash; Not Active Yet
                 </span>
@@ -523,14 +752,25 @@ onMounted(async () => {
               </template>
             </p>
 
-            <button
-              v-if="canPayNextTerm"
-              @click="payNextTerm"
-              class="w-full sm:w-auto mb-6 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
-            >
-              <Icon name="heroicons:credit-card" class="w-4 h-4" />
-              Pay Now
-            </button>
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-6">
+              <button
+                v-if="canPayNextTerm"
+                @click="payNextTerm"
+                class="inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
+              >
+                <Icon name="heroicons:credit-card" class="w-4 h-4" aria-hidden="true" />
+                Pay Now
+              </button>
+
+              <button
+                @click="cancelNextPlan"
+                :disabled="cancelling"
+                class="inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-lg text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Icon name="heroicons:x-circle" class="w-4 h-4" aria-hidden="true" />
+                Remove scheduled switch
+              </button>
+            </div>
 
             <div class="pt-4 border-t border-[#EEDFC4]">
               <span class="font-sans text-xs uppercase font-bold text-[#8B6656] block mb-2 tracking-wider">
@@ -546,21 +786,70 @@ onMounted(async () => {
                   <span>{{ feat.name }}</span>
                 </span>
               </div>
-              <p v-else class="font-sans text-xs text-[#9E7060]">
+              <p v-else class="font-sans text-xs text-[#8B6656]">
                 Basic plan access (single branch only, no advanced features).
               </p>
             </div>
           </div>
         </div>
 
+        <!-- Loading — hold the card's place instead of flashing an empty state -->
+        <div
+          v-else-if="loading"
+          class="bg-white border border-[#EEDFC4] rounded-2xl p-6 md:p-8 mb-8 shadow-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading your subscription…</span>
+          <div class="animate-pulse" aria-hidden="true">
+            <div class="flex justify-between gap-4 border-b border-[#F3E7D2] pb-6 mb-6">
+              <div class="space-y-3 flex-1">
+                <div class="h-3 w-24 rounded bg-[#F3E7D2]"></div>
+                <div class="h-7 w-48 max-w-full rounded bg-[#EEDFC4]"></div>
+              </div>
+              <div class="h-9 w-24 rounded bg-[#EEDFC4]"></div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+              <div class="h-16 rounded-xl bg-[#FFFDF9] border border-[#F3E7D2]"></div>
+              <div class="h-16 rounded-xl bg-[#FFFDF9] border border-[#F3E7D2]"></div>
+            </div>
+            <div class="flex gap-2">
+              <div class="h-8 w-28 rounded-xl bg-[#F3E7D2]"></div>
+              <div class="h-8 w-32 rounded-xl bg-[#F3E7D2]"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Load failed — never dressed up as "you have no subscription" -->
+        <div
+          v-else-if="loadError"
+          role="alert"
+          class="bg-white border border-[#ECC9C9] rounded-2xl p-6 md:p-8 mb-8 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4"
+        >
+          <Icon name="heroicons:exclamation-triangle" class="w-6 h-6 shrink-0 text-[#A13D3D]" aria-hidden="true" />
+          <div class="flex-1">
+            <h2 class="font-display text-lg font-bold text-[#3B1F0E]">We couldn't load your subscription</h2>
+            <p class="font-sans text-sm text-[#7D5A50] mt-1">
+              This is a connection problem, not a change to your plan. Your subscription and payments are unaffected.
+            </p>
+          </div>
+          <button
+            @click="loadOwnerSubscription"
+            class="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#3B1F0E]/50"
+          >
+            <Icon name="heroicons:arrow-path" class="w-4 h-4" aria-hidden="true" />
+            Try again
+          </button>
+        </div>
+
         <!-- Term Ended — pick up where the owner left off -->
         <div
-          v-else-if="!loading && renewalOffer"
+          v-else-if="renewalOffer"
           class="bg-[#FFF8EA] border border-[#D9B98D] rounded-2xl p-6 md:p-8 mb-8 shadow-sm"
         >
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#EEDFC4] pb-6 mb-6">
             <div>
-              <span class="inline-flex items-center gap-1.5 font-sans text-xs uppercase font-bold text-[#B8752F] tracking-wider mb-2">
+              <span class="inline-flex items-center gap-1.5 font-sans text-xs uppercase font-bold text-[#8F5B12] tracking-wider mb-2">
                 <Icon name="heroicons:exclamation-triangle" class="w-4 h-4" />
                 Subscription Ended
               </span>
@@ -600,7 +889,7 @@ onMounted(async () => {
           <div class="flex flex-col sm:flex-row gap-3">
             <button
               @click="payRenewalOffer"
-              class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-lg shadow-[#3B1F0E]/20"
+              class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
             >
               <Icon name="heroicons:credit-card" class="w-5 h-5" />
               {{ renewalOffer.was_scheduled ? 'Pay & Start' : 'Renew' }} {{ renewalOffer.plan?.sub_name }}
@@ -616,41 +905,35 @@ onMounted(async () => {
         </div>
 
         <!-- No Active Subscription State -->
-        <div v-else-if="!loading" class="bg-[#FFFDF9] border border-[#EEDFC4] rounded-3xl p-8 md:p-16 mb-8 text-center shadow-sm relative overflow-hidden flex flex-col items-center">
-          <!-- Decorative Background Elements -->
-          <div class="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#F3E7D2]/50 to-transparent"></div>
-          
-          <div class="relative z-10 w-24 h-24 bg-white rounded-2xl shadow-lg border border-[#EDD8CC] flex items-center justify-center mx-auto mb-6 rotate-3">
-            <div class="absolute -right-3 -top-3 w-8 h-8 bg-[#3B1F0E] rounded-full flex items-center justify-center -rotate-12 shadow-md">
-              <Icon name="heroicons:star-solid" class="w-4 h-4 text-[#F3E7D2]" />
-            </div>
-            <Icon name="heroicons:building-storefront" class="w-10 h-10 text-[#3B1F0E]" />
+        <div v-else class="bg-[#FFFDF9] border border-[#EEDFC4] rounded-2xl p-8 md:p-12 mb-8 text-center flex flex-col items-center">
+          <div class="w-16 h-16 bg-white rounded-xl border border-[#EDD8CC] flex items-center justify-center mb-5">
+            <Icon name="heroicons:building-storefront" class="w-8 h-8 text-[#3B1F0E]" aria-hidden="true" />
           </div>
-          
-          <h3 class="relative z-10 font-display text-2xl md:text-3xl font-black text-[#3B1F0E] mb-3">
+
+          <h2 class="font-display text-2xl font-bold text-[#3B1F0E] mb-3">
             Ready to grow your coffee empire?
-          </h3>
-          <p class="relative z-10 font-sans text-base text-[#7D5A50] max-w-lg mx-auto mb-8">
+          </h2>
+          <p class="font-sans text-base text-[#7D5A50] max-w-lg mx-auto mb-6">
             You're currently on the basic free tier. Upgrade your plan today to unlock the full potential of Brewspot and streamline your operations.
           </p>
-          
-          <div class="relative z-10 flex flex-wrap justify-center gap-3 mb-10">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-semibold text-[#3D2B24] shadow-sm">
-              <Icon name="heroicons:map" class="w-4 h-4 text-[#B8752F]" /> Multi-branch Management
+
+          <div class="flex flex-wrap justify-center gap-2 mb-8">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-medium text-[#3D2B24]">
+              <Icon name="heroicons:map" class="w-4 h-4 text-[#B8752F]" aria-hidden="true" /> Multi-branch Management
             </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-semibold text-[#3D2B24] shadow-sm">
-              <Icon name="heroicons:chart-bar" class="w-4 h-4 text-[#B8752F]" /> Advanced Analytics
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-medium text-[#3D2B24]">
+              <Icon name="heroicons:chart-bar" class="w-4 h-4 text-[#B8752F]" aria-hidden="true" /> Advanced Analytics
             </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-semibold text-[#3D2B24] shadow-sm">
-              <Icon name="heroicons:users" class="w-4 h-4 text-[#B8752F]" /> Staff Roles
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-medium text-[#3D2B24]">
+              <Icon name="heroicons:users" class="w-4 h-4 text-[#B8752F]" aria-hidden="true" /> Staff Roles
             </span>
           </div>
 
           <button
             @click="viewMode = 'browse'"
-            class="relative z-10 inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-all hover:-translate-y-1 shadow-[0_8px_20px_-6px_rgba(59,31,14,0.5)]"
+            class="inline-flex items-center gap-2 min-h-11 px-6 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
           >
-            <Icon name="heroicons:sparkles" class="w-5 h-5" />
+            <Icon name="heroicons:sparkles" class="w-5 h-5" aria-hidden="true" />
             View Premium Plans
           </button>
         </div>
@@ -667,7 +950,26 @@ onMounted(async () => {
 
       <!-- VIEW MODE: BROWSE PLANS -->
       <div v-else>
-        
+
+        <!-- Where the owner stands, so no button label has to be decoded from memory -->
+        <div
+          v-if="currentPlan"
+          class="max-w-6xl mx-auto mb-8 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-xl bg-white border border-[#EEDFC4] px-5 py-3 font-sans text-sm text-[#7D5A50]"
+        >
+          <span>
+            You're on <strong class="text-[#3B1F0E]">{{ currentPlan.plan?.sub_name }}</strong>
+            <span class="text-[#8B6656]">· {{ cycleLabel(currentPlan.billing_cycle) }}</span>
+          </span>
+          <span>
+            {{ isCancelled ? 'Ends' : 'Runs until' }}
+            <strong class="text-[#3B1F0E]">{{ formatDate(currentPlan.end_date) }}</strong>
+          </span>
+          <span v-if="hasScheduledChange">
+            Switching to <strong class="text-[#3B1F0E]">{{ currentPlan.pending_plan?.sub_name }}</strong>
+            on {{ formatDate(currentPlan.end_date) }}
+          </span>
+        </div>
+
         <!-- Monthly / Yearly Toggle -->
         <div class="flex justify-center mb-10 relative">
           <div class="inline-flex p-1 bg-white border border-[#EDD8CC] rounded-full shadow-sm relative">
@@ -681,8 +983,10 @@ onMounted(async () => {
             </div>
             
             <!-- Buttons wrapper to enforce equal widths -->
-            <div class="relative z-10 grid grid-cols-2 w-full sm:min-w-[320px]">
+            <div class="relative z-10 grid grid-cols-2 w-full sm:min-w-[320px]" role="group" aria-label="Billing cycle">
               <button
+                type="button"
+                :aria-pressed="browseBillingCycle === 'monthly'"
                 class="px-4 sm:px-6 py-2.5 rounded-full font-display text-sm font-semibold transition-colors"
                 :class="browseBillingCycle === 'monthly' ? 'text-white' : 'text-[#7D5A50] hover:text-[#3B1F0E]'"
                 @click="browseBillingCycle = 'monthly'"
@@ -690,6 +994,8 @@ onMounted(async () => {
                 Monthly
               </button>
               <button
+                type="button"
+                :aria-pressed="browseBillingCycle === 'yearly'"
                 class="px-4 sm:px-6 py-2.5 rounded-full font-display text-sm font-semibold transition-colors flex items-center justify-center gap-2"
                 :class="browseBillingCycle === 'yearly' ? 'text-white' : 'text-[#7D5A50] hover:text-[#3B1F0E]'"
                 @click="browseBillingCycle = 'yearly'"
@@ -704,8 +1010,25 @@ onMounted(async () => {
         </div>
 
         <!-- Loading State for Plans -->
-        <div v-if="loading" class="flex justify-center py-20">
-          <Icon name="heroicons:arrow-path" class="w-8 h-8 text-[#9E7060] animate-spin" />
+        <div v-if="loading" class="flex justify-center py-20" role="status">
+          <span class="sr-only">Loading plans…</span>
+          <Icon name="heroicons:arrow-path" class="w-8 h-8 text-[#9E7060] animate-spin" aria-hidden="true" />
+        </div>
+
+        <!-- Plans failed to load -->
+        <div
+          v-else-if="plansError && !availablePlans.length"
+          role="alert"
+          class="max-w-xl mx-auto bg-white border border-[#ECC9C9] rounded-2xl p-6 text-center"
+        >
+          <p class="font-sans text-sm text-[#7D5A50] mb-4">We couldn't load the available plans. Check your connection and try again.</p>
+          <button
+            @click="loadOwnerSubscription"
+            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#3B1F0E]/50"
+          >
+            <Icon name="heroicons:arrow-path" class="w-4 h-4" aria-hidden="true" />
+            Try again
+          </button>
         </div>
 
         <!-- Plans Grid -->
@@ -713,19 +1036,34 @@ onMounted(async () => {
           <div 
             v-for="plan in availablePlans" 
             :key="plan.uuid"
-            class="relative flex flex-col bg-white rounded-3xl border border-[#EDD8CC] p-8 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
+            class="relative flex flex-col bg-white rounded-3xl border p-8 shadow-sm hover:shadow-md transition-shadow duration-200"
+            :class="isCurrentPlan(plan) ? 'border-[#3B1F0E]' : 'border-[#EDD8CC]'"
           >
             <!-- Plan Header -->
             <div class="mb-6">
-              <h3 class="font-display text-xl font-bold text-[#3B1F0E] mb-2">{{ plan.sub_name }}</h3>
+              <div class="flex items-center justify-between gap-3 mb-2">
+                <h2 class="font-display text-xl font-bold text-[#3B1F0E]">{{ plan.sub_name }}</h2>
+                <span
+                  v-if="isCurrentPlan(plan)"
+                  class="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold text-xs"
+                >
+                  Your plan
+                </span>
+                <span
+                  v-else-if="isScheduledPlan(plan)"
+                  class="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#FFF8EA] border border-[#D9B98D] text-[#8F5B12] font-display font-semibold text-xs"
+                >
+                  Up next
+                </span>
+              </div>
               <p class="font-sans text-sm text-[#8B6656] min-h-[40px]">{{ plan.description || 'Access basic management features for your cafe.' }}</p>
             </div>
             
             <!-- Price -->
             <div class="mb-8">
               <div class="flex items-baseline gap-1">
-                <span class="font-display text-4xl font-black text-[#3B1F0E]">₱{{ getDisplayPrice(plan, browseBillingCycle) }}</span>
-                <span class="font-sans text-sm text-[#9E7060] font-medium">/ {{ browseBillingCycle === 'yearly' ? 'year' : 'month' }}</span>
+                <span class="font-display text-4xl font-bold text-[#3B1F0E]">₱{{ getDisplayPrice(plan, browseBillingCycle) }}</span>
+                <span class="font-sans text-sm text-[#8B6656] font-medium">/ {{ browseBillingCycle === 'yearly' ? 'year' : 'month' }}</span>
               </div>
             </div>
 
@@ -752,11 +1090,11 @@ onMounted(async () => {
             <!-- Subscribe Button -->
             <button
               @click="selectPlan(plan)"
-              class="w-full mt-8 py-3.5 rounded-xl font-display font-semibold text-sm transition-all duration-300"
+              class="w-full mt-8 min-h-11 py-3 rounded-xl font-display font-semibold text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#3B1F0E]/50"
               :class="
                 planButtonDisabled(plan)
                   ? 'bg-[#EEDFC4] text-[#7D5A50] cursor-not-allowed'
-                  : 'bg-[#FFF8EA] text-[#3B1F0E] border border-[#3B1F0E] hover:bg-[#3B1F0E] hover:text-[#FDF3E7] group-hover:bg-[#3B1F0E] group-hover:text-[#FDF3E7] shadow-[4px_4px_0px_0px_#3B1F0E] hover:shadow-[2px_2px_0px_0px_#3B1F0E] hover:translate-x-[2px] hover:translate-y-[2px]'
+                  : 'bg-white text-[#3B1F0E] border border-[#3B1F0E] hover:bg-[#3B1F0E] hover:text-[#FDF3E7]'
               "
               :disabled="planButtonDisabled(plan)"
             >
@@ -767,6 +1105,58 @@ onMounted(async () => {
       </div>
 
     </main>
+
+    <ConfirmDialog
+      :open="pendingCancel !== null"
+      :title="cancelDialog.title"
+      :message="cancelDialog.message"
+      :confirm-label="cancelDialog.confirmLabel"
+      :cancel-label="cancelDialog.cancelLabel"
+      :danger="pendingCancel === 'current'"
+      :loading="cancelling"
+      @confirm="confirmCancel"
+      @cancel="pendingCancel = null"
+    >
+      <ul v-if="cancelDialog.consequences.length" class="space-y-2 font-sans text-sm text-[#3B1F0E]/80">
+        <li v-for="line in cancelDialog.consequences" :key="line" class="flex items-start gap-2">
+          <Icon name="heroicons:check-circle" class="w-5 h-5 shrink-0 text-[#28A745]" aria-hidden="true" />
+          <span>{{ line }}</span>
+        </li>
+      </ul>
+    </ConfirmDialog>
+
+    <!-- Outcome messages. The live region is always mounted so screen readers pick up the text. -->
+    <div
+      class="fixed bottom-4 left-4 right-4 md:left-[calc(289px+1rem)] z-[60] flex justify-center pointer-events-none"
+      :aria-live="notice?.kind === 'error' ? 'assertive' : 'polite'"
+      aria-atomic="true"
+    >
+      <div
+        v-if="notice"
+        class="pointer-events-auto w-full max-w-md flex items-start gap-3 rounded-xl bg-white p-4 font-sans text-sm text-[#3B1F0E] shadow-lg shadow-[#3B1F0E]/15 border"
+        :class="notice.kind === 'error' ? 'border-[#ECC9C9]' : 'border-[#D9B98D]'"
+        @mouseenter="pauseNoticeTimer"
+        @mouseleave="startNoticeTimer"
+        @focusin="pauseNoticeTimer"
+        @focusout="startNoticeTimer"
+      >
+        <Icon
+          :name="notice.kind === 'error' ? 'heroicons:exclamation-circle' : notice.kind === 'info' ? 'heroicons:information-circle' : 'heroicons:check-circle'"
+          class="w-5 h-5 shrink-0 mt-0.5"
+          :class="notice.kind === 'error' ? 'text-[#A13D3D]' : notice.kind === 'info' ? 'text-[#B8752F]' : 'text-[#28A745]'"
+          aria-hidden="true"
+        />
+        <p class="flex-1 leading-relaxed">{{ notice.message }}</p>
+        <button
+          type="button"
+          @click="dismissNotice"
+          aria-label="Dismiss message"
+          class="shrink-0 -m-1 p-1 rounded-md text-[#7D5A50] hover:bg-[#F3E7D2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B1F0E]/40"
+        >
+          <Icon name="heroicons:x-mark" class="w-4 h-4" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
 
     <!-- Checkout Modal -->
     <CheckoutModal
