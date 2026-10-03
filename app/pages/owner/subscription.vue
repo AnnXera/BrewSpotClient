@@ -259,6 +259,17 @@ const canCancelCurrent = computed(() => {
   return Number(sub.plan?.price ?? 0) > 0
 })
 
+// Why cancel isn't offered, for the cases where the owner would otherwise wonder.
+const cancelHint = computed(() => {
+  const sub = currentPlan.value
+  if (!sub || sub.cancel_at_period_end) return ''
+  if (sub.gateway_subscription_id) return 'This subscription is billed by your payment provider. Contact support to cancel it.'
+  if (sub.billing_cycle === 'trial' || Number(sub.plan?.price ?? 0) <= 0) {
+    return `Your free trial ends on ${formatDate(sub.end_date)} on its own, so there's nothing to cancel.`
+  }
+  return ''
+})
+
 const cancelling = ref(false)
 
 // Which cancellation the owner is being asked to confirm, if any.
@@ -284,10 +295,10 @@ const cancelDialog = computed(() => {
 
   if (pendingCancel.value === 'next') {
     return {
-      title: 'Remove your scheduled plan change?',
+      title: `Remove your scheduled switch to ${currentPlan.value?.pending_plan?.sub_name ?? 'the next plan'}?`,
       message: `You'll stay on your ${currentPlan.value?.plan?.sub_name ?? 'current plan'}. Nothing has been charged for the next plan.`,
-      confirmLabel: 'Remove scheduled plan',
-      cancelLabel: 'Keep scheduled plan',
+      confirmLabel: 'Remove scheduled switch',
+      cancelLabel: 'Keep scheduled switch',
       consequences: [] as string[],
     }
   }
@@ -367,10 +378,13 @@ const isRenewalOpen = computed(() => {
 function planButtonLabel(plan: SubscriptionPlanItem): string {
   if (!currentPlan.value) return 'Subscribe Now'
   // Paid days are used up: every plan is now something the owner can pay for today.
-  if (isRenewalOpen.value) return isCurrentPlan(plan) ? 'Renew Now' : 'Pay & Switch Now'
-  if (isScheduledPlan(plan)) return 'Scheduled'
-  if (isCurrentPlan(plan)) return hasScheduledChange.value ? 'Keep This Plan' : 'Current Plan'
-  return 'Switch at Renewal'
+  if (isRenewalOpen.value) return isCurrentPlan(plan) ? 'Renew Now' : 'Switch & Pay Now'
+
+  // A date says when the change happens; "at renewal" leaves the owner to work it out.
+  const endDate = currentPlan.value.end_date ? formatDate(currentPlan.value.end_date) : null
+  if (isScheduledPlan(plan)) return endDate ? `Scheduled for ${endDate}` : 'Scheduled'
+  if (isCurrentPlan(plan)) return hasScheduledChange.value ? 'Stay on This Plan' : 'Current Plan'
+  return endDate ? `Switch on ${endDate}` : 'Switch at Renewal'
 }
 
 function planButtonDisabled(plan: SubscriptionPlanItem): boolean {
@@ -504,10 +518,10 @@ onMounted(async () => {
           <button
             v-if="viewMode === 'current'"
             @click="viewMode = 'browse'"
-            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-lg shadow-[#3B1F0E]/20"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
           >
             <Icon name="heroicons:sparkles" class="w-5 h-5 text-[#F3E7D2]" />
-            Upgrade Plan
+            Change Plan
           </button>
           <button
             v-else
@@ -539,16 +553,18 @@ onMounted(async () => {
                   <span class="font-display text-2xl font-bold text-[#3B1F0E]">
                     {{ currentPlan?.plan?.sub_name || 'Active Plan' }}
                   </span>
-                  <span
-                    class="inline-flex items-center px-3 py-0.5 rounded-full font-display font-semibold text-xs bg-[#D4EDDA] text-[#28A745] capitalize"
-                  >
-                    {{ currentPlan?.status || 'Active' }}
-                  </span>
+                  <!-- One status, so a cancelled plan never reads "Active" and "Cancelled" at once. -->
                   <span
                     v-if="isCancelled"
-                    class="inline-flex items-center px-2.5 py-0.5 rounded-full font-display font-semibold text-xs bg-[#F9ECEC] border border-[#ECC9C9] text-[#A13D3D]"
+                    class="inline-flex items-center px-3 py-0.5 rounded-full font-display font-semibold text-xs bg-[#FFF8EA] border border-[#D9B98D] text-[#8F5B12]"
                   >
-                    Cancelled
+                    Cancelled · ends {{ formatDate(currentPlan?.end_date) }}
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex items-center px-3 py-0.5 rounded-full font-display font-semibold text-xs bg-[#D4EDDA] text-[#1E6B34] capitalize"
+                  >
+                    {{ currentPlan?.status || 'Active' }}
                   </span>
                   <span
                     class="inline-flex items-center px-2.5 py-0.5 rounded-full font-display font-semibold text-xs bg-[#FFF8EA] border border-[#EDD8CC] text-[#7D5A50] capitalize"
@@ -576,7 +592,7 @@ onMounted(async () => {
                 </span>
               </div>
               <div class="bg-[#FFFDF9] p-4 rounded-xl border border-[#F3E7D2]">
-                <span class="text-[#8B6656] block text-xs font-medium uppercase tracking-wider">Expires On</span>
+                <span class="text-[#8B6656] block text-xs font-medium uppercase tracking-wider">{{ isCancelled ? 'Ends On' : 'Expires On' }}</span>
                 <span class="font-semibold text-[#3B1F0E] mt-0.5 block">
                   {{ formatDate(currentPlan?.end_date) }}
                 </span>
@@ -585,20 +601,20 @@ onMounted(async () => {
 
             <div
               v-if="isCancelled"
-              class="flex items-start gap-3 mb-6 p-4 rounded-xl bg-[#F9ECEC] border border-[#ECC9C9] text-[#A13D3D] font-sans text-xs leading-relaxed"
+              class="flex items-start gap-3 mb-6 p-4 rounded-xl bg-[#FFF8EA] border border-[#D9B98D] text-[#8F5B12] font-sans text-xs leading-relaxed"
             >
-              <Icon name="heroicons:exclamation-circle" class="w-5 h-5 shrink-0 mt-0.5" />
+              <Icon name="heroicons:information-circle" class="w-5 h-5 shrink-0 mt-0.5" aria-hidden="true" />
               <div class="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  Your subscription is cancelled and will not renew. You keep full access to every feature until
+                  Your subscription is cancelled and will not renew, so you won't be charged again. You keep full access to every feature until
                   <strong>{{ formatDate(currentPlan?.end_date) }}</strong>.
                 </div>
                 <button
                   @click="resumePlan"
                   :disabled="cancelling"
-                  class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  class="shrink-0 inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <Icon name="heroicons:arrow-uturn-left" class="w-4 h-4" />
+                  <Icon name="heroicons:arrow-uturn-left" class="w-4 h-4" aria-hidden="true" />
                   Resume Subscription
                 </button>
               </div>
@@ -624,9 +640,9 @@ onMounted(async () => {
                 <button
                   v-if="canPayNextTerm && !hasScheduledChange"
                   @click="payNextTerm"
-                  class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
+                  class="shrink-0 inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
                 >
-                  <Icon name="heroicons:credit-card" class="w-4 h-4" />
+                  <Icon name="heroicons:credit-card" class="w-4 h-4" aria-hidden="true" />
                   Renew Now
                 </button>
               </div>
@@ -647,24 +663,37 @@ onMounted(async () => {
                   <span>{{ feat.name }}</span>
                 </span>
               </div>
-              <p v-else class="font-sans text-xs text-[#9E7060]">
+              <p v-else class="font-sans text-xs text-[#8B6656]">
                 Basic plan access (single branch only, no advanced features).
               </p>
             </div>
 
-            <div v-if="canCancelCurrent" class="pt-4 mt-6 border-t border-[#F3E7D2]">
+            <!-- Manage footer: the reassurance sits with the action it qualifies, and the action
+                 stays quiet so it never competes with renewing. -->
+            <div
+              v-if="canCancelCurrent"
+              class="pt-3 mt-6 border-t border-[#F3E7D2] flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4"
+            >
+              <p class="font-sans text-xs text-[#8B6656]">
+                Cancelling keeps your access until {{ formatDate(currentPlan?.end_date) }}.
+              </p>
               <button
                 @click="cancelCurrentPlan"
                 :disabled="cancelling"
-                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-[#ECC9C9] text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                class="self-start sm:self-auto -ml-3 sm:ml-0 inline-flex items-center gap-2 min-h-11 px-3 rounded-lg text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <Icon name="heroicons:x-circle" class="w-4 h-4" />
-                Cancel Plan
+                <Icon name="heroicons:x-circle" class="w-4 h-4" aria-hidden="true" />
+                Cancel subscription
               </button>
-              <p class="font-sans text-xs text-[#8B6656] mt-2">
-                You'll keep access until {{ formatDate(currentPlan?.end_date) }}.
-              </p>
             </div>
+
+            <!-- Say why there's no cancel button instead of leaving the owner to hunt for it. -->
+            <p
+              v-else-if="cancelHint"
+              class="pt-4 mt-6 border-t border-[#F3E7D2] font-sans text-xs text-[#8B6656]"
+            >
+              {{ cancelHint }}
+            </p>
           </div>
 
           <!-- Next Plan (scheduled, not yet active) -->
@@ -674,7 +703,7 @@ onMounted(async () => {
           >
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#EEDFC4] pb-6 mb-6">
               <div>
-                <span class="inline-flex items-center gap-1.5 font-sans text-xs uppercase font-bold text-[#B8752F] tracking-wider mb-2">
+                <span class="inline-flex items-center gap-1.5 font-sans text-xs uppercase font-bold text-[#8F5B12] tracking-wider mb-2">
                   <Icon name="heroicons:clock" class="w-4 h-4" />
                   Next Plan &mdash; Not Active Yet
                 </span>
@@ -711,23 +740,25 @@ onMounted(async () => {
               </template>
             </p>
 
-            <button
-              v-if="canPayNextTerm"
-              @click="payNextTerm"
-              class="w-full sm:w-auto mb-6 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
-            >
-              <Icon name="heroicons:credit-card" class="w-4 h-4" />
-              Pay Now
-            </button>
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-6">
+              <button
+                v-if="canPayNextTerm"
+                @click="payNextTerm"
+                class="inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
+              >
+                <Icon name="heroicons:credit-card" class="w-4 h-4" aria-hidden="true" />
+                Pay Now
+              </button>
 
-            <button
-              @click="cancelNextPlan"
-              :disabled="cancelling"
-              class="w-full sm:w-auto mb-6 sm:ml-3 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-white border border-[#ECC9C9] text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <Icon name="heroicons:x-circle" class="w-4 h-4" />
-              Cancel Next Plan
-            </button>
+              <button
+                @click="cancelNextPlan"
+                :disabled="cancelling"
+                class="inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-lg text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Icon name="heroicons:x-circle" class="w-4 h-4" aria-hidden="true" />
+                Remove scheduled switch
+              </button>
+            </div>
 
             <div class="pt-4 border-t border-[#EEDFC4]">
               <span class="font-sans text-xs uppercase font-bold text-[#8B6656] block mb-2 tracking-wider">
@@ -743,7 +774,7 @@ onMounted(async () => {
                   <span>{{ feat.name }}</span>
                 </span>
               </div>
-              <p v-else class="font-sans text-xs text-[#9E7060]">
+              <p v-else class="font-sans text-xs text-[#8B6656]">
                 Basic plan access (single branch only, no advanced features).
               </p>
             </div>
@@ -806,7 +837,7 @@ onMounted(async () => {
         >
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#EEDFC4] pb-6 mb-6">
             <div>
-              <span class="inline-flex items-center gap-1.5 font-sans text-xs uppercase font-bold text-[#B8752F] tracking-wider mb-2">
+              <span class="inline-flex items-center gap-1.5 font-sans text-xs uppercase font-bold text-[#8F5B12] tracking-wider mb-2">
                 <Icon name="heroicons:exclamation-triangle" class="w-4 h-4" />
                 Subscription Ended
               </span>
@@ -846,7 +877,7 @@ onMounted(async () => {
           <div class="flex flex-col sm:flex-row gap-3">
             <button
               @click="payRenewalOffer"
-              class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-lg shadow-[#3B1F0E]/20"
+              class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
             >
               <Icon name="heroicons:credit-card" class="w-5 h-5" />
               {{ renewalOffer.was_scheduled ? 'Pay & Start' : 'Renew' }} {{ renewalOffer.plan?.sub_name }}
@@ -862,41 +893,35 @@ onMounted(async () => {
         </div>
 
         <!-- No Active Subscription State -->
-        <div v-else class="bg-[#FFFDF9] border border-[#EEDFC4] rounded-3xl p-8 md:p-16 mb-8 text-center shadow-sm relative overflow-hidden flex flex-col items-center">
-          <!-- Decorative Background Elements -->
-          <div class="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#F3E7D2]/50 to-transparent"></div>
-          
-          <div class="relative z-10 w-24 h-24 bg-white rounded-2xl shadow-lg border border-[#EDD8CC] flex items-center justify-center mx-auto mb-6 rotate-3">
-            <div class="absolute -right-3 -top-3 w-8 h-8 bg-[#3B1F0E] rounded-full flex items-center justify-center -rotate-12 shadow-md">
-              <Icon name="heroicons:star-solid" class="w-4 h-4 text-[#F3E7D2]" />
-            </div>
-            <Icon name="heroicons:building-storefront" class="w-10 h-10 text-[#3B1F0E]" />
+        <div v-else class="bg-[#FFFDF9] border border-[#EEDFC4] rounded-2xl p-8 md:p-12 mb-8 text-center flex flex-col items-center">
+          <div class="w-16 h-16 bg-white rounded-xl border border-[#EDD8CC] flex items-center justify-center mb-5">
+            <Icon name="heroicons:building-storefront" class="w-8 h-8 text-[#3B1F0E]" aria-hidden="true" />
           </div>
-          
-          <h3 class="relative z-10 font-display text-2xl md:text-3xl font-black text-[#3B1F0E] mb-3">
+
+          <h3 class="font-display text-2xl font-bold text-[#3B1F0E] mb-3">
             Ready to grow your coffee empire?
           </h3>
-          <p class="relative z-10 font-sans text-base text-[#7D5A50] max-w-lg mx-auto mb-8">
+          <p class="font-sans text-base text-[#7D5A50] max-w-lg mx-auto mb-6">
             You're currently on the basic free tier. Upgrade your plan today to unlock the full potential of Brewspot and streamline your operations.
           </p>
-          
-          <div class="relative z-10 flex flex-wrap justify-center gap-3 mb-10">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-semibold text-[#3D2B24] shadow-sm">
-              <Icon name="heroicons:map" class="w-4 h-4 text-[#B8752F]" /> Multi-branch Management
+
+          <div class="flex flex-wrap justify-center gap-2 mb-8">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-medium text-[#3D2B24]">
+              <Icon name="heroicons:map" class="w-4 h-4 text-[#B8752F]" aria-hidden="true" /> Multi-branch Management
             </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-semibold text-[#3D2B24] shadow-sm">
-              <Icon name="heroicons:chart-bar" class="w-4 h-4 text-[#B8752F]" /> Advanced Analytics
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-medium text-[#3D2B24]">
+              <Icon name="heroicons:chart-bar" class="w-4 h-4 text-[#B8752F]" aria-hidden="true" /> Advanced Analytics
             </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-semibold text-[#3D2B24] shadow-sm">
-              <Icon name="heroicons:users" class="w-4 h-4 text-[#B8752F]" /> Staff Roles
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#EDD8CC] text-sm font-medium text-[#3D2B24]">
+              <Icon name="heroicons:users" class="w-4 h-4 text-[#B8752F]" aria-hidden="true" /> Staff Roles
             </span>
           </div>
 
           <button
             @click="viewMode = 'browse'"
-            class="relative z-10 inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-all hover:-translate-y-1 shadow-[0_8px_20px_-6px_rgba(59,31,14,0.5)]"
+            class="inline-flex items-center gap-2 min-h-11 px-6 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
           >
-            <Icon name="heroicons:sparkles" class="w-5 h-5" />
+            <Icon name="heroicons:sparkles" class="w-5 h-5" aria-hidden="true" />
             View Premium Plans
           </button>
         </div>
@@ -913,7 +938,26 @@ onMounted(async () => {
 
       <!-- VIEW MODE: BROWSE PLANS -->
       <div v-else>
-        
+
+        <!-- Where the owner stands, so no button label has to be decoded from memory -->
+        <div
+          v-if="currentPlan"
+          class="max-w-6xl mx-auto mb-8 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-xl bg-white border border-[#EEDFC4] px-5 py-3 font-sans text-sm text-[#7D5A50]"
+        >
+          <span>
+            You're on <strong class="text-[#3B1F0E]">{{ currentPlan.plan?.sub_name }}</strong>
+            <span class="text-[#8B6656]">· {{ cycleLabel(currentPlan.billing_cycle) }}</span>
+          </span>
+          <span>
+            {{ isCancelled ? 'Ends' : 'Runs until' }}
+            <strong class="text-[#3B1F0E]">{{ formatDate(currentPlan.end_date) }}</strong>
+          </span>
+          <span v-if="hasScheduledChange">
+            Switching to <strong class="text-[#3B1F0E]">{{ currentPlan.pending_plan?.sub_name }}</strong>
+            on {{ formatDate(currentPlan.end_date) }}
+          </span>
+        </div>
+
         <!-- Monthly / Yearly Toggle -->
         <div class="flex justify-center mb-10 relative">
           <div class="inline-flex p-1 bg-white border border-[#EDD8CC] rounded-full shadow-sm relative">
@@ -975,19 +1019,34 @@ onMounted(async () => {
           <div 
             v-for="plan in availablePlans" 
             :key="plan.uuid"
-            class="relative flex flex-col bg-white rounded-3xl border border-[#EDD8CC] p-8 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
+            class="relative flex flex-col bg-white rounded-3xl border p-8 shadow-sm hover:shadow-md transition-shadow duration-200"
+            :class="isCurrentPlan(plan) ? 'border-[#3B1F0E]' : 'border-[#EDD8CC]'"
           >
             <!-- Plan Header -->
             <div class="mb-6">
-              <h3 class="font-display text-xl font-bold text-[#3B1F0E] mb-2">{{ plan.sub_name }}</h3>
+              <div class="flex items-center justify-between gap-3 mb-2">
+                <h3 class="font-display text-xl font-bold text-[#3B1F0E]">{{ plan.sub_name }}</h3>
+                <span
+                  v-if="isCurrentPlan(plan)"
+                  class="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold text-xs"
+                >
+                  Your plan
+                </span>
+                <span
+                  v-else-if="isScheduledPlan(plan)"
+                  class="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#FFF8EA] border border-[#D9B98D] text-[#8F5B12] font-display font-semibold text-xs"
+                >
+                  Up next
+                </span>
+              </div>
               <p class="font-sans text-sm text-[#8B6656] min-h-[40px]">{{ plan.description || 'Access basic management features for your cafe.' }}</p>
             </div>
             
             <!-- Price -->
             <div class="mb-8">
               <div class="flex items-baseline gap-1">
-                <span class="font-display text-4xl font-black text-[#3B1F0E]">₱{{ getDisplayPrice(plan, browseBillingCycle) }}</span>
-                <span class="font-sans text-sm text-[#9E7060] font-medium">/ {{ browseBillingCycle === 'yearly' ? 'year' : 'month' }}</span>
+                <span class="font-display text-4xl font-bold text-[#3B1F0E]">₱{{ getDisplayPrice(plan, browseBillingCycle) }}</span>
+                <span class="font-sans text-sm text-[#8B6656] font-medium">/ {{ browseBillingCycle === 'yearly' ? 'year' : 'month' }}</span>
               </div>
             </div>
 
@@ -1014,11 +1073,11 @@ onMounted(async () => {
             <!-- Subscribe Button -->
             <button
               @click="selectPlan(plan)"
-              class="w-full mt-8 py-3.5 rounded-xl font-display font-semibold text-sm transition-all duration-300"
+              class="w-full mt-8 min-h-11 py-3 rounded-xl font-display font-semibold text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#3B1F0E]/50"
               :class="
                 planButtonDisabled(plan)
                   ? 'bg-[#EEDFC4] text-[#7D5A50] cursor-not-allowed'
-                  : 'bg-[#FFF8EA] text-[#3B1F0E] border border-[#3B1F0E] hover:bg-[#3B1F0E] hover:text-[#FDF3E7] group-hover:bg-[#3B1F0E] group-hover:text-[#FDF3E7] shadow-[4px_4px_0px_0px_#3B1F0E] hover:shadow-[2px_2px_0px_0px_#3B1F0E] hover:translate-x-[2px] hover:translate-y-[2px]'
+                  : 'bg-white text-[#3B1F0E] border border-[#3B1F0E] hover:bg-[#3B1F0E] hover:text-[#FDF3E7]'
               "
               :disabled="planButtonDisabled(plan)"
             >
