@@ -1,8 +1,9 @@
 <!-- pages/owner/subscription.vue -->
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import PaymentHistoryTable, { type PaymentTransaction } from '~/components/common/PaymentHistoryTable.vue'
 import CheckoutModal from '~/components/subscription/CheckoutModal.vue'
+import ConfirmDialog from '~/components/ConfirmDialog.vue'
 import type { SubscriptionPlanItem } from '~/services/SubscriptionService'
 
 definePageMeta({
@@ -37,21 +38,72 @@ const isCheckoutOpen = ref(false)
 const selectedPlanToCheckout = ref<SubscriptionPlanItem | null>(null)
 const scheduling = ref(false)
 
+// Set when the subscription itself could not be loaded. Kept apart from "the owner has no
+// subscription", which is a normal answer: showing the free-tier upsell for a failed request
+// would tell a paying customer they have nothing.
+const loadError = ref(false)
+const plansError = ref(false)
+
+type Notice = { kind: 'success' | 'error' | 'info'; message: string }
+const notice = ref<Notice | null>(null)
+let noticeTimer: ReturnType<typeof setTimeout> | undefined
+
+/**
+ * Report an outcome without a blocking browser dialog. Errors stay until dismissed so a
+ * failure can't be missed; confirmations clear themselves.
+ */
+function showNotice(message: string, kind: Notice['kind'] = 'success') {
+  clearTimeout(noticeTimer)
+  notice.value = { kind, message }
+  if (kind !== 'error') {
+    noticeTimer = setTimeout(() => { notice.value = null }, 8000)
+  }
+}
+
+function dismissNotice() {
+  clearTimeout(noticeTimer)
+  notice.value = null
+}
+
+function errorMessage(err: any, fallback: string): string {
+  // No response at all means the request never reached the server.
+  if (!err?.response) return 'Could not reach the server. Check your connection and try again.'
+  return err.response._data?.message || fallback
+}
+
+/**
+ * The backend answers 404 with a body when the owner has no running term — that body carries
+ * the renewal offer, so it is a result, not a failure. Anything else propagates.
+ */
+async function fetchCurrentPlan() {
+  try {
+    return await subService.getCurrentPlan()
+  } catch (err: any) {
+    if (err?.response?.status === 404 && err.response._data) return err.response._data
+    throw err
+  }
+}
+
 async function loadOwnerSubscription() {
   loading.value = true
+  loadError.value = false
+  plansError.value = false
   try {
     const [planRes, historyRes, availableRes] = await Promise.all([
-      subService.getCurrentPlan().catch(() => null),
+      fetchCurrentPlan().catch(() => undefined),
       subService.getPlanHistory({ per_page: 20 }).catch(() => null),
-      subService.getAvailablePlans({ per_page: 50 }).catch(() => null)
+      subService.getAvailablePlans({ per_page: 50 }).catch(() => undefined)
     ])
 
-    if (planRes?.success && planRes.subscription) {
+    if (planRes === undefined) {
+      // Keep whatever was already on screen rather than blanking it on a failed refresh.
+      loadError.value = true
+    } else if (planRes.success && planRes.subscription) {
       currentPlan.value = planRes.subscription
       renewalOffer.value = null
     } else {
       currentPlan.value = null
-      renewalOffer.value = planRes?.renewal_offer ?? null
+      renewalOffer.value = planRes.renewal_offer ?? null
     }
 
     if (historyRes?.success && historyRes.history?.data?.length) {
@@ -69,14 +121,22 @@ async function loadOwnerSubscription() {
       history.value = []
     }
 
-    if (availableRes?.success && availableRes.plans?.data) {
+    if (availableRes === undefined) {
+      plansError.value = true
+    } else if (availableRes?.success && availableRes.plans?.data) {
       availablePlans.value = availableRes.plans.data
     }
 
   } catch (err) {
     console.warn('Owner subscription fetch:', err)
+    loadError.value = true
   } finally {
     loading.value = false
+  }
+
+  // A refresh that fails over data already on screen would otherwise go unnoticed.
+  if (loadError.value && (currentPlan.value || renewalOffer.value)) {
+    showNotice('Could not refresh your subscription. What you see may be out of date.', 'error')
   }
 }
 
@@ -187,13 +247,92 @@ function isScheduledPlan(plan: SubscriptionPlanItem): boolean {
 
 const hasScheduledChange = computed(() => !!currentPlan.value?.pending_plan)
 
+// The owner has told us not to renew. The subscription itself stays active until its end
+// date, so everything they paid for keeps working.
+const isCancelled = computed(() => !!currentPlan.value?.cancel_at_period_end)
+
+// Mirrors the backend: trials and gateway-billed subscriptions can't be cancelled here.
+const canCancelCurrent = computed(() => {
+  const sub = currentPlan.value
+  if (!sub || sub.cancel_at_period_end || sub.gateway_subscription_id) return false
+  if (sub.billing_cycle === 'trial') return false
+  return Number(sub.plan?.price ?? 0) > 0
+})
+
+const cancelling = ref(false)
+
+// Which cancellation the owner is being asked to confirm, if any.
+const pendingCancel = ref<'current' | 'next' | null>(null)
+
+async function runCancelAction(action: () => Promise<{ success: boolean; message: string }>) {
+  if (cancelling.value) return
+  cancelling.value = true
+  try {
+    const res = await action()
+    showNotice(res.message, res.success ? 'success' : 'error')
+    if (res.success) await loadOwnerSubscription()
+  } catch (err: any) {
+    showNotice(errorMessage(err, 'Could not update your subscription. Please try again.'), 'error')
+  } finally {
+    cancelling.value = false
+    pendingCancel.value = null
+  }
+}
+
+const cancelDialog = computed(() => {
+  const endsOn = formatDate(currentPlan.value?.end_date)
+
+  if (pendingCancel.value === 'next') {
+    return {
+      title: 'Remove your scheduled plan change?',
+      message: `You'll stay on your ${currentPlan.value?.plan?.sub_name ?? 'current plan'}. Nothing has been charged for the next plan.`,
+      confirmLabel: 'Remove scheduled plan',
+      cancelLabel: 'Keep scheduled plan',
+      consequences: [] as string[],
+    }
+  }
+
+  const consequences = [
+    `Full access to every feature until ${endsOn}`,
+    'No further charges after that date',
+  ]
+  if (hasScheduledChange.value) consequences.push('Your scheduled next plan is cancelled too')
+  consequences.push(`You can resume any time before ${endsOn}`)
+
+  return {
+    title: 'Cancel your subscription?',
+    message: `Your ${currentPlan.value?.plan?.sub_name ?? 'plan'} will not renew.`,
+    confirmLabel: 'Cancel subscription',
+    cancelLabel: 'Keep subscription',
+    consequences,
+  }
+})
+
+function cancelCurrentPlan() {
+  pendingCancel.value = 'current'
+}
+
+function cancelNextPlan() {
+  pendingCancel.value = 'next'
+}
+
+function confirmCancel() {
+  const target = pendingCancel.value
+  if (!target) return
+  runCancelAction(() => subService.cancelPlan(target))
+}
+
+function resumePlan() {
+  runCancelAction(() => subService.resumePlan())
+}
+
 /**
  * Whether the owner pays for the next term by hand from this page.
  *
  * A gateway-billed subscription renews on its own, so it gets no pay buttons — the same
  * rule the renewal banner follows.
  */
-const canPayNextTerm = computed(() => isRenewalOpen.value && !currentPlan.value?.gateway_subscription_id)
+const canPayNextTerm = computed(() => isRenewalOpen.value && !currentPlan.value?.gateway_subscription_id && !isCancelled.value)
 
 /**
  * Pay for the next term, into whichever plan it will be on: the booked change when there
@@ -269,14 +408,14 @@ async function selectPlan(plan: SubscriptionPlanItem) {
       return
     }
 
-    alert(res.message)
+    showNotice(res.message, res.success ? 'success' : 'error')
 
     if (res.success) {
       await loadOwnerSubscription()
       viewMode.value = 'current'
     }
   } catch (err: any) {
-    alert(err.response?._data?.message || 'Could not update your plan. Please try again.')
+    showNotice(errorMessage(err, 'Could not update your plan. Please try again.'), 'error')
   } finally {
     scheduling.value = false
   }
@@ -292,11 +431,19 @@ function handleCheckoutReturn() {
 
   if (outcome === 'success') {
     viewMode.value = 'current'
-    alert('Payment received. Your subscription will activate as soon as PayMongo confirms the payment — this usually takes a few seconds.')
+    showNotice('Payment received. Your subscription will activate as soon as PayMongo confirms the payment — this usually takes a few seconds.', 'info')
   } else if (outcome === 'cancelled') {
-    alert('Checkout was cancelled. You have not been charged.')
+    showNotice('Checkout was cancelled. You have not been charged.', 'info')
+  } else {
+    return
   }
+
+  // Drop the flag so a refresh or back-navigation doesn't announce the same outcome again.
+  const { checkout: _checkout, ...rest } = route.query
+  navigateTo({ query: rest }, { replace: true })
 }
+
+onBeforeUnmount(() => clearTimeout(noticeTimer))
 
 /**
  * Renewal links from the expiration reminder email arrive as
@@ -398,6 +545,12 @@ onMounted(async () => {
                     {{ currentPlan?.status || 'Active' }}
                   </span>
                   <span
+                    v-if="isCancelled"
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full font-display font-semibold text-xs bg-[#F9ECEC] border border-[#ECC9C9] text-[#A13D3D]"
+                  >
+                    Cancelled
+                  </span>
+                  <span
                     class="inline-flex items-center px-2.5 py-0.5 rounded-full font-display font-semibold text-xs bg-[#FFF8EA] border border-[#EDD8CC] text-[#7D5A50] capitalize"
                   >
                     {{ cycleLabel(currentPlan?.billing_cycle) }}
@@ -431,7 +584,28 @@ onMounted(async () => {
             </div>
 
             <div
-              v-if="currentPlan?.renewal_opens_at"
+              v-if="isCancelled"
+              class="flex items-start gap-3 mb-6 p-4 rounded-xl bg-[#F9ECEC] border border-[#ECC9C9] text-[#A13D3D] font-sans text-xs leading-relaxed"
+            >
+              <Icon name="heroicons:exclamation-circle" class="w-5 h-5 shrink-0 mt-0.5" />
+              <div class="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  Your subscription is cancelled and will not renew. You keep full access to every feature until
+                  <strong>{{ formatDate(currentPlan?.end_date) }}</strong>.
+                </div>
+                <button
+                  @click="resumePlan"
+                  :disabled="cancelling"
+                  class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Icon name="heroicons:arrow-uturn-left" class="w-4 h-4" />
+                  Resume Subscription
+                </button>
+              </div>
+            </div>
+
+            <div
+              v-else-if="currentPlan?.renewal_opens_at"
               class="flex items-start gap-3 mb-6 p-4 rounded-xl font-sans text-xs leading-relaxed"
               :class="isRenewalOpen ? 'bg-[#FFF8EA] border border-[#D9B98D] text-[#8F5B12]' : 'bg-[#FFFDF9] border border-[#F3E7D2] text-[#7D5A50]'"
             >
@@ -475,6 +649,20 @@ onMounted(async () => {
               </div>
               <p v-else class="font-sans text-xs text-[#9E7060]">
                 Basic plan access (single branch only, no advanced features).
+              </p>
+            </div>
+
+            <div v-if="canCancelCurrent" class="pt-4 mt-6 border-t border-[#F3E7D2]">
+              <button
+                @click="cancelCurrentPlan"
+                :disabled="cancelling"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-[#ECC9C9] text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Icon name="heroicons:x-circle" class="w-4 h-4" />
+                Cancel Plan
+              </button>
+              <p class="font-sans text-xs text-[#8B6656] mt-2">
+                You'll keep access until {{ formatDate(currentPlan?.end_date) }}.
               </p>
             </div>
           </div>
@@ -532,6 +720,15 @@ onMounted(async () => {
               Pay Now
             </button>
 
+            <button
+              @click="cancelNextPlan"
+              :disabled="cancelling"
+              class="w-full sm:w-auto mb-6 sm:ml-3 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-white border border-[#ECC9C9] text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Icon name="heroicons:x-circle" class="w-4 h-4" />
+              Cancel Next Plan
+            </button>
+
             <div class="pt-4 border-t border-[#EEDFC4]">
               <span class="font-sans text-xs uppercase font-bold text-[#8B6656] block mb-2 tracking-wider">
                 Features You'll Unlock
@@ -553,9 +750,58 @@ onMounted(async () => {
           </div>
         </div>
 
+        <!-- Loading — hold the card's place instead of flashing an empty state -->
+        <div
+          v-else-if="loading"
+          class="bg-white border border-[#EEDFC4] rounded-2xl p-6 md:p-8 mb-8 shadow-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading your subscription…</span>
+          <div class="animate-pulse" aria-hidden="true">
+            <div class="flex justify-between gap-4 border-b border-[#F3E7D2] pb-6 mb-6">
+              <div class="space-y-3 flex-1">
+                <div class="h-3 w-24 rounded bg-[#F3E7D2]"></div>
+                <div class="h-7 w-48 max-w-full rounded bg-[#EEDFC4]"></div>
+              </div>
+              <div class="h-9 w-24 rounded bg-[#EEDFC4]"></div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+              <div class="h-16 rounded-xl bg-[#FFFDF9] border border-[#F3E7D2]"></div>
+              <div class="h-16 rounded-xl bg-[#FFFDF9] border border-[#F3E7D2]"></div>
+            </div>
+            <div class="flex gap-2">
+              <div class="h-8 w-28 rounded-xl bg-[#F3E7D2]"></div>
+              <div class="h-8 w-32 rounded-xl bg-[#F3E7D2]"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Load failed — never dressed up as "you have no subscription" -->
+        <div
+          v-else-if="loadError"
+          role="alert"
+          class="bg-white border border-[#ECC9C9] rounded-2xl p-6 md:p-8 mb-8 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4"
+        >
+          <Icon name="heroicons:exclamation-triangle" class="w-6 h-6 shrink-0 text-[#A13D3D]" aria-hidden="true" />
+          <div class="flex-1">
+            <h2 class="font-display text-lg font-bold text-[#3B1F0E]">We couldn't load your subscription</h2>
+            <p class="font-sans text-sm text-[#7D5A50] mt-1">
+              This is a connection problem, not a change to your plan. Your subscription and payments are unaffected.
+            </p>
+          </div>
+          <button
+            @click="loadOwnerSubscription"
+            class="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#3B1F0E]/50"
+          >
+            <Icon name="heroicons:arrow-path" class="w-4 h-4" aria-hidden="true" />
+            Try again
+          </button>
+        </div>
+
         <!-- Term Ended — pick up where the owner left off -->
         <div
-          v-else-if="!loading && renewalOffer"
+          v-else-if="renewalOffer"
           class="bg-[#FFF8EA] border border-[#D9B98D] rounded-2xl p-6 md:p-8 mb-8 shadow-sm"
         >
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#EEDFC4] pb-6 mb-6">
@@ -616,7 +862,7 @@ onMounted(async () => {
         </div>
 
         <!-- No Active Subscription State -->
-        <div v-else-if="!loading" class="bg-[#FFFDF9] border border-[#EEDFC4] rounded-3xl p-8 md:p-16 mb-8 text-center shadow-sm relative overflow-hidden flex flex-col items-center">
+        <div v-else class="bg-[#FFFDF9] border border-[#EEDFC4] rounded-3xl p-8 md:p-16 mb-8 text-center shadow-sm relative overflow-hidden flex flex-col items-center">
           <!-- Decorative Background Elements -->
           <div class="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#F3E7D2]/50 to-transparent"></div>
           
@@ -708,6 +954,22 @@ onMounted(async () => {
           <Icon name="heroicons:arrow-path" class="w-8 h-8 text-[#9E7060] animate-spin" />
         </div>
 
+        <!-- Plans failed to load -->
+        <div
+          v-else-if="plansError && !availablePlans.length"
+          role="alert"
+          class="max-w-xl mx-auto bg-white border border-[#ECC9C9] rounded-2xl p-6 text-center"
+        >
+          <p class="font-sans text-sm text-[#7D5A50] mb-4">We couldn't load the available plans. Check your connection and try again.</p>
+          <button
+            @click="loadOwnerSubscription"
+            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#3B1F0E]/50"
+          >
+            <Icon name="heroicons:arrow-path" class="w-4 h-4" aria-hidden="true" />
+            Try again
+          </button>
+        </div>
+
         <!-- Plans Grid -->
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
           <div 
@@ -767,6 +1029,54 @@ onMounted(async () => {
       </div>
 
     </main>
+
+    <ConfirmDialog
+      :open="pendingCancel !== null"
+      :title="cancelDialog.title"
+      :message="cancelDialog.message"
+      :confirm-label="cancelDialog.confirmLabel"
+      :cancel-label="cancelDialog.cancelLabel"
+      :danger="pendingCancel === 'current'"
+      :loading="cancelling"
+      @confirm="confirmCancel"
+      @cancel="pendingCancel = null"
+    >
+      <ul v-if="cancelDialog.consequences.length" class="space-y-2 font-sans text-sm text-[#3B1F0E]/80">
+        <li v-for="line in cancelDialog.consequences" :key="line" class="flex items-start gap-2">
+          <Icon name="heroicons:check-circle" class="w-5 h-5 shrink-0 text-[#28A745]" aria-hidden="true" />
+          <span>{{ line }}</span>
+        </li>
+      </ul>
+    </ConfirmDialog>
+
+    <!-- Outcome messages. The live region is always mounted so screen readers pick up the text. -->
+    <div
+      class="fixed bottom-4 left-4 right-4 md:left-[calc(289px+1rem)] z-[60] flex justify-center pointer-events-none"
+      :aria-live="notice?.kind === 'error' ? 'assertive' : 'polite'"
+      aria-atomic="true"
+    >
+      <div
+        v-if="notice"
+        class="pointer-events-auto w-full max-w-md flex items-start gap-3 rounded-xl bg-white p-4 font-sans text-sm text-[#3B1F0E] shadow-lg shadow-[#3B1F0E]/15 border"
+        :class="notice.kind === 'error' ? 'border-[#ECC9C9]' : 'border-[#D9B98D]'"
+      >
+        <Icon
+          :name="notice.kind === 'error' ? 'heroicons:exclamation-circle' : notice.kind === 'info' ? 'heroicons:information-circle' : 'heroicons:check-circle'"
+          class="w-5 h-5 shrink-0 mt-0.5"
+          :class="notice.kind === 'error' ? 'text-[#A13D3D]' : notice.kind === 'info' ? 'text-[#B8752F]' : 'text-[#28A745]'"
+          aria-hidden="true"
+        />
+        <p class="flex-1 leading-relaxed">{{ notice.message }}</p>
+        <button
+          type="button"
+          @click="dismissNotice"
+          aria-label="Dismiss message"
+          class="shrink-0 -m-1 p-1 rounded-md text-[#7D5A50] hover:bg-[#F3E7D2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B1F0E]/40"
+        >
+          <Icon name="heroicons:x-mark" class="w-4 h-4" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
 
     <!-- Checkout Modal -->
     <CheckoutModal
