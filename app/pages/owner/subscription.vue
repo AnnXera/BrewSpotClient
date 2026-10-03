@@ -55,9 +55,21 @@ let noticeTimer: ReturnType<typeof setTimeout> | undefined
 function showNotice(message: string, kind: Notice['kind'] = 'success') {
   clearTimeout(noticeTimer)
   notice.value = { kind, message }
-  if (kind !== 'error') {
+  startNoticeTimer()
+}
+
+// Only routine confirmations clear themselves. Errors and the payment-return notices
+// (`info`) carry something the owner has to act on or be sure of, so they wait to be dismissed.
+function startNoticeTimer() {
+  clearTimeout(noticeTimer)
+  if (notice.value?.kind === 'success') {
     noticeTimer = setTimeout(() => { notice.value = null }, 8000)
   }
+}
+
+// Reading or focusing the message must not race the timer.
+function pauseNoticeTimer() {
+  clearTimeout(noticeTimer)
 }
 
 function dismissNotice() {
@@ -898,9 +910,9 @@ onMounted(async () => {
             <Icon name="heroicons:building-storefront" class="w-8 h-8 text-[#3B1F0E]" aria-hidden="true" />
           </div>
 
-          <h3 class="font-display text-2xl font-bold text-[#3B1F0E] mb-3">
+          <h2 class="font-display text-2xl font-bold text-[#3B1F0E] mb-3">
             Ready to grow your coffee empire?
-          </h3>
+          </h2>
           <p class="font-sans text-base text-[#7D5A50] max-w-lg mx-auto mb-6">
             You're currently on the basic free tier. Upgrade your plan today to unlock the full potential of Brewspot and streamline your operations.
           </p>
@@ -971,8 +983,10 @@ onMounted(async () => {
             </div>
             
             <!-- Buttons wrapper to enforce equal widths -->
-            <div class="relative z-10 grid grid-cols-2 w-full sm:min-w-[320px]">
+            <div class="relative z-10 grid grid-cols-2 w-full sm:min-w-[320px]" role="group" aria-label="Billing cycle">
               <button
+                type="button"
+                :aria-pressed="browseBillingCycle === 'monthly'"
                 class="px-4 sm:px-6 py-2.5 rounded-full font-display text-sm font-semibold transition-colors"
                 :class="browseBillingCycle === 'monthly' ? 'text-white' : 'text-[#7D5A50] hover:text-[#3B1F0E]'"
                 @click="browseBillingCycle = 'monthly'"
@@ -980,6 +994,8 @@ onMounted(async () => {
                 Monthly
               </button>
               <button
+                type="button"
+                :aria-pressed="browseBillingCycle === 'yearly'"
                 class="px-4 sm:px-6 py-2.5 rounded-full font-display text-sm font-semibold transition-colors flex items-center justify-center gap-2"
                 :class="browseBillingCycle === 'yearly' ? 'text-white' : 'text-[#7D5A50] hover:text-[#3B1F0E]'"
                 @click="browseBillingCycle = 'yearly'"
@@ -994,8 +1010,9 @@ onMounted(async () => {
         </div>
 
         <!-- Loading State for Plans -->
-        <div v-if="loading" class="flex justify-center py-20">
-          <Icon name="heroicons:arrow-path" class="w-8 h-8 text-[#9E7060] animate-spin" />
+        <div v-if="loading" class="flex justify-center py-20" role="status">
+          <span class="sr-only">Loading plans…</span>
+          <Icon name="heroicons:arrow-path" class="w-8 h-8 text-[#9E7060] animate-spin" aria-hidden="true" />
         </div>
 
         <!-- Plans failed to load -->
@@ -1025,7 +1042,7 @@ onMounted(async () => {
             <!-- Plan Header -->
             <div class="mb-6">
               <div class="flex items-center justify-between gap-3 mb-2">
-                <h3 class="font-display text-xl font-bold text-[#3B1F0E]">{{ plan.sub_name }}</h3>
+                <h2 class="font-display text-xl font-bold text-[#3B1F0E]">{{ plan.sub_name }}</h2>
                 <span
                   v-if="isCurrentPlan(plan)"
                   class="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold text-xs"
@@ -1118,6 +1135,10 @@ onMounted(async () => {
         v-if="notice"
         class="pointer-events-auto w-full max-w-md flex items-start gap-3 rounded-xl bg-white p-4 font-sans text-sm text-[#3B1F0E] shadow-lg shadow-[#3B1F0E]/15 border"
         :class="notice.kind === 'error' ? 'border-[#ECC9C9]' : 'border-[#D9B98D]'"
+        @mouseenter="pauseNoticeTimer"
+        @mouseleave="startNoticeTimer"
+        @focusin="pauseNoticeTimer"
+        @focusout="startNoticeTimer"
       >
         <Icon
           :name="notice.kind === 'error' ? 'heroicons:exclamation-circle' : notice.kind === 'info' ? 'heroicons:information-circle' : 'heroicons:check-circle'"
