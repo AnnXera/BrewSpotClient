@@ -255,7 +255,6 @@ const dtiSecFilePath = ref('')
 
 // BIR Certificate Additional Details
 const birRegisteredAt = ref('')
-const birExpiredAt = ref('')
 const tinNumber = ref('')
 const vat = ref<'vat-registered' | 'non-vat'>('non-vat')
 
@@ -338,7 +337,6 @@ function clearAllInputs() {
   dtiSecFileSize.value = ''
   dtiSecFilePath.value = ''
   birRegisteredAt.value = ''
-  birExpiredAt.value = ''
   tinNumber.value = ''
   vat.value = 'non-vat'
   // Errors & state
@@ -962,16 +960,6 @@ async function handleFinalSubmit() {
       error.value = 'Please enter the BIR Registered Date.'
       return
     }
-    if (!birExpiredAt.value) {
-      fieldErrors.value.bir_expired_at = 'BIR Expiration Date (if applicable) is required.'
-      error.value = 'Please enter the BIR Expiration Date.'
-      return
-    }
-    if (new Date(birExpiredAt.value) < new Date(birRegisteredAt.value)) {
-      fieldErrors.value.bir_expired_at = 'BIR Expiration Date cannot be before BIR Registered Date.'
-      error.value = 'BIR Expiration Date cannot be before BIR Registered Date.'
-      return
-    }
   }
 
   if (!governmentIdFile.value || (isBackIdRequired.value && !governmentIdFileBack.value)) {
@@ -1019,9 +1007,6 @@ async function handleFinalSubmit() {
     payload.append('bir_file', birFilePath.value)
     payload.append('dti_sec_file', dtiSecFilePath.value)
     payload.append('bir_registered_at', birRegisteredAt.value)
-    if (birExpiredAt.value) {
-      payload.append('bir_expired_at', birExpiredAt.value)
-    }
     payload.append('tin_number', tinNumber.value.trim())
     payload.append('vat', vat.value)
 
@@ -1087,7 +1072,6 @@ function saveDraft() {
     cafeLandlineDigits: cafeLandlineDigits.value,
     cafeEmail: cafeEmail.value,
     birRegisteredAt: birRegisteredAt.value,
-    birExpiredAt: birExpiredAt.value,
     tinNumber: tinNumber.value,
     vat: vat.value,
     governmentIdFilePath: governmentIdFilePath.value,
@@ -1127,7 +1111,6 @@ function restoreDraft() {
       if (draft.cafeLandlineDigits) cafeLandlineDigits.value = draft.cafeLandlineDigits
       if (draft.cafeEmail) cafeEmail.value = draft.cafeEmail
       if (draft.birRegisteredAt) birRegisteredAt.value = draft.birRegisteredAt
-      if (draft.birExpiredAt) birExpiredAt.value = draft.birExpiredAt
       if (draft.tinNumber) tinNumber.value = draft.tinNumber
       if (draft.vat) vat.value = draft.vat
       
@@ -1160,7 +1143,7 @@ function restoreDraft() {
 }
 
 watch(
-  [email, firstname, middlename, lastname, username, phoneType, mobileDigits, landlineDigits, ownerAddress, idType, cafeName, cafeDocType, branchName, address, cafePhoneType, cafeMobileDigits, cafeLandlineDigits, cafeEmail, birRegisteredAt, birExpiredAt, tinNumber, vat, governmentIdFilePath, governmentIdFileBackPath, birFilePath, dtiSecFilePath],
+  [email, firstname, middlename, lastname, username, phoneType, mobileDigits, landlineDigits, ownerAddress, idType, cafeName, cafeDocType, branchName, address, cafePhoneType, cafeMobileDigits, cafeLandlineDigits, cafeEmail, birRegisteredAt, tinNumber, vat, governmentIdFilePath, governmentIdFileBackPath, birFilePath, dtiSecFilePath],
   () => {
     saveDraft()
   },
@@ -1987,25 +1970,6 @@ onBeforeUnmount(() => {
                     />
                     <p v-if="fieldErrors.bir_registered_at" class="text-[0.7rem] text-red-600 font-medium">{{ fieldErrors.bir_registered_at }}</p>
                   </div>
-
-                  <!-- BIR Expiration Date (Required) -->
-                  <div class="space-y-1">
-                    <label class="block font-semibold text-[#2d201b]">BIR Expiration Date *</label>
-                    <input
-                      v-model="birExpiredAt"
-                      type="date"
-                      :min="birRegisteredAt || undefined"
-                      :class="[
-                        'w-full h-10 rounded-md border px-3 outline-none transition bg-white text-xs text-[#2d201b]',
-                        fieldErrors.bir_expired_at
-                          ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
-                          : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
-                      ]"
-                      required
-                      @change="clearFieldError('bir_expired_at')"
-                    />
-                    <p v-if="fieldErrors.bir_expired_at" class="text-[0.7rem] text-red-600 font-medium">{{ fieldErrors.bir_expired_at }}</p>
-                  </div>
                 </div>
               </div>
 
@@ -2019,7 +1983,7 @@ onBeforeUnmount(() => {
                 </button>
                 <button
                   type="submit"
-                  :disabled="loading || uploadedCount < 2 || (!!birFile && (!tinNumber || !birRegisteredAt || !birExpiredAt || !vat))"
+                  :disabled="loading || uploadedCount < 2 || (!!birFile && (!tinNumber || !birRegisteredAt || !vat))"
                   class="w-2/3 h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <span v-if="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>

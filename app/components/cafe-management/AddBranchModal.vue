@@ -35,8 +35,7 @@ const form = ref({
   cafe_phonenumber: '',
   tin_number: '',
   vat: 'vat-registered',
-  bir_registered_at: '',
-  bir_expired_at: ''
+  bir_registered_at: ''
 })
 const birFile = ref<File | null>(null)
 const cafePicture = ref<File | null>(null)
@@ -367,10 +366,6 @@ function handleSubmit() {
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">BIR Registered Date *</label>
                 <input type="date" v-model="form.bir_registered_at" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]" />
                 <p v-if="errors.bir_registered_at" class="text-xs text-red-600 mt-1 font-medium">{{ errors.bir_registered_at }}</p>
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-[#3D2B24] mb-1">BIR Expiry Date</label>
-                <input type="date" v-model="form.bir_expired_at" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">BIR File *</label>

@@ -282,10 +282,6 @@ onMounted(fetchBranch)
                   <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">Registered Date</p>
                   <p class="text-[15px] font-medium text-[#3D2B24]">{{ formatDate(birDocument.registered_at) }}</p>
                 </div>
-                <div class="flex flex-col gap-1">
-                  <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">Expired Date</p>
-                  <p class="text-[15px] font-medium text-[#3D2B24]">{{ formatDate(birDocument.expired_at) }}</p>
-                </div>
               </div>
             </div>
 
