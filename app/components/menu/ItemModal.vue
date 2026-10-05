@@ -5,6 +5,9 @@ import { INGREDIENT_UNITS } from '~/utils/constants'
 import { parseQuantity, formatQuantity, sanitizeQuantity } from '~/utils/fraction'
 import type { Ingredient } from '~/services/MenuService'
 import IngredientPicker from '~/components/menu/IngredientPicker.vue'
+import ConfirmModal from '~/components/common/ConfirmModal.vue'
+import AlertModal from '~/components/common/AlertModal.vue'
+import { useDialogs } from '~/composables/useDialogs'
 
 interface RecipeRow {
   // Set when the row uses one of the cafe's existing ingredients; its unit is then fixed.
@@ -27,6 +30,7 @@ const emit = defineEmits<{
 }>()
 
 const menuService = useMenuService()
+const { confirmDialog, alertDialog, askConfirm, runConfirm, showAlert } = useDialogs()
 
 const form = ref({
   menu_name: '',
@@ -145,9 +149,13 @@ watch(pictureFile, () => { isDirty.value = true })
 
 const handleClose = () => {
   if (isDirty.value) {
-    if (window.confirm('You have unsaved changes. Are you sure you want to discard them?')) {
-      emit('close')
-    }
+    askConfirm({
+      title: 'Discard Changes',
+      message: 'You have unsaved changes. Are you sure you want to discard them?',
+      confirmText: 'Discard',
+      isDestructive: true,
+      onConfirm: () => emit('close'),
+    })
   } else {
     emit('close')
   }
@@ -285,7 +293,7 @@ const saveItem = async () => {
     }
 
     console.error('Error saving item:', error)
-    alert('Failed to save item. Please try again.')
+    showAlert('Save Failed', 'Failed to save item. Please try again.')
   } finally {
     isSubmitting.value = false
   }
@@ -545,5 +553,21 @@ const saveItem = async () => {
       </div>
 
     </div>
+
+    <ConfirmModal
+      :show="confirmDialog.show"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :confirmText="confirmDialog.confirmText"
+      :isDestructive="confirmDialog.isDestructive"
+      @close="confirmDialog.show = false"
+      @confirm="runConfirm"
+    />
+    <AlertModal
+      :show="alertDialog.show"
+      :title="alertDialog.title"
+      :message="alertDialog.message"
+      @close="alertDialog.show = false"
+    />
   </div>
 </template>

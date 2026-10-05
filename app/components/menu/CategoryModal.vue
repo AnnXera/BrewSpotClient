@@ -5,6 +5,8 @@ import { useMenuItemSort } from '~/composables/useMenuItemSort'
 import MenuToolbar from '~/components/menu/MenuToolbar.vue'
 import CategoryMoveWarning from '~/components/menu/CategoryMoveWarning.vue'
 import { useCategoryMoves } from '~/composables/useCategoryMoves'
+import { useDialogs } from '~/composables/useDialogs'
+import AlertModal from '~/components/common/AlertModal.vue'
 
 const props = defineProps<{
   show: boolean
@@ -18,6 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const menuService = useMenuService()
+const { alertDialog, showAlert } = useDialogs()
 
 const form = ref({
   name: '',
@@ -127,9 +130,9 @@ const saveCategory = async () => {
       errors.value.name = fieldErrors.name?.[0] || ''
       errors.value.picture = fieldErrors.picture?.[0] || ''
     } else if (error.data?.message) {
-      alert(error.data.message)
+      showAlert('Save Failed', error.data.message)
     } else {
-      alert('Failed to save category. Please try again.')
+      showAlert('Save Failed', 'Failed to save category. Please try again.')
     }
   } finally {
     isSubmitting.value = false
@@ -321,5 +324,12 @@ const saveCategory = async () => {
       </div>
 
     </div>
+
+    <AlertModal
+      :show="alertDialog.show"
+      :title="alertDialog.title"
+      :message="alertDialog.message"
+      @close="alertDialog.show = false"
+    />
   </div>
 </template>
