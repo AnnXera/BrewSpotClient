@@ -19,6 +19,10 @@ const digits = ref(['', '', '', '', '', ''])
 const inputs = ref<HTMLInputElement[]>([])
 const otpCode = computed(() => digits.value.join(''))
 const cooldown = ref(0)
+const resending = ref(false)
+const notice = ref('')
+const RESEND_COOLDOWN = 30
+let cooldownTimer: ReturnType<typeof setInterval> | null = null
 
 // Step 3: Your Details
 const userUuid = ref('')
@@ -299,6 +303,11 @@ function clearAllInputs() {
   // Step 2
   digits.value = ['', '', '', '', '', '']
   cooldown.value = 0
+  notice.value = ''
+  if (cooldownTimer) {
+    clearInterval(cooldownTimer)
+    cooldownTimer = null
+  }
   // Step 3
   userUuid.value = ''
   firstname.value = ''
@@ -371,7 +380,10 @@ async function handleSendCode() {
     const res = await authService.sendRegistrationCode(trimmedEmail) as any
     if (res) {
       digits.value = ['', '', '', '', '', '']
+      notice.value = ''
       currentStep.value = 2
+      startCooldown(RESEND_COOLDOWN)
+      nextTick(() => inputs.value[0]?.focus())
     } else {
       error.value = 'Unable to send verification code.'
     }
@@ -383,23 +395,71 @@ async function handleSendCode() {
 }
 
 // Step 2: OTP Verification
+function startCooldown(seconds: number) {
+  cooldown.value = seconds
+  if (cooldownTimer) clearInterval(cooldownTimer)
+  cooldownTimer = setInterval(() => {
+    cooldown.value--
+    if (cooldown.value <= 0 && cooldownTimer) {
+      clearInterval(cooldownTimer)
+      cooldownTimer = null
+    }
+  }, 1000)
+}
+
+const cooldownLabel = computed(() => {
+  const m = Math.floor(cooldown.value / 60)
+  const sec = String(cooldown.value % 60).padStart(2, '0')
+  return `${m}:${sec}`
+})
+
+function resetDigits() {
+  digits.value = ['', '', '', '', '', '']
+  nextTick(() => inputs.value[0]?.focus())
+}
+
+function fillFrom(index: number, raw: string) {
+  const chars = raw.replace(/\D/g, '').slice(0, 6 - index).split('')
+  chars.forEach((c, i) => (digits.value[index + i] = c))
+  inputs.value[Math.min(index + chars.length, 5)]?.focus()
+  if (otpCode.value.length === 6) handleVerifyOTP()
+}
+
 function onDigitInput(index: number, event: Event) {
   const target = event.target as HTMLInputElement
-  const value = target.value.replace(/[^0-9]/g, '').slice(-1)
-  digits.value[index] = value
-  if (value && index < 5) {
-    inputs.value[index + 1]?.focus()
+  const cleaned = target.value.replace(/\D/g, '')
+  if (cleaned.length > 1) {
+    // Browser autofill or OTP suggestion delivers the whole code in one field
+    fillFrom(index, cleaned)
+    return
   }
+  digits.value[index] = cleaned
+  target.value = cleaned
+  if (cleaned && index < 5) inputs.value[index + 1]?.focus()
+  if (otpCode.value.length === 6) handleVerifyOTP()
 }
 
 function onDigitKeydown(index: number, event: KeyboardEvent) {
   if (event.key === 'Backspace' && !digits.value[index] && index > 0) {
     inputs.value[index - 1]?.focus()
+  } else if (event.key === 'ArrowLeft' && index > 0) {
+    event.preventDefault()
+    inputs.value[index - 1]?.focus()
+  } else if (event.key === 'ArrowRight' && index < 5) {
+    event.preventDefault()
+    inputs.value[index + 1]?.focus()
   }
 }
 
+function onDigitPaste(index: number, event: ClipboardEvent) {
+  event.preventDefault()
+  fillFrom(index, event.clipboardData?.getData('text') ?? '')
+}
+
 async function handleVerifyOTP() {
+  if (loading.value || otpCode.value.length < 6) return
   error.value = ''
+  notice.value = ''
   loading.value = true
   try {
     const res = await authService.verifyRegistrationCode(email.value.trim(), otpCode.value) as any
@@ -407,37 +467,38 @@ async function handleVerifyOTP() {
       userUuid.value = res.user_uuid
       currentStep.value = 3
     } else {
-      error.value = res.message || 'Invalid verification code.'
+      error.value = res.message || 'That code did not work. Check it and try again.'
+      resetDigits()
     }
   } catch (e: any) {
-    error.value = extractErrorMessage(e, 'Verification failed.')
+    error.value = extractErrorMessage(e, 'Verification failed. Check your connection and try again.')
+    resetDigits()
   } finally {
     loading.value = false
+    if (error.value) nextTick(() => inputs.value[0]?.focus())
   }
 }
 
 async function handleResendOTP() {
-  if (cooldown.value > 0) return
+  if (cooldown.value > 0 || resending.value) return
   error.value = ''
+  notice.value = ''
+  resending.value = true
   try {
     const res = await authService.resendRegistrationCode(email.value.trim())
     if (res.success) {
-      cooldown.value = 60
-      const interval = setInterval(() => {
-        cooldown.value--
-        if (cooldown.value <= 0) clearInterval(interval)
-      }, 1000)
+      notice.value = `A new code was sent to ${email.value.trim()}.`
+      startCooldown(RESEND_COOLDOWN)
+      resetDigits()
     } else if (res.retry_after_seconds) {
-      cooldown.value = res.retry_after_seconds
-      const interval = setInterval(() => {
-        cooldown.value--
-        if (cooldown.value <= 0) clearInterval(interval)
-      }, 1000)
+      startCooldown(res.retry_after_seconds)
     } else {
       error.value = res.message || 'Unable to resend code.'
     }
   } catch (e: any) {
     error.value = extractErrorMessage(e, 'Could not resend code.')
+  } finally {
+    resending.value = false
   }
 }
 
@@ -1164,6 +1225,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  if (cooldownTimer) clearInterval(cooldownTimer)
 })
 </script>
 
@@ -1307,48 +1369,69 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- STEP 2: OTP Verification -->
-        <div v-else-if="currentStep === 2" class="space-y-6">
+        <div v-else-if="currentStep === 2">
           <button
             type="button"
-            class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
+            class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity mb-8"
             @click="currentStep = 1"
           >
             <Icon name="heroicons:chevron-left" class="w-4 h-4" />
             Change Email
           </button>
 
-          <div>
-            <h1 class="text-3xl font-bold text-[#2d201b]">Verify your email</h1>
-            <p class="text-gray-600 text-sm mt-2 leading-relaxed">
-              We sent a 6-digit code to <span class="font-semibold text-[#2d201b]">{{ email }}</span>. Enter it below to continue.
+          <div class="mb-8">
+            <h1 class="text-3xl font-bold text-[#2d201b]">Check your inbox</h1>
+            <p class="text-gray-600 text-sm mt-1.5 leading-relaxed">
+              We sent a 6-digit code to <span class="font-semibold text-[#2d201b]">{{ email }}</span>.
+              Enter it below to continue.
             </p>
           </div>
 
           <!-- Auth Error Banner -->
           <div
             v-if="error"
-            class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
+            role="alert"
+            class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3 mb-6"
           >
             <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
             <span class="font-medium">{{ error }}</span>
           </div>
 
+          <!-- Resend confirmation -->
+          <p
+            v-if="notice && !error"
+            role="status"
+            class="mb-6 flex items-center gap-2 text-sm font-medium text-[#1F8A4C]"
+          >
+            <Icon name="heroicons:check-circle" class="w-5 h-5 shrink-0" />
+            {{ notice }}
+          </p>
+
           <form @submit.prevent="handleVerifyOTP" class="space-y-6">
-            <div class="flex justify-between gap-2">
+            <!-- Digit Inputs -->
+            <div class="flex justify-between gap-2" role="group" aria-label="6-digit verification code">
               <input
                 v-for="(digit, index) in digits"
                 :key="index"
                 ref="inputs"
-                v-model="digits[index]"
+                :value="digit"
                 type="text"
                 inputmode="numeric"
-                maxlength="1"
-                class="w-full h-14 text-center text-lg font-semibold rounded-lg border border-gray-300 bg-white text-[#2d201b] outline-none focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20 transition"
+                pattern="[0-9]*"
+                maxlength="6"
+                :autocomplete="index === 0 ? 'one-time-code' : 'off'"
+                :aria-label="`Digit ${index + 1} of 6`"
+                :disabled="loading"
+                :class="digit ? 'border-[#7B5A50]' : 'border-gray-300'"
+                class="min-w-0 w-full h-14 text-center text-xl font-semibold tabular-nums rounded-md border bg-white text-[#2d201b] outline-none focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20 transition"
                 @input="onDigitInput(index, $event)"
                 @keydown="onDigitKeydown(index, $event)"
+                @paste="onDigitPaste(index, $event)"
+                @focus="($event.target as HTMLInputElement).select()"
               />
             </div>
 
+            <!-- Submit Button -->
             <button
               type="submit"
               :disabled="loading || otpCode.length < 6"
@@ -1358,15 +1441,16 @@ onBeforeUnmount(() => {
               {{ loading ? 'Verifying...' : 'Verify and Continue' }}
             </button>
 
+            <!-- Resend -->
             <p class="text-sm text-gray-600 text-center">
               Didn't receive it?
               <button
                 type="button"
-                :disabled="cooldown > 0"
-                class="font-semibold text-[#7B5A50] hover:underline disabled:opacity-50 disabled:no-underline ml-1"
+                :disabled="cooldown > 0 || resending"
+                class="font-semibold tabular-nums text-[#7B5A50] hover:underline disabled:opacity-50 disabled:no-underline"
                 @click="handleResendOTP"
               >
-                {{ cooldown > 0 ? `Resend OTP (${cooldown}s)` : 'Resend OTP' }}
+                {{ cooldown > 0 ? `Resend code in ${cooldownLabel}` : resending ? 'Sending...' : 'Resend code' }}
               </button>
             </p>
           </form>

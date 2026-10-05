@@ -78,6 +78,12 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
 
 <template>
   <Teleport to="body">
+    <Transition
+      enter-active-class="transition-opacity duration-150 ease-out"
+      enter-from-class="opacity-0"
+      leave-active-class="transition-opacity duration-100 ease-in"
+      leave-to-class="opacity-0"
+    >
     <div
       v-if="open"
       class="fixed inset-0 z-50 flex items-center justify-center bg-[#3B1F0E]/40 backdrop-blur-sm"
@@ -103,7 +109,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
             ref="cancelButton"
             type="button"
             :disabled="loading"
-            class="rounded-lg px-4 py-2.5 font-sans text-sm font-medium text-[#3B1F0E]/70 hover:bg-[#F3E7D2] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B1F0E]/40 disabled:opacity-60 disabled:cursor-not-allowed"
+            class="min-h-11 rounded-lg px-4 py-2.5 font-sans text-sm font-medium text-[#3B1F0E]/70 hover:bg-[#F3E7D2] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B1F0E]/40 disabled:opacity-60 disabled:cursor-not-allowed"
             @click="dismiss"
           >
             {{ cancelLabel }}
@@ -111,17 +117,18 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
           <button
             type="button"
             :disabled="loading"
-            class="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 font-sans text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            class="inline-flex items-center justify-center gap-2 min-h-11 rounded-lg px-4 py-2.5 font-sans text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
             :class="danger
               ? 'bg-[#D9534F] text-white hover:bg-[#C24541] focus-visible:ring-[#D9534F]/50'
               : 'bg-[#3B1F0E] text-[#FDF3E7] hover:bg-[#2C1609] focus-visible:ring-[#3B1F0E]/50'"
             @click="emit('confirm')"
           >
-            <Icon v-if="loading" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" aria-hidden="true" />
+            <Icon v-if="loading" name="heroicons:arrow-path" class="w-4 h-4 animate-spin motion-reduce:animate-pulse" aria-hidden="true" />
             {{ confirmLabel }}
           </button>
         </div>
       </div>
     </div>
+    </Transition>
   </Teleport>
 </template>

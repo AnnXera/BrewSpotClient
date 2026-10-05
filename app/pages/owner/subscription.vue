@@ -214,6 +214,25 @@ function planFeatures(plan: any) {
   return []
 }
 
+/**
+ * The yearly discount, taken from the plans themselves rather than a number typed into the
+ * page. Each plan's saving is its yearly price against twelve months at the monthly price;
+ * a plan with no usable yearly price saves nothing and is skipped.
+ */
+const yearlySavings = computed<{ percent: number; varies: boolean } | null>(() => {
+  const percents = availablePlans.value
+    .map((plan) => {
+      const monthly = Number(plan.price)
+      const yearly = Number(plan.yearly_price)
+      if (!(monthly > 0) || !(yearly > 0)) return 0
+      return Math.round((1 - yearly / (monthly * 12)) * 100)
+    })
+    .filter((percent) => percent > 0)
+
+  if (!percents.length) return null
+  return { percent: Math.max(...percents), varies: new Set(percents).size > 1 }
+})
+
 const activePlanFeatures = computed(() => planFeatures(currentPlan.value?.plan))
 const nextPlanFeatures = computed(() => planFeatures(currentPlan.value?.pending_plan))
 
@@ -801,7 +820,7 @@ onMounted(async () => {
           aria-live="polite"
         >
           <span class="sr-only">Loading your subscription…</span>
-          <div class="animate-pulse" aria-hidden="true">
+          <div class="animate-pulse motion-reduce:animate-none" aria-hidden="true">
             <div class="flex justify-between gap-4 border-b border-[#F3E7D2] pb-6 mb-6">
               <div class="space-y-3 flex-1">
                 <div class="h-3 w-24 rounded bg-[#F3E7D2]"></div>
@@ -977,7 +996,7 @@ onMounted(async () => {
             <!-- Inner container for the slider to match button dimensions exactly -->
             <div class="absolute inset-1 pointer-events-none">
               <div 
-                class="w-1/2 h-full bg-[#3B1F0E] rounded-full transition-transform duration-300 ease-out shadow-sm"
+                class="w-1/2 h-full bg-[#3B1F0E] rounded-full transition-transform duration-300 ease-out motion-reduce:transition-none shadow-sm"
                 :class="browseBillingCycle === 'monthly' ? 'translate-x-0' : 'translate-x-full'"
               ></div>
             </div>
@@ -987,7 +1006,7 @@ onMounted(async () => {
               <button
                 type="button"
                 :aria-pressed="browseBillingCycle === 'monthly'"
-                class="px-4 sm:px-6 py-2.5 rounded-full font-display text-sm font-semibold transition-colors"
+                class="min-h-11 px-4 sm:px-6 py-2.5 rounded-full font-display text-sm font-semibold transition-colors"
                 :class="browseBillingCycle === 'monthly' ? 'text-white' : 'text-[#7D5A50] hover:text-[#3B1F0E]'"
                 @click="browseBillingCycle = 'monthly'"
               >
@@ -996,13 +1015,17 @@ onMounted(async () => {
               <button
                 type="button"
                 :aria-pressed="browseBillingCycle === 'yearly'"
-                class="px-4 sm:px-6 py-2.5 rounded-full font-display text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                class="min-h-11 px-4 sm:px-6 py-2.5 rounded-full font-display text-sm font-semibold transition-colors flex items-center justify-center gap-2"
                 :class="browseBillingCycle === 'yearly' ? 'text-white' : 'text-[#7D5A50] hover:text-[#3B1F0E]'"
                 @click="browseBillingCycle = 'yearly'"
               >
                 <span>Yearly</span>
-                <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-[#FFF8EA] text-[#3B1F0E] text-[10px] font-bold tracking-wider" :class="browseBillingCycle === 'yearly' ? 'bg-white/20 text-white shadow-inner' : ''">
-                  SAVE 20%
+                <span
+                  v-if="yearlySavings"
+                  class="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-[#FFF8EA] text-[#3B1F0E] text-xs font-bold tracking-wider"
+                  :class="browseBillingCycle === 'yearly' ? 'bg-white/20 text-white shadow-inner' : ''"
+                >
+                  SAVE {{ yearlySavings.varies ? 'UP TO ' : '' }}{{ yearlySavings.percent }}%
                 </span>
               </button>
             </div>
@@ -1012,7 +1035,7 @@ onMounted(async () => {
         <!-- Loading State for Plans -->
         <div v-if="loading" class="flex justify-center py-20" role="status">
           <span class="sr-only">Loading plans…</span>
-          <Icon name="heroicons:arrow-path" class="w-8 h-8 text-[#9E7060] animate-spin" aria-hidden="true" />
+          <Icon name="heroicons:arrow-path" class="w-8 h-8 text-[#9E7060] animate-spin motion-reduce:animate-pulse" aria-hidden="true" />
         </div>
 
         <!-- Plans failed to load -->
@@ -1131,6 +1154,13 @@ onMounted(async () => {
       :aria-live="notice?.kind === 'error' ? 'assertive' : 'polite'"
       aria-atomic="true"
     >
+      <!-- Arrives with a short rise and fade; reduced motion keeps the fade and drops the rise. -->
+      <Transition
+        enter-active-class="transition duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        enter-from-class="opacity-0 translate-y-2 motion-reduce:translate-y-0"
+        leave-active-class="transition duration-150 ease-in"
+        leave-to-class="opacity-0"
+      >
       <div
         v-if="notice"
         class="pointer-events-auto w-full max-w-md flex items-start gap-3 rounded-xl bg-white p-4 font-sans text-sm text-[#3B1F0E] shadow-lg shadow-[#3B1F0E]/15 border"
@@ -1151,11 +1181,12 @@ onMounted(async () => {
           type="button"
           @click="dismissNotice"
           aria-label="Dismiss message"
-          class="shrink-0 -m-1 p-1 rounded-md text-[#7D5A50] hover:bg-[#F3E7D2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B1F0E]/40"
+          class="shrink-0 -m-3.5 p-3.5 rounded-lg text-[#7D5A50] hover:bg-[#F3E7D2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B1F0E]/40"
         >
           <Icon name="heroicons:x-mark" class="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
+      </Transition>
     </div>
 
     <!-- Checkout Modal -->
