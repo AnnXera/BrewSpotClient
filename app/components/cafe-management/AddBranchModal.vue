@@ -69,6 +69,21 @@ function toggleAmenity(amenity: string) {
   }
 }
 
+function formatTinNumber(val: string): string {
+  const raw = val.replace(/[^0-9]/g, '').slice(0, 12)
+  const parts: string[] = []
+  for (let i = 0; i < raw.length; i += 3) {
+    parts.push(raw.slice(i, i + 3))
+  }
+  return parts.join('-')
+}
+
+function onTinInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  form.value.tin_number = formatTinNumber(target.value)
+  target.value = form.value.tin_number
+}
+
 function validateStep(step: number): boolean {
   errors.value = {}
   if (step === 1) {
@@ -79,7 +94,11 @@ function validateStep(step: number): boolean {
   } else if (step === 4) {
     if (!form.value.cafe_email.trim()) errors.value.cafe_email = 'Cafe email is required'
     if (!form.value.cafe_phonenumber.trim()) errors.value.cafe_phonenumber = 'Phone number is required'
-    if (!form.value.tin_number.trim()) errors.value.tin_number = 'TIN number is required'
+    
+    const tinRaw = form.value.tin_number.replace(/[^0-9]/g, '')
+    if (!tinRaw) errors.value.tin_number = 'TIN number is required'
+    else if (tinRaw.length < 12) errors.value.tin_number = 'TIN Number must follow format XXX-XXX-XXX-XXX.'
+    
     if (!form.value.bir_registered_at.trim()) errors.value.bir_registered_at = 'BIR Registration date is required'
     if (!birFile.value) errors.value.bir_file = 'BIR File is required'
   }
@@ -352,7 +371,14 @@ function handleSubmit() {
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">TIN Number *</label>
-                <input type="text" v-model="form.tin_number" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]" />
+                <input 
+                  type="text" 
+                  v-model="form.tin_number" 
+                  placeholder="XXX-XXX-XXX-XXX"
+                  maxlength="15"
+                  @input="onTinInput"
+                  class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]" 
+                />
                 <p v-if="errors.tin_number" class="text-xs text-red-600 mt-1 font-medium">{{ errors.tin_number }}</p>
               </div>
               <div>

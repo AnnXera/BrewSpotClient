@@ -151,6 +151,22 @@ function validatePhoneNumber(): boolean {
     delete fieldErrors.value.phone_number
     phoneNumber.value = formatLandlineForBackend(landlineDigits.value)
   }
+  if (cafePhone.value.trim()) {
+    const normPersonal = normalizePhoneNumber(phoneNumber.value)
+    const normCafe = normalizePhoneNumber(cafePhone.value)
+    if (normPersonal && normCafe && normPersonal === normCafe) {
+      fieldErrors.value.phone_number = 'Personal contact number and café phone number must be different.'
+      return false
+    }
+  }
+  if (phoneNumber.value.trim()) {
+    const normPersonal = normalizePhoneNumber(phoneNumber.value)
+    const normCafe = normalizePhoneNumber(cafePhone.value)
+    if (normPersonal && normCafe && normPersonal === normCafe) {
+      fieldErrors.value.cafe_phonenumber = 'Branch phone number must be different from your personal contact number.'
+      return false
+    }
+  }
   return true
 }
 const ownerAddress = ref('')
@@ -263,10 +279,10 @@ const tinNumber = ref('')
 const vat = ref<'vat-registered' | 'non-vat'>('non-vat')
 
 function formatTinNumber(val: string): string {
-  const raw = val.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 16)
+  const raw = val.replace(/[^0-9]/g, '').slice(0, 12)
   const parts: string[] = []
-  for (let i = 0; i < raw.length; i += 4) {
-    parts.push(raw.slice(i, i + 4))
+  for (let i = 0; i < raw.length; i += 3) {
+    parts.push(raw.slice(i, i + 3))
   }
   return parts.join('-')
 }
@@ -1005,10 +1021,10 @@ async function handleFinalSubmit() {
       error.value = 'Please enter the TIN Number.'
       return
     }
-    const tinRaw = tinNumber.value.replace(/[^a-zA-Z0-9]/g, '')
+    const tinRaw = tinNumber.value.replace(/[^0-9]/g, '')
     if (tinRaw.length < 12) {
-      fieldErrors.value.tin_number = 'TIN Number must follow format XXXX-XXXX-XXXX-XXXX.'
-      error.value = 'TIN Number must follow format XXXX-XXXX-XXXX-XXXX.'
+      fieldErrors.value.tin_number = 'TIN Number must follow format XXX-XXX-XXX-XXX.'
+      error.value = 'TIN Number must follow format XXX-XXX-XXX-XXX.'
       return
     }
     if (!vat.value) {
@@ -1230,9 +1246,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="min-h-screen grid lg:grid-cols-2">
+  <div class="h-screen w-full overflow-hidden grid lg:grid-cols-2">
     <!-- Left Hero Section (Matches login.vue & verify-login-code.vue) -->
-    <section class="hidden lg:flex flex-col justify-center bg-[#7B5A50] font-display text-white px-16 py-12">
+    <section class="hidden lg:flex flex-col justify-center bg-[#7B5A50] font-display text-white px-16 py-12 h-full relative">
       <div class="max-w-lg mx-auto text-center space-y-12">
         <!-- Brand Header -->
         <div>
@@ -1270,11 +1286,11 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- Right Form Section -->
-    <section class="flex items-center justify-center bg-[#FFF8EA] px-8 py-12 min-h-screen lg:min-h-0 overflow-y-auto">
-      <div class="w-full max-w-md space-y-6 my-auto">
-
+    <section class="flex items-center justify-center bg-[#FFF8EA] px-8 py-12 h-full overflow-y-auto">
+      <div class="w-full max-w-md space-y-6 my-auto relative">
+        <Transition name="fade-slide" mode="out-in">
         <!-- STEP 1: Email Verification -->
-        <div v-if="currentStep === 1" class="space-y-6">
+        <div v-if="currentStep === 1" key="step1" class="space-y-6">
           <NuxtLink
             to="/"
             class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
@@ -1369,7 +1385,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- STEP 2: OTP Verification -->
-        <div v-else-if="currentStep === 2">
+        <div v-else-if="currentStep === 2" key="step2">
           <button
             type="button"
             class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity mb-8"
@@ -1457,7 +1473,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- STEP 3: Personal Details -->
-        <div v-else-if="currentStep === 3" class="space-y-5">
+        <div v-else-if="currentStep === 3" key="step3" class="space-y-5">
           <button
             type="button"
             class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
@@ -1482,66 +1498,75 @@ onBeforeUnmount(() => {
             <span class="font-medium">{{ error }}</span>
           </div>
 
-          <form @submit.prevent="handleNextToBusiness" class="space-y-4">
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">First Name</label>
-                <input
-                  v-model="firstname"
-                  type="text"
-                  placeholder="John"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                  required
-                  @input="onFirstNameInput"
-                />
+          <form @submit.prevent="handleNextToBusiness" class="space-y-5">
+            <!-- Basic Information -->
+            <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+              <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                <Icon name="heroicons:user" class="w-4 h-4 text-[#7B5A50]" /> Basic Information
+              </h3>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">First Name</label>
+                  <input
+                    v-model="firstname"
+                    type="text"
+                    placeholder="John"
+                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    required
+                    @input="onFirstNameInput"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Last Name</label>
+                  <input
+                    v-model="lastname"
+                    type="text"
+                    placeholder="Doe"
+                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    required
+                    @input="onLastNameInput"
+                  />
+                </div>
               </div>
-              <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Last Name</label>
-                <input
-                  v-model="lastname"
-                  type="text"
-                  placeholder="Doe"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                  required
-                  @input="onLastNameInput"
-                />
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Middle Name</label>
+                  <input
+                    v-model="middlename"
+                    type="text"
+                    placeholder="Optional"
+                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    @input="onMiddleNameInput"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Username *</label>
+                  <input
+                    v-model="username"
+                    type="text"
+                    placeholder="Username"
+                    :class="[
+                      'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
+                      fieldErrors.username
+                        ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                        : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
+                    ]"
+                    required
+                    @input="clearFieldError('username')"
+                    @blur="checkUsernameAvailability"
+                  />
+                  <p v-if="fieldErrors.username" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.username }}</p>
+                </div>
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Middle Name</label>
-                <input
-                  v-model="middlename"
-                  type="text"
-                  placeholder="Optional"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                  @input="onMiddleNameInput"
-                />
-              </div>
-              <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Username *</label>
-                <input
-                  v-model="username"
-                  type="text"
-                  placeholder="Username"
-                  :class="[
-                    'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
-                    fieldErrors.username
-                      ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
-                      : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
-                  ]"
-                  required
-                  @input="clearFieldError('username')"
-                  @blur="checkUsernameAvailability"
-                />
-                <p v-if="fieldErrors.username" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.username }}</p>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-12 gap-3 items-start">
-              <!-- Contact No. (7 cols on sm) -->
-              <div class="col-span-12 sm:col-span-7 space-y-1">
+            <!-- Contact & Location -->
+            <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+              <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                <Icon name="heroicons:map-pin" class="w-4 h-4 text-[#7B5A50]" /> Contact & Location
+              </h3>
+              <div class="space-y-1">
                 <label class="block text-sm font-medium text-[#2d201b]">Contact No. *</label>
                 <div
                   class="flex items-center rounded-md border bg-white overflow-hidden transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
@@ -1590,8 +1615,25 @@ onBeforeUnmount(() => {
                 <p v-if="fieldErrors.phone_number" class="text-xs text-red-600 font-medium">{{ fieldErrors.phone_number }}</p>
               </div>
 
-              <!-- ID Type (5 cols on sm) -->
-              <div class="col-span-12 sm:col-span-5 space-y-1">
+              <div>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Personal Address *</label>
+                <input
+                  v-model="ownerAddress"
+                  type="text"
+                  placeholder="Street, Barangay, District, Davao City"
+                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  required
+                />
+              </div>
+            </div>
+
+            <!-- Identity Verification -->
+            <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+              <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                <Icon name="heroicons:identification" class="w-4 h-4 text-[#7B5A50]" /> Identity Verification
+              </h3>
+              
+              <div class="space-y-1 w-full sm:w-1/2">
                 <label class="block text-sm font-medium text-[#2d201b]">ID Type</label>
                 <select
                   v-model="idType"
@@ -1607,20 +1649,8 @@ onBeforeUnmount(() => {
                 </select>
                 <p v-if="fieldErrors.id_type" class="text-xs text-red-600 font-medium">{{ fieldErrors.id_type }}</p>
               </div>
-            </div>
 
-            <div>
-              <label class="block text-sm font-medium mb-1 text-[#2d201b]">Personal Address *</label>
-              <input
-                v-model="ownerAddress"
-                type="text"
-                placeholder="Street, Barangay, District, Davao City"
-                class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                required
-              />
-            </div>
-
-            <div>
+              <div>
               <label class="block text-sm font-medium mb-1 text-[#2d201b]">
                 {{ isBackIdRequired ? 'Government ID (Front & Back) *' : 'Passport (Photo / Bio-page) *' }}
               </label>
@@ -1680,6 +1710,7 @@ onBeforeUnmount(() => {
                     >&times;</button>
                   </div>
                 </div>
+                </div>
               </div>
             </div>
 
@@ -1696,7 +1727,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- STEP 4: Business Details & Requirements -->
-        <div v-else-if="currentStep === 4" class="space-y-5">
+        <div v-else-if="currentStep === 4" key="step4" class="space-y-5">
           <!-- Page 1: Business Information -->
           <div v-if="businessSubPage === 1" class="space-y-5">
             <button
@@ -1726,45 +1757,53 @@ onBeforeUnmount(() => {
               <span class="font-medium">{{ error }}</span>
             </div>
 
-            <form @submit.prevent="nextBusinessSubPage" class="space-y-4">
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Business Name</label>
-                  <input
-                    v-model="cafeName"
-                    type="text"
-                    placeholder="BrewSpot Davao"
-                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                    required
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Document Type *</label>
-                  <select
-                    v-model="cafeDocType"
-                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                  >
-                    <option value="DTI">DTI</option>
-                    <option value="SEC">SEC</option>
-                  </select>
+            <form @submit.prevent="nextBusinessSubPage" class="space-y-5">
+              <!-- General Info -->
+              <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                  <Icon name="heroicons:building-storefront" class="w-4 h-4 text-[#7B5A50]" /> General Info
+                </h3>
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="col-span-2 sm:col-span-1">
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Business Name</label>
+                    <input
+                      v-model="cafeName"
+                      type="text"
+                      placeholder="BrewSpot Davao"
+                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                      required
+                    />
+                  </div>
+                  <div class="col-span-2 sm:col-span-1">
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Document Type *</label>
+                    <select
+                      v-model="cafeDocType"
+                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    >
+                      <option value="DTI">DTI</option>
+                      <option value="SEC">SEC</option>
+                    </select>
+                  </div>
+                  <div class="col-span-2">
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Name</label>
+                    <input
+                      v-model="branchName"
+                      type="text"
+                      placeholder="Main Branch"
+                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div class="grid grid-cols-12 gap-3 items-start">
-                <!-- Branch Name (5 cols on sm) -->
-                <div class="col-span-12 sm:col-span-5 space-y-1">
-                  <label class="block text-sm font-medium text-[#2d201b]">Branch Name</label>
-                  <input
-                    v-model="branchName"
-                    type="text"
-                    placeholder="Main Branch"
-                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                    required
-                  />
-                </div>
-
-                <!-- Branch Phone (7 cols on sm) -->
-                <div class="col-span-12 sm:col-span-7 space-y-1">
+              <!-- Contact Info -->
+              <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                  <Icon name="heroicons:phone" class="w-4 h-4 text-[#7B5A50]" /> Branch Contact
+                </h3>
+                <div class="space-y-4">
+                  <div class="space-y-1">
                   <label class="block text-sm font-medium text-[#2d201b]">Branch Phone *</label>
                   <div
                     class="flex items-center rounded-md border bg-white overflow-hidden transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
@@ -1811,37 +1850,38 @@ onBeforeUnmount(() => {
                     />
                   </div>
                   <p v-if="fieldErrors.cafe_phonenumber" class="text-xs text-red-600 font-medium">{{ fieldErrors.cafe_phonenumber }}</p>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Address</label>
+                    <input
+                      v-model="address"
+                      type="text"
+                      placeholder="Street, Barangay, District, Davao City"
+                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Café Email *</label>
+                    <input
+                      v-model="cafeEmail"
+                      type="email"
+                      placeholder="contact@brewspot.com"
+                      :class="[
+                        'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
+                        fieldErrors.cafe_email
+                          ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                          : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
+                      ]"
+                      required
+                      @input="clearFieldError('cafe_email')"
+                      @blur="checkCafeEmailAvailability"
+                    />
+                    <p v-if="fieldErrors.cafe_email" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.cafe_email }}</p>
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Address</label>
-                <input
-                  v-model="address"
-                  type="text"
-                  placeholder="Street, Barangay, District, Davao City"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                  required
-                />
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Café Email *</label>
-                <input
-                  v-model="cafeEmail"
-                  type="email"
-                  placeholder="contact@brewspot.com"
-                  :class="[
-                    'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
-                    fieldErrors.cafe_email
-                      ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
-                      : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
-                  ]"
-                  required
-                  @input="clearFieldError('cafe_email')"
-                  @blur="checkCafeEmailAvailability"
-                />
-                <p v-if="fieldErrors.cafe_email" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.cafe_email }}</p>
               </div>
 
               <div class="pt-2">
@@ -1991,8 +2031,8 @@ onBeforeUnmount(() => {
                     <input
                       v-model="tinNumber"
                       type="text"
-                      placeholder="XXXX-XXXX-XXXX-XXXX"
-                      maxlength="19"
+                      placeholder="XXX-XXX-XXX-XXX"
+                      maxlength="15"
                       :class="[
                         'w-full h-10 rounded-md border px-3 outline-none transition bg-white text-xs text-[#2d201b] font-mono tracking-wider',
                         fieldErrors.tin_number
@@ -2079,7 +2119,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- STEP 5: Review / Submitted Screen -->
-        <div v-else-if="currentStep === 5" class="space-y-6">
+        <div v-else-if="currentStep === 5" key="step5" class="space-y-6">
           <div>
             <span class="text-xs uppercase tracking-wider font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">Registration Submitted ✓</span>
             <h1 class="text-2xl font-bold text-[#2d201b] mt-2">Application Received! 🎉</h1>
@@ -2148,7 +2188,23 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
+        </Transition>
       </div>
     </section>
   </div>
 </template>
+
+<style scoped>
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(15px);
+}
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-15px);
+}
+</style>
