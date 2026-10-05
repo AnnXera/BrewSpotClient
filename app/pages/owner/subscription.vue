@@ -96,6 +96,37 @@ async function fetchCurrentPlan() {
   }
 }
 
+function applyCurrentPlan(planRes: any) {
+  if (planRes === undefined) {
+    // Keep whatever was already on screen rather than blanking it on a failed refresh.
+    loadError.value = true
+  } else if (planRes.success && planRes.subscription) {
+    currentPlan.value = planRes.subscription
+    renewalOffer.value = null
+  } else {
+    currentPlan.value = null
+    renewalOffer.value = planRes.renewal_offer ?? null
+  }
+}
+
+// A refresh that fails over data already on screen would otherwise go unnoticed.
+function warnIfStale() {
+  if (loadError.value && (currentPlan.value || renewalOffer.value)) {
+    showNotice('Could not refresh your subscription. What you see may be out of date.', 'error')
+  }
+}
+
+/**
+ * Re-read only the subscription. Cancelling, resuming and scheduling change the subscription
+ * and nothing else — no payment is made and the plan catalogue is untouched — so the history
+ * and plan list stay as they are instead of being fetched again for every click.
+ */
+async function refreshCurrentPlan() {
+  loadError.value = false
+  applyCurrentPlan(await fetchCurrentPlan().catch(() => undefined))
+  warnIfStale()
+}
+
 async function loadOwnerSubscription() {
   loading.value = true
   loadError.value = false
@@ -107,16 +138,7 @@ async function loadOwnerSubscription() {
       subService.getAvailablePlans({ per_page: 50 }).catch(() => undefined)
     ])
 
-    if (planRes === undefined) {
-      // Keep whatever was already on screen rather than blanking it on a failed refresh.
-      loadError.value = true
-    } else if (planRes.success && planRes.subscription) {
-      currentPlan.value = planRes.subscription
-      renewalOffer.value = null
-    } else {
-      currentPlan.value = null
-      renewalOffer.value = planRes.renewal_offer ?? null
-    }
+    applyCurrentPlan(planRes)
 
     if (historyRes?.success && historyRes.history?.data?.length) {
       history.value = historyRes.history.data.map((item: any) => {
@@ -146,10 +168,7 @@ async function loadOwnerSubscription() {
     loading.value = false
   }
 
-  // A refresh that fails over data already on screen would otherwise go unnoticed.
-  if (loadError.value && (currentPlan.value || renewalOffer.value)) {
-    showNotice('Could not refresh your subscription. What you see may be out of date.', 'error')
-  }
+  warnIfStale()
 }
 
 function formatDate(val?: string | null): string {
@@ -312,7 +331,7 @@ async function runCancelAction(action: () => Promise<{ success: boolean; message
   try {
     const res = await action()
     showNotice(res.message, res.success ? 'success' : 'error')
-    if (res.success) await loadOwnerSubscription()
+    if (res.success) await refreshCurrentPlan()
   } catch (err: any) {
     showNotice(errorMessage(err, 'Could not update your subscription. Please try again.'), 'error')
   } finally {
@@ -456,7 +475,7 @@ async function selectPlan(plan: SubscriptionPlanItem) {
     showNotice(res.message, res.success ? 'success' : 'error')
 
     if (res.success) {
-      await loadOwnerSubscription()
+      await refreshCurrentPlan()
       viewMode.value = 'current'
     }
   } catch (err: any) {
@@ -711,7 +730,7 @@ onMounted(async () => {
               <button
                 @click="cancelCurrentPlan"
                 :disabled="cancelling"
-                class="self-start sm:self-auto -ml-3 sm:ml-0 inline-flex items-center gap-2 min-h-11 px-3 rounded-lg text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                class="self-start sm:self-auto inline-flex items-center gap-2 min-h-11 px-4 rounded-lg border border-[#ECC9C9] text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Icon name="heroicons:x-circle" class="w-4 h-4" aria-hidden="true" />
                 Cancel subscription
@@ -771,26 +790,6 @@ onMounted(async () => {
               </template>
             </p>
 
-            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-6">
-              <button
-                v-if="canPayNextTerm"
-                @click="payNextTerm"
-                class="inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
-              >
-                <Icon name="heroicons:credit-card" class="w-4 h-4" aria-hidden="true" />
-                Pay Now
-              </button>
-
-              <button
-                @click="cancelNextPlan"
-                :disabled="cancelling"
-                class="inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-lg text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <Icon name="heroicons:x-circle" class="w-4 h-4" aria-hidden="true" />
-                Remove scheduled switch
-              </button>
-            </div>
-
             <div class="pt-4 border-t border-[#EEDFC4]">
               <span class="font-sans text-xs uppercase font-bold text-[#8B6656] block mb-2 tracking-wider">
                 Features You'll Unlock
@@ -808,6 +807,27 @@ onMounted(async () => {
               <p v-else class="font-sans text-xs text-[#8B6656]">
                 Basic plan access (single branch only, no advanced features).
               </p>
+            </div>
+
+            <!-- Actions sit at the foot of the card and share its full width -->
+            <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-6 pt-6 border-t border-[#EEDFC4]">
+              <button
+                v-if="canPayNextTerm"
+                @click="payNextTerm"
+                class="flex-1 inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
+              >
+                <Icon name="heroicons:credit-card" class="w-4 h-4" aria-hidden="true" />
+                Pay Now
+              </button>
+
+              <button
+                @click="cancelNextPlan"
+                :disabled="cancelling"
+                class="flex-1 inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-lg border border-[#ECC9C9] text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Icon name="heroicons:x-circle" class="w-4 h-4" aria-hidden="true" />
+                Remove scheduled switch
+              </button>
             </div>
           </div>
         </div>
