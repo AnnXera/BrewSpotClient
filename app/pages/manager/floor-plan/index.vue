@@ -49,6 +49,9 @@ const undoStack = ref<string[]>([])
 
 const preview = ref(false)
 const snapOn = ref(true)
+const panMode = ref(false) // Pan button: dragging scrolls the canvas instead of moving items
+const panning = ref(false)
+const scrollEl = ref<HTMLElement | null>(null)
 const loading = ref(true)
 const saving = ref(false)
 const statusBusy = ref(false)
@@ -341,7 +344,7 @@ function removeSelected() {
 let drag: { type: 'table' | 'element'; uid: string; sx: number; sy: number; ox: number; oy: number; moved: boolean } | null = null
 
 function startDrag(e: PointerEvent, type: 'table' | 'element', item: EditorTable | EditorElement) {
-  if (preview.value || e.button !== 0) return
+  if (preview.value || panMode.value || e.button !== 0) return
   selected.value = { type, uid: item.uid }
   drag = { type, uid: item.uid, sx: e.clientX, sy: e.clientY, ox: item.x, oy: item.y, moved: false }
   window.addEventListener('pointermove', onDragMove)
@@ -368,6 +371,36 @@ function onDragMove(e: PointerEvent) {
 function endDrag() {
   drag = null
   window.removeEventListener('pointermove', onDragMove)
+}
+
+// ── Panning (Pan button, or the middle mouse button any time) ────────────
+let pan: { sx: number; sy: number; sl: number; st: number } | null = null
+
+function togglePan() {
+  panMode.value = !panMode.value
+  if (panMode.value) selected.value = null
+}
+
+function startPan(e: PointerEvent) {
+  const el = scrollEl.value
+  if (!el || !(panMode.value ? e.button === 0 || e.button === 1 : e.button === 1)) return
+  e.preventDefault()
+  pan = { sx: e.clientX, sy: e.clientY, sl: el.scrollLeft, st: el.scrollTop }
+  panning.value = true
+  window.addEventListener('pointermove', onPanMove)
+  window.addEventListener('pointerup', endPan, { once: true })
+}
+
+function onPanMove(e: PointerEvent) {
+  if (!pan || !scrollEl.value) return
+  scrollEl.value.scrollLeft = pan.sl - (e.clientX - pan.sx)
+  scrollEl.value.scrollTop = pan.st - (e.clientY - pan.sy)
+}
+
+function endPan() {
+  pan = null
+  panning.value = false
+  window.removeEventListener('pointermove', onPanMove)
 }
 
 // ── Joining walls ────────────────────────────────────────────────────────
@@ -421,7 +454,7 @@ const ROTATE_STEP = 15
 let rotating: { type: 'table' | 'element'; uid: string; moved: boolean } | null = null
 
 function startRotate(e: PointerEvent, type: 'table' | 'element', item: EditorTable | EditorElement) {
-  if (preview.value || e.button !== 0) return
+  if (preview.value || panMode.value || e.button !== 0) return
   selected.value = { type, uid: item.uid }
   rotating = { type, uid: item.uid, moved: false }
   window.addEventListener('pointermove', onRotateMove)
@@ -466,7 +499,7 @@ let resize: {
 } | null = null
 
 function startResize(e: PointerEvent, el: EditorElement, side: 'start' | 'end') {
-  if (preview.value || e.button !== 0) return
+  if (preview.value || panMode.value || e.button !== 0) return
   selected.value = { type: 'element', uid: el.uid }
   const { w, h } = itemSize('element', el)
   const rad = (el.rotation * Math.PI) / 180
@@ -767,6 +800,7 @@ onBeforeUnmount(() => {
   endDrag()
   endResize()
   endRotate()
+  endPan()
 })
 
 // ── Template helpers ─────────────────────────────────────────────────────
@@ -878,6 +912,17 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
               <button
                 type="button"
                 class="h-[35px] px-3 rounded-[6px] border border-[#3A2923] flex items-center gap-2 text-[12px] transition-colors"
+                :class="panMode ? 'bg-[#3A2923] text-white' : 'hover:bg-[#F1E9DE]'"
+                :aria-pressed="panMode"
+                title="Drag the canvas to scroll it (middle mouse button also works)"
+                @click="togglePan"
+              >
+                <Icon name="heroicons:hand-raised" class="size-4" />
+                Pan
+              </button>
+              <button
+                type="button"
+                class="h-[35px] px-3 rounded-[6px] border border-[#3A2923] flex items-center gap-2 text-[12px] transition-colors"
                 :class="snapOn ? 'bg-[#3A2923] text-white' : 'hover:bg-[#F1E9DE]'"
                 :aria-pressed="snapOn"
                 :title="`Snap objects to a ${GRID}px grid`"
@@ -936,7 +981,13 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
           </form>
 
           <!-- Canvas -->
-          <div v-if="plan" class="overflow-auto p-[18px] max-h-[78vh] bg-white">
+          <div
+            v-if="plan"
+            ref="scrollEl"
+            class="overflow-auto p-[18px] max-h-[78vh] bg-white"
+            :class="panning ? 'cursor-grabbing' : panMode ? 'cursor-grab touch-none' : ''"
+            @pointerdown="startPan"
+          >
             <div
               ref="canvasEl"
               class="relative mx-auto rounded-[10px] border border-[#F4E6DE] select-none touch-none"
@@ -952,7 +1003,7 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
                 :key="el.uid"
                 class="absolute"
                 :class="[
-                  preview ? '' : 'cursor-move',
+                  preview || panMode ? '' : 'cursor-move',
                   isSelected('element', el.uid) ? 'outline outline-2 outline-offset-2 outline-[#A96746] rounded-[6px]' : '',
                 ]"
                 :style="itemStyle('element', el, i + 1)"
@@ -1001,7 +1052,7 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
                 :key="t.uid"
                 class="absolute"
                 :class="[
-                  preview ? '' : 'cursor-move',
+                  preview || panMode ? '' : 'cursor-move',
                   isSelected('table', t.uid) ? 'outline outline-2 outline-offset-2 outline-[#A96746] rounded-[12px]' : '',
                 ]"
                 :style="itemStyle('table', t, 1000)"
