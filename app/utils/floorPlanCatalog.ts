@@ -14,14 +14,18 @@ export interface TableAsset {
   h: number
 }
 
-// Natural size of each table SVG (chairs included).
+// Natural size of each table SVG (chairs included), as drawn in the Figma file.
+// The SVGs fill whatever box they are given (viewBox), so tables render at TABLE_SCALE of this.
+const TABLE_SCALE = 0.8
+const scaled = (n: number) => Math.round(n * TABLE_SCALE)
+
 export const TABLE_ASSETS: TableAsset[] = [
-  { key: 'table_sqr_1', name: 'Square table', shape: 'square', seats: 1, w: 89, h: 67 },
-  { key: 'table_sqr_2', name: 'Square table', shape: 'square', seats: 2, w: 112, h: 67 },
-  { key: 'table_sqr_3', name: 'Square table', shape: 'square', seats: 3, w: 112, h: 90 },
-  { key: 'table_sqr_4', name: 'Square table', shape: 'square', seats: 4, w: 112, h: 112 },
-  { key: 'table_rec_2', name: 'Long table', shape: 'long', seats: 2, w: 137, h: 89 },
-  { key: 'table_rec_4', name: 'Long table', shape: 'long', seats: 4, w: 137, h: 112 },
+  { key: 'table_sqr_1', name: 'Square table', shape: 'square', seats: 1, w: scaled(89), h: scaled(67) },
+  { key: 'table_sqr_2', name: 'Square table', shape: 'square', seats: 2, w: scaled(112), h: scaled(67) },
+  { key: 'table_sqr_3', name: 'Square table', shape: 'square', seats: 3, w: scaled(112), h: scaled(90) },
+  { key: 'table_sqr_4', name: 'Square table', shape: 'square', seats: 4, w: scaled(112), h: scaled(112) },
+  { key: 'table_rec_2', name: 'Long table', shape: 'long', seats: 2, w: scaled(137), h: scaled(89) },
+  { key: 'table_rec_4', name: 'Long table', shape: 'long', seats: 4, w: scaled(137), h: scaled(112) },
 ]
 
 export const DOOR_ASSETS = [

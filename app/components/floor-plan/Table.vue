@@ -31,5 +31,5 @@ const state = computed(() => tableVisual(props.status, props.selected))
 </script>
 
 <template>
-  <component :is="component" v-if="component" :label="label" :state="state" class="transition-colors" />
+  <component :is="component" v-if="component" :label="label" :state="state" class="size-full transition-colors" />
 </template>

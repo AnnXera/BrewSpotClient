@@ -187,13 +187,16 @@ function itemSize(kind: 'table' | 'element', item: EditorTable | EditorElement) 
   return { w: e.width ?? 100, h: e.height ?? 10 }
 }
 
-// Rotation turns in 90 degree steps, so a quarter turn swaps the visual width and height
-// (the box rotates around its centre; x/y stay the unrotated top-left).
+// The box rotates around its centre while x/y stay the unrotated top-left, so the
+// on-screen footprint is the rotated box's bounding rectangle.
 function footprint(kind: 'table' | 'element', item: EditorTable | EditorElement) {
   const { w, h } = itemSize(kind, item)
-  const turned = Math.round(item.rotation / 90) % 2 !== 0
-  const vw = turned ? h : w
-  const vh = turned ? w : h
+  const rad = (item.rotation * Math.PI) / 180
+  const c = Math.abs(Math.cos(rad))
+  const s = Math.abs(Math.sin(rad))
+  const r2 = (n: number) => Math.round(n * 100) / 100
+  const vw = r2(w * c + h * s)
+  const vh = r2(w * s + h * c)
   return { w, h, vw, vh, offX: (w - vw) / 2, offY: (h - vh) / 2 }
 }
 
@@ -358,12 +361,98 @@ function onDragMove(e: PointerEvent) {
     drag.moved = true
   }
   snapPlace(drag.type, item, drag.ox + dx, drag.oy + dy)
+  if (drag.type === 'element') magnetMove(item as EditorElement)
   clamp(drag.type, item)
 }
 
 function endDrag() {
   drag = null
   window.removeEventListener('pointermove', onDragMove)
+}
+
+// ── Joining walls ────────────────────────────────────────────────────────
+// Grid snapping puts a wall's *edge* on a grid line, so its 8px-thick centre line is 4px off
+// and ends miss each other. While snap is on, a wall end that comes within MAGNET px of another
+// wall's centre line (or end) is pulled onto it, so corners and T-junctions meet exactly.
+const MAGNET = 12
+
+function wallSegment(el: EditorElement) {
+  const { w, h } = itemSize('element', el)
+  const rad = (el.rotation * Math.PI) / 180
+  const ux = Math.cos(rad)
+  const uy = Math.sin(rad)
+  const cx = el.x + w / 2
+  const cy = el.y + h / 2
+  return { a: { x: cx - (ux * w) / 2, y: cy - (uy * w) / 2 }, b: { x: cx + (ux * w) / 2, y: cy + (uy * w) / 2 } }
+}
+
+function nearestOnWalls(p: { x: number; y: number }, excludeUid: string) {
+  let best: { pt: { x: number; y: number }; d: number } | null = null
+  for (const o of elements.value) {
+    if (o.category !== 'wall' || o.uid === excludeUid) continue
+    const { a, b } = wallSegment(o)
+    const vx = b.x - a.x
+    const vy = b.y - a.y
+    const len2 = vx * vx + vy * vy || 1
+    const t = Math.min(Math.max(((p.x - a.x) * vx + (p.y - a.y) * vy) / len2, 0), 1)
+    const pt = { x: a.x + t * vx, y: a.y + t * vy }
+    const d = Math.hypot(pt.x - p.x, pt.y - p.y)
+    if (!best || d < best.d) best = { pt, d }
+  }
+  return best
+}
+
+function magnetMove(el: EditorElement) {
+  if (!snapOn.value || el.category !== 'wall') return
+  const { a, b } = wallSegment(el)
+  let best: { dx: number; dy: number; d: number } | null = null
+  for (const end of [a, b]) {
+    const hit = nearestOnWalls(end, el.uid)
+    if (hit && hit.d <= MAGNET && (!best || hit.d < best.d)) best = { dx: hit.pt.x - end.x, dy: hit.pt.y - end.y, d: hit.d }
+  }
+  if (!best) return
+  el.x = Math.round((el.x + best.dx) * 100) / 100
+  el.y = Math.round((el.y + best.dy) * 100) / 100
+}
+
+// ── Rotating with the mouse (knob above the selected item) ───────────────
+const ROTATE_STEP = 15
+
+let rotating: { type: 'table' | 'element'; uid: string; moved: boolean } | null = null
+
+function startRotate(e: PointerEvent, type: 'table' | 'element', item: EditorTable | EditorElement) {
+  if (preview.value || e.button !== 0) return
+  selected.value = { type, uid: item.uid }
+  rotating = { type, uid: item.uid, moved: false }
+  window.addEventListener('pointermove', onRotateMove)
+  window.addEventListener('pointerup', endRotate, { once: true })
+}
+
+function onRotateMove(e: PointerEvent) {
+  if (!rotating || !canvasEl.value) return
+  const item = (rotating.type === 'table' ? tables.value : elements.value).find((i) => i.uid === rotating!.uid)
+  if (!item) return
+  // The knob sits straight above the centre at 0 degrees, so the pointer angle + 90 is the rotation.
+  const { w, h } = itemSize(rotating.type, item)
+  const rect = canvasEl.value.getBoundingClientRect()
+  const cx = rect.left + canvasEl.value.clientLeft + item.x + w / 2
+  const cy = rect.top + canvasEl.value.clientTop + item.y + h / 2
+  const deg = (Math.atan2(e.clientY - cy, e.clientX - cx) * 180) / Math.PI + 90
+  const step = snapOn.value ? ROTATE_STEP : 1
+  const next = (((Math.round(deg / step) * step) % 360) + 360) % 360
+  if (next === item.rotation) return
+  if (!rotating.moved) {
+    pushUndo()
+    lastPatchKey = ''
+    rotating.moved = true
+  }
+  item.rotation = next
+  clamp(rotating.type, item)
+}
+
+function endRotate() {
+  rotating = null
+  window.removeEventListener('pointermove', onRotateMove)
 }
 
 // ── Extending walls / counters from either end ───────────────────────────
@@ -406,9 +495,17 @@ function onResizeMove(e: PointerEvent) {
   }
   const max = Math.abs(r.uy) > Math.abs(r.ux) ? canvasH.value : canvasW.value
   const raw = r.side === 'end' ? r.w0 + p : r.w0 - p
-  const w = Math.round(Math.min(Math.max(snap(raw), MIN_LENGTH), max))
+  let w = Math.round(Math.min(Math.max(snap(raw), MIN_LENGTH), max))
   const h = el.height ?? 10
   const sign = r.side === 'end' ? 1 : -1
+  if (snapOn.value && el.category === 'wall') {
+    // Pull the moving end onto a neighbouring wall, measured along this wall's own axis.
+    const hit = nearestOnWalls({ x: r.ax + sign * r.ux * w, y: r.ay + sign * r.uy * w }, el.uid)
+    if (hit && hit.d <= MAGNET) {
+      const along = sign * ((hit.pt.x - r.ax) * r.ux + (hit.pt.y - r.ay) * r.uy)
+      if (along >= MIN_LENGTH && along <= max) w = Math.round(along)
+    }
+  }
   const cx = r.ax + (sign * r.ux * w) / 2
   const cy = r.ay + (sign * r.uy * w) / 2
   el.width = w
@@ -669,6 +766,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
   endDrag()
   endResize()
+  endRotate()
 })
 
 // ── Template helpers ─────────────────────────────────────────────────────
@@ -867,7 +965,22 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
                 >
                   {{ el.label }}
                 </div>
-                <div v-else class="size-full rounded-[10px] bg-[#D9D9D9]" />
+                <!-- Walls run half a thickness past each end, so joined walls fill the corner -->
+                <div
+                  v-else
+                  class="absolute inset-y-0 bg-[#D9D9D9]"
+                  :style="{ left: `${-(el.height ?? 10) / 2}px`, right: `${-(el.height ?? 10) / 2}px` }"
+                />
+
+                <!-- Drag the knob to rotate -->
+                <template v-if="isSelected('element', el.uid) && !preview">
+                  <span class="absolute left-1/2 -top-[18px] h-[18px] w-px bg-[#A96746] -translate-x-1/2 pointer-events-none" />
+                  <span
+                    class="absolute left-1/2 -top-[30px] size-[14px] -translate-x-1/2 rounded-full border-2 border-[#A96746] bg-white cursor-grab touch-none"
+                    aria-label="Rotate"
+                    @pointerdown.stop.prevent="startRotate($event, 'element', el)"
+                  />
+                </template>
 
                 <!-- Drag either end to lengthen or shorten -->
                 <template v-if="isSelected('element', el.uid) && !preview && isDrawn(el)">
@@ -902,6 +1015,15 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
                   :selected="isSelected('table', t.uid)"
                   class="pointer-events-none"
                 />
+
+                <template v-if="isSelected('table', t.uid) && !preview">
+                  <span class="absolute left-1/2 -top-[18px] h-[18px] w-px bg-[#A96746] -translate-x-1/2 pointer-events-none" />
+                  <span
+                    class="absolute left-1/2 -top-[30px] size-[14px] -translate-x-1/2 rounded-full border-2 border-[#A96746] bg-white cursor-grab touch-none"
+                    aria-label="Rotate"
+                    @pointerdown.stop.prevent="startRotate($event, 'table', t)"
+                  />
+                </template>
               </div>
 
               <p
