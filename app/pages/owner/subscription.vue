@@ -96,6 +96,37 @@ async function fetchCurrentPlan() {
   }
 }
 
+function applyCurrentPlan(planRes: any) {
+  if (planRes === undefined) {
+    // Keep whatever was already on screen rather than blanking it on a failed refresh.
+    loadError.value = true
+  } else if (planRes.success && planRes.subscription) {
+    currentPlan.value = planRes.subscription
+    renewalOffer.value = null
+  } else {
+    currentPlan.value = null
+    renewalOffer.value = planRes.renewal_offer ?? null
+  }
+}
+
+// A refresh that fails over data already on screen would otherwise go unnoticed.
+function warnIfStale() {
+  if (loadError.value && (currentPlan.value || renewalOffer.value)) {
+    showNotice('Could not refresh your subscription. What you see may be out of date.', 'error')
+  }
+}
+
+/**
+ * Re-read only the subscription. Cancelling, resuming and scheduling change the subscription
+ * and nothing else — no payment is made and the plan catalogue is untouched — so the history
+ * and plan list stay as they are instead of being fetched again for every click.
+ */
+async function refreshCurrentPlan() {
+  loadError.value = false
+  applyCurrentPlan(await fetchCurrentPlan().catch(() => undefined))
+  warnIfStale()
+}
+
 async function loadOwnerSubscription() {
   loading.value = true
   loadError.value = false
@@ -107,16 +138,7 @@ async function loadOwnerSubscription() {
       subService.getAvailablePlans({ per_page: 50 }).catch(() => undefined)
     ])
 
-    if (planRes === undefined) {
-      // Keep whatever was already on screen rather than blanking it on a failed refresh.
-      loadError.value = true
-    } else if (planRes.success && planRes.subscription) {
-      currentPlan.value = planRes.subscription
-      renewalOffer.value = null
-    } else {
-      currentPlan.value = null
-      renewalOffer.value = planRes.renewal_offer ?? null
-    }
+    applyCurrentPlan(planRes)
 
     if (historyRes?.success && historyRes.history?.data?.length) {
       history.value = historyRes.history.data.map((item: any) => {
@@ -146,10 +168,7 @@ async function loadOwnerSubscription() {
     loading.value = false
   }
 
-  // A refresh that fails over data already on screen would otherwise go unnoticed.
-  if (loadError.value && (currentPlan.value || renewalOffer.value)) {
-    showNotice('Could not refresh your subscription. What you see may be out of date.', 'error')
-  }
+  warnIfStale()
 }
 
 function formatDate(val?: string | null): string {
@@ -213,6 +232,25 @@ function planFeatures(plan: any) {
   }
   return []
 }
+
+/**
+ * The yearly discount, taken from the plans themselves rather than a number typed into the
+ * page. Each plan's saving is its yearly price against twelve months at the monthly price;
+ * a plan with no usable yearly price saves nothing and is skipped.
+ */
+const yearlySavings = computed<{ percent: number; varies: boolean } | null>(() => {
+  const percents = availablePlans.value
+    .map((plan) => {
+      const monthly = Number(plan.price)
+      const yearly = Number(plan.yearly_price)
+      if (!(monthly > 0) || !(yearly > 0)) return 0
+      return Math.round((1 - yearly / (monthly * 12)) * 100)
+    })
+    .filter((percent) => percent > 0)
+
+  if (!percents.length) return null
+  return { percent: Math.max(...percents), varies: new Set(percents).size > 1 }
+})
 
 const activePlanFeatures = computed(() => planFeatures(currentPlan.value?.plan))
 const nextPlanFeatures = computed(() => planFeatures(currentPlan.value?.pending_plan))
@@ -293,7 +331,7 @@ async function runCancelAction(action: () => Promise<{ success: boolean; message
   try {
     const res = await action()
     showNotice(res.message, res.success ? 'success' : 'error')
-    if (res.success) await loadOwnerSubscription()
+    if (res.success) await refreshCurrentPlan()
   } catch (err: any) {
     showNotice(errorMessage(err, 'Could not update your subscription. Please try again.'), 'error')
   } finally {
@@ -437,7 +475,7 @@ async function selectPlan(plan: SubscriptionPlanItem) {
     showNotice(res.message, res.success ? 'success' : 'error')
 
     if (res.success) {
-      await loadOwnerSubscription()
+      await refreshCurrentPlan()
       viewMode.value = 'current'
     }
   } catch (err: any) {
@@ -692,7 +730,7 @@ onMounted(async () => {
               <button
                 @click="cancelCurrentPlan"
                 :disabled="cancelling"
-                class="self-start sm:self-auto -ml-3 sm:ml-0 inline-flex items-center gap-2 min-h-11 px-3 rounded-lg text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                class="self-start sm:self-auto inline-flex items-center gap-2 min-h-11 px-4 rounded-lg border border-[#ECC9C9] text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Icon name="heroicons:x-circle" class="w-4 h-4" aria-hidden="true" />
                 Cancel subscription
@@ -752,26 +790,6 @@ onMounted(async () => {
               </template>
             </p>
 
-            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-6">
-              <button
-                v-if="canPayNextTerm"
-                @click="payNextTerm"
-                class="inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
-              >
-                <Icon name="heroicons:credit-card" class="w-4 h-4" aria-hidden="true" />
-                Pay Now
-              </button>
-
-              <button
-                @click="cancelNextPlan"
-                :disabled="cancelling"
-                class="inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-lg text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <Icon name="heroicons:x-circle" class="w-4 h-4" aria-hidden="true" />
-                Remove scheduled switch
-              </button>
-            </div>
-
             <div class="pt-4 border-t border-[#EEDFC4]">
               <span class="font-sans text-xs uppercase font-bold text-[#8B6656] block mb-2 tracking-wider">
                 Features You'll Unlock
@@ -790,6 +808,27 @@ onMounted(async () => {
                 Basic plan access (single branch only, no advanced features).
               </p>
             </div>
+
+            <!-- Actions sit at the foot of the card and share its full width -->
+            <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-6 pt-6 border-t border-[#EEDFC4]">
+              <button
+                v-if="canPayNextTerm"
+                @click="payNextTerm"
+                class="flex-1 inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-lg bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
+              >
+                <Icon name="heroicons:credit-card" class="w-4 h-4" aria-hidden="true" />
+                Pay Now
+              </button>
+
+              <button
+                @click="cancelNextPlan"
+                :disabled="cancelling"
+                class="flex-1 inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-lg border border-[#ECC9C9] text-[#A13D3D] font-display font-semibold text-sm hover:bg-[#F9ECEC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Icon name="heroicons:x-circle" class="w-4 h-4" aria-hidden="true" />
+                Remove scheduled switch
+              </button>
+            </div>
           </div>
         </div>
 
@@ -801,7 +840,7 @@ onMounted(async () => {
           aria-live="polite"
         >
           <span class="sr-only">Loading your subscription…</span>
-          <div class="animate-pulse" aria-hidden="true">
+          <div class="animate-pulse motion-reduce:animate-none" aria-hidden="true">
             <div class="flex justify-between gap-4 border-b border-[#F3E7D2] pb-6 mb-6">
               <div class="space-y-3 flex-1">
                 <div class="h-3 w-24 rounded bg-[#F3E7D2]"></div>
@@ -977,7 +1016,7 @@ onMounted(async () => {
             <!-- Inner container for the slider to match button dimensions exactly -->
             <div class="absolute inset-1 pointer-events-none">
               <div 
-                class="w-1/2 h-full bg-[#3B1F0E] rounded-full transition-transform duration-300 ease-out shadow-sm"
+                class="w-1/2 h-full bg-[#3B1F0E] rounded-full transition-transform duration-300 ease-out motion-reduce:transition-none shadow-sm"
                 :class="browseBillingCycle === 'monthly' ? 'translate-x-0' : 'translate-x-full'"
               ></div>
             </div>
@@ -987,7 +1026,7 @@ onMounted(async () => {
               <button
                 type="button"
                 :aria-pressed="browseBillingCycle === 'monthly'"
-                class="px-4 sm:px-6 py-2.5 rounded-full font-display text-sm font-semibold transition-colors"
+                class="min-h-11 px-4 sm:px-6 py-2.5 rounded-full font-display text-sm font-semibold transition-colors"
                 :class="browseBillingCycle === 'monthly' ? 'text-white' : 'text-[#7D5A50] hover:text-[#3B1F0E]'"
                 @click="browseBillingCycle = 'monthly'"
               >
@@ -996,13 +1035,17 @@ onMounted(async () => {
               <button
                 type="button"
                 :aria-pressed="browseBillingCycle === 'yearly'"
-                class="px-4 sm:px-6 py-2.5 rounded-full font-display text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                class="min-h-11 px-4 sm:px-6 py-2.5 rounded-full font-display text-sm font-semibold transition-colors flex items-center justify-center gap-2"
                 :class="browseBillingCycle === 'yearly' ? 'text-white' : 'text-[#7D5A50] hover:text-[#3B1F0E]'"
                 @click="browseBillingCycle = 'yearly'"
               >
                 <span>Yearly</span>
-                <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-[#FFF8EA] text-[#3B1F0E] text-[10px] font-bold tracking-wider" :class="browseBillingCycle === 'yearly' ? 'bg-white/20 text-white shadow-inner' : ''">
-                  SAVE 20%
+                <span
+                  v-if="yearlySavings"
+                  class="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-[#FFF8EA] text-[#3B1F0E] text-xs font-bold tracking-wider"
+                  :class="browseBillingCycle === 'yearly' ? 'bg-white/20 text-white shadow-inner' : ''"
+                >
+                  SAVE {{ yearlySavings.varies ? 'UP TO ' : '' }}{{ yearlySavings.percent }}%
                 </span>
               </button>
             </div>
@@ -1012,7 +1055,7 @@ onMounted(async () => {
         <!-- Loading State for Plans -->
         <div v-if="loading" class="flex justify-center py-20" role="status">
           <span class="sr-only">Loading plans…</span>
-          <Icon name="heroicons:arrow-path" class="w-8 h-8 text-[#9E7060] animate-spin" aria-hidden="true" />
+          <Icon name="heroicons:arrow-path" class="w-8 h-8 text-[#9E7060] animate-spin motion-reduce:animate-pulse" aria-hidden="true" />
         </div>
 
         <!-- Plans failed to load -->
@@ -1131,6 +1174,13 @@ onMounted(async () => {
       :aria-live="notice?.kind === 'error' ? 'assertive' : 'polite'"
       aria-atomic="true"
     >
+      <!-- Arrives with a short rise and fade; reduced motion keeps the fade and drops the rise. -->
+      <Transition
+        enter-active-class="transition duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        enter-from-class="opacity-0 translate-y-2 motion-reduce:translate-y-0"
+        leave-active-class="transition duration-150 ease-in"
+        leave-to-class="opacity-0"
+      >
       <div
         v-if="notice"
         class="pointer-events-auto w-full max-w-md flex items-start gap-3 rounded-xl bg-white p-4 font-sans text-sm text-[#3B1F0E] shadow-lg shadow-[#3B1F0E]/15 border"
@@ -1151,11 +1201,12 @@ onMounted(async () => {
           type="button"
           @click="dismissNotice"
           aria-label="Dismiss message"
-          class="shrink-0 -m-1 p-1 rounded-md text-[#7D5A50] hover:bg-[#F3E7D2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B1F0E]/40"
+          class="shrink-0 -m-3.5 p-3.5 rounded-lg text-[#7D5A50] hover:bg-[#F3E7D2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B1F0E]/40"
         >
           <Icon name="heroicons:x-mark" class="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
+      </Transition>
     </div>
 
     <!-- Checkout Modal -->

@@ -64,7 +64,7 @@ const pendingBranchesCount = computed(() => {
   return branches.value.filter(b => (b.status || '').toLowerCase().includes('pending')).length
 })
 
-const canAddBranch = computed(() => true)
+const canAddBranch = computed(() => hasFeature('multi_branch'))
 
 async function fetchBranches() {
   errorMessage.value = ''
@@ -273,10 +273,12 @@ function viewDetails(uuid: string) {
         </div>
       </div>
 
-      <!-- Main Container with Filter Bar and Branch List -->
-      <div :class="['bg-white border border-[#EEDFC4] shadow-sm flex flex-col overflow-hidden', branches.length > 0 ? 'rounded-t-[24px] border-b-0' : 'rounded-[24px]']">
+      <!-- Main Container with Filter Bar and Branch List (wrapped with pagination so main's space-y gap doesn't split them) -->
+      <div>
+      <div :class="['bg-white border border-[#EEDFC4] shadow-sm flex flex-col', branches.length > 0 ? 'rounded-t-[24px] border-b-0' : 'rounded-[24px]']">
         <!-- Filter Bar -->
-        <CafeManagementCafeFilterBar 
+        <CafeManagementCafeFilterBar
+          class="sticky top-0 z-20 bg-white rounded-t-[24px]"
           v-model:search="search"
           v-model:status="status"
           :selected-count="selectedBranches.length"
@@ -315,12 +317,13 @@ function viewDetails(uuid: string) {
       </div>
       
       <!-- Pagination (Separate Frame) -->
-      <div v-if="branches.length > 0" class="bg-white rounded-b-[24px] border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
+      <div v-if="branches.length > 0" class="sticky bottom-0 z-20 bg-white rounded-b-[24px] border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
         <Pagination
           :page="currentPage"
           :last-page="lastPage"
           @change="goToPage"
         />
+      </div>
       </div>
 
       <!-- Interactive Modals -->
