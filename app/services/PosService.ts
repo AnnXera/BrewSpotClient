@@ -71,11 +71,14 @@ export class DevicePosService extends BaseService {
         return this.get<{ success: boolean; today_total: number; today_count: number; month_total: number; transactions: any[] }>('/pos/device/transactions')
     }
 
-    checkout(items: any[], paymentMethod: string, amountTendered: number) {
+    checkout(items: any[], paymentMethod: string, amountTendered: number, referenceNumber?: string, discountType?: string, discountAmount?: number) {
         return this.post<{ success: boolean; message: string; transaction_uuid: string; receipt_number?: string }>('/pos/device/checkout', {
             items,
             payment_method: paymentMethod,
-            amount_tendered: amountTendered
+            amount_tendered: amountTendered,
+            reference_number: referenceNumber,
+            discount_type: discountType,
+            discount_amount: discountAmount
         })
     }
 }
