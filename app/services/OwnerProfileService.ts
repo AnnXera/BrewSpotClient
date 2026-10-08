@@ -89,7 +89,8 @@ export class OwnerProfileService extends BaseService {
             success: boolean; 
             total_earnings?: number; 
             detailed_stats?: { today_revenue: number, today_orders: number, avg_order_value: number, active_customers: number };
-            chart_data?: { month: string, revenue: number }[]
+            chart_data?: { month: string, revenue: number }[];
+            top_selling_items?: { rank: number, name: string, category: string, orders: number, percentage: number, revenue: number }[]
         }>('/owner/dashboard-stats')
     }
 }

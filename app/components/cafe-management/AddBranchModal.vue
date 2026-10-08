@@ -21,10 +21,14 @@ const form = ref({
   branch_name: '',
   branch_type: 'SIDE',
   address: '',
-  phone_number: '',
+  storePhoneType: 'mobile',
+  storeMobileDigits: '',
+  storeLandlineDigits: '',
   manager_name: '',
+  managerPhoneType: 'mobile',
+  managerMobileDigits: '',
+  managerLandlineDigits: '',
   manager_email: '',
-  manager_phone: '',
   seating_capacity: 40,
   has_drivethru: false,
   use_general_hours: true,
@@ -32,8 +36,9 @@ const form = ref({
   custom_close_time: '22:00',
   amenities: ['High-speed WiFi', 'Airconditioned', 'Power Outlets'],
   cafe_email: '',
-  cafe_phonenumber: '',
-  tin_number: '',
+  cafePhoneType: 'mobile',
+  cafeMobileDigits: '',
+  cafeLandlineDigits: '',
   vat: 'vat-registered',
   bir_registered_at: ''
 })
@@ -69,19 +74,40 @@ function toggleAmenity(amenity: string) {
   }
 }
 
-function formatTinNumber(val: string): string {
-  const raw = val.replace(/[^0-9]/g, '').slice(0, 12)
-  const parts: string[] = []
-  for (let i = 0; i < raw.length; i += 3) {
-    parts.push(raw.slice(i, i + 3))
-  }
-  return parts.join('-')
+function onCafeMobileInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  form.value.cafeMobileDigits = target.value.replace(/[^0-9]/g, '').slice(0, 10)
+  target.value = form.value.cafeMobileDigits
 }
 
-function onTinInput(event: Event) {
+function onCafeLandlineInput(event: Event) {
   const target = event.target as HTMLInputElement
-  form.value.tin_number = formatTinNumber(target.value)
-  target.value = form.value.tin_number
+  form.value.cafeLandlineDigits = target.value.replace(/[^0-9\-]/g, '').slice(0, 15)
+  target.value = form.value.cafeLandlineDigits
+}
+
+function onStoreMobileInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  form.value.storeMobileDigits = target.value.replace(/[^0-9]/g, '').slice(0, 10)
+  target.value = form.value.storeMobileDigits
+}
+
+function onStoreLandlineInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  form.value.storeLandlineDigits = target.value.replace(/[^0-9\-]/g, '').slice(0, 15)
+  target.value = form.value.storeLandlineDigits
+}
+
+function onManagerMobileInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  form.value.managerMobileDigits = target.value.replace(/[^0-9]/g, '').slice(0, 10)
+  target.value = form.value.managerMobileDigits
+}
+
+function onManagerLandlineInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  form.value.managerLandlineDigits = target.value.replace(/[^0-9\-]/g, '').slice(0, 15)
+  target.value = form.value.managerLandlineDigits
 }
 
 function validateStep(step: number): boolean {
@@ -93,11 +119,14 @@ function validateStep(step: number): boolean {
     if (form.value.seating_capacity < 1) errors.value.seating_capacity = 'Must be at least 1 seat'
   } else if (step === 4) {
     if (!form.value.cafe_email.trim()) errors.value.cafe_email = 'Cafe email is required'
-    if (!form.value.cafe_phonenumber.trim()) errors.value.cafe_phonenumber = 'Phone number is required'
     
-    const tinRaw = form.value.tin_number.replace(/[^0-9]/g, '')
-    if (!tinRaw) errors.value.tin_number = 'TIN number is required'
-    else if (tinRaw.length < 12) errors.value.tin_number = 'TIN Number must follow format XXX-XXX-XXX-XXX.'
+    if (form.value.cafePhoneType === 'mobile') {
+      if (!form.value.cafeMobileDigits) errors.value.cafe_phonenumber = 'Phone number is required'
+      else if (form.value.cafeMobileDigits.length < 10) errors.value.cafe_phonenumber = 'Phone number must be 10 digits starting with 9.'
+      else if (!form.value.cafeMobileDigits.startsWith('9')) errors.value.cafe_phonenumber = 'Phone number must start with 9.'
+    } else {
+      if (!form.value.cafeLandlineDigits) errors.value.cafe_phonenumber = 'Landline number is required'
+    }
     
     if (!form.value.bir_registered_at.trim()) errors.value.bir_registered_at = 'BIR Registration date is required'
     if (!birFile.value) errors.value.bir_file = 'BIR File is required'
@@ -125,10 +154,28 @@ function handleFileChange(e: Event, type: 'bir' | 'picture') {
 
 function handleSubmit() {
   if (!validateStep(4)) return
+  
+  const finalPhoneNumber = form.value.cafePhoneType === 'mobile' 
+    ? `+63${form.value.cafeMobileDigits}`
+    : form.value.cafeLandlineDigits
+
+  const finalStorePhoneNumber = form.value.storeMobileDigits || form.value.storeLandlineDigits 
+    ? (form.value.storePhoneType === 'mobile' ? `+63${form.value.storeMobileDigits}` : form.value.storeLandlineDigits)
+    : ''
+
+  const finalManagerPhoneNumber = form.value.managerMobileDigits || form.value.managerLandlineDigits 
+    ? (form.value.managerPhoneType === 'mobile' ? `+63${form.value.managerMobileDigits}` : form.value.managerLandlineDigits)
+    : ''
+
   const formData = new FormData()
   Object.keys(form.value).forEach(key => {
+    if (['cafePhoneType', 'cafeMobileDigits', 'cafeLandlineDigits', 'storePhoneType', 'storeMobileDigits', 'storeLandlineDigits', 'managerPhoneType', 'managerMobileDigits', 'managerLandlineDigits'].includes(key)) return
     formData.append(key, (form.value as any)[key])
   })
+  formData.append('cafe_phonenumber', finalPhoneNumber)
+  if (finalStorePhoneNumber) formData.append('phone_number', finalStorePhoneNumber)
+  if (finalManagerPhoneNumber) formData.append('manager_phone', finalManagerPhoneNumber)
+
   if (birFile.value) formData.append('bir_file', birFile.value)
   if (cafePicture.value) formData.append('cafe_picture', cafePicture.value)
 
@@ -216,14 +263,39 @@ function handleSubmit() {
               <p v-if="errors.address" class="text-xs text-red-600 mt-1 font-medium">{{ errors.address }}</p>
             </div>
 
-            <div>
-              <label class="block text-xs font-bold text-[#3D2B24] mb-1">Store Direct Phone Number</label>
-              <input
-                type="text"
-                v-model="form.phone_number"
-                placeholder="+63 912 345 6789"
-                class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]"
-              />
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-[#3D2B24]">Store Direct Phone Number</label>
+              <div class="flex items-center rounded-xl border bg-[#FDF8F3] overflow-hidden transition focus-within:border-[#7D5A50] focus-within:ring-2 focus-within:ring-[#7D5A50]/20 h-[42px] border-[#EEDFC4]">
+                <div class="relative bg-gray-100 border-r border-[#EEDFC4] shrink-0 h-full flex items-center">
+                  <select
+                    v-model="form.storePhoneType"
+                    class="h-full bg-transparent text-[#3D2B24] font-semibold text-xs pl-3 pr-7 outline-none cursor-pointer appearance-none z-10"
+                  >
+                    <option value="mobile">Mobile (+63)</option>
+                    <option value="telephone">Landline</option>
+                  </select>
+                  <Icon name="heroicons:chevron-down" class="w-3.5 h-3.5 text-[#9E7060] absolute right-2 pointer-events-none" />
+                </div>
+                <input
+                  v-if="form.storePhoneType === 'mobile'"
+                  v-model="form.storeMobileDigits"
+                  type="tel"
+                  inputmode="numeric"
+                  maxlength="10"
+                  placeholder="9123456789"
+                  class="w-full h-full px-3 text-sm text-[#3D2B24] bg-transparent outline-none"
+                  @input="onStoreMobileInput"
+                />
+                <input
+                  v-else
+                  v-model="form.storeLandlineDigits"
+                  type="tel"
+                  placeholder="082-299-1234"
+                  maxlength="15"
+                  class="w-full h-full px-3 text-sm text-[#3D2B24] bg-transparent outline-none"
+                  @input="onStoreLandlineInput"
+                />
+              </div>
             </div>
           </div>
 
@@ -241,14 +313,39 @@ function handleSubmit() {
                 />
               </div>
 
-              <div>
-                <label class="block text-xs font-bold text-[#3D2B24] mb-1">Manager Phone</label>
-                <input
-                  type="text"
-                  v-model="form.manager_phone"
-                  placeholder="+63 917 123 4567"
-                  class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]"
-                />
+              <div class="space-y-1">
+                <label class="block text-xs font-bold text-[#3D2B24]">Manager Phone</label>
+                <div class="flex items-center rounded-xl border bg-[#FDF8F3] overflow-hidden transition focus-within:border-[#7D5A50] focus-within:ring-2 focus-within:ring-[#7D5A50]/20 h-[42px] border-[#EEDFC4]">
+                  <div class="relative bg-gray-100 border-r border-[#EEDFC4] shrink-0 h-full flex items-center">
+                    <select
+                      v-model="form.managerPhoneType"
+                      class="h-full bg-transparent text-[#3D2B24] font-semibold text-xs pl-3 pr-7 outline-none cursor-pointer appearance-none z-10"
+                    >
+                      <option value="mobile">Mobile (+63)</option>
+                      <option value="telephone">Landline</option>
+                    </select>
+                    <Icon name="heroicons:chevron-down" class="w-3.5 h-3.5 text-[#9E7060] absolute right-2 pointer-events-none" />
+                  </div>
+                  <input
+                    v-if="form.managerPhoneType === 'mobile'"
+                    v-model="form.managerMobileDigits"
+                    type="tel"
+                    inputmode="numeric"
+                    maxlength="10"
+                    placeholder="9123456789"
+                    class="w-full h-full px-3 text-sm text-[#3D2B24] bg-transparent outline-none"
+                    @input="onManagerMobileInput"
+                  />
+                  <input
+                    v-else
+                    v-model="form.managerLandlineDigits"
+                    type="tel"
+                    placeholder="082-299-1234"
+                    maxlength="15"
+                    class="w-full h-full px-3 text-sm text-[#3D2B24] bg-transparent outline-none"
+                    @input="onManagerLandlineInput"
+                  />
+                </div>
               </div>
             </div>
 
@@ -361,46 +458,79 @@ function handleSubmit() {
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">Cafe Email *</label>
-                <input type="email" v-model="form.cafe_email" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]" />
+                <input type="email" v-model="form.cafe_email" placeholder="hello@brewspot.com" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50] focus:outline-none focus:ring-1 focus:ring-[#7D5A50]" />
                 <p v-if="errors.cafe_email" class="text-xs text-red-600 mt-1 font-medium">{{ errors.cafe_email }}</p>
               </div>
-              <div>
-                <label class="block text-xs font-bold text-[#3D2B24] mb-1">Cafe Phone Number *</label>
-                <input type="text" v-model="form.cafe_phonenumber" placeholder="+639..." class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]" />
-                <p v-if="errors.cafe_phonenumber" class="text-xs text-red-600 mt-1 font-medium">{{ errors.cafe_phonenumber }}</p>
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-[#3D2B24] mb-1">TIN Number *</label>
-                <input 
-                  type="text" 
-                  v-model="form.tin_number" 
-                  placeholder="XXX-XXX-XXX-XXX"
-                  maxlength="15"
-                  @input="onTinInput"
-                  class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]" 
-                />
-                <p v-if="errors.tin_number" class="text-xs text-red-600 mt-1 font-medium">{{ errors.tin_number }}</p>
+              <div class="space-y-1">
+                <label class="block text-xs font-bold text-[#3D2B24]">Cafe Phone Number *</label>
+                <div
+                  class="flex items-center rounded-xl border bg-white overflow-hidden transition focus-within:border-[#7D5A50] focus-within:ring-2 focus-within:ring-[#7D5A50]/20 h-10"
+                  :class="errors.cafe_phonenumber ? 'border-red-500' : 'border-[#EEDFC4]'"
+                >
+                  <div class="relative bg-gray-100 border-r border-[#EEDFC4] shrink-0 h-full flex items-center">
+                    <select
+                      v-model="form.cafePhoneType"
+                      class="h-full bg-transparent text-[#3D2B24] font-semibold text-xs pl-3 pr-7 outline-none cursor-pointer appearance-none z-10"
+                    >
+                      <option value="mobile">Mobile (+63)</option>
+                      <option value="telephone">Landline</option>
+                    </select>
+                    <Icon name="heroicons:chevron-down" class="w-3.5 h-3.5 text-[#9E7060] absolute right-2 pointer-events-none" />
+                  </div>
+                  <input
+                    v-if="form.cafePhoneType === 'mobile'"
+                    v-model="form.cafeMobileDigits"
+                    type="tel"
+                    inputmode="numeric"
+                    maxlength="10"
+                    placeholder="9123456789"
+                    class="w-full h-full px-3 text-sm text-[#3D2B24] bg-transparent outline-none"
+                    @input="onCafeMobileInput"
+                  />
+                  <input
+                    v-else
+                    v-model="form.cafeLandlineDigits"
+                    type="tel"
+                    placeholder="082-299-1234"
+                    maxlength="15"
+                    class="w-full h-full px-3 text-sm text-[#3D2B24] bg-transparent outline-none"
+                    @input="onCafeLandlineInput"
+                  />
+                </div>
+                <p v-if="errors.cafe_phonenumber" class="text-xs text-red-600 font-medium">{{ errors.cafe_phonenumber }}</p>
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">VAT Status *</label>
-                <select v-model="form.vat" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]">
+                <select v-model="form.vat" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50] focus:outline-none focus:ring-1 focus:ring-[#7D5A50]">
                   <option value="vat-registered">VAT Registered</option>
                   <option value="non-vat">Non-VAT</option>
                 </select>
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">BIR Registered Date *</label>
-                <input type="date" v-model="form.bir_registered_at" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50]" />
+                <input type="date" v-model="form.bir_registered_at" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50] focus:outline-none focus:ring-1 focus:ring-[#7D5A50]" />
                 <p v-if="errors.bir_registered_at" class="text-xs text-red-600 mt-1 font-medium">{{ errors.bir_registered_at }}</p>
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">BIR File *</label>
-                <input type="file" @change="e => handleFileChange(e, 'bir')" class="w-full text-xs" accept=".jpg,.jpeg,.png,.pdf" />
+                <div class="relative group cursor-pointer border-2 border-dashed border-[#EEDFC4] rounded-xl hover:border-[#7D5A50] hover:bg-[#FDF8F3] transition-all overflow-hidden flex items-center justify-center p-3 h-11 bg-[#FDF8F3]">
+                  <input type="file" @change="e => handleFileChange(e, 'bir')" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".jpg,.jpeg,.png,.pdf" />
+                  <div class="flex items-center gap-2 text-[#9E7060] group-hover:text-[#7D5A50] transition-colors truncate">
+                    <Icon name="heroicons:arrow-up-tray" class="w-5 h-5 shrink-0" />
+                    <span class="text-xs font-bold truncate">{{ birFile ? birFile.name : 'Upload BIR Document' }}</span>
+                  </div>
+                </div>
                 <p v-if="errors.bir_file" class="text-xs text-red-600 mt-1 font-medium">{{ errors.bir_file }}</p>
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">Cafe Picture</label>
-                <input type="file" @change="e => handleFileChange(e, 'picture')" class="w-full text-xs" accept=".jpg,.jpeg,.png,.webp" />
+                <div class="relative group cursor-pointer border-2 border-dashed border-[#EEDFC4] rounded-xl hover:border-[#7D5A50] hover:bg-[#FDF8F3] transition-all overflow-hidden flex items-center justify-center p-3 h-11 bg-[#FDF8F3]">
+                  <input type="file" @change="e => handleFileChange(e, 'picture')" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".jpg,.jpeg,.png,.webp" />
+                  <div class="flex items-center gap-2 text-[#9E7060] group-hover:text-[#7D5A50] transition-colors truncate">
+                    <Icon name="heroicons:photo" class="w-5 h-5 shrink-0" />
+                    <span class="text-xs font-bold truncate">{{ cafePicture ? cafePicture.name : 'Upload Branch Picture' }}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

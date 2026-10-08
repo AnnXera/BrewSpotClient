@@ -256,8 +256,24 @@ function getItemUnitPrice(item: any) {
   return price;
 }
 
+const baseItemsTotal = computed(() => {
+  return cart.value.reduce((sum, item) => sum + (item.base_price * item.quantity), 0);
+})
+
+const addonsTotal = computed(() => {
+  return cart.value.reduce((sum, item) => {
+    let itemAddonTotal = 0;
+    if (item.addons && item.addons.length > 0) {
+      item.addons.forEach((addon: string) => {
+        itemAddonTotal += getAddonPrice(addon);
+      });
+    }
+    return sum + (itemAddonTotal * item.quantity);
+  }, 0);
+})
+
 const subtotal = computed(() => {
-  return cart.value.reduce((sum, item) => sum + (getItemUnitPrice(item) * item.quantity), 0);
+  return baseItemsTotal.value + addonsTotal.value;
 })
 const tax = computed(() => {
   if (device.value?.vat_status === 'vat-registered') {
@@ -413,6 +429,8 @@ async function completeOrder() {
       completedOrderDetails.value = {
         receiptNumber: res.receipt_number || res.transaction_uuid,
         items: currentItems,
+        baseItemsTotal: baseItemsTotal.value,
+        addonsTotal: addonsTotal.value,
         subtotal: subtotal.value,
         tax: tax.value,
         discountType: selectedDiscountType.value,
@@ -753,8 +771,12 @@ function formatCurrency(amount: number) {
           <div class="p-4 bg-gray-50 border-t border-gray-200 shrink-0">
             <div class="space-y-1.5 mb-3 text-sm font-medium text-gray-500">
               <div class="flex justify-between">
-                <span>Subtotal</span>
-                <span>{{ formatCurrency(subtotal) }}</span>
+                <span>Items Subtotal</span>
+                <span>{{ formatCurrency(baseItemsTotal) }}</span>
+              </div>
+              <div v-if="addonsTotal > 0" class="flex justify-between">
+                <span>Add-ons Total</span>
+                <span>{{ formatCurrency(addonsTotal) }}</span>
               </div>
               
               <!-- Discount Selection -->
@@ -934,8 +956,12 @@ function formatCurrency(amount: number) {
 
             <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
               <div class="flex justify-between text-sm text-gray-500 mb-2">
-                <span>Subtotal</span>
-                <span>{{ formatCurrency(completedOrderDetails.subtotal) }}</span>
+                <span>Items Subtotal</span>
+                <span>{{ formatCurrency(completedOrderDetails.baseItemsTotal) }}</span>
+              </div>
+              <div v-if="completedOrderDetails.addonsTotal > 0" class="flex justify-between text-sm text-gray-500 mb-2">
+                <span>Add-ons Total</span>
+                <span>{{ formatCurrency(completedOrderDetails.addonsTotal) }}</span>
               </div>
               <div v-if="completedOrderDetails.discountAmount > 0" class="flex justify-between text-sm text-red-500 mb-2">
                 <span>Discount ({{ completedOrderDetails.discountType }})</span>
