@@ -6,6 +6,9 @@ import CategoryCard from '~/components/menu/CategoryCard.vue'
 import EmptyState from '~/components/menu/EmptyState.vue'
 import CategoryModal from '~/components/menu/CategoryModal.vue'
 import Pagination from '~/components/common/Pagination.vue'
+import ConfirmModal from '~/components/common/ConfirmModal.vue'
+import AlertModal from '~/components/common/AlertModal.vue'
+import { useDialogs } from '~/composables/useDialogs'
 
 definePageMeta({
   layout: 'owner',
@@ -14,6 +17,7 @@ definePageMeta({
 const route = useRoute()
 const router = useRouter()
 const menuService = useMenuService()
+const { confirmDialog, alertDialog, askConfirm, runConfirm, showAlert } = useDialogs()
 
 const categories = ref<any[]>([])
 const items = ref<any[]>([])
@@ -135,14 +139,18 @@ function onCategorySaved() {
 }
 
 function handleDeleteCategory(catUuid: string) {
-  if (window.confirm('Are you sure you want to delete this category?')) {
-    menuService.deleteMenuCategory(catUuid)
+  askConfirm({
+    title: 'Delete Category',
+    message: 'Are you sure you want to delete this category?',
+    confirmText: 'Delete',
+    isDestructive: true,
+    onConfirm: () => menuService.deleteMenuCategory(catUuid)
       .then(() => fetchData())
       .catch((error) => {
         console.error('Failed to delete category', error)
-        alert('Failed to delete category. Please try again.')
-      })
-  }
+        showAlert('Delete Failed', 'Failed to delete category. Please try again.')
+      }),
+  })
 }
 
 const links = [
@@ -228,6 +236,22 @@ const links = [
       :items="items"
       @close="closeCategoryModal"
       @saved="onCategorySaved"
+    />
+
+    <ConfirmModal
+      :show="confirmDialog.show"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :confirmText="confirmDialog.confirmText"
+      :isDestructive="confirmDialog.isDestructive"
+      @close="confirmDialog.show = false"
+      @confirm="runConfirm"
+    />
+    <AlertModal
+      :show="alertDialog.show"
+      :title="alertDialog.title"
+      :message="alertDialog.message"
+      @close="alertDialog.show = false"
     />
   </div>
 </template>
