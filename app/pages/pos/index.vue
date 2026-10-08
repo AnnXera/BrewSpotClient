@@ -511,7 +511,7 @@ function formatCurrency(amount: number) {
 <template>
   <div class="w-full h-full">
     <!-- Main App Interface (Hidden during printing) -->
-    <div class="h-screen h-[100dvh] overflow-hidden bg-[#FFF8EA] font-sans flex flex-col text-[#2d201b] selection:bg-[#7B5A50]/20 selection:text-[#7B5A50] print:hidden">
+    <div class="h-[100dvh] overflow-hidden bg-[#FFF8EA] font-sans flex flex-col text-[#2d201b] selection:bg-[#7B5A50]/20 selection:text-[#7B5A50] print:hidden">
       <!-- Loading State -->
       <div v-if="loading && !device" class="flex-1 flex items-center justify-center">
       <Icon name="heroicons:arrow-path" class="w-8 h-8 animate-spin text-gray-400" />
