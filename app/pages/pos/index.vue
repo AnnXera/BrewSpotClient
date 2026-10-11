@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import logoIcon from '~/assets/images/logo-icon.svg'
+
 // POS Register uses its own auth via pos_device_token cookie
 // It does not use the standard user auth, so we don't define a 'role' requirement here.
 definePageMeta({
@@ -468,7 +470,7 @@ function formatCurrency(amount: number) {
       <!-- ── HEADER ───────────────────────────────────────────────────────── -->
       <header class="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between shadow-sm sticky top-0 z-10">
         <div class="flex-1 flex items-center gap-2">
-          <Icon name="lucide:coffee" class="w-7 h-7 text-[#7B5A50]" />
+          <img :src="logoIcon" alt="BrewSpot" class="w-9 h-9 rounded-lg" />
           <div>
             <h1 class="text-lg font-bold text-[#7B5A50]">{{ device.cafe_name || device.branch_name || 'BrewSpot POS' }}</h1>
             <p class="text-sm text-gray-500">{{ device.branch_name }} &bull; {{ device.name }}</p>
