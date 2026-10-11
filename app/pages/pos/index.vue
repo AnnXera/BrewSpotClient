@@ -305,6 +305,7 @@ const isCustomizationModalOpen = ref(false)
 const pendingCartItem = ref<any>(null)
 
 function openCustomizationModal(item: any) {
+  if (item.sold_out) return
   pendingCartItem.value = { ...item, sugar_level: 100, addons: [] }
   isCustomizationModalOpen.value = true
 }
@@ -446,6 +447,8 @@ async function completeOrder() {
       amountTendered.value = ''
       referenceNumber.value = ''
       selectedDiscountType.value = 'none'
+      // Servings left changed with this sale.
+      devicePosService.getMenu().then((m) => { if (m.success) menuItems.value = m.items }).catch(() => {})
     }
   } catch (e: any) {
     alert(e?.data?.message || 'Failed to complete checkout')
@@ -697,7 +700,9 @@ function formatCurrency(amount: number) {
                 v-for="item in filteredItems" 
                 :key="item.uuid"
                 @click="openCustomizationModal(item)"
-                class="bg-white border border-gray-200 rounded-md overflow-hidden hover:shadow-md hover:border-[#7B5A50]/50 transition-all text-left flex flex-col group active:scale-[0.98]"
+                :disabled="item.sold_out"
+                :class="item.sold_out ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md hover:border-[#7B5A50]/50 active:scale-[0.98]'"
+                class="bg-white border border-gray-200 rounded-md overflow-hidden transition-all text-left flex flex-col group"
               >
                 <div class="h-20 w-full bg-gray-100 flex-shrink-0 flex items-center justify-center text-gray-400 overflow-hidden">
                   <img v-if="item.picture" :src="item.picture" :alt="item.menu_name" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
@@ -706,6 +711,8 @@ function formatCurrency(amount: number) {
                 <div class="p-2.5 flex flex-col gap-0.5">
                   <h3 class="font-semibold text-gray-800 text-sm leading-tight truncate">{{ item.menu_name }}</h3>
                   <p class="text-gray-500 text-sm">{{ formatCurrency(item.base_price) }}</p>
+                  <p v-if="item.sold_out" class="text-red-600 text-xs font-semibold">Sold out</p>
+                  <p v-else class="text-gray-400 text-xs">{{ item.available_stock }} left</p>
                 </div>
               </button>
             </div>
