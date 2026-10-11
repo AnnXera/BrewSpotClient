@@ -322,19 +322,39 @@ const canCheckout = computed(() => {
 })
 
 
+const cartCount = computed(() => cart.value.reduce((n, i) => n + i.quantity, 0))
+
+const discountOptions = [
+  { value: 'none', label: 'None' },
+  { value: 'PWD', label: 'PWD' },
+  { value: 'Senior', label: 'Senior' },
+  { value: 'VIP', label: 'VIP' },
+] as const
+
+const paymentMethods = [
+  { value: 'cash', label: 'Cash', icon: 'heroicons:banknotes' },
+  { value: 'card', label: 'Card', icon: 'heroicons:credit-card' },
+  { value: 'ewallet', label: 'E-Wallet', icon: 'heroicons:device-phone-mobile' },
+]
+
+const shortBy = computed(() => {
+  const tendered = Number(amountTendered.value)
+  return tendered > 0 && tendered < total.value ? total.value - tendered : 0
+})
+
+const checkoutHint = computed(() => {
+  if (selectedPaymentMethod.value === 'cash') {
+    return Number(amountTendered.value) > 0 ? 'Amount tendered is less than the total.' : 'Enter the cash received to continue.'
+  }
+  return 'Enter the reference number to continue.'
+})
+
 const isProcessingOrder = ref(false)
 const isReceiptModalOpen = ref(false)
-const isConfirmOrderModalOpen = ref(false)
 const completedOrderDetails = ref<any>(null)
 
-function promptConfirmOrder() {
-  if (!canCheckout.value) return
-  isConfirmOrderModalOpen.value = true
-}
-
 async function completeOrder() {
-  isConfirmOrderModalOpen.value = false
-  if (!canCheckout.value) return
+  if (!canCheckout.value || isProcessingOrder.value) return
   isProcessingOrder.value = true
   try {
     const items = cart.value.map(i => ({ 
@@ -648,140 +668,132 @@ function formatCurrency(amount: number) {
         </div>
 
         <!-- Right Side: Cart / Order Summary -->
-        <div class="w-[320px] bg-white flex flex-col shadow-sm border-l border-gray-200">
-          <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-            <h2 class="text-base font-semibold text-gray-800 flex items-center gap-1.5">
-              <Icon name="heroicons:shopping-cart" class="w-4 h-4" />
+        <div class="w-[320px] lg:w-[380px] shrink-0 bg-white flex flex-col shadow-sm border-l border-gray-200">
+          <div class="px-4 h-14 border-b border-gray-200 flex items-center justify-between bg-gray-50 shrink-0">
+            <h2 class="text-base font-semibold text-gray-800 flex items-center gap-2">
               Current Order
+              <span v-if="cartCount" class="min-w-6 h-6 px-1.5 rounded-full bg-[#7B5A50] text-white text-xs font-semibold flex items-center justify-center tabular-nums">{{ cartCount }}</span>
             </h2>
-            <button v-if="cart.length" @click="clearCart" class="text-sm text-red-600 hover:text-red-800 font-medium">
+            <button v-if="cart.length" @click="clearCart" class="min-h-11 px-3 -mr-3 text-sm text-red-600 hover:text-red-800 font-medium">
               Clear
             </button>
           </div>
 
           <!-- Cart Items List -->
-          <div class="flex-1 overflow-y-auto p-3 min-h-0">
-            <div v-if="cart.length === 0" class="h-full flex flex-col items-center justify-center text-center opacity-50">
-              <Icon name="heroicons:document-text" class="w-8 h-8 text-gray-400 mb-2" />
-              <p class="text-base text-gray-500 font-medium">Empty Order</p>
+          <div class="flex-1 overflow-y-auto px-3 py-2 min-h-[120px]">
+            <div v-if="cart.length === 0" class="h-full flex flex-col items-center justify-center text-center px-6">
+              <Icon name="heroicons:document-text" class="w-8 h-8 text-gray-300 mb-2" />
+              <p class="text-base text-gray-600 font-medium">No items yet</p>
+              <p class="text-sm text-gray-500">Tap an item on the left to start the order.</p>
             </div>
-            <div v-else class="space-y-2 overflow-x-hidden">
-              <TransitionGroup name="list" tag="div" class="space-y-2">
-                <div v-for="item in cart" :key="item.uuid" class="flex flex-col bg-white p-2.5 rounded-md border border-gray-100 shadow-sm gap-2 transition-all">
-                  <div class="flex justify-between items-start w-full">
-                    <div class="flex flex-col flex-1 pr-2">
-                      <p class="font-semibold text-gray-800 text-sm leading-tight">{{ item.menu_name }}</p>
-                    </div>
-                    <div class="font-semibold text-gray-800 text-right text-sm whitespace-nowrap">
-                      {{ formatCurrency(getItemUnitPrice(item) * item.quantity) }}
-                    </div>
-                  </div>
-                  
-                  <div class="flex items-center justify-between w-full">
-                    <p class="text-xs text-gray-500">{{ formatCurrency(getItemUnitPrice(item)) }} each</p>
-                    <div class="flex items-center gap-2 bg-gray-50 rounded border border-gray-200">
-                      <button @click="updateQuantity(item, -1)" class="w-6 h-6 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors active:scale-90">
-                        <Icon name="heroicons:minus" class="w-3 h-3" />
-                      </button>
-                      <span class="w-4 text-center font-semibold text-gray-800 text-sm">{{ item.quantity }}</span>
-                      <button @click="updateQuantity(item, 1)" class="w-6 h-6 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors active:scale-90">
-                        <Icon name="heroicons:plus" class="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
+            <TransitionGroup v-else name="list" tag="ul" class="divide-y divide-gray-100">
+              <li v-for="item in cart" :key="item.uuid" class="flex items-center gap-3 py-2">
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-gray-800 text-sm leading-tight break-words">{{ item.menu_name }}</p>
+                  <p class="text-xs text-gray-500 tabular-nums">{{ formatCurrency(getItemUnitPrice(item)) }} each</p>
                 </div>
-              </TransitionGroup>
-            </div>
+                <div class="flex items-center">
+                  <button @click="updateQuantity(item, -1)" :aria-label="`Remove one ${item.menu_name}`" class="w-11 h-11 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-md transition-colors active:scale-90">
+                    <Icon name="heroicons:minus" class="w-4 h-4" />
+                  </button>
+                  <span class="w-6 text-center font-semibold text-gray-800 text-base tabular-nums">{{ item.quantity }}</span>
+                  <button @click="updateQuantity(item, 1)" :aria-label="`Add one ${item.menu_name}`" class="w-11 h-11 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-md transition-colors active:scale-90">
+                    <Icon name="heroicons:plus" class="w-4 h-4" />
+                  </button>
+                </div>
+                <div class="w-[72px] text-right font-semibold text-gray-800 text-sm tabular-nums">
+                  {{ formatCurrency(getItemUnitPrice(item) * item.quantity) }}
+                </div>
+              </li>
+            </TransitionGroup>
           </div>
 
-          <!-- Cart Totals & Payment -->
-          <div class="p-4 bg-gray-50 border-t border-gray-200 shrink-0">
-            <div class="space-y-1.5 mb-3 text-sm font-medium text-gray-500">
+          <!-- Adjustments + payment (scrolls on short screens, Charge stays pinned) -->
+          <div class="bg-gray-50 border-t border-gray-200 overflow-y-auto min-h-0 max-h-[58%] px-4 pt-3 pb-3 space-y-3">
+            <div class="space-y-1 text-sm text-gray-600 tabular-nums">
               <div class="flex justify-between">
-                <span>Items Subtotal</span>
+                <span>Subtotal</span>
                 <span>{{ formatCurrency(baseItemsTotal) }}</span>
               </div>
-              
-              <!-- Discount Selection -->
-              <div class="flex justify-between items-center py-1 border-t border-gray-100 mt-1 pt-2">
-                <span class="text-xs font-bold uppercase text-gray-500">Discount</span>
-                <select v-model="selectedDiscountType" class="text-xs py-0.5 px-2 rounded border border-gray-200 bg-white outline-none">
-                  <option value="none">None</option>
-                  <option value="PWD">PWD (20%)</option>
-                  <option value="Senior">Senior (20%)</option>
-                  <option value="VIP">VIP Member (10%)</option>
-                </select>
-              </div>
-
               <div v-if="device?.vat_status === 'vat-registered'" class="flex justify-between">
                 <span>VAT (12%)</span>
                 <span>{{ formatCurrency(tax) }}</span>
               </div>
-              <div v-if="discountAmount > 0" class="flex justify-between text-red-500">
+              <div v-if="discountAmount > 0" class="flex justify-between text-red-700">
                 <span>Discount ({{ selectedDiscountType }})</span>
                 <span>- {{ formatCurrency(discountAmount) }}</span>
               </div>
-              <div class="flex justify-between text-base font-bold text-gray-900 pt-2 border-t border-gray-200 mt-2">
-                <span>Total Due</span>
-                <span class="text-[#7B5A50]">{{ formatCurrency(total) }}</span>
-              </div>
             </div>
 
-            <!-- Payment Method Selection -->
-            <div v-if="cart.length > 0" class="pt-3 border-t border-gray-200 space-y-3 mb-4">
-              <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Payment Method</p>
-              <div class="grid grid-cols-3 gap-2">
-                <button @click="selectedPaymentMethod = 'cash'" class="py-2 flex flex-col items-center justify-center gap-1 rounded-md border transition-all active:scale-95" :class="selectedPaymentMethod === 'cash' ? 'border-[#7B5A50] bg-[#7B5A50]/10 text-[#7B5A50] shadow-sm' : 'border-gray-300 text-gray-600 hover:bg-gray-100'">
-                  <Icon name="heroicons:banknotes" class="w-6 h-6" />
-                  <span class="text-sm font-semibold">Cash</span>
-                </button>
-                <button @click="selectedPaymentMethod = 'card'" class="py-2 flex flex-col items-center justify-center gap-1 rounded-md border transition-all active:scale-95" :class="selectedPaymentMethod === 'card' ? 'border-[#7B5A50] bg-[#7B5A50]/10 text-[#7B5A50] shadow-sm' : 'border-gray-300 text-gray-600 hover:bg-gray-100'">
-                  <div class="flex items-center gap-1 h-6">
-                    <Icon name="logos:visa" class="w-6 h-6" />
-                    <Icon name="logos:mastercard" class="w-5 h-5" />
-                  </div>
-                  <span class="text-sm font-semibold">Card</span>
-                </button>
-                <button @click="selectedPaymentMethod = 'ewallet'" class="py-2 flex flex-col items-center justify-center gap-1 rounded-md border transition-all active:scale-95" :class="selectedPaymentMethod === 'ewallet' ? 'border-[#7B5A50] bg-[#7B5A50]/10 text-[#7B5A50] shadow-sm' : 'border-gray-300 text-gray-600 hover:bg-gray-100'">
-                  <div class="flex items-center gap-1 h-6">
-                    <span class="text-[11px] font-bold bg-blue-500 text-white px-1 py-0.5 rounded leading-none">GCash</span>
-                    <span class="text-[11px] font-bold bg-green-500 text-white px-1 py-0.5 rounded leading-none">Maya</span>
-                  </div>
-                  <span class="text-sm font-semibold">E-Wallet</span>
+            <template v-if="cart.length > 0">
+              <!-- Discount -->
+              <div role="radiogroup" aria-label="Discount" class="grid grid-cols-4 gap-1.5">
+                <button
+                  v-for="d in discountOptions"
+                  :key="d.value"
+                  role="radio"
+                  :aria-checked="selectedDiscountType === d.value"
+                  @click="selectedDiscountType = d.value"
+                  class="h-11 rounded-md border text-sm font-semibold transition-colors"
+                  :class="selectedDiscountType === d.value ? 'border-[#7B5A50] bg-[#7B5A50]/10 text-[#7B5A50]' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-100'"
+                >{{ d.label }}</button>
+              </div>
+
+              <!-- Payment Method -->
+              <div role="radiogroup" aria-label="Payment method" class="grid grid-cols-3 gap-1.5">
+                <button
+                  v-for="m in paymentMethods"
+                  :key="m.value"
+                  role="radio"
+                  :aria-checked="selectedPaymentMethod === m.value"
+                  @click="selectedPaymentMethod = m.value"
+                  class="h-12 rounded-md border flex items-center justify-center gap-1.5 text-sm font-semibold transition-colors active:scale-95"
+                  :class="selectedPaymentMethod === m.value ? 'border-[#7B5A50] bg-[#7B5A50]/10 text-[#7B5A50]' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-100'"
+                >
+                  <Icon :name="m.icon" class="w-5 h-5" />
+                  {{ m.label }}
                 </button>
               </div>
 
-              <!-- Cash Amount Input -->
-              <div v-if="selectedPaymentMethod === 'cash'" class="space-y-1">
-                <label class="block text-sm font-medium text-gray-700">Amount Tendered</label>
-                <div class="relative">
-                  <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-base text-gray-500 font-semibold">₱</span>
-                  <input v-model="amountTendered" type="number" class="w-full bg-white border border-gray-300 focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] text-gray-900 rounded-md pl-7 pr-3 py-1.5 text-base font-semibold outline-none transition-colors" placeholder="0.00" />
-                </div>
-                <div v-if="Number(amountTendered) > 0" class="flex justify-between items-center text-[11px] mt-1 bg-white p-1.5 rounded border border-gray-200">
-                  <span class="text-gray-500 font-semibold">Change:</span>
-                  <span class="font-bold" :class="changeAmount >= 0 ? 'text-emerald-600' : 'text-red-500'">
-                    {{ changeAmount >= 0 ? formatCurrency(changeAmount) : 'Insufficient' }}
+              <!-- Cash: quick amounts + tendered -->
+              <div v-if="selectedPaymentMethod === 'cash'" class="space-y-2">
+                <label class="block">
+                  <span class="sr-only">Amount tendered</span>
+                  <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-base text-gray-500 font-semibold">₱</span>
+                    <input v-model="amountTendered" type="number" inputmode="decimal" min="0" step="0.01" class="w-full h-12 bg-white border border-gray-300 focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] text-gray-900 rounded-md pl-8 pr-3 text-lg font-semibold tabular-nums outline-none transition-colors" placeholder="Amount tendered" />
+                  </div>
+                </label>
+                <div v-if="Number(amountTendered) > 0" class="flex justify-between items-baseline" aria-live="polite">
+                  <span class="text-sm font-semibold text-gray-600">{{ shortBy > 0 ? 'Still needed' : 'Change' }}</span>
+                  <span class="text-xl font-bold tabular-nums" :class="shortBy > 0 ? 'text-red-700' : 'text-emerald-700'">
+                    {{ formatCurrency(shortBy > 0 ? shortBy : changeAmount) }}
                   </span>
                 </div>
               </div>
 
-              <!-- Reference Number Input -->
-              <div v-if="selectedPaymentMethod === 'card' || selectedPaymentMethod === 'ewallet'" class="space-y-1">
-                <label class="block text-sm font-medium text-gray-700">Reference Number</label>
-                <div class="relative">
-                  <input v-model="referenceNumber" type="text" class="w-full bg-white border border-gray-300 focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] text-gray-900 rounded-md px-3 py-1.5 text-base font-semibold outline-none transition-colors" placeholder="Enter reference number" />
-                </div>
-              </div>
-            </div>
+              <!-- Card / e-wallet reference -->
+              <label v-else class="block">
+                <span class="block text-sm font-medium text-gray-700 mb-1">Reference number</span>
+                <input v-model="referenceNumber" type="text" class="w-full h-12 bg-white border border-gray-300 focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] text-gray-900 rounded-md px-3 text-base font-semibold outline-none transition-colors" placeholder="From the terminal or app" />
+              </label>
+            </template>
+          </div>
 
-            <button 
-              @click="promptConfirmOrder" 
-              class="w-full bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-md py-2.5 text-base transition-colors shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+          <!-- Pinned: total + charge -->
+          <div class="px-4 pt-3 pb-4 bg-white border-t border-gray-200 shrink-0">
+            <div class="flex items-baseline justify-between mb-2">
+              <span class="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total due</span>
+              <span class="font-display text-3xl font-bold text-[#7B5A50] tabular-nums" aria-live="polite">{{ formatCurrency(total) }}</span>
+            </div>
+            <button
+              @click="completeOrder"
+              class="w-full h-14 bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-md text-lg transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="!canCheckout || isProcessingOrder"
             >
-              {{ isProcessingOrder ? 'Processing...' : 'Confirm Order' }}
+              {{ isProcessingOrder ? 'Processing...' : `Charge ${formatCurrency(total)}` }}
             </button>
+            <p v-if="cart.length && !canCheckout && !isProcessingOrder" class="mt-2 text-sm text-gray-600 text-center">{{ checkoutHint }}</p>
           </div>
         </div>
       </main>
@@ -1032,58 +1044,6 @@ function formatCurrency(amount: number) {
       <div class="text-center text-sm mt-8">
         <p>Thank you for your purchase!</p>
         <p>Please come again.</p>
-      </div>
-    </div>
-
-    <!-- ── CONFIRM ORDER MODAL ──────────────────────────────────────────── -->
-    <div v-if="isConfirmOrderModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4 print:hidden">
-      <div class="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150">
-        <div class="p-5 border-b border-gray-100">
-          <h2 class="text-xl font-bold text-gray-800">Confirm Order</h2>
-          <p class="text-sm text-gray-500">Please review the order details before proceeding.</p>
-        </div>
-        
-        <div class="p-5 space-y-4 max-h-[50vh] overflow-y-auto bg-gray-50">
-          <div v-for="item in cart" :key="item.uuid" class="flex justify-between items-start text-sm bg-white p-3 rounded border border-gray-100 shadow-sm">
-            <div class="flex flex-col">
-              <span class="font-bold text-gray-800">{{ item.menu_name }}</span>
-              <span class="text-gray-500 text-xs">{{ item.quantity }} x {{ formatCurrency(getItemUnitPrice(item)) }}</span>
-            </div>
-            <span class="font-bold text-gray-800">{{ formatCurrency(getItemUnitPrice(item) * item.quantity) }}</span>
-          </div>
-        </div>
-        
-        <div class="p-5 border-t border-gray-100 bg-white">
-          <div class="flex justify-between text-sm text-gray-600 mb-1">
-            <span>Subtotal</span>
-            <span>{{ formatCurrency(subtotal) }}</span>
-          </div>
-          <div v-if="discountAmount > 0" class="flex justify-between text-sm text-red-500 mb-1">
-            <span>Discount ({{ selectedDiscountType }})</span>
-            <span>- {{ formatCurrency(discountAmount) }}</span>
-          </div>
-          <div v-if="device?.vat_status === 'vat-registered'" class="flex justify-between text-sm text-gray-600 mb-3 border-b border-gray-100 pb-3">
-            <span>VAT (12%)</span>
-            <span>{{ formatCurrency(tax) }}</span>
-          </div>
-          <div class="flex justify-between text-base font-bold text-gray-800 mb-2">
-            <span>Total Amount</span>
-            <span class="text-[#7B5A50]">{{ formatCurrency(total) }}</span>
-          </div>
-          <div class="flex justify-between text-sm text-gray-600 mb-6">
-            <span>Payment via <span class="capitalize">{{ selectedPaymentMethod }}</span></span>
-            <span v-if="selectedPaymentMethod === 'cash'" class="font-medium text-gray-800">Tendered: {{ formatCurrency(Number(amountTendered)) }}</span>
-          </div>
-          
-          <div class="flex gap-3 w-full">
-            <button @click="isConfirmOrderModalOpen = false" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-md py-2.5 transition-colors">
-              Back to Edit
-            </button>
-            <button @click="completeOrder" class="flex-1 bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-md py-2.5 transition-colors shadow-sm disabled:opacity-50" :disabled="isProcessingOrder">
-              {{ isProcessingOrder ? 'Processing...' : 'Finalize Checkout' }}
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   </div>
