@@ -13,6 +13,7 @@ const posDeviceCookie = useCookie<string | null>('pos_device_token')
 
 const loading = ref(true)
 const errorMessage = ref('')
+const loadError = ref('')
 const device = ref<any>(null)
 const staffList = ref<any[]>([])
 
@@ -29,6 +30,7 @@ async function loadDeviceData() {
   }
 
   loading.value = true
+  loadError.value = ''
   try {
     // 1. Fetch current device info
     const devRes = await devicePosService.getCurrentDevice()
@@ -63,6 +65,7 @@ async function loadDeviceData() {
       router.push('/pos/setup')
     }
     errorMessage.value = e?.data?.message || 'Failed to load POS data'
+    loadError.value = e?.data?.message || (navigator.onLine ? 'The register data could not be loaded.' : 'No internet connection.')
   } finally {
     loading.value = false
   }
@@ -182,6 +185,28 @@ async function unregisterDevice() {
   }
 }
 
+function onEscape(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return
+  if (isReceiptModalOpen.value) closeReceipt()
+  else if (isTransactionsModalOpen.value) isTransactionsModalOpen.value = false
+}
+onMounted(() => window.addEventListener('keydown', onEscape))
+onUnmounted(() => window.removeEventListener('keydown', onEscape))
+
+// -- CONNECTIVITY -----------------------------------------------------------
+const isOnline = ref(true)
+function syncOnline() { isOnline.value = navigator.onLine }
+
+onMounted(() => {
+  syncOnline()
+  window.addEventListener('online', syncOnline)
+  window.addEventListener('offline', syncOnline)
+})
+onUnmounted(() => {
+  window.removeEventListener('online', syncOnline)
+  window.removeEventListener('offline', syncOnline)
+})
+
 onMounted(() => {
   loadDeviceData()
   timer = setInterval(() => {
@@ -272,9 +297,36 @@ const discountAmount = computed(() => {
 
 const total = computed(() => subtotal.value + tax.value - discountAmount.value)
 
+// -- ORDER NOTICE (stock limits, undo) --------------------------------------
+const orderNotice = ref<{ text: string, restore?: CartItem[] } | null>(null)
+let noticeTimer: any
+function showNotice(text: string, restore?: CartItem[]) {
+  orderNotice.value = { text, restore }
+  clearTimeout(noticeTimer)
+  noticeTimer = setTimeout(() => { orderNotice.value = null }, restore ? 8000 : 4000)
+}
+onUnmounted(() => clearTimeout(noticeTimer))
+
+function undoClear() {
+  if (orderNotice.value?.restore) cart.value = orderNotice.value.restore
+  orderNotice.value = null
+}
+
+// Servings left for a menu item, or Infinity when the menu does not track it.
+function stockLimit(uuid: string) {
+  const menuItem = menuItems.value.find(i => i.uuid === uuid)
+  const stock = Number(menuItem?.available_stock)
+  return menuItem?.available_stock != null && Number.isFinite(stock) ? stock : Infinity
+}
+
 function addToCart(item: any) {
-  if (item.sold_out) return
+  if (item.sold_out || isProcessingOrder.value) return
   const existing = cart.value.find(i => i.uuid === item.uuid)
+  const limit = stockLimit(item.uuid)
+  if ((existing?.quantity ?? 0) >= limit) {
+    showNotice(`Only ${limit} ${item.menu_name} left in stock.`)
+    return
+  }
   if (existing) {
     existing.quantity++
   } else {
@@ -283,8 +335,13 @@ function addToCart(item: any) {
 }
 
 function updateQuantity(item: CartItem, delta: number) {
+  if (isProcessingOrder.value) return
   const existing = cart.value.find(i => i.uuid === item.uuid)
   if (existing) {
+    if (delta > 0 && existing.quantity + delta > stockLimit(existing.uuid)) {
+      showNotice(`Only ${stockLimit(existing.uuid)} ${existing.menu_name} left in stock.`)
+      return
+    }
     existing.quantity += delta
     if (existing.quantity <= 0) {
       cart.value = cart.value.filter(i => i.uuid !== item.uuid)
@@ -293,9 +350,10 @@ function updateQuantity(item: CartItem, delta: number) {
 }
 
 function clearCart() {
-  if (confirm('Remove all items from this order?')) {
-    cart.value = []
-  }
+  if (isProcessingOrder.value || cart.value.length === 0) return
+  const snapshot = cart.value.map(i => ({ ...i }))
+  cart.value = []
+  showNotice('Order cleared.', snapshot)
 }
 
 // Payment Modal State
@@ -312,6 +370,7 @@ const changeAmount = computed(() => {
 
 const canCheckout = computed(() => {
   if (cart.value.length === 0) return false
+  if (!isOnline.value) return false
   if (selectedPaymentMethod.value === 'cash') {
     return Number(amountTendered.value) >= total.value
   }
@@ -321,6 +380,8 @@ const canCheckout = computed(() => {
   return true
 })
 
+
+watch([() => cart.value.length, total, selectedPaymentMethod, amountTendered, referenceNumber], () => { checkoutError.value = '' })
 
 const cartCount = computed(() => cart.value.reduce((n, i) => n + i.quantity, 0))
 
@@ -343,6 +404,7 @@ const shortBy = computed(() => {
 })
 
 const checkoutHint = computed(() => {
+  if (!isOnline.value) return 'Offline. Reconnect to record the sale.'
   if (selectedPaymentMethod.value === 'cash') {
     return Number(amountTendered.value) > 0 ? 'Amount tendered is less than the total.' : 'Enter the cash received to continue.'
   }
@@ -350,12 +412,14 @@ const checkoutHint = computed(() => {
 })
 
 const isProcessingOrder = ref(false)
+const checkoutError = ref('')
 const isReceiptModalOpen = ref(false)
 const completedOrderDetails = ref<any>(null)
 
 async function completeOrder() {
   if (!canCheckout.value || isProcessingOrder.value) return
   isProcessingOrder.value = true
+  checkoutError.value = ''
   try {
     const items = cart.value.map(i => ({ 
       uuid: i.uuid, 
@@ -399,7 +463,18 @@ async function completeOrder() {
       devicePosService.getMenu().then((m) => { if (m.success) menuItems.value = m.items }).catch(() => {})
     }
   } catch (e: any) {
-    alert(`${e?.data?.message ? e.data.message + ' ' : ''}The sale was not recorded and the order is still open. Try Charge again.`)
+    const status = e?.response?.status ?? e?.status
+    if (status === 401) {
+      posDeviceCookie.value = null
+      router.push('/pos/setup')
+      return
+    }
+    if (status == null && !e?.data) {
+      // No response: the server may have recorded the sale before the connection dropped.
+      checkoutError.value = 'Could not confirm the sale. Check Transactions before charging again so the customer is not charged twice.'
+    } else {
+      checkoutError.value = `${e?.data?.message ? e.data.message + ' ' : ''}The sale was not recorded and the order is still open. Tap Charge to try again.`
+    }
   } finally {
     isProcessingOrder.value = false
   }
@@ -409,17 +484,19 @@ async function completeOrder() {
 const isTransactionsModalOpen = ref(false)
 const transactionsData = ref<any>(null)
 const isLoadingTransactions = ref(false)
+const transactionsError = ref('')
 
 async function openTransactions() {
   isTransactionsModalOpen.value = true
   isLoadingTransactions.value = true
+  transactionsError.value = ''
   try {
     const res = await devicePosService.getTransactions()
     if (res.success) {
       transactionsData.value = res
     }
   } catch (e: any) {
-    alert('Could not load transactions. Check the connection and try again.')
+    transactionsError.value = navigator.onLine ? 'Transactions could not be loaded.' : 'No internet connection.'
   } finally {
     isLoadingTransactions.value = false
   }
@@ -513,15 +590,15 @@ function formatCurrency(amount: number) {
               <span class="font-semibold text-base text-gray-700">{{ device.active_staff.firstname }}</span>
             </div>
             
-            <button @click="openTransactions" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-md text-base font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
+            <button @click="openTransactions" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 min-h-11 rounded-md text-base font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
               <Icon name="heroicons:document-text" class="w-4 h-4" /> Transactions
             </button>
-            <button @click="lockRegister" title="Lock the register and clear the current order" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-md text-base font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
+            <button @click="lockRegister" title="Lock the register and clear the current order" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 min-h-11 rounded-md text-base font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
               <Icon name="heroicons:arrow-right-on-rectangle" class="w-4 h-4" /> Lock Register
             </button>
           </template>
           <template v-else>
-            <button @click="unregisterDevice" class="text-sm font-semibold text-red-600 hover:text-red-800 transition-colors px-2 py-1">
+            <button @click="unregisterDevice" class="min-h-11 text-sm font-semibold text-red-700 hover:text-red-900 transition-colors px-3">
               Unregister device
             </button>
           </template>
@@ -607,6 +684,13 @@ function formatCurrency(amount: number) {
       <main v-else class="flex-1 flex overflow-hidden">
         <!-- Left Side: Menu Grid -->
         <div class="flex-1 flex flex-col bg-gray-50 overflow-hidden border-r border-gray-200">
+          <div v-if="!isOnline" role="status" class="px-4 py-2 bg-amber-100 text-amber-900 text-sm font-medium">
+            Offline. You can build orders, but sales can't be recorded until the connection returns.
+          </div>
+          <div v-else-if="loadError" role="alert" class="px-4 py-2 bg-red-50 text-red-800 text-sm font-medium flex items-center justify-between gap-3">
+            <span>{{ loadError }} The menu may be out of date.</span>
+            <button @click="loadDeviceData" class="min-h-11 px-3 font-semibold underline">Try again</button>
+          </div>
           <!-- Search and Categories Filter -->
           <div class="px-4 py-2 bg-white border-b border-gray-200 flex flex-col gap-2">
             <!-- Search Bar -->
@@ -616,12 +700,13 @@ function formatCurrency(amount: number) {
                 v-model="searchQuery" 
                 type="text" 
                 placeholder="Search menu" 
-                class="w-full bg-gray-50 border border-gray-200 rounded-md pl-9 pr-3 py-1.5 text-sm focus:outline-none focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] transition-all"
+                class="w-full bg-gray-50 border border-gray-200 rounded-md pl-9 pr-11 h-11 text-base focus:outline-none focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] transition-all"
               />
               <button 
                 v-if="searchQuery" 
                 @click="searchQuery = ''"
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label="Clear search"
+                class="absolute right-0 top-0 w-11 h-11 flex items-center justify-center text-gray-500 hover:text-gray-700"
               >
                 <Icon name="heroicons:x-mark" class="w-4 h-4" />
               </button>
@@ -633,7 +718,7 @@ function formatCurrency(amount: number) {
                 v-for="cat in categories" 
                 :key="cat.uuid"
                 @click="selectedCategory = cat.uuid"
-                class="whitespace-nowrap px-4 py-1.5 rounded-md text-sm font-semibold transition-all border shrink-0"
+                class="whitespace-nowrap px-4 min-h-11 rounded-md text-sm font-semibold transition-all border shrink-0"
                 :class="selectedCategory === cat.uuid ? 'bg-[#7B5A50] border-[#7B5A50] text-white shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'"
               >
                 {{ cat.name }}
@@ -642,7 +727,7 @@ function formatCurrency(amount: number) {
           </div>
 
           <!-- Items Grid -->
-          <div class="flex-1 overflow-y-auto p-4 min-h-0">
+          <div class="flex-1 overflow-y-auto p-4 pb-24 min-h-0">
             <p v-if="filteredItems.length === 0" class="text-center text-base text-gray-600 py-12">
               {{ searchQuery.trim() ? `No menu items match "${searchQuery.trim()}".` : 'No items in this category.' }}
             </p>
@@ -660,10 +745,10 @@ function formatCurrency(amount: number) {
                   <Icon v-else name="heroicons:photo" class="w-8 h-8 opacity-30 group-hover:scale-110 transition-transform duration-300" />
                 </div>
                 <div class="p-2.5 flex flex-col gap-0.5">
-                  <h3 class="font-semibold text-gray-800 text-sm leading-tight truncate">{{ item.menu_name }}</h3>
+                  <h3 :title="item.menu_name" class="font-semibold text-gray-800 text-sm leading-tight line-clamp-2 break-words">{{ item.menu_name }}</h3>
                   <p class="text-gray-500 text-sm">{{ formatCurrency(item.base_price) }}</p>
                   <p v-if="item.sold_out" class="text-red-600 text-xs font-semibold">Sold out</p>
-                  <p v-else class="text-gray-400 text-xs">{{ item.available_stock }} left</p>
+                  <p v-else class="text-gray-500 text-xs">{{ item.available_stock }} left</p>
                 </div>
               </button>
             </div>
@@ -680,6 +765,11 @@ function formatCurrency(amount: number) {
             <button v-if="cart.length" @click="clearCart" class="min-h-11 px-3 -mr-3 text-sm text-red-600 hover:text-red-800 font-medium">
               Clear
             </button>
+          </div>
+
+          <div v-if="orderNotice" role="status" class="px-4 py-2 bg-gray-800 text-white text-sm flex items-center justify-between gap-3 shrink-0">
+            <span>{{ orderNotice.text }}</span>
+            <button v-if="orderNotice.restore" @click="undoClear" class="min-h-11 px-3 -mr-3 font-semibold underline">Undo</button>
           </div>
 
           <!-- Cart Items List -->
@@ -728,6 +818,7 @@ function formatCurrency(amount: number) {
               </div>
             </div>
 
+            <fieldset :disabled="isProcessingOrder" class="m-0 p-0 border-0 min-w-0 space-y-3" :class="{ 'opacity-60': isProcessingOrder }">
             <template v-if="cart.length > 0">
               <!-- Discount -->
               <div role="radiogroup" aria-label="Discount" class="grid grid-cols-4 gap-1.5">
@@ -781,6 +872,7 @@ function formatCurrency(amount: number) {
                 <input v-model="referenceNumber" type="text" class="w-full h-12 bg-white border border-gray-300 focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] text-gray-900 rounded-md px-3 text-base font-semibold outline-none transition-colors" placeholder="From the terminal or app" />
               </label>
             </template>
+            </fieldset>
           </div>
 
           <!-- Pinned: total + charge -->
@@ -794,27 +886,28 @@ function formatCurrency(amount: number) {
               class="w-full h-14 bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-md text-lg transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="!canCheckout || isProcessingOrder"
             >
-              {{ isProcessingOrder ? 'Processing...' : `Charge ${formatCurrency(total)}` }}
+              {{ isProcessingOrder ? 'Recording sale...' : `Charge ${formatCurrency(total)}` }}
             </button>
-            <p v-if="cart.length && !canCheckout && !isProcessingOrder" class="mt-2 text-sm text-gray-600 text-center">{{ checkoutHint }}</p>
+            <p v-if="checkoutError" role="alert" class="mt-2 p-2 rounded-md bg-red-50 border border-red-200 text-sm text-red-800">{{ checkoutError }}</p>
+            <p v-else-if="cart.length && !canCheckout && !isProcessingOrder" class="mt-2 text-sm text-gray-600 text-center">{{ checkoutHint }}</p>
           </div>
         </div>
       </main>
 
       <!-- ── TRANSACTIONS MODAL ───────────────────────────────────────────── -->
-      <div v-if="isTransactionsModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150 max-h-[85vh]">
+      <div v-if="isTransactionsModalOpen" role="dialog" aria-modal="true" aria-labelledby="txn-title" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4" @click.self="isTransactionsModalOpen = false">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl flex flex-col overflow-hidden modal-pop max-h-[85vh]">
           
           <div class="px-5 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-            <h2 class="text-xl font-bold text-[#7B5A50]">Transaction History</h2>
+            <h2 id="txn-title" class="text-xl font-bold text-[#7B5A50]">Transaction History</h2>
             <div class="flex items-center gap-2">
-              <button @click="exportTransactionsCSV" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-md flex items-center gap-1.5 shadow-sm transition-colors">
+              <button @click="exportTransactionsCSV" class="px-3 min-h-11 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-md flex items-center gap-1.5 shadow-sm transition-colors">
                 <Icon name="heroicons:arrow-down-tray" class="w-4 h-4" /> Export CSV
               </button>
-              <button @click="printZReading" class="px-3 py-1.5 bg-[#7B5A50] hover:bg-[#65463D] text-white text-sm font-semibold rounded-md flex items-center gap-1.5 shadow-sm transition-colors">
+              <button @click="printZReading" class="px-3 min-h-11 bg-[#7B5A50] hover:bg-[#65463D] text-white text-sm font-semibold rounded-md flex items-center gap-1.5 shadow-sm transition-colors">
                 <Icon name="heroicons:printer" class="w-4 h-4" /> Print Z-Reading
               </button>
-              <button @click="isTransactionsModalOpen = false" class="p-1.5 text-gray-400 hover:text-gray-700 transition-colors bg-white border border-gray-200 hover:bg-gray-100 rounded-md">
+              <button @click="isTransactionsModalOpen = false" aria-label="Close transactions" class="w-11 h-11 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors bg-white border border-gray-200 hover:bg-gray-100 rounded-md">
                 <Icon name="heroicons:x-mark" class="w-4 h-4" />
               </button>
             </div>
@@ -823,6 +916,10 @@ function formatCurrency(amount: number) {
           <div class="p-5 flex-1 overflow-y-auto">
             <div v-if="isLoadingTransactions" class="flex justify-center py-10">
               <Icon name="heroicons:arrow-path" class="w-6 h-6 animate-spin text-gray-400" />
+            </div>
+            <div v-else-if="transactionsError" role="alert" class="py-10 text-center">
+              <p class="text-base text-gray-700">{{ transactionsError }}</p>
+              <button @click="openTransactions" class="mt-3 min-h-11 px-5 bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-md">Try again</button>
             </div>
             <div v-else-if="transactionsData">
               <!-- Stats Row -->
@@ -864,14 +961,14 @@ function formatCurrency(amount: number) {
       </div>
 
       <!-- ── RECEIPT MODAL ────────────────────────────────────────────────── -->
-      <div v-if="isReceiptModalOpen && completedOrderDetails" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150">
+      <div v-if="isReceiptModalOpen && completedOrderDetails" role="dialog" aria-modal="true" aria-labelledby="receipt-title" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm flex flex-col overflow-hidden modal-pop">
           
           <div class="bg-[#7B5A50] text-white text-center py-4 px-6 relative">
             <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-2">
               <Icon name="heroicons:check" class="w-6 h-6 text-white" />
             </div>
-            <h2 class="text-xl font-bold">Payment Successful</h2>
+            <h2 id="receipt-title" class="text-xl font-bold">Payment Successful</h2>
             <p class="text-sm text-white/80 mt-1">Receipt No: <span class="font-mono">{{ completedOrderDetails.receiptNumber }}</span></p>
           </div>
 
@@ -940,6 +1037,14 @@ function formatCurrency(amount: number) {
       </button>
 
     </template>
+
+    <div v-else class="flex-1 flex items-center justify-center p-6">
+      <div class="max-w-sm text-center" role="alert">
+        <h2 class="text-xl font-bold text-gray-800">The register could not start</h2>
+        <p class="text-base text-gray-600 mt-1">{{ loadError || 'Something went wrong while loading.' }}</p>
+        <button @click="loadDeviceData" class="mt-4 h-12 px-6 bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-md">Try again</button>
+      </div>
+    </div>
     </div>
 
     <!-- ── Z-READING PRINT TICKET (Only visible when printing) ── -->
@@ -1053,6 +1158,29 @@ function formatCurrency(amount: number) {
 </template>
 
 <style scoped>
+button:focus-visible,
+select:focus-visible,
+[role='radio']:focus-visible {
+  outline: 2px solid #7B5A50;
+  outline-offset: 2px;
+}
+.hide-scrollbar {
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.modal-pop {
+  animation: modal-pop 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes modal-pop {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-pop { animation: none; }
+  .list-enter-active, .list-leave-active { transition: none; }
+}
 .list-enter-active,
 .list-leave-active {
   transition: all 0.3s ease;
