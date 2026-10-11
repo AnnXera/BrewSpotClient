@@ -142,7 +142,11 @@ async function handleResend() {
       error.value = res.message || 'Could not resend code.'
     }
   } catch (e: any) {
-    error.value = e?.data?.message ?? 'Could not resend code.'
+    const retrySeconds = e?.data?.retry_after_seconds ?? e?.response?._data?.retry_after_seconds
+    if (retrySeconds) {
+      startCooldown(retrySeconds)
+    }
+    error.value = e?.data?.message ?? e?.response?._data?.message ?? 'Could not resend code.'
   } finally {
     resending.value = false
   }
