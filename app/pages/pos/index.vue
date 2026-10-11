@@ -236,45 +236,19 @@ interface CartItem {
   base_price: number
   quantity: number
   picture?: string
-  sugar_level?: number
-  addons?: string[]
 }
 
 const cart = ref<CartItem[]>([])
 
-function getAddonPrice(addon: string) {
-  return !addon.toLowerCase().includes('ice') ? 25 : 0;
-}
-
 function getItemUnitPrice(item: any) {
-  let price = item.base_price;
-  if (item.addons && item.addons.length > 0) {
-    item.addons.forEach((addon: string) => {
-      price += getAddonPrice(addon);
-    });
-  }
-  return price;
+  return item.base_price;
 }
 
 const baseItemsTotal = computed(() => {
   return cart.value.reduce((sum, item) => sum + (item.base_price * item.quantity), 0);
 })
 
-const addonsTotal = computed(() => {
-  return cart.value.reduce((sum, item) => {
-    let itemAddonTotal = 0;
-    if (item.addons && item.addons.length > 0) {
-      item.addons.forEach((addon: string) => {
-        itemAddonTotal += getAddonPrice(addon);
-      });
-    }
-    return sum + (itemAddonTotal * item.quantity);
-  }, 0);
-})
-
-const subtotal = computed(() => {
-  return baseItemsTotal.value + addonsTotal.value;
-})
+const subtotal = computed(() => baseItemsTotal.value)
 const tax = computed(() => {
   if (device.value?.vat_status === 'vat-registered') {
     return subtotal.value * 0.12 // 12% VAT
@@ -296,67 +270,22 @@ const discountAmount = computed(() => {
 
 const total = computed(() => subtotal.value + tax.value - discountAmount.value)
 
-const availableAddons = [
-  'Extra Espresso Shot', 'Vanilla Syrup', 'Caramel Syrup', 'Hazelnut Syrup', 'Oat Milk', 'Almond Milk', 'Extra Ice', 'Less Ice', 'No Ice'
-]
-const sugarLevels = [0, 25, 50, 75, 100]
-
-const isCustomizationModalOpen = ref(false)
-const pendingCartItem = ref<any>(null)
-
-function openCustomizationModal(item: any) {
+function addToCart(item: any) {
   if (item.sold_out) return
-  pendingCartItem.value = { ...item, sugar_level: 100, addons: [] }
-  isCustomizationModalOpen.value = true
-}
-
-function confirmAddToCart() {
-  if (!pendingCartItem.value) return
-  
-  const pAddons = pendingCartItem.value.addons.slice().sort().join(',')
-  
-  const existing = cart.value.find(i => {
-    if (i.uuid !== pendingCartItem.value.uuid) return false
-    if (i.sugar_level !== pendingCartItem.value.sugar_level) return false
-    const iAddons = i.addons ? i.addons.slice().sort().join(',') : ''
-    return iAddons === pAddons
-  })
-  
+  const existing = cart.value.find(i => i.uuid === item.uuid)
   if (existing) {
     existing.quantity++
   } else {
-    cart.value.push({ ...pendingCartItem.value, quantity: 1 })
+    cart.value.push({ ...item, quantity: 1 })
   }
-  
-  isCustomizationModalOpen.value = false
-  pendingCartItem.value = null
-}
-
-function cancelAddToCart() {
-  isCustomizationModalOpen.value = false
-  pendingCartItem.value = null
-}
-
-function pendingAddonChange(event: Event) {
-  const target = event.target as HTMLSelectElement
-  const addon = target.value
-  if (!addon) return
-  if (!pendingCartItem.value.addons.includes(addon)) {
-    pendingCartItem.value.addons.push(addon)
-  }
-  target.value = ''
-}
-
-function removePendingAddon(addon: string) {
-  pendingCartItem.value.addons = pendingCartItem.value.addons.filter((a: string) => a !== addon)
 }
 
 function updateQuantity(item: CartItem, delta: number) {
-  const existing = cart.value.find(i => i.uuid === item.uuid && i.sugar_level === item.sugar_level)
+  const existing = cart.value.find(i => i.uuid === item.uuid)
   if (existing) {
     existing.quantity += delta
     if (existing.quantity <= 0) {
-      cart.value = cart.value.filter(i => !(i.uuid === item.uuid && i.sugar_level === item.sugar_level))
+      cart.value = cart.value.filter(i => i.uuid !== item.uuid)
     }
   }
 }
@@ -408,9 +337,7 @@ async function completeOrder() {
   try {
     const items = cart.value.map(i => ({ 
       uuid: i.uuid, 
-      quantity: i.quantity, 
-      sugar_level: i.sugar_level,
-      addons: i.addons && i.addons.length > 0 ? i.addons : null
+      quantity: i.quantity
     }))
     const currentChange = changeAmount.value
     const currentTotal = total.value
@@ -431,7 +358,6 @@ async function completeOrder() {
         receiptNumber: res.receipt_number || res.transaction_uuid,
         items: currentItems,
         baseItemsTotal: baseItemsTotal.value,
-        addonsTotal: addonsTotal.value,
         subtotal: subtotal.value,
         tax: tax.value,
         discountType: selectedDiscountType.value,
@@ -699,7 +625,7 @@ function formatCurrency(amount: number) {
               <button 
                 v-for="item in filteredItems" 
                 :key="item.uuid"
-                @click="openCustomizationModal(item)"
+                @click="addToCart(item)"
                 :disabled="item.sold_out"
                 :class="item.sold_out ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md hover:border-[#7B5A50]/50 active:scale-[0.98]'"
                 class="bg-white border border-gray-200 rounded-md overflow-hidden transition-all text-left flex flex-col group"
@@ -739,18 +665,10 @@ function formatCurrency(amount: number) {
             </div>
             <div v-else class="space-y-2 overflow-x-hidden">
               <TransitionGroup name="list" tag="div" class="space-y-2">
-                <div v-for="item in cart" :key="item.uuid + '-' + item.sugar_level + '-' + (item.addons?.join(',') || '')" class="flex flex-col bg-white p-2.5 rounded-md border border-gray-100 shadow-sm gap-2 transition-all">
+                <div v-for="item in cart" :key="item.uuid" class="flex flex-col bg-white p-2.5 rounded-md border border-gray-100 shadow-sm gap-2 transition-all">
                   <div class="flex justify-between items-start w-full">
                     <div class="flex flex-col flex-1 pr-2">
-                      <p class="font-semibold text-gray-800 text-sm leading-tight">
-                        {{ item.menu_name }}
-                        <span v-if="item.sugar_level !== undefined" class="text-[10px] bg-gray-100 text-[#7B5A50] px-1 py-0.5 rounded ml-1 whitespace-nowrap">{{ item.sugar_level }}% Sugar</span>
-                      </p>
-                      <div v-if="item.addons && item.addons.length > 0" class="flex flex-wrap gap-1 mt-1">
-                        <span v-for="addon in item.addons" :key="addon" class="text-[9px] bg-gray-50 text-gray-500 border border-gray-200 px-1 py-0.5 rounded">
-                          {{ addon }} <span v-if="getAddonPrice(addon) > 0">(+{{ formatCurrency(getAddonPrice(addon)) }})</span>
-                        </span>
-                      </div>
+                      <p class="font-semibold text-gray-800 text-sm leading-tight">{{ item.menu_name }}</p>
                     </div>
                     <div class="font-semibold text-gray-800 text-right text-sm whitespace-nowrap">
                       {{ formatCurrency(getItemUnitPrice(item) * item.quantity) }}
@@ -780,10 +698,6 @@ function formatCurrency(amount: number) {
               <div class="flex justify-between">
                 <span>Items Subtotal</span>
                 <span>{{ formatCurrency(baseItemsTotal) }}</span>
-              </div>
-              <div v-if="addonsTotal > 0" class="flex justify-between">
-                <span>Add-ons Total</span>
-                <span>{{ formatCurrency(addonsTotal) }}</span>
               </div>
               
               <!-- Discount Selection -->
@@ -952,9 +866,6 @@ function formatCurrency(amount: number) {
                   <div class="flex flex-col">
                     <span class="font-medium text-gray-900">{{ item.menu_name }}</span>
                     <span class="text-sm text-gray-500">{{ item.quantity }} x {{ formatCurrency(getItemUnitPrice(item)) }}</span>
-                    <div v-if="item.addons && item.addons.length > 0" class="flex flex-wrap gap-1 mt-1">
-                      <span v-for="addon in item.addons" :key="addon" class="text-[10px] text-gray-500">+ {{ addon }} <span v-if="getAddonPrice(addon) > 0">({{ formatCurrency(getAddonPrice(addon)) }})</span></span>
-                    </div>
                   </div>
                   <span class="font-semibold text-gray-700">{{ formatCurrency(getItemUnitPrice(item) * item.quantity) }}</span>
                 </div>
@@ -965,10 +876,6 @@ function formatCurrency(amount: number) {
               <div class="flex justify-between text-sm text-gray-500 mb-2">
                 <span>Items Subtotal</span>
                 <span>{{ formatCurrency(completedOrderDetails.baseItemsTotal) }}</span>
-              </div>
-              <div v-if="completedOrderDetails.addonsTotal > 0" class="flex justify-between text-sm text-gray-500 mb-2">
-                <span>Add-ons Total</span>
-                <span>{{ formatCurrency(completedOrderDetails.addonsTotal) }}</span>
               </div>
               <div v-if="completedOrderDetails.discountAmount > 0" class="flex justify-between text-sm text-red-500 mb-2">
                 <span>Discount ({{ completedOrderDetails.discountType }})</span>
@@ -1082,18 +989,10 @@ function formatCurrency(amount: number) {
       </div>
 
       <div v-if="completedOrderDetails" class="space-y-2 border-b border-black pb-3 border-dashed mb-3 text-sm">
-        <div v-for="item in completedOrderDetails.items" :key="item.uuid + '-' + item.sugar_level" class="flex justify-between">
+        <div v-for="item in completedOrderDetails.items" :key="item.uuid" class="flex justify-between">
           <div class="flex flex-col">
-            <span class="font-bold">
-              {{ item.menu_name }}
-              <span v-if="item.sugar_level !== undefined" class="text-xs font-normal">({{ item.sugar_level }}%)</span>
-            </span>
+            <span class="font-bold">{{ item.menu_name }}</span>
             <span class="text-xs ml-2">{{ item.quantity }} x {{ formatCurrency(getItemUnitPrice(item)) }}</span>
-            <div v-if="item.addons && item.addons.length > 0" class="flex flex-col ml-2 mt-0.5">
-              <span v-for="addon in item.addons" :key="addon" class="text-[10px] text-gray-600 leading-tight">
-                + {{ addon }} <span v-if="getAddonPrice(addon) > 0">({{ formatCurrency(getAddonPrice(addon)) }})</span>
-              </span>
-            </div>
           </div>
           <span class="font-bold">{{ formatCurrency(getItemUnitPrice(item) * item.quantity) }}</span>
         </div>
@@ -1134,60 +1033,6 @@ function formatCurrency(amount: number) {
       </div>
     </div>
 
-    <!-- ── CUSTOMIZATION MODAL ──────────────────────────────────────────── -->
-    <div v-if="isCustomizationModalOpen && pendingCartItem" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4 print:hidden">
-      <div class="bg-white rounded-lg shadow-xl w-full max-w-sm flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150">
-        <div class="p-5 flex flex-col items-center border-b border-gray-100">
-          <h2 class="text-xl font-bold text-gray-800">{{ pendingCartItem.menu_name }}</h2>
-          <p class="text-sm text-gray-500">Customize your order</p>
-        </div>
-        
-        <div class="p-5 space-y-5 bg-gray-50">
-          <!-- Sugar Level -->
-          <div>
-            <label class="block text-sm font-bold text-gray-700 mb-2">Sugar Level</label>
-            <div class="grid grid-cols-5 gap-2 w-full">
-              <button 
-                v-for="level in sugarLevels" :key="level"
-                @click="pendingCartItem.sugar_level = level"
-                class="py-2 bg-white border rounded-md transition-colors font-semibold text-gray-700 text-sm"
-                :class="pendingCartItem.sugar_level === level ? 'bg-[#7B5A50]/10 border-[#7B5A50] text-[#7B5A50]' : 'border-gray-200 hover:border-[#7B5A50]/50'"
-              >
-                {{ level }}%
-              </button>
-            </div>
-          </div>
-          
-          <!-- Addons -->
-          <div>
-            <label class="block text-sm font-bold text-gray-700 mb-2">Add-ons</label>
-            <select class="w-full py-2 px-3 rounded-md bg-white border border-gray-200 outline-none text-sm text-gray-700" @change="pendingAddonChange($event)">
-              <option value="">+ Select an Add-on</option>
-              <option v-for="addon in availableAddons" :key="addon" :value="addon">{{ addon }}</option>
-            </select>
-            
-            <div v-if="pendingCartItem.addons.length > 0" class="flex flex-wrap gap-2 mt-3">
-              <span v-for="addon in pendingCartItem.addons" :key="addon" class="text-xs bg-white text-gray-700 border border-gray-200 px-2 py-1 rounded-md flex items-center gap-1.5 shadow-sm">
-                {{ addon }}
-                <button @click="removePendingAddon(addon)" class="text-gray-400 hover:text-red-500 transition-colors">
-                  <Icon name="heroicons:x-mark" class="w-3.5 h-3.5"/>
-                </button>
-              </span>
-            </div>
-          </div>
-        </div>
-        
-        <div class="p-5 flex gap-3 border-t border-gray-100 bg-white">
-          <button @click="cancelAddToCart" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-md py-2.5 transition-colors">
-            Cancel
-          </button>
-          <button @click="confirmAddToCart" class="flex-1 bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-md py-2.5 transition-colors shadow-sm">
-            Add to Order
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- ── CONFIRM ORDER MODAL ──────────────────────────────────────────── -->
     <div v-if="isConfirmOrderModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4 print:hidden">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150">
@@ -1197,16 +1042,10 @@ function formatCurrency(amount: number) {
         </div>
         
         <div class="p-5 space-y-4 max-h-[50vh] overflow-y-auto bg-gray-50">
-          <div v-for="item in cart" :key="item.uuid + '-' + item.sugar_level + '-' + (item.addons?.join(',') || '')" class="flex justify-between items-start text-sm bg-white p-3 rounded border border-gray-100 shadow-sm">
+          <div v-for="item in cart" :key="item.uuid" class="flex justify-between items-start text-sm bg-white p-3 rounded border border-gray-100 shadow-sm">
             <div class="flex flex-col">
               <span class="font-bold text-gray-800">{{ item.menu_name }}</span>
               <span class="text-gray-500 text-xs">{{ item.quantity }} x {{ formatCurrency(getItemUnitPrice(item)) }}</span>
-              <span v-if="item.sugar_level !== undefined" class="text-[11px] text-[#7B5A50] font-medium mt-0.5">{{ item.sugar_level }}% Sugar</span>
-              <div v-if="item.addons && item.addons.length > 0" class="flex flex-wrap gap-1 mt-1">
-                <span v-for="addon in item.addons" :key="addon" class="text-[9px] bg-gray-100 text-gray-600 px-1 py-0.5 rounded leading-none">
-                  + {{ addon }} <span v-if="getAddonPrice(addon) > 0">({{ formatCurrency(getAddonPrice(addon)) }})</span>
-                </span>
-              </div>
             </div>
             <span class="font-bold text-gray-800">{{ formatCurrency(getItemUnitPrice(item) * item.quantity) }}</span>
           </div>
