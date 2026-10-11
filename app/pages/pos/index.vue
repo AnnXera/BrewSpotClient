@@ -188,6 +188,7 @@ async function unregisterDevice() {
 function onEscape(e: KeyboardEvent) {
   if (e.key !== 'Escape') return
   if (isReceiptModalOpen.value) closeReceipt()
+  else if (isPaymentModalOpen.value) closePayment()
   else if (isTransactionsModalOpen.value) isTransactionsModalOpen.value = false
 }
 onMounted(() => window.addEventListener('keydown', onEscape))
@@ -414,6 +415,30 @@ const checkoutHint = computed(() => {
 const isProcessingOrder = ref(false)
 const checkoutError = ref('')
 const isReceiptModalOpen = ref(false)
+const isPaymentModalOpen = ref(false)
+const tenderInput = ref<HTMLInputElement | null>(null)
+const referenceInput = ref<HTMLInputElement | null>(null)
+
+function openPayment() {
+  if (cart.value.length === 0 || !isOnline.value) return
+  checkoutError.value = ''
+  isPaymentModalOpen.value = true
+}
+
+function closePayment() {
+  if (isProcessingOrder.value) return
+  isPaymentModalOpen.value = false
+}
+
+// Put the cursor where the cashier types next.
+watch([isPaymentModalOpen, selectedPaymentMethod], async ([open]) => {
+  if (!open) return
+  await nextTick()
+  ;(tenderInput.value ?? referenceInput.value)?.focus()
+})
+
+// An emptied cart leaves nothing to pay for.
+watch(() => cart.value.length, (n) => { if (n === 0 && !isProcessingOrder.value) isPaymentModalOpen.value = false })
 const completedOrderDetails = ref<any>(null)
 
 async function completeOrder() {
@@ -454,6 +479,7 @@ async function completeOrder() {
         staff: currentStaff,
         date: new Date().toLocaleString()
       }
+      isPaymentModalOpen.value = false
       isReceiptModalOpen.value = true
       cart.value = []
       amountTendered.value = ''
@@ -466,6 +492,7 @@ async function completeOrder() {
     const status = e?.response?.status ?? e?.status
     if (status === 401) {
       posDeviceCookie.value = null
+      isPaymentModalOpen.value = false
       router.push('/pos/setup')
       return
     }
@@ -801,8 +828,8 @@ function formatCurrency(amount: number) {
             </TransitionGroup>
           </div>
 
-          <!-- Adjustments + payment (scrolls on short screens, Charge stays pinned) -->
-          <div class="bg-gray-50 border-t border-gray-200 overflow-y-auto min-h-0 max-h-[58%] px-4 pt-3 pb-3 space-y-3">
+          <!-- Summary + discount -->
+          <div class="bg-gray-50 border-t border-gray-200 px-4 pt-3 pb-3 space-y-3 shrink-0">
             <div class="space-y-1 text-sm text-gray-600 tabular-nums">
               <div class="flex justify-between">
                 <span>Subtotal</span>
@@ -818,81 +845,106 @@ function formatCurrency(amount: number) {
               </div>
             </div>
 
-            <fieldset :disabled="isProcessingOrder" class="m-0 p-0 border-0 min-w-0 space-y-3" :class="{ 'opacity-60': isProcessingOrder }">
-            <template v-if="cart.length > 0">
-              <!-- Discount -->
-              <div role="radiogroup" aria-label="Discount" class="grid grid-cols-4 gap-1.5">
-                <button
-                  v-for="d in discountOptions"
-                  :key="d.value"
-                  role="radio"
-                  :aria-checked="selectedDiscountType === d.value"
-                  @click="selectedDiscountType = d.value"
-                  class="h-11 rounded-md border text-sm font-semibold transition-colors"
-                  :class="selectedDiscountType === d.value ? 'border-[#7B5A50] bg-[#7B5A50]/10 text-[#7B5A50]' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-100'"
-                >{{ d.label }}</button>
-              </div>
-
-              <!-- Payment Method -->
-              <div role="radiogroup" aria-label="Payment method" class="grid grid-cols-3 gap-1.5">
-                <button
-                  v-for="m in paymentMethods"
-                  :key="m.value"
-                  role="radio"
-                  :aria-checked="selectedPaymentMethod === m.value"
-                  @click="selectedPaymentMethod = m.value"
-                  class="h-12 rounded-md border flex items-center justify-center gap-1.5 text-sm font-semibold transition-colors active:scale-95"
-                  :class="selectedPaymentMethod === m.value ? 'border-[#7B5A50] bg-[#7B5A50]/10 text-[#7B5A50]' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-100'"
-                >
-                  <Icon :name="m.icon" class="w-5 h-5" />
-                  {{ m.label }}
-                </button>
-              </div>
-
-              <!-- Cash: quick amounts + tendered -->
-              <div v-if="selectedPaymentMethod === 'cash'" class="space-y-2">
-                <label class="block">
-                  <span class="sr-only">Amount tendered</span>
-                  <div class="relative">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-base text-gray-500 font-semibold">₱</span>
-                    <input v-model="amountTendered" type="number" inputmode="decimal" min="0" step="0.01" class="w-full h-12 bg-white border border-gray-300 focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] text-gray-900 rounded-md pl-8 pr-3 text-lg font-semibold tabular-nums outline-none transition-colors" placeholder="Amount tendered" />
-                  </div>
-                </label>
-                <div v-if="Number(amountTendered) > 0" class="flex justify-between items-baseline" aria-live="polite">
-                  <span class="text-sm font-semibold text-gray-600">{{ shortBy > 0 ? 'Still needed' : 'Change' }}</span>
-                  <span class="text-xl font-bold tabular-nums" :class="shortBy > 0 ? 'text-red-700' : 'text-emerald-700'">
-                    {{ formatCurrency(shortBy > 0 ? shortBy : changeAmount) }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Card / e-wallet reference -->
-              <label v-else class="block">
-                <span class="block text-sm font-medium text-gray-700 mb-1">Reference number</span>
-                <input v-model="referenceNumber" type="text" class="w-full h-12 bg-white border border-gray-300 focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] text-gray-900 rounded-md px-3 text-base font-semibold outline-none transition-colors" placeholder="From the terminal or app" />
-              </label>
-            </template>
-            </fieldset>
+            <div v-if="cart.length > 0" role="radiogroup" aria-label="Discount" class="grid grid-cols-4 gap-1.5">
+              <button
+                v-for="d in discountOptions"
+                :key="d.value"
+                role="radio"
+                :aria-checked="selectedDiscountType === d.value"
+                @click="selectedDiscountType = d.value"
+                class="h-11 rounded-md border text-sm font-semibold transition-colors"
+                :class="selectedDiscountType === d.value ? 'border-[#7B5A50] bg-[#7B5A50]/10 text-[#7B5A50]' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-100'"
+              >{{ d.label }}</button>
+            </div>
           </div>
 
-          <!-- Pinned: total + charge -->
+          <!-- Pinned: total + process payment -->
           <div class="px-4 pt-3 pb-4 bg-white border-t border-gray-200 shrink-0">
             <div class="flex items-baseline justify-between mb-2">
               <span class="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total due</span>
               <span class="font-display text-3xl font-bold text-[#7B5A50] tabular-nums" aria-live="polite">{{ formatCurrency(total) }}</span>
             </div>
             <button
-              @click="completeOrder"
+              @click="openPayment"
               class="w-full h-14 bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-md text-lg transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="!canCheckout || isProcessingOrder"
+              :disabled="cart.length === 0 || !isOnline"
             >
-              {{ isProcessingOrder ? 'Recording sale...' : `Charge ${formatCurrency(total)}` }}
+              Process Payment
             </button>
-            <p v-if="checkoutError" role="alert" class="mt-2 p-2 rounded-md bg-red-50 border border-red-200 text-sm text-red-800">{{ checkoutError }}</p>
-            <p v-else-if="cart.length && !canCheckout && !isProcessingOrder" class="mt-2 text-sm text-gray-600 text-center">{{ checkoutHint }}</p>
+            <p v-if="cart.length && !isOnline" class="mt-2 text-sm text-gray-600 text-center">Offline. Reconnect to record the sale.</p>
           </div>
         </div>
       </main>
+
+      <!-- ── PAYMENT MODAL ────────────────────────────────────────────────── -->
+      <div v-if="isPaymentModalOpen" role="dialog" aria-modal="true" aria-labelledby="pay-title" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4 print:hidden" @click.self="closePayment">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col overflow-hidden modal-pop max-h-[92vh]">
+          <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50 shrink-0">
+            <h2 id="pay-title" class="text-xl font-bold text-[#7B5A50]">Process Payment</h2>
+            <button @click="closePayment" :disabled="isProcessingOrder" aria-label="Close payment" class="w-11 h-11 flex items-center justify-center text-gray-500 hover:text-gray-700 bg-white border border-gray-200 hover:bg-gray-100 rounded-md disabled:opacity-50">
+              <Icon name="heroicons:x-mark" class="w-4 h-4" />
+            </button>
+          </div>
+
+          <fieldset :disabled="isProcessingOrder" class="m-0 border-0 min-w-0 p-5 space-y-4 overflow-y-auto" :class="{ 'opacity-60': isProcessingOrder }">
+            <div class="flex items-baseline justify-between">
+              <span class="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total due</span>
+              <span class="font-display text-4xl font-bold text-[#7B5A50] tabular-nums">{{ formatCurrency(total) }}</span>
+            </div>
+
+            <div role="radiogroup" aria-label="Payment method" class="grid grid-cols-3 gap-2">
+              <button
+                v-for="m in paymentMethods"
+                :key="m.value"
+                role="radio"
+                :aria-checked="selectedPaymentMethod === m.value"
+                @click="selectedPaymentMethod = m.value"
+                class="h-16 rounded-md border flex flex-col items-center justify-center gap-1 text-sm font-semibold transition-colors active:scale-95"
+                :class="selectedPaymentMethod === m.value ? 'border-[#7B5A50] bg-[#7B5A50]/10 text-[#7B5A50]' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-100'"
+              >
+                <Icon :name="m.icon" class="w-6 h-6" />
+                {{ m.label }}
+              </button>
+            </div>
+
+            <div v-if="selectedPaymentMethod === 'cash'" class="space-y-2">
+              <label class="block">
+                <span class="block text-sm font-medium text-gray-700 mb-1">Amount tendered</span>
+                <div class="relative">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-base text-gray-500 font-semibold">&#8369;</span>
+                  <input ref="tenderInput" v-model="amountTendered" @keydown.enter="completeOrder" type="number" inputmode="decimal" min="0" step="0.01" class="w-full h-14 bg-white border border-gray-300 focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] text-gray-900 rounded-md pl-8 pr-3 text-xl font-semibold tabular-nums outline-none transition-colors" placeholder="0.00" />
+                </div>
+              </label>
+              <div v-if="Number(amountTendered) > 0" class="flex justify-between items-baseline" aria-live="polite">
+                <span class="text-sm font-semibold text-gray-600">{{ shortBy > 0 ? 'Still needed' : 'Change' }}</span>
+                <span class="text-2xl font-bold tabular-nums" :class="shortBy > 0 ? 'text-red-700' : 'text-emerald-700'">
+                  {{ formatCurrency(shortBy > 0 ? shortBy : changeAmount) }}
+                </span>
+              </div>
+            </div>
+
+            <label v-else class="block">
+              <span class="block text-sm font-medium text-gray-700 mb-1">Reference number</span>
+              <input ref="referenceInput" v-model="referenceNumber" @keydown.enter="completeOrder" type="text" class="w-full h-14 bg-white border border-gray-300 focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] text-gray-900 rounded-md px-3 text-lg font-semibold outline-none transition-colors" placeholder="From the terminal or app" />
+            </label>
+          </fieldset>
+
+          <div class="px-5 pt-3 pb-5 border-t border-gray-200 bg-white shrink-0">
+            <p v-if="checkoutError" role="alert" class="mb-3 p-2 rounded-md bg-red-50 border border-red-200 text-sm text-red-800">{{ checkoutError }}</p>
+            <div class="flex gap-3">
+              <button @click="closePayment" :disabled="isProcessingOrder" class="px-5 h-14 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-md text-base transition-colors disabled:opacity-50">Cancel</button>
+              <button
+                @click="completeOrder"
+                class="flex-1 h-14 bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-md text-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="!canCheckout || isProcessingOrder"
+              >
+                {{ isProcessingOrder ? 'Recording sale...' : `Charge ${formatCurrency(total)}` }}
+              </button>
+            </div>
+            <p v-if="!canCheckout && !isProcessingOrder" class="mt-2 text-sm text-gray-600 text-center">{{ checkoutHint }}</p>
+          </div>
+        </div>
+      </div>
 
       <!-- ── TRANSACTIONS MODAL ───────────────────────────────────────────── -->
       <div v-if="isTransactionsModalOpen" role="dialog" aria-modal="true" aria-labelledby="txn-title" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4" @click.self="isTransactionsModalOpen = false">
