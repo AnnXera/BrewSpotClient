@@ -169,7 +169,7 @@ async function lockRegister() {
 }
 
 async function unregisterDevice() {
-  if (!confirm('Are you sure you want to unregister this POS device? It will need to be set up again by a manager.')) return
+  if (!confirm('Unregister this POS device? A manager will need to set it up again before it can take orders.')) return
   
   loading.value = true
   try {
@@ -293,7 +293,7 @@ function updateQuantity(item: CartItem, delta: number) {
 }
 
 function clearCart() {
-  if (confirm('Clear the current order?')) {
+  if (confirm('Remove all items from this order?')) {
     cart.value = []
   }
 }
@@ -399,7 +399,7 @@ async function completeOrder() {
       devicePosService.getMenu().then((m) => { if (m.success) menuItems.value = m.items }).catch(() => {})
     }
   } catch (e: any) {
-    alert(e?.data?.message || 'Failed to complete checkout')
+    alert(`${e?.data?.message ? e.data.message + ' ' : ''}The sale was not recorded and the order is still open. Try Charge again.`)
   } finally {
     isProcessingOrder.value = false
   }
@@ -419,7 +419,7 @@ async function openTransactions() {
       transactionsData.value = res
     }
   } catch (e: any) {
-    alert('Failed to load transactions')
+    alert('Could not load transactions. Check the connection and try again.')
   } finally {
     isLoadingTransactions.value = false
   }
@@ -516,13 +516,13 @@ function formatCurrency(amount: number) {
             <button @click="openTransactions" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-md text-base font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
               <Icon name="heroicons:document-text" class="w-4 h-4" /> Transactions
             </button>
-            <button @click="lockRegister" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-md text-base font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
-              <Icon name="heroicons:arrow-right-on-rectangle" class="w-4 h-4" /> End Shift
+            <button @click="lockRegister" title="Lock the register and clear the current order" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-md text-base font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
+              <Icon name="heroicons:arrow-right-on-rectangle" class="w-4 h-4" /> Lock Register
             </button>
           </template>
           <template v-else>
             <button @click="unregisterDevice" class="text-sm font-semibold text-red-600 hover:text-red-800 transition-colors px-2 py-1">
-              De-register
+              Unregister device
             </button>
           </template>
         </div>
@@ -580,13 +580,13 @@ function formatCurrency(amount: number) {
                     class="bg-white border border-gray-200 rounded-lg h-12 text-xl font-semibold text-gray-800 hover:bg-gray-50 active:bg-gray-200 active:scale-95 transition-all shadow-sm">
               {{ n }}
             </button>
-            <button @click="cancelUnlock" class="bg-gray-100 border border-gray-200 rounded-lg h-12 text-sm font-semibold text-gray-600 hover:bg-gray-200 active:scale-95 transition-all">
-              CLR
+            <button @click="cancelUnlock" aria-label="Choose a different staff member" class="bg-gray-100 border border-gray-200 rounded-lg h-12 text-sm font-semibold text-gray-600 hover:bg-gray-200 active:scale-95 transition-all">
+              Cancel
             </button>
             <button @click="handleNumpad('0')" class="bg-white border border-gray-200 rounded-lg h-12 text-xl font-semibold text-gray-800 hover:bg-gray-50 active:bg-gray-200 active:scale-95 transition-all shadow-sm">
               0
             </button>
-            <button @click="handleBackspace" class="bg-gray-100 border border-gray-200 rounded-lg h-12 flex items-center justify-center text-gray-600 hover:bg-gray-200 active:scale-95 transition-all">
+            <button @click="handleBackspace" aria-label="Delete last digit" class="bg-gray-100 border border-gray-200 rounded-lg h-12 flex items-center justify-center text-gray-600 hover:bg-gray-200 active:scale-95 transition-all">
               <Icon name="heroicons:backspace" class="w-5 h-5" />
             </button>
           </div>
@@ -615,7 +615,7 @@ function formatCurrency(amount: number) {
               <input 
                 v-model="searchQuery" 
                 type="text" 
-                placeholder="Search products..." 
+                placeholder="Search menu" 
                 class="w-full bg-gray-50 border border-gray-200 rounded-md pl-9 pr-3 py-1.5 text-sm focus:outline-none focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] transition-all"
               />
               <button 
@@ -643,6 +643,9 @@ function formatCurrency(amount: number) {
 
           <!-- Items Grid -->
           <div class="flex-1 overflow-y-auto p-4 min-h-0">
+            <p v-if="filteredItems.length === 0" class="text-center text-base text-gray-600 py-12">
+              {{ searchQuery.trim() ? `No menu items match "${searchQuery.trim()}".` : 'No items in this category.' }}
+            </p>
             <div class="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               <button 
                 v-for="item in filteredItems" 
@@ -919,7 +922,7 @@ function formatCurrency(amount: number) {
               <Icon name="heroicons:printer" class="w-4 h-4" /> Print Receipt
             </button>
             <button @click="closeReceipt" class="flex-1 bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-md py-2.5 text-base transition-colors shadow-sm">
-              Done
+              Next order
             </button>
           </div>
 
@@ -930,10 +933,10 @@ function formatCurrency(amount: number) {
         v-if="device && device.active_staff"
         @click="loadDeviceData" 
         class="fixed bottom-6 left-6 w-14 h-14 bg-[#7B5A50] hover:bg-[#65463D] text-white rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95 z-50 group"
-        title="Sync live menu changes"
+        title="Refresh menu and stock" aria-label="Refresh menu and stock"
       >
         <Icon name="heroicons:arrow-path" class="w-6 h-6" :class="{'animate-spin': loading}" />
-        <span class="absolute left-16 bg-gray-800 text-white text-sm font-semibold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Sync Menu</span>
+        <span class="absolute left-16 bg-gray-800 text-white text-sm font-semibold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Refresh menu</span>
       </button>
 
     </template>
