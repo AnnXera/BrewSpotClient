@@ -104,7 +104,7 @@ function num(e: Event) {
           <label class="flex flex-col gap-1 text-[10px] text-[#736761]">
             Shape
             <select :class="field" :value="shape" @change="setShape(($event.target as HTMLSelectElement).value as TableShape)">
-              <option v-for="(s, key) in TABLE_SHAPES" :key="key" :value="key">{{ key === 'square' ? 'Square' : 'Long' }}</option>
+              <option v-for="(s, key) in TABLE_SHAPES" :key="key" :value="key">{{ s.label }}</option>
             </select>
           </label>
           <label class="flex flex-col gap-1 text-[10px] text-[#736761]">

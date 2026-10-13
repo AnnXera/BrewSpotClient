@@ -6,6 +6,7 @@ import { tableVisual } from '~/utils/tableColors'
 import TableRec2 from './TableRec2.vue'
 import TableRec4 from './TableRec4.vue'
 import TableRecWide from './TableRecWide.vue'
+import TableRound from './TableRound.vue'
 import TableSqr1 from './TableSqr1.vue'
 import TableSqr2 from './TableSqr2.vue'
 import TableSqr3 from './TableSqr3.vue'
@@ -35,8 +36,13 @@ const props = defineProps<{
   selected?: boolean
 }>()
 
-const component = computed(() => (props.assetKey in WIDE ? TableRecWide : TABLES[props.assetKey]))
-const extra = computed(() => (props.assetKey in WIDE ? WIDE[props.assetKey] : {}))
+// Round tables: seats around the circle.
+const ROUND: Record<string, number> = { table_round_2: 2, table_round_3: 3, table_round_4: 4 }
+
+const component = computed(() =>
+  props.assetKey in WIDE ? TableRecWide : props.assetKey in ROUND ? TableRound : TABLES[props.assetKey])
+const extra = computed(() =>
+  props.assetKey in WIDE ? WIDE[props.assetKey] : props.assetKey in ROUND ? { seats: ROUND[props.assetKey] } : {})
 const state = computed(() => tableVisual(props.status, props.selected))
 </script>
 
