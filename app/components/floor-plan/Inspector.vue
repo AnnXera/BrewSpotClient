@@ -2,7 +2,7 @@
 <!-- The "Selected object" card: edits one table or element; the page owns the data and the undo stack. -->
 <script setup lang="ts">
 import type { TableStatus } from '~/services/FloorPlanService'
-import { doorAsset, tableAsset } from '~/utils/floorPlanCatalog'
+import { TABLE_SHAPES, assetFor, doorAsset, hasEndsOption, nearestSeats, tableAsset, type TableShape } from '~/utils/floorPlanCatalog'
 
 export interface EditorTable {
   uid: string
@@ -55,12 +55,29 @@ const title = computed(() => {
   if (el.category === 'door') return doorAsset(el.asset_key)?.name ?? 'Door'
   return el.label || (el.category === 'wall' ? 'Wall' : 'Counter')
 })
-const shapeLabel = computed(() => {
-  const a = tableAsset(props.table?.asset_key)
-  return a ? `${a.shape === 'square' ? 'Square' : 'Long'} (${a.seats} chairs)` : '-'
-})
+const shape = computed<TableShape>(() => tableAsset(props.table?.asset_key)?.shape ?? 'square')
+// Seats a shape can have: each one is a different drawing, so changing it swaps the table's look.
+const seatOptions = computed(() => TABLE_SHAPES[shape.value].seats)
+
+function setShape(next: TableShape) {
+  const a = assetFor(next, nearestSeats(next, props.table?.capacity ?? 4))
+  if (a) emit('patch', { asset_key: a.key, capacity: a.seats })
+}
+
+// 6 and 8 seat long tables can seat two people at the short ends instead of all along the sides.
+const ends = computed(() => !!tableAsset(props.table?.asset_key)?.ends)
+const showEnds = computed(() => hasEndsOption(shape.value, props.table?.capacity ?? 0))
+
+function setSeats(seats: number) {
+  const a = assetFor(shape.value, seats, ends.value)
+  if (a) emit('patch', { asset_key: a.key, capacity: a.seats })
+}
+
+function setEnds(atEnds: boolean) {
+  const a = assetFor(shape.value, props.table?.capacity ?? 0, atEnds)
+  if (a) emit('patch', { asset_key: a.key, capacity: a.seats })
+}
 const drawn = computed(() => props.element?.category === 'wall' || props.element?.category === 'counter')
-const seatOptions = computed(() => Array.from({ length: props.maxSeats }, (_, i) => i + 1))
 // A status only exists on the server once the layout has been saved.
 const canSetStatus = computed(() => !!props.table?.uuid)
 
@@ -86,15 +103,25 @@ function num(e: Event) {
         <div class="grid grid-cols-2 gap-[10px]">
           <label class="flex flex-col gap-1 text-[10px] text-[#736761]">
             Shape
-            <span :class="field" class="flex items-center gap-2 truncate bg-[#F8F3EC]">{{ shapeLabel }}</span>
+            <select :class="field" :value="shape" @change="setShape(($event.target as HTMLSelectElement).value as TableShape)">
+              <option v-for="(s, key) in TABLE_SHAPES" :key="key" :value="key">{{ key === 'square' ? 'Square' : 'Long' }}</option>
+            </select>
           </label>
           <label class="flex flex-col gap-1 text-[10px] text-[#736761]">
             Seats
-            <select :class="field" :value="table.capacity" @change="emit('patch', { capacity: Number(($event.target as HTMLSelectElement).value) })">
+            <select :class="field" :value="table.capacity" @change="setSeats(Number(($event.target as HTMLSelectElement).value))">
               <option v-for="n in seatOptions" :key="n" :value="n">{{ n }}</option>
             </select>
           </label>
         </div>
+
+        <label v-if="showEnds" class="flex flex-col gap-1 text-[10px] text-[#736761]">
+          Chairs
+          <select :class="field" :value="ends ? 'ends' : 'sides'" @change="setEnds(($event.target as HTMLSelectElement).value === 'ends')">
+            <option value="sides">All along the sides</option>
+            <option value="ends">Two at the ends</option>
+          </select>
+        </label>
 
         <label class="flex flex-col gap-1 text-[10px] text-[#736761]">
           Table Name

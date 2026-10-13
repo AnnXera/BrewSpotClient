@@ -13,6 +13,8 @@ import {
   DRAWN,
   doorAsset,
   tableAsset,
+  assetFor,
+  TABLE_SHAPES,
   type PlaceSpec,
 } from '~/utils/floorPlanCatalog'
 
@@ -248,7 +250,7 @@ function addItem(spec: PlaceSpec, at?: { x: number; y: number }) {
   const uid = newUid()
 
   if (spec.kind === 'table') {
-    const a = tableAsset(spec.key)
+    const a = assetFor(spec.shape, TABLE_SHAPES[spec.shape].defaultSeats)
     if (!a) return
     const t: EditorTable = {
       uid, uuid: null, table_name: nextTableName(), capacity: a.seats, asset_key: a.key,
@@ -366,9 +368,28 @@ function onDragMove(e: PointerEvent) {
   snapPlace(drag.type, item, drag.ox + dx, drag.oy + dy)
   if (drag.type === 'element') magnetMove(item as EditorElement)
   clamp(drag.type, item)
+  discardUid.value = pointerOutsideCanvas(e) ? item.uid : null
+}
+
+// Letting go of an item outside the visible canvas throws it away (Undo brings it back).
+const discardUid = ref<string | null>(null)
+
+function pointerOutsideCanvas(e: PointerEvent) {
+  return [canvasEl.value, scrollEl.value].some((el) => {
+    if (!el) return false
+    const r = el.getBoundingClientRect()
+    return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom
+  })
 }
 
 function endDrag() {
+  if (drag?.moved && discardUid.value === drag.uid) {
+    const { type, uid } = drag
+    if (type === 'table') tables.value = tables.value.filter((t) => t.uid !== uid)
+    else elements.value = elements.value.filter((e) => e.uid !== uid)
+    selected.value = null
+  }
+  discardUid.value = null
   drag = null
   window.removeEventListener('pointermove', onDragMove)
 }
@@ -812,6 +833,7 @@ function itemStyle(kind: 'table' | 'element', item: EditorTable | EditorElement,
     width: `${w}px`,
     height: `${h}px`,
     transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined,
+    opacity: discardUid.value === item.uid ? 0.3 : undefined, // about to be discarded
     zIndex: z,
   }
 }

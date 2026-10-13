@@ -10,6 +10,7 @@ export interface TableAsset {
   name: string
   shape: 'square' | 'long'
   seats: number
+  ends?: boolean // one chair at each short end
   w: number
   h: number
 }
@@ -26,7 +27,33 @@ export const TABLE_ASSETS: TableAsset[] = [
   { key: 'table_sqr_4', name: 'Square table', shape: 'square', seats: 4, w: scaled(112), h: scaled(112) },
   { key: 'table_rec_2', name: 'Long table', shape: 'long', seats: 2, w: scaled(137), h: scaled(89) },
   { key: 'table_rec_4', name: 'Long table', shape: 'long', seats: 4, w: scaled(137), h: scaled(112) },
+  // Drawn in code by TableRecWide (3 and 4 chairs per side): width = 62 * perSide + 13.
+  { key: 'table_rec_6', name: 'Long table', shape: 'long', seats: 6, w: scaled(199), h: scaled(112) },
+  { key: 'table_rec_8', name: 'Long table', shape: 'long', seats: 8, w: scaled(261), h: scaled(112) },
+  // Same, but two of the chairs sit at the short ends (2 / 3 per long side): the svg grows by 23px each end.
+  { key: 'table_rec_6_ends', name: 'Long table', shape: 'long', seats: 6, ends: true, w: scaled(183), h: scaled(112) },
+  { key: 'table_rec_8_ends', name: 'Long table', shape: 'long', seats: 8, ends: true, w: scaled(245), h: scaled(112) },
 ]
+
+export type TableShape = 'square' | 'long'
+
+// One table per shape in the library; its seat count picks the drawing (and so the asset_key).
+export const TABLE_SHAPES: Record<TableShape, { name: string; seats: number[]; defaultSeats: number }> = {
+  square: { name: 'Square table', seats: [1, 2, 3, 4], defaultSeats: 4 },
+  long: { name: 'Long table', seats: [2, 4, 6, 8], defaultSeats: 4 },
+}
+
+// With `ends`, the variant with chairs at the short ends when one exists (6 and 8 seat long tables), else the usual drawing.
+export const assetFor = (shape: TableShape, seats: number, ends = false) =>
+  TABLE_ASSETS.find((a) => a.shape === shape && a.seats === seats && !!a.ends === ends)
+  ?? TABLE_ASSETS.find((a) => a.shape === shape && a.seats === seats && !a.ends)
+
+export const hasEndsOption = (shape: TableShape, seats: number) =>
+  TABLE_ASSETS.some((a) => a.shape === shape && a.seats === seats && a.ends)
+
+// Seat count to keep when the shape changes: the closest one the new shape has a drawing for.
+export const nearestSeats = (shape: TableShape, seats: number) =>
+  TABLE_SHAPES[shape].seats.reduce((best, s) => (Math.abs(s - seats) < Math.abs(best - seats) ? s : best))
 
 export const DOOR_ASSETS = [
   { key: 'door_sgl', name: 'Door', note: 'Single swing', src: doorSgl, w: 64, h: 64 },
@@ -44,7 +71,7 @@ export const DRAWN = {
 
 // What the library hands to the canvas (by click or drag).
 export type PlaceSpec =
-  | { kind: 'table'; key: string }
+  | { kind: 'table'; shape: TableShape }
   | { kind: 'door'; key: string }
   | { kind: 'counter' }
   | { kind: 'wall' }

@@ -1,7 +1,7 @@
 <!-- app/components/floor-plan/Library.vue -->
 <!-- The "Objects" panel: click an item to drop it in the middle of the plan, or drag it to a spot. -->
 <script setup lang="ts">
-import { DOOR_ASSETS, TABLE_ASSETS, type LibraryCategory, type PlaceSpec } from '~/utils/floorPlanCatalog'
+import { DOOR_ASSETS, TABLE_SHAPES, type LibraryCategory, type PlaceSpec, type TableShape } from '~/utils/floorPlanCatalog'
 
 defineProps<{ disabled?: boolean }>()
 const emit = defineEmits<{ (e: 'add', spec: PlaceSpec): void }>()
@@ -22,13 +22,16 @@ interface Entry {
 
 const entries = computed<Entry[]>(() => {
   if (category.value === 'tables') {
-    return TABLE_ASSETS.map((a) => ({
-      id: a.key,
-      name: a.name,
-      note: `${a.seats} ${a.seats === 1 ? 'seat' : 'seats'}`,
-      icon: a.shape === 'square' ? 'heroicons:stop' : 'heroicons:rectangle-stack',
-      spec: { kind: 'table', key: a.key },
-    }))
+    return (Object.keys(TABLE_SHAPES) as TableShape[]).map((shape) => {
+      const { name, seats } = TABLE_SHAPES[shape]
+      return {
+        id: shape,
+        name,
+        note: `${seats[0]}-${seats[seats.length - 1]} seats`,
+        icon: shape === 'square' ? 'heroicons:stop' : 'heroicons:rectangle-stack',
+        spec: { kind: 'table', shape },
+      }
+    })
   }
   return [
     ...DOOR_ASSETS.map<Entry>((d) => ({
