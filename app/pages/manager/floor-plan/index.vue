@@ -965,7 +965,7 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
 <template>
   <div class="flex flex-col md:flex-row min-h-screen bg-[#FFF8EA]">
     <NavBar :links="links" />
-    <main class="flex-1 min-w-0 p-6 lg:px-10 lg:py-8 flex flex-col gap-5">
+    <main class="flex-1 min-w-0 p-6 lg:px-[48px] lg:py-[48px] flex flex-col gap-5">
       <!-- Header -->
       <header class="flex flex-col lg:flex-row lg:items-start justify-between gap-4 border-b border-[#EDD8CC] pb-4">
         <div class="flex flex-col gap-1">
