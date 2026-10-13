@@ -69,6 +69,12 @@ const plan = ref<FloorPlan | null>(null)
 const tables = ref<EditorTable[]>([])
 const elements = ref<EditorElement[]>([])
 const selected = ref<{ type: 'table' | 'element'; uid: string } | null>(null)
+
+// Side panel: the library, or the properties of the selected item. Nothing selected means the library.
+const sideTab = ref<'objects' | 'selected'>('objects')
+watch(selected, (now) => {
+  if (!now) sideTab.value = 'objects'
+})
 const baseline = ref('')
 const undoStack = ref<string[]>([])
 
@@ -371,6 +377,7 @@ let drag: { type: 'table' | 'element'; uid: string; sx: number; sy: number; ox: 
 function startDrag(e: PointerEvent, type: 'table' | 'element', item: EditorTable | EditorElement) {
   if (preview.value || panMode.value || e.button !== 0) return
   selected.value = { type, uid: item.uid }
+  sideTab.value = 'selected' // clicking an item on the plan opens its properties; adding one does not
   drag = { type, uid: item.uid, sx: e.clientX, sy: e.clientY, ox: item.x, oy: item.y, moved: false }
   window.addEventListener('pointermove', onDragMove)
   window.addEventListener('pointerup', endDrag, { once: true })
@@ -764,7 +771,10 @@ async function explainSaveFailure(e: any) {
     })
     if (answer.startsWith('item:')) {
       const [type, uid] = answer.slice(5).split(/:(.+)/)
-      if (type === 'table' || type === 'element') selected.value = { type, uid: uid! }
+      if (type === 'table' || type === 'element') {
+        selected.value = { type, uid: uid! }
+        sideTab.value = 'selected'
+      }
     }
     return
   }
@@ -1230,21 +1240,54 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
         </section>
 
         <!-- Side panels -->
-        <aside v-if="!preview" class="flex flex-col gap-5">
-          <FloorPlanLibrary :disabled="!plan" @add="addItem($event)" />
-          <FloorPlanInspector
-            :table="selectedTable"
-            :element="selectedElement"
-            :max-seats="limits?.max_table_capacity ?? 50"
-            :statuses="statuses"
-            :status-busy="statusBusy"
-            :errors="selectedErrors"
-            @patch="patchSelected"
-            @status="changeStatus"
-            @rotate="rotateSelected"
-            @duplicate="duplicateSelected"
-            @remove="removeSelected"
-          />
+        <aside v-if="!preview" class="flex flex-col gap-3">
+          <div class="grid grid-cols-2 gap-1 rounded-[12px] bg-[#F1E9DE] p-1" role="tablist" aria-label="Side panel">
+            <button
+              id="fp-tab-objects"
+              type="button"
+              role="tab"
+              aria-controls="fp-panel-objects"
+              :aria-selected="sideTab === 'objects'"
+              class="rounded-[9px] px-3 py-2 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+              :class="sideTab === 'objects' ? 'bg-[#FFFDF9] text-[#2D2521] shadow-[0_1px_2px_rgba(58,41,35,0.12)]' : 'text-[#736761] hover:text-[#2D2521]'"
+              @click="sideTab = 'objects'"
+            >
+              Objects
+            </button>
+            <button
+              id="fp-tab-selected"
+              type="button"
+              role="tab"
+              aria-controls="fp-panel-selected"
+              :aria-selected="sideTab === 'selected'"
+              :disabled="!selectedTable && !selectedElement"
+              :title="selectedTable || selectedElement ? undefined : 'Select a table or fixture on the plan to edit it'"
+              class="rounded-[9px] px-3 py-2 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:cursor-not-allowed disabled:text-[#A39891]"
+              :class="sideTab === 'selected' ? 'bg-[#FFFDF9] text-[#2D2521] shadow-[0_1px_2px_rgba(58,41,35,0.12)]' : 'text-[#736761] hover:text-[#2D2521] disabled:hover:text-[#A39891]'"
+              @click="sideTab = 'selected'"
+            >
+              Selected
+            </button>
+          </div>
+
+          <div v-show="sideTab === 'objects'" id="fp-panel-objects" role="tabpanel" aria-labelledby="fp-tab-objects">
+            <FloorPlanLibrary :disabled="!plan" @add="addItem($event)" />
+          </div>
+          <div v-show="sideTab === 'selected'" id="fp-panel-selected" role="tabpanel" aria-labelledby="fp-tab-selected">
+            <FloorPlanInspector
+              :table="selectedTable"
+              :element="selectedElement"
+              :max-seats="limits?.max_table_capacity ?? 50"
+              :statuses="statuses"
+              :status-busy="statusBusy"
+              :errors="selectedErrors"
+              @patch="patchSelected"
+              @status="changeStatus"
+              @rotate="rotateSelected"
+              @duplicate="duplicateSelected"
+              @remove="removeSelected"
+            />
+          </div>
         </aside>
         <aside v-else class="bg-[#FFFDF9] border border-[#EDD8CC] rounded-[14px] p-[15px] text-[12px] text-[#736761] flex flex-col gap-2">
           <h2 class="font-bold text-[14px] text-[#2D2521]">Preview</h2>

@@ -158,7 +158,7 @@ onBeforeUnmount(() => {
       <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="flex flex-col gap-1.5">
           <h1 class="font-display font-bold text-[36px] leading-[39px] text-[#3D2B24]">Servings Management</h1>
-          <p class="text-[16px] text-[#9E7060]">Manage your servings portions here.</p>
+          <p class="font-display text-[12px] text-[#9E7060]">Manage your servings portions here.</p>
         </div>
         <div class="flex items-center gap-3">
           <select
