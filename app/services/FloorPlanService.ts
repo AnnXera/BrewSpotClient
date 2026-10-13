@@ -35,6 +35,7 @@ export interface FloorPlan {
     canvas_height: number
     boundary_points: { x: number; y: number }[] | null
     is_active: boolean
+    tables_count?: number // on the list only
     tables?: FloorPlanTable[]
     elements?: FloorPlanElement[]
 }
@@ -127,8 +128,14 @@ export class FloorPlanService extends BaseService {
         return this.delete<{ success: boolean; message: string }>(`${this.base(branchUuid)}/floor-plans/${planUuid}`)
     }
 
+    // Show a floor on the register. Any number of floors can be active at once.
     activate(branchUuid: string, planUuid: string) {
         return this.post<Saved>(`${this.base(branchUuid)}/floor-plans/${planUuid}/activate`)
+    }
+
+    // Take a floor off the register.
+    deactivate(branchUuid: string, planUuid: string) {
+        return this.post<Saved>(`${this.base(branchUuid)}/floor-plans/${planUuid}/deactivate`)
     }
 
     // Save layout: full replace of tables and elements (422 with `errors` keyed "tables.N.field").

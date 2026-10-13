@@ -48,6 +48,10 @@ function showAlert(title: string, message: string) {
   })
 }
 
+// Up to this many floors show as tabs (one click, like the design); more become a dropdown.
+const TAB_LIMIT = 3
+const manyFloors = computed(() => plans.value.length > TAB_LIMIT)
+
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 // "Layout saved" toast: passive, so it is not a dialog.
@@ -846,14 +850,20 @@ async function submitPanel() {
   }
 }
 
-async function activatePlan() {
-  if (!plan.value || plan.value.is_active) return
+// Each floor is shown on the register or not, independently of the others.
+async function toggleOnRegister() {
+  if (!plan.value || formBusy.value) return
+  formBusy.value = true
   try {
-    const res = await service.activate(branchUuid.value, plan.value.uuid)
+    const res = plan.value.is_active
+      ? await service.deactivate(branchUuid.value, plan.value.uuid)
+      : await service.activate(branchUuid.value, plan.value.uuid)
     plans.value = (await service.list(branchUuid.value)).floor_plans
     plan.value = { ...plan.value, is_active: res.floor_plan.is_active }
   } catch (e: any) {
-    formFailure(e, 'Could not activate the floor plan.')
+    formFailure(e, 'Could not change whether this floor is on the register.')
+  } finally {
+    formBusy.value = false
   }
 }
 
@@ -865,7 +875,7 @@ async function deletePlan() {
     tone: 'danger',
     icon: 'heroicons:trash',
     title: `Delete "${p.floorplan_name}"?`,
-    message: `Its ${contents} will be removed for good.${p.is_active ? ' This is the active plan, so the register will show no floor plan until you make another one active.' : ''}`,
+    message: `Its ${contents} will be removed for good.${p.is_active ? ' This floor is shown on the register, so it will disappear from there too.' : ''}`,
     focus: 'keep',
     actions: [
       { id: 'keep', label: 'Keep plan', variant: 'quiet' },
@@ -1031,9 +1041,11 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
         <!-- Canvas card -->
         <section class="bg-white border border-[#F4E6DE] rounded-2xl overflow-hidden min-w-0">
           <div class="flex flex-wrap items-center justify-between gap-2 px-[18px] py-3 border-b border-[#F4E6DE]">
-            <div class="flex flex-wrap items-center gap-[6px]" role="tablist" aria-label="Floor plans">
+            <div class="flex flex-wrap items-center gap-[6px]" :role="manyFloors ? undefined : 'tablist'" :aria-label="manyFloors ? undefined : 'Floor plans'">
+              <!-- Four or more floors: one switcher instead of a row of tabs that would overflow -->
+              <FloorPlanSwitcher v-if="manyFloors" :plans="plans" :current-uuid="plan?.uuid" @select="selectPlan" />
               <button
-                v-for="p in plans"
+                v-for="p in (manyFloors ? [] : plans)"
                 :key="p.uuid"
                 type="button"
                 role="tab"
@@ -1043,7 +1055,7 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
                 @click="selectPlan(p.uuid)"
               >
                 {{ p.floorplan_name }}
-                <span v-if="p.is_active" class="ml-2 inline-block size-[6px] rounded-full bg-[#4CAF7D] align-middle" title="Active on the register">
+                <span v-if="p.is_active" class="ml-2 inline-block size-[6px] rounded-full bg-[#4CAF7D] align-middle" title="Shown on the register">
                   <span class="sr-only">(active)</span>
                 </span>
               </button>
@@ -1116,16 +1128,21 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
             <template v-if="panel === 'settings' && plan">
               <button
                 type="button"
-                :disabled="plan.is_active"
-                class="border border-[#DED4CA] rounded-[8px] px-4 py-2 text-[12px] text-[#2D2521] hover:bg-[#F1E9DE] disabled:opacity-50 disabled:cursor-default"
-                @click="activatePlan"
+                :disabled="formBusy"
+                :aria-pressed="plan.is_active"
+                class="flex items-center gap-2 border border-[#DED4CA] rounded-[8px] px-4 py-2 text-[12px] text-[#2D2521] hover:bg-[#F1E9DE] disabled:opacity-50"
+                @click="toggleOnRegister"
               >
-                {{ plan.is_active ? 'Active on the register' : 'Make active' }}
+                <span class="size-[7px] rounded-full" :class="plan.is_active ? 'bg-[#4CAF7D]' : 'bg-[#C9BDB3]'" />
+                {{ plan.is_active ? 'Hide from register' : 'Show on register' }}
               </button>
               <button type="button" class="bg-[#F3DFDC] text-[#A85F57] rounded-[8px] px-4 py-2 text-[12px] hover:bg-[#EBCFCB]" @click="deletePlan">
                 Delete plan
               </button>
             </template>
+            <p v-if="panel === 'new' && plans.length" class="basis-full text-[11px] text-[#736761]">
+              A new floor stays off the register until you show it, so you can finish arranging it first.
+            </p>
             <p v-if="formError" role="alert" class="basis-full text-[12px] text-[#B31E1E]">{{ formError }}</p>
           </form>
 
