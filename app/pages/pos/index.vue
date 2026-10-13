@@ -277,12 +277,6 @@ const baseItemsTotal = computed(() => {
 })
 
 const subtotal = computed(() => baseItemsTotal.value)
-const tax = computed(() => {
-  if (device.value?.vat_status === 'vat-registered') {
-    return subtotal.value * 0.12 // 12% VAT
-  }
-  return 0 // Non-VAT
-})
 
 const selectedDiscountType = ref<'none'|'PWD'|'Senior'|'VIP'>('none')
 const discountAmount = computed(() => {
@@ -296,7 +290,7 @@ const discountAmount = computed(() => {
   return 0
 })
 
-const total = computed(() => subtotal.value + tax.value - discountAmount.value)
+const total = computed(() => subtotal.value - discountAmount.value)
 
 // -- ORDER NOTICE (stock limits, undo) --------------------------------------
 const orderNotice = ref<{ text: string, restore?: CartItem[] } | null>(null)
@@ -470,7 +464,6 @@ async function completeOrder() {
         items: currentItems,
         baseItemsTotal: baseItemsTotal.value,
         subtotal: subtotal.value,
-        tax: tax.value,
         discountType: selectedDiscountType.value,
         discountAmount: discountAmount.value,
         total: currentTotal,
@@ -835,10 +828,6 @@ function formatCurrency(amount: number) {
                 <span>Subtotal</span>
                 <span>{{ formatCurrency(baseItemsTotal) }}</span>
               </div>
-              <div v-if="device?.vat_status === 'vat-registered'" class="flex justify-between">
-                <span>VAT (12%)</span>
-                <span>{{ formatCurrency(tax) }}</span>
-              </div>
               <div v-if="discountAmount > 0" class="flex justify-between text-red-700">
                 <span>Discount ({{ selectedDiscountType }})</span>
                 <span>- {{ formatCurrency(discountAmount) }}</span>
@@ -1047,10 +1036,6 @@ function formatCurrency(amount: number) {
                 <span>Discount ({{ completedOrderDetails.discountType }})</span>
                 <span>- {{ formatCurrency(completedOrderDetails.discountAmount) }}</span>
               </div>
-              <div v-if="completedOrderDetails.tax > 0" class="flex justify-between text-sm text-gray-500 mb-3 border-b border-gray-100 pb-2">
-                <span>VAT (12%)</span>
-                <span>{{ formatCurrency(completedOrderDetails.tax) }}</span>
-              </div>
               <div class="flex justify-between items-center mb-3">
                 <span class="text-sm font-semibold text-gray-500 uppercase">Total Paid</span>
                 <span class="text-xl font-bold text-gray-900">{{ formatCurrency(completedOrderDetails.total) }}</span>
@@ -1181,10 +1166,6 @@ function formatCurrency(amount: number) {
         <div v-if="completedOrderDetails.discountAmount > 0" class="flex justify-between">
           <span>Discount ({{ completedOrderDetails.discountType }})</span>
           <span>- {{ formatCurrency(completedOrderDetails.discountAmount) }}</span>
-        </div>
-        <div v-if="completedOrderDetails.tax > 0" class="flex justify-between">
-          <span>VAT (12%)</span>
-          <span>{{ formatCurrency(completedOrderDetails.tax) }}</span>
         </div>
         
         <div class="flex justify-between font-bold text-lg border-t border-black pt-1 mt-1 border-dashed">
