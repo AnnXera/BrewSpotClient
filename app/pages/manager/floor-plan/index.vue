@@ -8,6 +8,7 @@ import type {
   TableStatus,
 } from '~/services/FloorPlanService'
 import type { EditorElement, EditorTable } from '~/components/floor-plan/Inspector.vue'
+import type { DialogItem } from '~/composables/useFloorPlanDialog'
 import {
   DOOR_ASSETS,
   DRAWN,
@@ -34,7 +35,29 @@ const GRID = 20 // matches the dotted canvas background
 const NUDGE = GRID
 
 const service = useFloorPlanService('manager')
-const { confirmDialog, alertDialog, askConfirm, runConfirm, showAlert } = useDialogs()
+const { spec: dialogSpec, open: openDialog, close: closeDialog } = useFloorPlanDialog()
+
+// A plain "got it" notice (limits and the like).
+function showAlert(title: string, message: string) {
+  void openDialog({
+    tone: 'info',
+    icon: 'heroicons:squares-plus',
+    title,
+    message,
+    actions: [{ id: 'ok', label: 'Got it', variant: 'primary' }],
+  })
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+
+// "Layout saved" toast: passive, so it is not a dialog.
+const savedToast = ref(false)
+let toastTimer: ReturnType<typeof setTimeout> | undefined
+function flashSaved() {
+  savedToast.value = true
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => (savedToast.value = false), 2600)
+}
 
 // ── State ────────────────────────────────────────────────────────────────
 const branches = ref<{ uuid: string; branch_name: string }[]>([])
@@ -586,6 +609,7 @@ function onDrop(e: DragEvent) {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  if (dialogSpec.value) return // a dialog is open: Delete and Ctrl+Z must not touch the plan behind it
   const el = e.target as HTMLElement | null
   if (el && ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)) return
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
@@ -628,16 +652,32 @@ async function openPlan(uuid: string) {
   preview.value = false
 }
 
-// Switching away from unsaved work asks first.
-function guard(action: () => void | Promise<void>) {
-  if (!dirty.value) return void action()
-  askConfirm({
-    title: 'Discard changes?',
-    message: 'You have unsaved layout changes. Leave them behind?',
-    confirmText: 'Discard',
-    isDestructive: true,
-    onConfirm: action,
+// Unsaved work: keep editing, throw it away, or save first. Escape and the scrim mean "keep editing".
+async function askUnsaved(): Promise<'stay' | 'discard' | 'save'> {
+  const answer = await openDialog({
+    tone: 'warn',
+    icon: 'heroicons:pencil-square',
+    title: 'Leave without saving?',
+    message: `Your changes to "${plan.value?.floorplan_name ?? 'this floor plan'}" haven't been saved yet. If you leave now they are lost.`,
+    focus: 'stay',
+    actions: [
+      { id: 'stay', label: 'Keep editing', variant: 'quiet' },
+      { id: 'discard', label: 'Discard changes', variant: 'danger' },
+      { id: 'save', label: 'Save and continue', variant: 'primary' },
+    ],
   })
+  return answer === 'discard' || answer === 'save' ? answer : 'stay'
+}
+
+// Switching away from unsaved work asks first.
+async function guard(action: () => void | Promise<void>) {
+  if (!dirty.value) return void action()
+  const answer = await askUnsaved()
+  if (answer === 'discard') await action()
+  else if (answer === 'save') {
+    await saveLayout()
+    if (!dirty.value) await action() // a failed save keeps the user on the plan
+  }
 }
 
 function selectPlan(uuid: string) {
@@ -659,6 +699,7 @@ async function saveLayout() {
   saveErrors.value = {}
   const keepTable = selectedTable.value?.table_name
   const keepElement = selectedElement.value ? elements.value.indexOf(selectedElement.value) : -1
+  let caught: any = null
   try {
     const { tables: t, elements: e } = layoutPayload()
     const res = await service.saveLayout(branchUuid.value, plan.value.uuid, t, e)
@@ -669,14 +710,73 @@ async function saveLayout() {
     } else if (keepElement >= 0 && elements.value[keepElement]) {
       selected.value = { type: 'element', uid: elements.value[keepElement]!.uid }
     } else selected.value = null
+    flashSaved()
   } catch (e: any) {
+    caught = e
     saveErrors.value = e?.data?.errors ?? {}
-    const first = Object.values(saveErrors.value)[0]?.[0]
-    failure(e, 'Could not save the layout.')
-    if (first && !planLocked.value) errorMessage.value = first
   } finally {
     saving.value = false
   }
+  if (caught) await explainSaveFailure(caught)
+}
+
+// The server's per-row validation errors ("tables.2.table_name"), named after what the user sees.
+const FIELD_NAMES: Record<string, string> = {
+  table_name: 'Name', capacity: 'Seats', asset_key: 'Type', x_location: 'Position', y_location: 'Position',
+  width: 'Width', height: 'Height', rotation: 'Rotation', label: 'Label',
+}
+
+function describeIssues(errors: Record<string, string[]>): DialogItem[] {
+  return Object.entries(errors).map(([key, msgs]) => {
+    const m = /^(tables|elements)\.(\d+)\.(\w+)$/.exec(key)
+    const msg = msgs[0] ?? 'Not valid.'
+    if (!m) return { id: 'layout', label: 'Layout', detail: msg }
+    const idx = Number(m[2])
+    const row = m[1] === 'tables' ? tables.value[idx] : elements.value[idx]
+    const name = m[1] === 'tables'
+      ? (row as EditorTable | undefined)?.table_name || `Table ${idx + 1}`
+      : (row as EditorElement | undefined)?.label || ((row as EditorElement | undefined)?.category ?? 'Fixture')
+    return {
+      id: `${m[1] === 'tables' ? 'table' : 'element'}:${row?.uid ?? idx}`,
+      label: name.charAt(0).toUpperCase() + name.slice(1),
+      detail: `${FIELD_NAMES[m[3]!] ?? m[3]}: ${msg}`,
+    }
+  })
+}
+
+async function explainSaveFailure(e: any) {
+  const status = e?.response?.status
+  const issues = describeIssues(saveErrors.value)
+
+  if (status === 403 || (!issues.length && status !== 409)) {
+    failure(e, 'Could not save the layout.')
+    return
+  }
+
+  if (issues.length) {
+    const answer = await openDialog({
+      tone: 'danger',
+      icon: 'heroicons:exclamation-circle',
+      title: issues.length === 1 ? 'One thing needs fixing' : `${issues.length} things need fixing`,
+      message: 'Your layout was not saved. Fix these and save again; nothing on the plan has been lost.',
+      items: issues,
+      actions: [{ id: 'back', label: 'Back to the plan', variant: 'primary' }],
+    })
+    if (answer.startsWith('item:')) {
+      const [type, uid] = answer.slice(5).split(/:(.+)/)
+      if (type === 'table' || type === 'element') selected.value = { type, uid: uid! }
+    }
+    return
+  }
+
+  // 409: a table with upcoming reservations was taken off the plan.
+  await openDialog({
+    tone: 'warn',
+    icon: 'heroicons:calendar-days',
+    title: "A table can't be removed yet",
+    message: e?.data?.message ?? 'One of the tables you removed still has upcoming reservations.',
+    actions: [{ id: 'ok', label: 'Back to the plan', variant: 'primary' }],
+  })
 }
 
 async function changeStatus(status: TableStatus) {
@@ -747,26 +847,37 @@ async function activatePlan() {
   }
 }
 
-function deletePlan() {
+async function deletePlan() {
   const p = plan.value
   if (!p) return
-  askConfirm({
-    title: 'Delete floor plan?',
-    message: `"${p.floorplan_name}" and its layout will be removed.`,
-    confirmText: 'Delete',
-    isDestructive: true,
-    onConfirm: async () => {
-      try {
-        await service.remove(branchUuid.value, p.uuid)
-        panel.value = null
-        await loadPlans()
-      } catch (e: any) {
-        // e.g. 409: upcoming reservations
-        formFailure(e, 'Could not delete the floor plan.')
-        showAlert('Could not delete', formError.value)
-      }
-    },
+  const contents = `${plural(tables.value.length, 'table')} and ${plural(elements.value.length, 'fixture')}`
+  const answer = await openDialog({
+    tone: 'danger',
+    icon: 'heroicons:trash',
+    title: `Delete "${p.floorplan_name}"?`,
+    message: `Its ${contents} will be removed for good.${p.is_active ? ' This is the active plan, so the register will show no floor plan until you make another one active.' : ''}`,
+    focus: 'keep',
+    actions: [
+      { id: 'keep', label: 'Keep plan', variant: 'quiet' },
+      { id: 'delete', label: 'Delete plan', variant: 'danger' },
+    ],
   })
+  if (answer !== 'delete') return
+
+  try {
+    await service.remove(branchUuid.value, p.uuid)
+    panel.value = null
+    await loadPlans()
+  } catch (e: any) {
+    formFailure(e, 'Could not delete the floor plan.')
+    await openDialog({
+      tone: 'warn',
+      icon: 'heroicons:calendar-days',
+      title: "This plan can't be deleted yet",
+      message: formError.value,
+      actions: [{ id: 'ok', label: 'Got it', variant: 'primary' }],
+    })
+  }
 }
 
 function togglePreview() {
@@ -811,8 +922,14 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
   if (dirty.value) e.preventDefault()
 }
 
-onBeforeRouteLeave(() => {
-  if (dirty.value && !window.confirm('You have unsaved changes. Leave without saving?')) return false
+onBeforeRouteLeave(async () => {
+  if (!dirty.value) return
+  const answer = await askUnsaved()
+  if (answer === 'save') {
+    await saveLayout()
+    return !dirty.value
+  }
+  return answer === 'discard'
 })
 
 onBeforeUnmount(() => {
@@ -1012,7 +1129,7 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
           >
             <div
               ref="canvasEl"
-              class="relative mx-auto rounded-[10px] border border-[#F4E6DE] select-none touch-none"
+              class="relative isolate mx-auto rounded-[10px] border border-[#F4E6DE] select-none touch-none"
               :class="preview ? 'bg-white' : 'bg-[#FFFDF9] [background-image:radial-gradient(#EADFD0_1px,transparent_1px)]'"
               :style="{ width: `${canvasW}px`, height: `${canvasH}px`, ...(preview ? {} : { backgroundSize: `${GRID}px ${GRID}px` }) }"
               @dragover.prevent
@@ -1137,20 +1254,7 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
       </div>
     </main>
 
-    <CommonConfirmModal
-      :show="confirmDialog.show"
-      :title="confirmDialog.title"
-      :message="confirmDialog.message"
-      :confirm-text="confirmDialog.confirmText"
-      :is-destructive="confirmDialog.isDestructive"
-      @close="confirmDialog.show = false"
-      @confirm="runConfirm"
-    />
-    <CommonAlertModal
-      :show="alertDialog.show"
-      :title="alertDialog.title"
-      :message="alertDialog.message"
-      @close="alertDialog.show = false"
-    />
+    <FloorPlanDialog :spec="dialogSpec" @close="closeDialog" />
+    <FloorPlanToast :show="savedToast" message="Layout saved" />
   </div>
 </template>

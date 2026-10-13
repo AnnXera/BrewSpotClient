@@ -18,7 +18,8 @@ export interface TableAsset {
 // Natural size of each table SVG (chairs included), as drawn in the Figma file.
 // The SVGs fill whatever box they are given (viewBox), so tables render at TABLE_SCALE of this.
 const TABLE_SCALE = 0.8
-const scaled = (n: number) => Math.round(n * TABLE_SCALE)
+// Not rounded: the box must keep the drawing's exact proportions, or the svg is centred on a half pixel and one edge renders thin.
+const scaled = (n: number) => n * TABLE_SCALE
 
 export const TABLE_ASSETS: TableAsset[] = [
   { key: 'table_sqr_1', name: 'Square table', shape: 'square', seats: 1, w: scaled(89), h: scaled(67) },
@@ -35,17 +36,21 @@ export const TABLE_ASSETS: TableAsset[] = [
   { key: 'table_round_2', name: 'Round table', shape: 'round', seats: 2, w: scaled(112), h: scaled(112) },
   { key: 'table_round_3', name: 'Round table', shape: 'round', seats: 3, w: scaled(112), h: scaled(112) },
   { key: 'table_round_4', name: 'Round table', shape: 'round', seats: 4, w: scaled(112), h: scaled(112) },
+  // Counter seating (TableBar): 40px per stool, 62px tall. Booked by seat, so `shared` on the server.
+  ...[2, 3, 4, 5, 6, 7, 8].map((n): TableAsset => (
+    { key: `table_bar_${n}`, name: 'Counter seating', shape: 'bar', seats: n, w: scaled(n * 40 + 13), h: scaled(62) })),
   { key: 'table_rec_6_ends', name: 'Long table', shape: 'long', seats: 6, ends: true, w: scaled(183), h: scaled(112) },
   { key: 'table_rec_8_ends', name: 'Long table', shape: 'long', seats: 8, ends: true, w: scaled(245), h: scaled(112) },
 ]
 
-export type TableShape = 'square' | 'long' | 'round'
+export type TableShape = 'square' | 'long' | 'round' | 'bar'
 
 // One table per shape in the library; its seat count picks the drawing (and so the asset_key).
 export const TABLE_SHAPES: Record<TableShape, { name: string; label: string; seats: number[]; defaultSeats: number }> = {
   square: { name: 'Square table', label: 'Square', seats: [1, 2, 3, 4], defaultSeats: 4 },
   round: { name: 'Round table', label: 'Round', seats: [2, 3, 4], defaultSeats: 4 },
   long: { name: 'Long table', label: 'Long', seats: [2, 4, 6, 8], defaultSeats: 4 },
+  bar: { name: 'Counter seating', label: 'Counter seating', seats: [2, 3, 4, 5, 6, 7, 8], defaultSeats: 4 },
 }
 
 // With `ends`, the variant with chairs at the short ends when one exists (6 and 8 seat long tables), else the usual drawing.

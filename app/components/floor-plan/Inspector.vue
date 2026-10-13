@@ -115,6 +115,10 @@ function num(e: Event) {
           </label>
         </div>
 
+        <p v-if="shape === 'bar'" class="text-[10px] leading-[1.4] text-[#736761]">
+          Booked by seat: several parties can share this counter while their seats fit.
+        </p>
+
         <label v-if="showEnds" class="flex flex-col gap-1 text-[10px] text-[#736761]">
           Chairs
           <select :class="field" :value="ends ? 'ends' : 'sides'" @change="setEnds(($event.target as HTMLSelectElement).value === 'ends')">

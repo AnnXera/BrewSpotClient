@@ -28,7 +28,7 @@ const entries = computed<Entry[]>(() => {
         id: shape,
         name,
         note: `${seats[0]}-${seats[seats.length - 1]} seats`,
-        icon: { square: 'heroicons:stop', round: 'heroicons:stop-circle', long: 'heroicons:rectangle-stack' }[shape],
+        icon: { square: 'heroicons:stop', round: 'heroicons:stop-circle', long: 'heroicons:rectangle-stack', bar: 'heroicons:bars-3' }[shape],
         spec: { kind: 'table', shape },
       }
     })
