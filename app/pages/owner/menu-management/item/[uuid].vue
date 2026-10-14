@@ -54,6 +54,11 @@ function formatPrice(value: string | number | null | undefined) {
   return `₱${Number(value).toFixed(2)}`
 }
 
+// A recipe row with no size is used by every size.
+function sizeName(sizeUuid: string | null) {
+  return item.value?.sizes?.find((s: any) => s.uuid === sizeUuid)?.name ?? 'All sizes'
+}
+
 async function fetchItem() {
   isLoading.value = true
   errorMessage.value = ''
@@ -153,7 +158,10 @@ onMounted(fetchItem)
                     </div>
                     <div class="flex flex-col gap-1">
                       <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">Price</p>
-                      <p class="text-base font-medium text-[#3D2B24]">{{ formatPrice(item.base_price) }}</p>
+                      <p v-if="!item.sizes?.length" class="text-base font-medium text-[#3D2B24]">{{ formatPrice(item.base_price) }}</p>
+                      <ul v-else class="text-base font-medium text-[#3D2B24]">
+                        <li v-for="size in item.sizes" :key="size.uuid">{{ size.name }}: {{ formatPrice(size.price) }}</li>
+                      </ul>
                     </div>
                   </div>
                 </div>
@@ -162,6 +170,13 @@ onMounted(fetchItem)
               <div class="flex flex-col gap-1">
                 <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">Description</p>
                 <p class="text-base font-medium text-[#3D2B24] break-words">{{ item.description || 'No description provided' }}</p>
+              </div>
+
+              <div v-if="item.addons?.length" class="flex flex-col gap-1">
+                <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">Add-ons</p>
+                <p class="text-base font-medium text-[#3D2B24] break-words">
+                  {{ item.addons.map((a: any) => `${a.name} (+${formatPrice(a.price)})`).join(', ') }}
+                </p>
               </div>
             </div>
           </section>
@@ -188,7 +203,10 @@ onMounted(fetchItem)
               :key="recipe.uuid"
               class="flex items-center justify-between gap-4 py-3 text-base font-medium text-[#3D2B24]"
             >
-              <p class="min-w-0 break-words">{{ recipe.ingredient_name }}</p>
+              <p class="min-w-0 break-words">
+                {{ recipe.ingredient_name }}
+                <span v-if="item.sizes?.length" class="text-sm text-[#9E7060]">({{ sizeName(recipe.size_uuid) }})</span>
+              </p>
               <div class="flex items-center shrink-0 w-[180px] sm:w-[249px] text-center">
                 <p class="flex-1">{{ formatQuantity(recipe.quantity, 0.01) || Number(recipe.quantity) }}</p>
                 <p class="w-[95px]">{{ recipe.unit }}</p>

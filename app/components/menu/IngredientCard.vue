@@ -2,10 +2,14 @@
 <script setup lang="ts">
 import type { Ingredient } from '~/services/MenuService'
 
-defineProps<{
+const props = defineProps<{
   ingredient: Ingredient
   selected?: boolean
 }>()
+
+// Same preview as the item cards' recipe line: up to 4 names, then a +N pill.
+const USED_IN_PREVIEW = 4
+const usedInNames = computed(() => props.ingredient.used_in_names ?? [])
 
 defineEmits<{
   (e: 'edit'): void
@@ -69,8 +73,12 @@ defineEmits<{
     </div>
 
     <div class="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-[#EEDFC4]">
-      <p class="font-sans text-xs text-[#757575]/80">
-        <template v-if="ingredient.used_in">
+      <p class="font-sans text-xs text-[#757575]/80 leading-snug line-clamp-2">
+        <template v-if="usedInNames.length">
+          {{ usedInNames.slice(0, USED_IN_PREVIEW).join(' • ') }}
+          <span v-if="usedInNames.length > USED_IN_PREVIEW" class="inline-flex items-center justify-center bg-[#EDEDED] text-[#757575]/70 text-[8px] font-bold px-[5px] py-[2.5px] rounded-full ml-1 align-middle">+{{ usedInNames.length - USED_IN_PREVIEW }}</span>
+        </template>
+        <template v-else-if="ingredient.used_in">
           Used in {{ ingredient.used_in }} {{ ingredient.used_in === 1 ? 'item' : 'items' }}
         </template>
         <template v-else>Not used in any item</template>

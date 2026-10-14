@@ -61,6 +61,7 @@ const getImageUrl = () => {
           {{ item.menu_name }}
         </h3>
         <span v-if="item.base_price" class="font-display font-bold text-[16px] text-[#3B1F0E] whitespace-nowrap">
+          <span v-if="item.sizes?.length" class="text-xs font-sans font-normal text-[#B4846C]">from</span>
           ₱{{ Number(item.base_price).toFixed(2) }}
         </span>
       </div>

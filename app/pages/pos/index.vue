@@ -163,6 +163,7 @@ async function lockRegister() {
     clearPin()
     // Clear cart on lock
     cart.value = []
+    optionsItem.value = null
     selectedCategory.value = 'all'
   } catch (e) {
     console.error('Failed to lock', e)
@@ -188,6 +189,7 @@ async function unregisterDevice() {
 function onEscape(e: KeyboardEvent) {
   if (e.key !== 'Escape') return
   if (isReceiptModalOpen.value) closeReceipt()
+  else if (optionsItem.value) closeOptions()
   else if (isPaymentModalOpen.value) closePayment()
   else if (isTransactionsModalOpen.value) isTransactionsModalOpen.value = false
 }
@@ -258,22 +260,42 @@ const filteredItems = computed(() => {
   return items
 })
 
+interface CartAddon {
+  uuid: string
+  name: string
+  price: number
+  quantity: number // per drink
+}
+
+// One line per item + size + add-ons, so a Large with Oreo and a plain Large are separate lines.
 interface CartItem {
+  line_key: string
   uuid: string
   menu_name: string
   base_price: number
+  size_uuid: string | null
+  size_name: string | null
+  addons: CartAddon[]
+  unit_price: number // size (or base) price + add-ons, per drink
   quantity: number
   picture?: string
 }
 
 const cart = ref<CartItem[]>([])
 
-function getItemUnitPrice(item: any) {
-  return item.base_price;
+function getItemUnitPrice(item: CartItem) {
+  return item.unit_price
+}
+
+// "Large · 2x Oreo Crumbles" under the item name.
+function lineDetails(item: CartItem) {
+  const parts = item.size_name ? [item.size_name] : []
+  for (const a of item.addons) parts.push(a.quantity > 1 ? `${a.quantity}x ${a.name}` : a.name)
+  return parts.join(' · ')
 }
 
 const baseItemsTotal = computed(() => {
-  return cart.value.reduce((sum, item) => sum + (item.base_price * item.quantity), 0);
+  return cart.value.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
 })
 
 const subtotal = computed(() => baseItemsTotal.value)
@@ -314,34 +336,105 @@ function stockLimit(uuid: string) {
   return menuItem?.available_stock != null && Number.isFinite(stock) ? stock : Infinity
 }
 
-function addToCart(item: any) {
-  if (item.sold_out || isProcessingOrder.value) return
-  const existing = cart.value.find(i => i.uuid === item.uuid)
+// Every size and add-on combination of an item draws from the same servings.
+function inCart(uuid: string) {
+  return cart.value.reduce((n, i) => n + (i.uuid === uuid ? i.quantity : 0), 0)
+}
+
+function addLine(item: any, size: { uuid: string; name: string; price: number } | null, addons: CartAddon[]) {
   const limit = stockLimit(item.uuid)
-  if ((existing?.quantity ?? 0) >= limit) {
+  if (inCart(item.uuid) >= limit) {
     showNotice(`Only ${limit} ${item.menu_name} left in stock.`)
-    return
+    return false
   }
+
+  const sorted = [...addons].sort((a, b) => a.uuid.localeCompare(b.uuid))
+  const lineKey = [item.uuid, size?.uuid ?? '', ...sorted.map(a => `${a.uuid}x${a.quantity}`)].join('|')
+  const existing = cart.value.find(i => i.line_key === lineKey)
+
   if (existing) {
     existing.quantity++
   } else {
-    cart.value.push({ ...item, quantity: 1 })
+    const price = size ? Number(size.price) : Number(item.base_price)
+    cart.value.push({
+      line_key: lineKey,
+      uuid: item.uuid,
+      menu_name: item.menu_name,
+      base_price: Number(item.base_price),
+      picture: item.picture,
+      size_uuid: size?.uuid ?? null,
+      size_name: size?.name ?? null,
+      addons: sorted,
+      unit_price: price + sorted.reduce((sum, a) => sum + a.price * a.quantity, 0),
+      quantity: 1
+    })
   }
+  return true
+}
+
+function addToCart(item: any) {
+  if (item.sold_out || isProcessingOrder.value) return
+  // Sizes or add-ons to choose: ask first.
+  if (item.sizes?.length || item.addons?.length) {
+    openOptions(item)
+    return
+  }
+  addLine(item, null, [])
 }
 
 function updateQuantity(item: CartItem, delta: number) {
   if (isProcessingOrder.value) return
-  const existing = cart.value.find(i => i.uuid === item.uuid)
+  const existing = cart.value.find(i => i.line_key === item.line_key)
   if (existing) {
-    if (delta > 0 && existing.quantity + delta > stockLimit(existing.uuid)) {
+    if (delta > 0 && inCart(existing.uuid) + delta > stockLimit(existing.uuid)) {
       showNotice(`Only ${stockLimit(existing.uuid)} ${existing.menu_name} left in stock.`)
       return
     }
     existing.quantity += delta
     if (existing.quantity <= 0) {
-      cart.value = cart.value.filter(i => i.uuid !== item.uuid)
+      cart.value = cart.value.filter(i => i.line_key !== item.line_key)
     }
   }
+}
+
+// -- SIZE AND ADD-ON PICKER -------------------------------------------------
+const optionsItem = ref<any | null>(null)
+const optionsSizeUuid = ref<string | null>(null)
+const optionsAddonQty = ref<Record<string, number>>({})
+
+function openOptions(item: any) {
+  optionsItem.value = item
+  optionsSizeUuid.value = item.sizes?.length === 1 ? item.sizes[0].uuid : null
+  optionsAddonQty.value = {}
+}
+
+function closeOptions() {
+  optionsItem.value = null
+}
+
+function setAddonQty(addon: any, qty: number) {
+  optionsAddonQty.value = { ...optionsAddonQty.value, [addon.uuid]: Math.max(0, Math.min(addon.max_quantity, qty)) }
+}
+
+const optionsSize = computed(() => optionsItem.value?.sizes?.find((s: any) => s.uuid === optionsSizeUuid.value) ?? null)
+
+const optionsAddons = computed<CartAddon[]>(() =>
+  (optionsItem.value?.addons ?? [])
+    .filter((a: any) => (optionsAddonQty.value[a.uuid] ?? 0) > 0)
+    .map((a: any) => ({ uuid: a.uuid, name: a.name, price: Number(a.price), quantity: optionsAddonQty.value[a.uuid] }))
+)
+
+const optionsNeedsSize = computed(() => !!optionsItem.value?.sizes?.length && !optionsSize.value)
+
+const optionsPrice = computed(() => {
+  if (!optionsItem.value) return 0
+  const base = optionsSize.value ? Number(optionsSize.value.price) : Number(optionsItem.value.base_price)
+  return base + optionsAddons.value.reduce((sum, a) => sum + a.price * a.quantity, 0)
+})
+
+function confirmOptions() {
+  if (!optionsItem.value || optionsNeedsSize.value) return
+  if (addLine(optionsItem.value, optionsSize.value, optionsAddons.value)) closeOptions()
 }
 
 function clearCart() {
@@ -440,9 +533,11 @@ async function completeOrder() {
   isProcessingOrder.value = true
   checkoutError.value = ''
   try {
-    const items = cart.value.map(i => ({ 
-      uuid: i.uuid, 
-      quantity: i.quantity
+    const items = cart.value.map(i => ({
+      uuid: i.uuid,
+      quantity: i.quantity,
+      size_uuid: i.size_uuid,
+      addons: i.addons.map(a => ({ uuid: a.uuid, quantity: a.quantity }))
     }))
     const currentChange = changeAmount.value
     const currentTotal = total.value
@@ -766,7 +861,7 @@ function formatCurrency(amount: number) {
                 </div>
                 <div class="p-2.5 flex flex-col gap-0.5">
                   <h3 :title="item.menu_name" class="font-semibold text-gray-800 text-sm leading-tight line-clamp-2 break-words">{{ item.menu_name }}</h3>
-                  <p class="text-gray-500 text-sm">{{ formatCurrency(item.base_price) }}</p>
+                  <p class="text-gray-500 text-sm"><span v-if="item.sizes?.length" class="text-xs">from </span>{{ formatCurrency(item.base_price) }}</p>
                   <p v-if="item.sold_out" class="text-red-600 text-xs font-semibold">Sold out</p>
                   <p v-else class="text-gray-500 text-xs">{{ item.available_stock }} left</p>
                 </div>
@@ -800,9 +895,10 @@ function formatCurrency(amount: number) {
               <p class="text-sm text-gray-500">Tap an item on the left to start the order.</p>
             </div>
             <TransitionGroup v-else name="list" tag="ul" class="divide-y divide-gray-100">
-              <li v-for="item in cart" :key="item.uuid" class="flex items-center gap-3 py-2">
+              <li v-for="item in cart" :key="item.line_key" class="flex items-center gap-3 py-2">
                 <div class="flex-1 min-w-0">
                   <p class="font-semibold text-gray-800 text-sm leading-tight break-words">{{ item.menu_name }}</p>
+                  <p v-if="lineDetails(item)" class="text-xs text-gray-600 leading-snug break-words">{{ lineDetails(item) }}</p>
                   <p class="text-xs text-gray-500 tabular-nums">{{ formatCurrency(getItemUnitPrice(item)) }} each</p>
                 </div>
                 <div class="flex items-center">
@@ -1001,6 +1097,80 @@ function formatCurrency(amount: number) {
         </div>
       </div>
 
+      <!-- ── SIZE AND ADD-ON PICKER ───────────────────────────────────────── -->
+      <div v-if="optionsItem" role="dialog" aria-modal="true" aria-labelledby="options-title" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4 print:hidden" @click.self="closeOptions">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col overflow-hidden modal-pop max-h-[92vh]">
+          <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between gap-3 bg-gray-50 shrink-0">
+            <h2 id="options-title" class="text-xl font-bold text-[#7B5A50] break-words">{{ optionsItem.menu_name }}</h2>
+            <button @click="closeOptions" aria-label="Close" class="w-11 h-11 shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 bg-white border border-gray-200 hover:bg-gray-100 rounded-md">
+              <Icon name="heroicons:x-mark" class="w-4 h-4" />
+            </button>
+          </div>
+
+          <div class="p-5 space-y-5 overflow-y-auto">
+            <fieldset v-if="optionsItem.sizes?.length">
+              <legend class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Size</legend>
+              <div role="radiogroup" aria-label="Size" class="grid grid-cols-2 gap-2">
+                <button
+                  v-for="size in optionsItem.sizes"
+                  :key="size.uuid"
+                  role="radio"
+                  :aria-checked="optionsSizeUuid === size.uuid"
+                  @click="optionsSizeUuid = size.uuid"
+                  class="min-h-14 px-3 py-2 rounded-md border text-left transition-colors"
+                  :class="optionsSizeUuid === size.uuid ? 'border-[#7B5A50] bg-[#7B5A50]/10 text-[#7B5A50]' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'"
+                >
+                  <span class="block font-semibold text-base leading-tight">{{ size.name }}</span>
+                  <span class="block text-sm tabular-nums">{{ formatCurrency(size.price) }}</span>
+                </button>
+              </div>
+            </fieldset>
+
+            <fieldset v-if="optionsItem.addons?.length">
+              <legend class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Add-ons</legend>
+              <ul class="divide-y divide-gray-100 border border-gray-200 rounded-md">
+                <li v-for="addon in optionsItem.addons" :key="addon.uuid" class="flex items-center gap-3 px-3 py-1.5">
+                  <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-gray-800 text-sm break-words">{{ addon.name }}</p>
+                    <p class="text-xs text-gray-500 tabular-nums">+{{ formatCurrency(addon.price) }}<template v-if="addon.max_quantity > 1"> each, up to {{ addon.max_quantity }}</template></p>
+                  </div>
+                  <div class="flex items-center">
+                    <button
+                      @click="setAddonQty(addon, (optionsAddonQty[addon.uuid] ?? 0) - 1)"
+                      :disabled="!optionsAddonQty[addon.uuid]"
+                      :aria-label="`Remove one ${addon.name}`"
+                      class="w-11 h-11 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-md disabled:opacity-30"
+                    >
+                      <Icon name="heroicons:minus" class="w-4 h-4" />
+                    </button>
+                    <span class="w-6 text-center font-semibold text-gray-800 text-base tabular-nums">{{ optionsAddonQty[addon.uuid] ?? 0 }}</span>
+                    <button
+                      @click="setAddonQty(addon, (optionsAddonQty[addon.uuid] ?? 0) + 1)"
+                      :disabled="(optionsAddonQty[addon.uuid] ?? 0) >= addon.max_quantity"
+                      :aria-label="`Add one ${addon.name}`"
+                      class="w-11 h-11 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-md disabled:opacity-30"
+                    >
+                      <Icon name="heroicons:plus" class="w-4 h-4" />
+                    </button>
+                  </div>
+                </li>
+              </ul>
+            </fieldset>
+          </div>
+
+          <div class="px-5 pt-3 pb-5 border-t border-gray-200 shrink-0">
+            <button
+              @click="confirmOptions"
+              :disabled="optionsNeedsSize"
+              class="w-full h-14 bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-md text-lg transition-colors shadow-sm flex items-center justify-between px-5 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span>{{ optionsNeedsSize ? 'Pick a size' : 'Add to order' }}</span>
+              <span class="tabular-nums">{{ formatCurrency(optionsPrice) }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- ── RECEIPT MODAL ────────────────────────────────────────────────── -->
       <div v-if="isReceiptModalOpen && completedOrderDetails" role="dialog" aria-modal="true" aria-labelledby="receipt-title" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-sm flex flex-col overflow-hidden modal-pop">
@@ -1017,9 +1187,10 @@ function formatCurrency(amount: number) {
             <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm mb-4">
               <h3 class="text-base font-bold text-gray-800 mb-3 border-b pb-2">Order Items</h3>
               <div class="space-y-3">
-                <div v-for="item in completedOrderDetails.items" :key="item.uuid" class="flex justify-between text-base">
+                <div v-for="item in completedOrderDetails.items" :key="item.line_key" class="flex justify-between text-base">
                   <div class="flex flex-col">
                     <span class="font-medium text-gray-900">{{ item.menu_name }}</span>
+                    <span v-if="lineDetails(item)" class="text-sm text-gray-600">{{ lineDetails(item) }}</span>
                     <span class="text-sm text-gray-500">{{ item.quantity }} x {{ formatCurrency(getItemUnitPrice(item)) }}</span>
                   </div>
                   <span class="font-semibold text-gray-700">{{ formatCurrency(getItemUnitPrice(item) * item.quantity) }}</span>
@@ -1148,9 +1319,10 @@ function formatCurrency(amount: number) {
       </div>
 
       <div v-if="completedOrderDetails" class="space-y-2 border-b border-black pb-3 border-dashed mb-3 text-sm">
-        <div v-for="item in completedOrderDetails.items" :key="item.uuid" class="flex justify-between">
+        <div v-for="item in completedOrderDetails.items" :key="item.line_key" class="flex justify-between">
           <div class="flex flex-col">
             <span class="font-bold">{{ item.menu_name }}</span>
+            <span v-if="lineDetails(item)" class="text-xs ml-2">{{ lineDetails(item) }}</span>
             <span class="text-xs ml-2">{{ item.quantity }} x {{ formatCurrency(getItemUnitPrice(item)) }}</span>
           </div>
           <span class="font-bold">{{ formatCurrency(getItemUnitPrice(item) * item.quantity) }}</span>
