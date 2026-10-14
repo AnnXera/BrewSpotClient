@@ -277,6 +277,32 @@ const links = [
           @change="page => currentPage = page"
         />
       </div>
+
+      <!-- Bulk Actions Bar: sticks to the bottom of the page content, centered in it (not under the sidebar) -->
+      <Transition
+        enter-active-class="transition duration-300 ease-out"
+        enter-from-class="transform translate-y-full opacity-0"
+        enter-to-class="transform translate-y-0 opacity-100"
+        leave-active-class="transition duration-200 ease-in"
+        leave-from-class="transform translate-y-0 opacity-100"
+        leave-to-class="transform translate-y-full opacity-0"
+      >
+        <div v-if="selectedUuids.size > 0" class="sticky bottom-6 z-40 mt-6 mx-auto w-fit max-w-full bg-white rounded-2xl shadow-2xl border border-[#EEDFC4] p-3 flex items-center gap-4 min-w-[320px]">
+          <div class="px-3 py-1 bg-[#F5F5F5] rounded-lg text-[#7D5A50] font-bold text-sm whitespace-nowrap">
+            {{ selectedUuids.size }} selected
+          </div>
+          <div class="h-6 w-[1px] bg-[#EEDFC4]"></div>
+          <div class="flex items-center gap-2">
+            <button @click="confirmBulkAction('retire')" :disabled="isBulkLoading" class="px-4 py-2 text-sm font-bold text-[#9E7060] hover:bg-[#FDF8F3] rounded-xl transition-colors disabled:opacity-50">Retire</button>
+            <button @click="confirmBulkAction('restore')" :disabled="isBulkLoading" class="px-4 py-2 text-sm font-bold text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors disabled:opacity-50">Restore</button>
+            <button @click="confirmBulkAction('delete')" :disabled="isBulkLoading" class="px-4 py-2 text-sm font-bold text-[#D9534F] hover:bg-[#FDE8E8] rounded-xl transition-colors disabled:opacity-50">Delete</button>
+          </div>
+          <div class="h-6 w-[1px] bg-[#EEDFC4]"></div>
+          <button @click="selectedUuids.clear()" class="p-2 text-[#B4846C] hover:bg-[#F5F5F5] rounded-xl transition-colors" title="Clear selection">
+            <Icon name="heroicons:x-mark" class="w-5 h-5" />
+          </button>
+        </div>
+      </Transition>
     </main>
 
     <IngredientModal
@@ -296,30 +322,5 @@ const links = [
       @confirm="confirmModal.onConfirm"
     />
 
-    <!-- Bulk Actions Bar -->
-    <Transition
-      enter-active-class="transition duration-300 ease-out"
-      enter-from-class="transform translate-y-full opacity-0"
-      enter-to-class="transform translate-y-0 opacity-100"
-      leave-active-class="transition duration-200 ease-in"
-      leave-from-class="transform translate-y-0 opacity-100"
-      leave-to-class="transform translate-y-full opacity-0"
-    >
-      <div v-if="selectedUuids.size > 0" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white rounded-2xl shadow-2xl border border-[#EEDFC4] p-3 flex items-center gap-4 min-w-[320px]">
-        <div class="px-3 py-1 bg-[#F5F5F5] rounded-lg text-[#7D5A50] font-bold text-sm whitespace-nowrap">
-          {{ selectedUuids.size }} selected
-        </div>
-        <div class="h-6 w-[1px] bg-[#EEDFC4]"></div>
-        <div class="flex items-center gap-2">
-          <button @click="confirmBulkAction('retire')" :disabled="isBulkLoading" class="px-4 py-2 text-sm font-bold text-[#9E7060] hover:bg-[#FDF8F3] rounded-xl transition-colors disabled:opacity-50">Retire</button>
-          <button @click="confirmBulkAction('restore')" :disabled="isBulkLoading" class="px-4 py-2 text-sm font-bold text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors disabled:opacity-50">Restore</button>
-          <button @click="confirmBulkAction('delete')" :disabled="isBulkLoading" class="px-4 py-2 text-sm font-bold text-[#D9534F] hover:bg-[#FDE8E8] rounded-xl transition-colors disabled:opacity-50">Delete</button>
-        </div>
-        <div class="h-6 w-[1px] bg-[#EEDFC4]"></div>
-        <button @click="selectedUuids.clear()" class="p-2 text-[#B4846C] hover:bg-[#F5F5F5] rounded-xl transition-colors" title="Clear selection">
-          <Icon name="heroicons:x-mark" class="w-5 h-5" />
-        </button>
-      </div>
-    </Transition>
   </div>
 </template>

@@ -172,6 +172,35 @@ const faqs = [
     answer: "During registration, you will need your business details (Cafe Name, Branch Address, Contact Info) and basic verification documents (such as DTI/SEC registration and Mayor's Permit)."
   }
 ]
+
+// Setup Intersection Observer for scroll animations
+let observer: IntersectionObserver | null = null
+
+onMounted(() => {
+  observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-revealed')
+      }
+    })
+  }, {
+    root: null,
+    threshold: 0.15,
+    rootMargin: '0px 0px -50px 0px'
+  })
+
+  // Observe all elements with 'reveal-on-scroll'
+  document.querySelectorAll('.reveal-on-scroll').forEach((el) => {
+    observer?.observe(el)
+  })
+})
+
+onUnmounted(() => {
+  if (observer) {
+    observer.disconnect()
+  }
+})
+
 </script>
 
 <template>
@@ -290,7 +319,7 @@ const faqs = [
     </header>
 
     <!-- SECTION 1: HERO SECTION (PERFECTLY CENTERED) -->
-    <section id="hero" class="min-h-screen relative flex flex-col justify-between items-center overflow-hidden bg-[#FFF8EA] text-[#2D201B] pt-28 pb-10 border-b border-[#E5B299]/40">
+    <section id="hero" class="min-h-screen relative flex flex-col justify-between items-center overflow-hidden bg-[#FFF8EA] text-[#2D201B] pt-28 pb-10 border-b border-[#E5B299]/40 reveal-on-scroll">
       <!-- Background Image with Rich Palette Dark Overlay -->
       <div
         class="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-1000 scale-105"
@@ -373,7 +402,7 @@ const faqs = [
     </section>
 
     <!-- SECTION 2: PLATFORM DEMO SUITE -->
-    <section id="demo" class="min-h-screen py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden">
+    <section id="demo" class="min-h-screen py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden reveal-on-scroll">
       <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 w-full space-y-10">
         <div class="text-center max-w-2xl mx-auto space-y-3">
           <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-4 py-2 rounded-full border border-[#E5B299]">Interactive Suite</span>
@@ -693,7 +722,7 @@ const faqs = [
     </section>
 
     <!-- SECTION 3: CAFÉ OWNER FEATURES & BENEFITS -->
-    <section id="features" class="min-h-screen py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden">
+    <section id="features" class="min-h-screen py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden reveal-on-scroll">
       <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 w-full space-y-12">
         <div class="text-center max-w-2xl mx-auto space-y-3">
           <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-4 py-2 rounded-full border border-[#E5B299]">Owner Platform Features</span>
@@ -720,7 +749,7 @@ const faqs = [
     </section>
 
     <!-- SECTION 4: HOW IT WORKS -->
-    <section id="how-it-works" class="min-h-screen py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden">
+    <section id="how-it-works" class="min-h-screen py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden reveal-on-scroll">
       <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 w-full space-y-12">
         <div class="text-center max-w-2xl mx-auto space-y-3">
           <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-4 py-2 rounded-full border border-[#E5B299]">Streamlined Onboarding</span>
@@ -758,7 +787,7 @@ const faqs = [
     </section>
 
     <!-- SECTION 5: TESTIMONIALS -->
-    <section id="testimonials" class="min-h-screen py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden">
+    <section id="testimonials" class="min-h-screen py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden reveal-on-scroll">
       <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 w-full space-y-12">
         <div class="text-center max-w-2xl mx-auto space-y-3">
           <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-4 py-2 rounded-full border border-[#E5B299]">Trusted Leaders</span>
@@ -794,7 +823,7 @@ const faqs = [
     </section>
 
     <!-- SECTION 6: FAQ SECTION -->
-    <section id="faq" class="min-h-screen py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden">
+    <section id="faq" class="min-h-screen py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden reveal-on-scroll">
       <div class="max-w-4xl mx-auto px-6 sm:px-8 lg:px-10 w-full space-y-12">
         <div class="text-center max-w-2xl mx-auto space-y-3">
           <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-4 py-2 rounded-full border border-[#E5B299]">Clear Answers</span>
@@ -835,7 +864,7 @@ const faqs = [
     </section>
 
     <!-- SECTION 8: CALL TO ACTION & FOOTER -->
-    <section id="cta" class="pt-24 flex flex-col justify-between bg-[#FFF8EA] text-[#2D201B] relative overflow-hidden">
+    <section id="cta" class="pt-24 flex flex-col justify-between bg-[#FFF8EA] text-[#2D201B] relative overflow-hidden reveal-on-scroll">
       <!-- Main CTA Box -->
       <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 w-full mb-24">
         <div class="rounded-3xl bg-gradient-to-r from-[#7D5A50] via-[#B4846C] to-[#7D5A50] text-[#FFF8EA] p-8 sm:p-10 text-center space-y-6 shadow-2xl relative overflow-hidden">
@@ -965,5 +994,17 @@ const faqs = [
 <style>
 html {
   scroll-behavior: smooth;
+}
+</style>
+
+<style scoped>
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+}
+.reveal-on-scroll.is-revealed {
+  opacity: 1;
+  transform: translateY(0);
 }
 </style>

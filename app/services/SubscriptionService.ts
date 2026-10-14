@@ -181,6 +181,24 @@ export class SubscriptionService extends BaseService {
     )
   }
 
+  /**
+   * POST /api/owner/subscriptions/cancel-plan
+   *
+   * `next` drops the booked plan change. `current` stops the plan renewing — the owner keeps
+   * access until the end date they already paid for.
+   */
+  async cancelPlan(target: 'current' | 'next') {
+    return this.post<{ success: boolean; message: string }>('/owner/subscriptions/cancel-plan', { target })
+  }
+
+  /**
+   * POST /api/owner/subscriptions/resume
+   * Undo a cancellation made earlier in the same term.
+   */
+  async resumePlan() {
+    return this.post<{ success: boolean; message: string }>('/owner/subscriptions/resume', {})
+  }
+
   // ─── ADMIN: FEATURES CATALOG ───────────────────────────────────────────────
 
   /**

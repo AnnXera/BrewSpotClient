@@ -22,7 +22,8 @@ export interface Ingredient {
     unit: string
     is_measured: boolean
     is_active: boolean
-    used_in: number // number of menu items using it
+    used_in: number // number of menu items and add-ons using it
+    used_in_names?: string[] // their names; sent with the ingredient list
 }
 
 export interface IngredientPayload {
@@ -32,6 +33,42 @@ export interface IngredientPayload {
 }
 
 type IngredientResponse = { success: boolean; message: string; ingredient?: Ingredient; errors?: Record<string, string[]> }
+
+// One size of a menu item (Small, Large). An item with no sizes sells at base_price.
+export interface MenuItemSize {
+    uuid: string
+    name: string
+    price: string
+}
+
+export interface AddonRecipe {
+    ingredient_uuid: string | null
+    ingredient_name: string
+    quantity: string
+    unit: string
+}
+
+// An extra for a drink (Oreo crumbles +20), offered on the items linked to it.
+export interface MenuAddon {
+    uuid: string
+    name: string
+    price: string
+    max_quantity: number // most one drink can have
+    is_available: boolean
+    recipes: AddonRecipe[]
+    items: Array<{ uuid: string; menu_name: string }>
+}
+
+export interface MenuAddonPayload {
+    name?: string
+    price?: number
+    max_quantity?: number
+    is_available?: boolean
+    recipes?: Array<{ ingredient_uuid?: string; ingredient_name?: string; quantity: number; unit: string }>
+    item_uuids?: string[]
+}
+
+type AddonResponse = { success: boolean; message: string; addon?: MenuAddon; errors?: Record<string, string[]> }
 
 export class MenuService extends BaseService {
     // --- Menu Categories ---
@@ -73,6 +110,24 @@ export class MenuService extends BaseService {
 
     deleteIngredient(uuid: string) {
         return this.delete<{ success: boolean; message: string }>(`/owner/ingredients/${uuid}`)
+    }
+
+    // --- Add-ons ---
+
+    getAddons() {
+        return this.get<{ success: boolean; addons: MenuAddon[] }>('/owner/menu-addons')
+    }
+
+    createAddon(payload: MenuAddonPayload) {
+        return this.post<AddonResponse>('/owner/menu-addons', payload)
+    }
+
+    updateAddon(uuid: string, payload: MenuAddonPayload) {
+        return this.patch<AddonResponse>(`/owner/menu-addons/${uuid}`, payload)
+    }
+
+    deleteAddon(uuid: string) {
+        return this.delete<{ success: boolean; message: string }>(`/owner/menu-addons/${uuid}`)
     }
 
     // --- Menu Items ---

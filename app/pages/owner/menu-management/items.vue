@@ -7,6 +7,9 @@ import ItemCard from '~/components/menu/ItemCard.vue'
 import EmptyState from '~/components/menu/EmptyState.vue'
 import ItemModal from '~/components/menu/ItemModal.vue'
 import Pagination from '~/components/common/Pagination.vue'
+import ConfirmModal from '~/components/common/ConfirmModal.vue'
+import AlertModal from '~/components/common/AlertModal.vue'
+import { useDialogs } from '~/composables/useDialogs'
 
 definePageMeta({
   layout: 'owner',
@@ -15,6 +18,7 @@ definePageMeta({
 const route = useRoute()
 const router = useRouter()
 const menuService = useMenuService()
+const { confirmDialog, alertDialog, askConfirm, runConfirm, showAlert } = useDialogs()
 
 const items = ref<any[]>([])
 const categories = ref<any[]>([])
@@ -98,14 +102,18 @@ function onItemSaved() {
 }
 
 function handleDeleteItem(itemUuid: string) {
-  if (window.confirm('Are you sure you want to delete this item?')) {
-    menuService.deleteMenuItem(itemUuid)
+  askConfirm({
+    title: 'Delete Item',
+    message: 'Are you sure you want to delete this item?',
+    confirmText: 'Delete',
+    isDestructive: true,
+    onConfirm: () => menuService.deleteMenuItem(itemUuid)
       .then(() => fetchData())
       .catch((error) => {
         console.error('Failed to delete item', error)
-        alert('Failed to delete item. Please try again.')
-      })
-  }
+        showAlert('Delete Failed', 'Failed to delete item. Please try again.')
+      }),
+  })
 }
 
 const breadcrumbs = [
@@ -195,6 +203,22 @@ const links = [
       :categories="categories"
       @close="closeItemModal"
       @saved="onItemSaved"
+    />
+
+    <ConfirmModal
+      :show="confirmDialog.show"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :confirmText="confirmDialog.confirmText"
+      :isDestructive="confirmDialog.isDestructive"
+      @close="confirmDialog.show = false"
+      @confirm="runConfirm"
+    />
+    <AlertModal
+      :show="alertDialog.show"
+      :title="alertDialog.title"
+      :message="alertDialog.message"
+      @close="alertDialog.show = false"
     />
   </div>
 </template>

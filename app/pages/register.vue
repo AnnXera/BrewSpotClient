@@ -19,6 +19,10 @@ const digits = ref(['', '', '', '', '', ''])
 const inputs = ref<HTMLInputElement[]>([])
 const otpCode = computed(() => digits.value.join(''))
 const cooldown = ref(0)
+const resending = ref(false)
+const notice = ref('')
+const RESEND_COOLDOWN = 30
+let cooldownTimer: ReturnType<typeof setInterval> | null = null
 
 // Step 3: Your Details
 const userUuid = ref('')
@@ -147,6 +151,22 @@ function validatePhoneNumber(): boolean {
     delete fieldErrors.value.phone_number
     phoneNumber.value = formatLandlineForBackend(landlineDigits.value)
   }
+  if (cafePhone.value.trim()) {
+    const normPersonal = normalizePhoneNumber(phoneNumber.value)
+    const normCafe = normalizePhoneNumber(cafePhone.value)
+    if (normPersonal && normCafe && normPersonal === normCafe) {
+      fieldErrors.value.phone_number = 'Personal contact number and café phone number must be different.'
+      return false
+    }
+  }
+  if (phoneNumber.value.trim()) {
+    const normPersonal = normalizePhoneNumber(phoneNumber.value)
+    const normCafe = normalizePhoneNumber(cafePhone.value)
+    if (normPersonal && normCafe && normPersonal === normCafe) {
+      fieldErrors.value.cafe_phonenumber = 'Branch phone number must be different from your personal contact number.'
+      return false
+    }
+  }
   return true
 }
 const ownerAddress = ref('')
@@ -255,15 +275,14 @@ const dtiSecFilePath = ref('')
 
 // BIR Certificate Additional Details
 const birRegisteredAt = ref('')
-const birExpiredAt = ref('')
 const tinNumber = ref('')
 const vat = ref<'vat-registered' | 'non-vat'>('non-vat')
 
 function formatTinNumber(val: string): string {
-  const raw = val.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 16)
+  const raw = val.replace(/[^0-9]/g, '').slice(0, 12)
   const parts: string[] = []
-  for (let i = 0; i < raw.length; i += 4) {
-    parts.push(raw.slice(i, i + 4))
+  for (let i = 0; i < raw.length; i += 3) {
+    parts.push(raw.slice(i, i + 3))
   }
   return parts.join('-')
 }
@@ -300,6 +319,11 @@ function clearAllInputs() {
   // Step 2
   digits.value = ['', '', '', '', '', '']
   cooldown.value = 0
+  notice.value = ''
+  if (cooldownTimer) {
+    clearInterval(cooldownTimer)
+    cooldownTimer = null
+  }
   // Step 3
   userUuid.value = ''
   firstname.value = ''
@@ -338,7 +362,6 @@ function clearAllInputs() {
   dtiSecFileSize.value = ''
   dtiSecFilePath.value = ''
   birRegisteredAt.value = ''
-  birExpiredAt.value = ''
   tinNumber.value = ''
   vat.value = 'non-vat'
   // Errors & state
@@ -373,7 +396,10 @@ async function handleSendCode() {
     const res = await authService.sendRegistrationCode(trimmedEmail) as any
     if (res) {
       digits.value = ['', '', '', '', '', '']
+      notice.value = ''
       currentStep.value = 2
+      startCooldown(RESEND_COOLDOWN)
+      nextTick(() => inputs.value[0]?.focus())
     } else {
       error.value = 'Unable to send verification code.'
     }
@@ -385,23 +411,71 @@ async function handleSendCode() {
 }
 
 // Step 2: OTP Verification
+function startCooldown(seconds: number) {
+  cooldown.value = seconds
+  if (cooldownTimer) clearInterval(cooldownTimer)
+  cooldownTimer = setInterval(() => {
+    cooldown.value--
+    if (cooldown.value <= 0 && cooldownTimer) {
+      clearInterval(cooldownTimer)
+      cooldownTimer = null
+    }
+  }, 1000)
+}
+
+const cooldownLabel = computed(() => {
+  const m = Math.floor(cooldown.value / 60)
+  const sec = String(cooldown.value % 60).padStart(2, '0')
+  return `${m}:${sec}`
+})
+
+function resetDigits() {
+  digits.value = ['', '', '', '', '', '']
+  nextTick(() => inputs.value[0]?.focus())
+}
+
+function fillFrom(index: number, raw: string) {
+  const chars = raw.replace(/\D/g, '').slice(0, 6 - index).split('')
+  chars.forEach((c, i) => (digits.value[index + i] = c))
+  inputs.value[Math.min(index + chars.length, 5)]?.focus()
+  if (otpCode.value.length === 6) handleVerifyOTP()
+}
+
 function onDigitInput(index: number, event: Event) {
   const target = event.target as HTMLInputElement
-  const value = target.value.replace(/[^0-9]/g, '').slice(-1)
-  digits.value[index] = value
-  if (value && index < 5) {
-    inputs.value[index + 1]?.focus()
+  const cleaned = target.value.replace(/\D/g, '')
+  if (cleaned.length > 1) {
+    // Browser autofill or OTP suggestion delivers the whole code in one field
+    fillFrom(index, cleaned)
+    return
   }
+  digits.value[index] = cleaned
+  target.value = cleaned
+  if (cleaned && index < 5) inputs.value[index + 1]?.focus()
+  if (otpCode.value.length === 6) handleVerifyOTP()
 }
 
 function onDigitKeydown(index: number, event: KeyboardEvent) {
   if (event.key === 'Backspace' && !digits.value[index] && index > 0) {
     inputs.value[index - 1]?.focus()
+  } else if (event.key === 'ArrowLeft' && index > 0) {
+    event.preventDefault()
+    inputs.value[index - 1]?.focus()
+  } else if (event.key === 'ArrowRight' && index < 5) {
+    event.preventDefault()
+    inputs.value[index + 1]?.focus()
   }
 }
 
+function onDigitPaste(index: number, event: ClipboardEvent) {
+  event.preventDefault()
+  fillFrom(index, event.clipboardData?.getData('text') ?? '')
+}
+
 async function handleVerifyOTP() {
+  if (loading.value || otpCode.value.length < 6) return
   error.value = ''
+  notice.value = ''
   loading.value = true
   try {
     const res = await authService.verifyRegistrationCode(email.value.trim(), otpCode.value) as any
@@ -409,37 +483,38 @@ async function handleVerifyOTP() {
       userUuid.value = res.user_uuid
       currentStep.value = 3
     } else {
-      error.value = res.message || 'Invalid verification code.'
+      error.value = res.message || 'That code did not work. Check it and try again.'
+      resetDigits()
     }
   } catch (e: any) {
-    error.value = extractErrorMessage(e, 'Verification failed.')
+    error.value = extractErrorMessage(e, 'Verification failed. Check your connection and try again.')
+    resetDigits()
   } finally {
     loading.value = false
+    if (error.value) nextTick(() => inputs.value[0]?.focus())
   }
 }
 
 async function handleResendOTP() {
-  if (cooldown.value > 0) return
+  if (cooldown.value > 0 || resending.value) return
   error.value = ''
+  notice.value = ''
+  resending.value = true
   try {
     const res = await authService.resendRegistrationCode(email.value.trim())
     if (res.success) {
-      cooldown.value = 60
-      const interval = setInterval(() => {
-        cooldown.value--
-        if (cooldown.value <= 0) clearInterval(interval)
-      }, 1000)
+      notice.value = `A new code was sent to ${email.value.trim()}.`
+      startCooldown(RESEND_COOLDOWN)
+      resetDigits()
     } else if (res.retry_after_seconds) {
-      cooldown.value = res.retry_after_seconds
-      const interval = setInterval(() => {
-        cooldown.value--
-        if (cooldown.value <= 0) clearInterval(interval)
-      }, 1000)
+      startCooldown(res.retry_after_seconds)
     } else {
       error.value = res.message || 'Unable to resend code.'
     }
   } catch (e: any) {
     error.value = extractErrorMessage(e, 'Could not resend code.')
+  } finally {
+    resending.value = false
   }
 }
 
@@ -946,10 +1021,10 @@ async function handleFinalSubmit() {
       error.value = 'Please enter the TIN Number.'
       return
     }
-    const tinRaw = tinNumber.value.replace(/[^a-zA-Z0-9]/g, '')
+    const tinRaw = tinNumber.value.replace(/[^0-9]/g, '')
     if (tinRaw.length < 12) {
-      fieldErrors.value.tin_number = 'TIN Number must follow format XXXX-XXXX-XXXX-XXXX.'
-      error.value = 'TIN Number must follow format XXXX-XXXX-XXXX-XXXX.'
+      fieldErrors.value.tin_number = 'TIN Number must follow format XXX-XXX-XXX-XXX.'
+      error.value = 'TIN Number must follow format XXX-XXX-XXX-XXX.'
       return
     }
     if (!vat.value) {
@@ -960,16 +1035,6 @@ async function handleFinalSubmit() {
     if (!birRegisteredAt.value) {
       fieldErrors.value.bir_registered_at = 'BIR Registered Date is required.'
       error.value = 'Please enter the BIR Registered Date.'
-      return
-    }
-    if (!birExpiredAt.value) {
-      fieldErrors.value.bir_expired_at = 'BIR Expiration Date (if applicable) is required.'
-      error.value = 'Please enter the BIR Expiration Date.'
-      return
-    }
-    if (new Date(birExpiredAt.value) < new Date(birRegisteredAt.value)) {
-      fieldErrors.value.bir_expired_at = 'BIR Expiration Date cannot be before BIR Registered Date.'
-      error.value = 'BIR Expiration Date cannot be before BIR Registered Date.'
       return
     }
   }
@@ -1019,9 +1084,6 @@ async function handleFinalSubmit() {
     payload.append('bir_file', birFilePath.value)
     payload.append('dti_sec_file', dtiSecFilePath.value)
     payload.append('bir_registered_at', birRegisteredAt.value)
-    if (birExpiredAt.value) {
-      payload.append('bir_expired_at', birExpiredAt.value)
-    }
     payload.append('tin_number', tinNumber.value.trim())
     payload.append('vat', vat.value)
 
@@ -1087,7 +1149,6 @@ function saveDraft() {
     cafeLandlineDigits: cafeLandlineDigits.value,
     cafeEmail: cafeEmail.value,
     birRegisteredAt: birRegisteredAt.value,
-    birExpiredAt: birExpiredAt.value,
     tinNumber: tinNumber.value,
     vat: vat.value,
     governmentIdFilePath: governmentIdFilePath.value,
@@ -1127,7 +1188,6 @@ function restoreDraft() {
       if (draft.cafeLandlineDigits) cafeLandlineDigits.value = draft.cafeLandlineDigits
       if (draft.cafeEmail) cafeEmail.value = draft.cafeEmail
       if (draft.birRegisteredAt) birRegisteredAt.value = draft.birRegisteredAt
-      if (draft.birExpiredAt) birExpiredAt.value = draft.birExpiredAt
       if (draft.tinNumber) tinNumber.value = draft.tinNumber
       if (draft.vat) vat.value = draft.vat
       
@@ -1160,7 +1220,7 @@ function restoreDraft() {
 }
 
 watch(
-  [email, firstname, middlename, lastname, username, phoneType, mobileDigits, landlineDigits, ownerAddress, idType, cafeName, cafeDocType, branchName, address, cafePhoneType, cafeMobileDigits, cafeLandlineDigits, cafeEmail, birRegisteredAt, birExpiredAt, tinNumber, vat, governmentIdFilePath, governmentIdFileBackPath, birFilePath, dtiSecFilePath],
+  [email, firstname, middlename, lastname, username, phoneType, mobileDigits, landlineDigits, ownerAddress, idType, cafeName, cafeDocType, branchName, address, cafePhoneType, cafeMobileDigits, cafeLandlineDigits, cafeEmail, birRegisteredAt, tinNumber, vat, governmentIdFilePath, governmentIdFileBackPath, birFilePath, dtiSecFilePath],
   () => {
     saveDraft()
   },
@@ -1181,13 +1241,14 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  if (cooldownTimer) clearInterval(cooldownTimer)
 })
 </script>
 
 <template>
-  <div class="min-h-screen grid lg:grid-cols-2">
+  <div class="h-screen w-full overflow-hidden grid lg:grid-cols-2">
     <!-- Left Hero Section (Matches login.vue & verify-login-code.vue) -->
-    <section class="hidden lg:flex flex-col justify-center bg-[#7B5A50] font-display text-white px-16 py-12">
+    <section class="hidden lg:flex flex-col justify-center bg-[#7B5A50] font-display text-white px-16 py-12 h-full relative">
       <div class="max-w-lg mx-auto text-center space-y-12">
         <!-- Brand Header -->
         <div>
@@ -1225,11 +1286,11 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- Right Form Section -->
-    <section class="flex items-center justify-center bg-[#FFF8EA] px-8 py-12 min-h-screen lg:min-h-0 overflow-y-auto">
-      <div class="w-full max-w-md space-y-6 my-auto">
-
+    <section class="flex items-center justify-center bg-[#FFF8EA] px-8 py-12 h-full overflow-y-auto">
+      <div class="w-full max-w-md space-y-6 my-auto relative">
+        <Transition name="fade-slide" mode="out-in">
         <!-- STEP 1: Email Verification -->
-        <div v-if="currentStep === 1" class="space-y-6">
+        <div v-if="currentStep === 1" key="step1" class="space-y-6">
           <NuxtLink
             to="/"
             class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
@@ -1324,48 +1385,69 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- STEP 2: OTP Verification -->
-        <div v-else-if="currentStep === 2" class="space-y-6">
+        <div v-else-if="currentStep === 2" key="step2">
           <button
             type="button"
-            class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
+            class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity mb-8"
             @click="currentStep = 1"
           >
             <Icon name="heroicons:chevron-left" class="w-4 h-4" />
             Change Email
           </button>
 
-          <div>
-            <h1 class="text-3xl font-bold text-[#2d201b]">Verify your email</h1>
-            <p class="text-gray-600 text-sm mt-2 leading-relaxed">
-              We sent a 6-digit code to <span class="font-semibold text-[#2d201b]">{{ email }}</span>. Enter it below to continue.
+          <div class="mb-8">
+            <h1 class="text-3xl font-bold text-[#2d201b]">Check your inbox</h1>
+            <p class="text-gray-600 text-sm mt-1.5 leading-relaxed">
+              We sent a 6-digit code to <span class="font-semibold text-[#2d201b]">{{ email }}</span>.
+              Enter it below to continue.
             </p>
           </div>
 
           <!-- Auth Error Banner -->
           <div
             v-if="error"
-            class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
+            role="alert"
+            class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3 mb-6"
           >
             <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
             <span class="font-medium">{{ error }}</span>
           </div>
 
+          <!-- Resend confirmation -->
+          <p
+            v-if="notice && !error"
+            role="status"
+            class="mb-6 flex items-center gap-2 text-sm font-medium text-[#1F8A4C]"
+          >
+            <Icon name="heroicons:check-circle" class="w-5 h-5 shrink-0" />
+            {{ notice }}
+          </p>
+
           <form @submit.prevent="handleVerifyOTP" class="space-y-6">
-            <div class="flex justify-between gap-2">
+            <!-- Digit Inputs -->
+            <div class="flex justify-between gap-2" role="group" aria-label="6-digit verification code">
               <input
                 v-for="(digit, index) in digits"
                 :key="index"
                 ref="inputs"
-                v-model="digits[index]"
+                :value="digit"
                 type="text"
                 inputmode="numeric"
-                maxlength="1"
-                class="w-full h-14 text-center text-lg font-semibold rounded-lg border border-gray-300 bg-white text-[#2d201b] outline-none focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20 transition"
+                pattern="[0-9]*"
+                maxlength="6"
+                :autocomplete="index === 0 ? 'one-time-code' : 'off'"
+                :aria-label="`Digit ${index + 1} of 6`"
+                :disabled="loading"
+                :class="digit ? 'border-[#7B5A50]' : 'border-gray-300'"
+                class="min-w-0 w-full h-14 text-center text-xl font-semibold tabular-nums rounded-md border bg-white text-[#2d201b] outline-none focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20 transition"
                 @input="onDigitInput(index, $event)"
                 @keydown="onDigitKeydown(index, $event)"
+                @paste="onDigitPaste(index, $event)"
+                @focus="($event.target as HTMLInputElement).select()"
               />
             </div>
 
+            <!-- Submit Button -->
             <button
               type="submit"
               :disabled="loading || otpCode.length < 6"
@@ -1375,22 +1457,23 @@ onBeforeUnmount(() => {
               {{ loading ? 'Verifying...' : 'Verify and Continue' }}
             </button>
 
+            <!-- Resend -->
             <p class="text-sm text-gray-600 text-center">
               Didn't receive it?
               <button
                 type="button"
-                :disabled="cooldown > 0"
-                class="font-semibold text-[#7B5A50] hover:underline disabled:opacity-50 disabled:no-underline ml-1"
+                :disabled="cooldown > 0 || resending"
+                class="font-semibold tabular-nums text-[#7B5A50] hover:underline disabled:opacity-50 disabled:no-underline"
                 @click="handleResendOTP"
               >
-                {{ cooldown > 0 ? `Resend OTP (${cooldown}s)` : 'Resend OTP' }}
+                {{ cooldown > 0 ? `Resend code in ${cooldownLabel}` : resending ? 'Sending...' : 'Resend code' }}
               </button>
             </p>
           </form>
         </div>
 
         <!-- STEP 3: Personal Details -->
-        <div v-else-if="currentStep === 3" class="space-y-5">
+        <div v-else-if="currentStep === 3" key="step3" class="space-y-5">
           <button
             type="button"
             class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
@@ -1415,66 +1498,75 @@ onBeforeUnmount(() => {
             <span class="font-medium">{{ error }}</span>
           </div>
 
-          <form @submit.prevent="handleNextToBusiness" class="space-y-4">
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">First Name</label>
-                <input
-                  v-model="firstname"
-                  type="text"
-                  placeholder="John"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                  required
-                  @input="onFirstNameInput"
-                />
+          <form @submit.prevent="handleNextToBusiness" class="space-y-5">
+            <!-- Basic Information -->
+            <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+              <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                <Icon name="heroicons:user" class="w-4 h-4 text-[#7B5A50]" /> Basic Information
+              </h3>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">First Name</label>
+                  <input
+                    v-model="firstname"
+                    type="text"
+                    placeholder="John"
+                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    required
+                    @input="onFirstNameInput"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Last Name</label>
+                  <input
+                    v-model="lastname"
+                    type="text"
+                    placeholder="Doe"
+                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    required
+                    @input="onLastNameInput"
+                  />
+                </div>
               </div>
-              <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Last Name</label>
-                <input
-                  v-model="lastname"
-                  type="text"
-                  placeholder="Doe"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                  required
-                  @input="onLastNameInput"
-                />
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Middle Name</label>
+                  <input
+                    v-model="middlename"
+                    type="text"
+                    placeholder="Optional"
+                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    @input="onMiddleNameInput"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Username *</label>
+                  <input
+                    v-model="username"
+                    type="text"
+                    placeholder="Username"
+                    :class="[
+                      'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
+                      fieldErrors.username
+                        ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                        : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
+                    ]"
+                    required
+                    @input="clearFieldError('username')"
+                    @blur="checkUsernameAvailability"
+                  />
+                  <p v-if="fieldErrors.username" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.username }}</p>
+                </div>
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Middle Name</label>
-                <input
-                  v-model="middlename"
-                  type="text"
-                  placeholder="Optional"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                  @input="onMiddleNameInput"
-                />
-              </div>
-              <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Username *</label>
-                <input
-                  v-model="username"
-                  type="text"
-                  placeholder="Username"
-                  :class="[
-                    'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
-                    fieldErrors.username
-                      ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
-                      : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
-                  ]"
-                  required
-                  @input="clearFieldError('username')"
-                  @blur="checkUsernameAvailability"
-                />
-                <p v-if="fieldErrors.username" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.username }}</p>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-12 gap-3 items-start">
-              <!-- Contact No. (7 cols on sm) -->
-              <div class="col-span-12 sm:col-span-7 space-y-1">
+            <!-- Contact & Location -->
+            <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+              <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                <Icon name="heroicons:map-pin" class="w-4 h-4 text-[#7B5A50]" /> Contact & Location
+              </h3>
+              <div class="space-y-1">
                 <label class="block text-sm font-medium text-[#2d201b]">Contact No. *</label>
                 <div
                   class="flex items-center rounded-md border bg-white overflow-hidden transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
@@ -1523,8 +1615,25 @@ onBeforeUnmount(() => {
                 <p v-if="fieldErrors.phone_number" class="text-xs text-red-600 font-medium">{{ fieldErrors.phone_number }}</p>
               </div>
 
-              <!-- ID Type (5 cols on sm) -->
-              <div class="col-span-12 sm:col-span-5 space-y-1">
+              <div>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Personal Address *</label>
+                <input
+                  v-model="ownerAddress"
+                  type="text"
+                  placeholder="Street, Barangay, District, Davao City"
+                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  required
+                />
+              </div>
+            </div>
+
+            <!-- Identity Verification -->
+            <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+              <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                <Icon name="heroicons:identification" class="w-4 h-4 text-[#7B5A50]" /> Identity Verification
+              </h3>
+              
+              <div class="space-y-1 w-full sm:w-1/2">
                 <label class="block text-sm font-medium text-[#2d201b]">ID Type</label>
                 <select
                   v-model="idType"
@@ -1540,20 +1649,8 @@ onBeforeUnmount(() => {
                 </select>
                 <p v-if="fieldErrors.id_type" class="text-xs text-red-600 font-medium">{{ fieldErrors.id_type }}</p>
               </div>
-            </div>
 
-            <div>
-              <label class="block text-sm font-medium mb-1 text-[#2d201b]">Personal Address *</label>
-              <input
-                v-model="ownerAddress"
-                type="text"
-                placeholder="Street, Barangay, District, Davao City"
-                class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                required
-              />
-            </div>
-
-            <div>
+              <div>
               <label class="block text-sm font-medium mb-1 text-[#2d201b]">
                 {{ isBackIdRequired ? 'Government ID (Front & Back) *' : 'Passport (Photo / Bio-page) *' }}
               </label>
@@ -1613,6 +1710,7 @@ onBeforeUnmount(() => {
                     >&times;</button>
                   </div>
                 </div>
+                </div>
               </div>
             </div>
 
@@ -1629,7 +1727,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- STEP 4: Business Details & Requirements -->
-        <div v-else-if="currentStep === 4" class="space-y-5">
+        <div v-else-if="currentStep === 4" key="step4" class="space-y-5">
           <!-- Page 1: Business Information -->
           <div v-if="businessSubPage === 1" class="space-y-5">
             <button
@@ -1659,45 +1757,53 @@ onBeforeUnmount(() => {
               <span class="font-medium">{{ error }}</span>
             </div>
 
-            <form @submit.prevent="nextBusinessSubPage" class="space-y-4">
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Business Name</label>
-                  <input
-                    v-model="cafeName"
-                    type="text"
-                    placeholder="BrewSpot Davao"
-                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                    required
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Document Type *</label>
-                  <select
-                    v-model="cafeDocType"
-                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                  >
-                    <option value="DTI">DTI</option>
-                    <option value="SEC">SEC</option>
-                  </select>
+            <form @submit.prevent="nextBusinessSubPage" class="space-y-5">
+              <!-- General Info -->
+              <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                  <Icon name="heroicons:building-storefront" class="w-4 h-4 text-[#7B5A50]" /> General Info
+                </h3>
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="col-span-2 sm:col-span-1">
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Business Name</label>
+                    <input
+                      v-model="cafeName"
+                      type="text"
+                      placeholder="BrewSpot Davao"
+                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                      required
+                    />
+                  </div>
+                  <div class="col-span-2 sm:col-span-1">
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Document Type *</label>
+                    <select
+                      v-model="cafeDocType"
+                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    >
+                      <option value="DTI">DTI</option>
+                      <option value="SEC">SEC</option>
+                    </select>
+                  </div>
+                  <div class="col-span-2">
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Name</label>
+                    <input
+                      v-model="branchName"
+                      type="text"
+                      placeholder="Main Branch"
+                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div class="grid grid-cols-12 gap-3 items-start">
-                <!-- Branch Name (5 cols on sm) -->
-                <div class="col-span-12 sm:col-span-5 space-y-1">
-                  <label class="block text-sm font-medium text-[#2d201b]">Branch Name</label>
-                  <input
-                    v-model="branchName"
-                    type="text"
-                    placeholder="Main Branch"
-                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                    required
-                  />
-                </div>
-
-                <!-- Branch Phone (7 cols on sm) -->
-                <div class="col-span-12 sm:col-span-7 space-y-1">
+              <!-- Contact Info -->
+              <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                  <Icon name="heroicons:phone" class="w-4 h-4 text-[#7B5A50]" /> Branch Contact
+                </h3>
+                <div class="space-y-4">
+                  <div class="space-y-1">
                   <label class="block text-sm font-medium text-[#2d201b]">Branch Phone *</label>
                   <div
                     class="flex items-center rounded-md border bg-white overflow-hidden transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
@@ -1744,37 +1850,38 @@ onBeforeUnmount(() => {
                     />
                   </div>
                   <p v-if="fieldErrors.cafe_phonenumber" class="text-xs text-red-600 font-medium">{{ fieldErrors.cafe_phonenumber }}</p>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Address</label>
+                    <input
+                      v-model="address"
+                      type="text"
+                      placeholder="Street, Barangay, District, Davao City"
+                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Café Email *</label>
+                    <input
+                      v-model="cafeEmail"
+                      type="email"
+                      placeholder="contact@brewspot.com"
+                      :class="[
+                        'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
+                        fieldErrors.cafe_email
+                          ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                          : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
+                      ]"
+                      required
+                      @input="clearFieldError('cafe_email')"
+                      @blur="checkCafeEmailAvailability"
+                    />
+                    <p v-if="fieldErrors.cafe_email" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.cafe_email }}</p>
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Address</label>
-                <input
-                  v-model="address"
-                  type="text"
-                  placeholder="Street, Barangay, District, Davao City"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                  required
-                />
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Café Email *</label>
-                <input
-                  v-model="cafeEmail"
-                  type="email"
-                  placeholder="contact@brewspot.com"
-                  :class="[
-                    'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
-                    fieldErrors.cafe_email
-                      ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
-                      : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
-                  ]"
-                  required
-                  @input="clearFieldError('cafe_email')"
-                  @blur="checkCafeEmailAvailability"
-                />
-                <p v-if="fieldErrors.cafe_email" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.cafe_email }}</p>
               </div>
 
               <div class="pt-2">
@@ -1924,8 +2031,8 @@ onBeforeUnmount(() => {
                     <input
                       v-model="tinNumber"
                       type="text"
-                      placeholder="XXXX-XXXX-XXXX-XXXX"
-                      maxlength="19"
+                      placeholder="XXX-XXX-XXX-XXX"
+                      maxlength="15"
                       :class="[
                         'w-full h-10 rounded-md border px-3 outline-none transition bg-white text-xs text-[#2d201b] font-mono tracking-wider',
                         fieldErrors.tin_number
@@ -1987,25 +2094,6 @@ onBeforeUnmount(() => {
                     />
                     <p v-if="fieldErrors.bir_registered_at" class="text-[0.7rem] text-red-600 font-medium">{{ fieldErrors.bir_registered_at }}</p>
                   </div>
-
-                  <!-- BIR Expiration Date (Required) -->
-                  <div class="space-y-1">
-                    <label class="block font-semibold text-[#2d201b]">BIR Expiration Date *</label>
-                    <input
-                      v-model="birExpiredAt"
-                      type="date"
-                      :min="birRegisteredAt || undefined"
-                      :class="[
-                        'w-full h-10 rounded-md border px-3 outline-none transition bg-white text-xs text-[#2d201b]',
-                        fieldErrors.bir_expired_at
-                          ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
-                          : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
-                      ]"
-                      required
-                      @change="clearFieldError('bir_expired_at')"
-                    />
-                    <p v-if="fieldErrors.bir_expired_at" class="text-[0.7rem] text-red-600 font-medium">{{ fieldErrors.bir_expired_at }}</p>
-                  </div>
                 </div>
               </div>
 
@@ -2019,7 +2107,7 @@ onBeforeUnmount(() => {
                 </button>
                 <button
                   type="submit"
-                  :disabled="loading || uploadedCount < 2 || (!!birFile && (!tinNumber || !birRegisteredAt || !birExpiredAt || !vat))"
+                  :disabled="loading || uploadedCount < 2 || (!!birFile && (!tinNumber || !birRegisteredAt || !vat))"
                   class="w-2/3 h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <span v-if="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
@@ -2031,7 +2119,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- STEP 5: Review / Submitted Screen -->
-        <div v-else-if="currentStep === 5" class="space-y-6">
+        <div v-else-if="currentStep === 5" key="step5" class="space-y-6">
           <div>
             <span class="text-xs uppercase tracking-wider font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">Registration Submitted ✓</span>
             <h1 class="text-2xl font-bold text-[#2d201b] mt-2">Application Received! 🎉</h1>
@@ -2100,7 +2188,23 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
+        </Transition>
       </div>
     </section>
   </div>
 </template>
+
+<style scoped>
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(15px);
+}
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-15px);
+}
+</style>

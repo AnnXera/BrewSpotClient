@@ -7,6 +7,7 @@ definePageMeta({
 const links = [
   { label: 'Dashboard', to: '/manager/dashboard', icon: 'squares-2x2' },
   { label: 'Servings', to: '/manager/servings', icon: 'cake' },
+  { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
 ]
 </script>
 

@@ -48,6 +48,7 @@ onMounted(async () => {
     const baseMenuChildren: NavLink[] = [
       { label: 'Menu Items', to: '/owner/menu-management/items' },
       { label: 'Ingredients', to: '/owner/menu-management/ingredients' },
+      { label: 'Add-ons', to: '/owner/menu-management/addons' },
       { label: 'CATEGORIES', to: '', isHeader: true }
     ]
     dynamicLinks.value[menuIndex].isDropdown = true

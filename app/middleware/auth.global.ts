@@ -31,8 +31,11 @@ export default defineNuxtRouteMiddleware((to) => {
     const publicRoutes = ['/', '/login', '/verify-login-code', '/register', '/setup-password', '/application', '/unauthorized']
     const isPublic = publicRoutes.some((p) => p === '/' ? to.path === '/' : (to.path === p || to.path.startsWith(p + '/')))
 
+    // Allow /pos exactly to bypass the user auth check (it uses pos_device_token internally)
+    const isPosRegister = to.path === '/pos'
+
     // 3. Protect authenticated routes for unauthenticated users
-    if (!token.value && !isPublic) {
+    if (!token.value && !isPublic && !isPosRegister) {
         return navigateTo('/login', { replace: true })
     }
 

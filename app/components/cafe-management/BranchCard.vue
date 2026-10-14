@@ -56,12 +56,12 @@ function statusColor(status: string) {
       </div>
 
       <!-- Thumbnail image / fallback initial icon box -->
-      <div class="w-16 h-16 shrink-0 mr-4 bg-gradient-to-br from-[#7D5A50] to-[#B4846C] rounded-2xl overflow-hidden shadow-sm flex items-center justify-center text-white font-extrabold text-xl relative group-hover:scale-105 transition-transform duration-300">
+      <div class="w-20 h-20 shrink-0 mr-4 bg-gradient-to-br from-[#7D5A50] to-[#B4846C] rounded-2xl overflow-hidden shadow-sm flex items-center justify-center text-white font-extrabold text-xl relative group-hover:scale-105 transition-transform duration-300">
         <img 
           v-if="branch.cafe_picture && !imageError" 
           :src="branch.cafe_picture" 
           :alt="branch.branch_name || 'Branch Image'" 
-          class="w-full h-full object-cover" 
+          class="absolute inset-0 w-full h-full object-cover"
           @error="imageError = true" 
         />
         <span v-else class="uppercase font-display tracking-widest text-2xl drop-shadow-xs">

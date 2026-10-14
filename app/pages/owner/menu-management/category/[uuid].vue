@@ -10,6 +10,9 @@ import AddEditItemToCategory from '~/components/menu/AddEditItemToCategory.vue'
 import CategoryBranchesPanel from '~/components/menu/CategoryBranchesPanel.vue'
 import Pagination from '~/components/common/Pagination.vue'
 import CategoryModal from '~/components/menu/CategoryModal.vue'
+import ConfirmModal from '~/components/common/ConfirmModal.vue'
+import AlertModal from '~/components/common/AlertModal.vue'
+import { useDialogs } from '~/composables/useDialogs'
 
 definePageMeta({
   layout: 'owner',
@@ -18,6 +21,7 @@ definePageMeta({
 const route = useRoute()
 const router = useRouter()
 const menuService = useMenuService()
+const { confirmDialog, alertDialog, askConfirm, runConfirm, showAlert } = useDialogs()
 
 const currentCategoryUuid = computed(() => route.params.uuid as string)
 
@@ -123,33 +127,45 @@ function onItemSaved() {
 }
 
 function handleDeleteItem(itemUuid: string) {
-  if (window.confirm('Are you sure you want to delete this item?')) {
-    menuService.deleteMenuItem(itemUuid)
+  askConfirm({
+    title: 'Delete Item',
+    message: 'Are you sure you want to delete this item?',
+    confirmText: 'Delete',
+    isDestructive: true,
+    onConfirm: () => menuService.deleteMenuItem(itemUuid)
       .then(() => fetchData())
       .catch((error) => {
         console.error('Failed to delete item', error)
-        alert('Failed to delete item. Please try again.')
-      })
-  }
+        showAlert('Delete Failed', 'Failed to delete item. Please try again.')
+      }),
+  })
 }
 
 const isRealCategory = computed(() => currentCategoryUuid.value !== 'uncategorized')
 const isCategoryModalOpen = ref(false)
 const isDeletingCategory = ref(false)
 
-async function handleDeleteCategory() {
+function handleDeleteCategory() {
   if (!currentCategory.value || isDeletingCategory.value) return
-  if (!window.confirm(`Delete the category "${currentCategory.value.name}"?`)) return
-  isDeletingCategory.value = true
-  try {
-    await menuService.deleteMenuCategory(currentCategory.value.uuid)
-    await router.push('/owner/menu-management')
-  } catch (error) {
-    console.error('Failed to delete category', error)
-    alert('Failed to delete category. Please try again.')
-  } finally {
-    isDeletingCategory.value = false
-  }
+  const category = currentCategory.value
+  askConfirm({
+    title: 'Delete Category',
+    message: `Delete the category "${category.name}"?`,
+    confirmText: 'Delete',
+    isDestructive: true,
+    onConfirm: async () => {
+      isDeletingCategory.value = true
+      try {
+        await menuService.deleteMenuCategory(category.uuid)
+        await router.push('/owner/menu-management')
+      } catch (error) {
+        console.error('Failed to delete category', error)
+        showAlert('Delete Failed', 'Failed to delete category. Please try again.')
+      } finally {
+        isDeletingCategory.value = false
+      }
+    },
+  })
 }
 
 const isAssignItemsModalOpen = computed(() => route.query.action === 'assign-items')
@@ -176,7 +192,7 @@ async function onAssignItemsConfirm(selectedItemUuids: string[]) {
     closeAssignItemsModal()
   } catch (error) {
     console.error('Failed to update category items', error)
-    alert('Failed to update category items. Please try again.')
+    showAlert('Update Failed', 'Failed to update category items. Please try again.')
   }
 }
 
@@ -313,6 +329,22 @@ const links = [
       @close="closeAssignItemsModal"
       @confirm="onAssignItemsConfirm"
       @add-item="openAddItemModal"
+    />
+
+    <ConfirmModal
+      :show="confirmDialog.show"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :confirmText="confirmDialog.confirmText"
+      :isDestructive="confirmDialog.isDestructive"
+      @close="confirmDialog.show = false"
+      @confirm="runConfirm"
+    />
+    <AlertModal
+      :show="alertDialog.show"
+      :title="alertDialog.title"
+      :message="alertDialog.message"
+      @close="alertDialog.show = false"
     />
   </div>
 </template>

@@ -4,7 +4,7 @@ import RenewalBanner from '~/components/subscription/RenewalBanner.vue'
 import OwnerMetricCards from '~/components/dashboard/OwnerMetricCards.vue'
 import OwnerAnalyticsChart from '~/components/dashboard/OwnerAnalyticsChart.vue'
 import OwnerDetailedStats from '~/components/dashboard/OwnerDetailedStats.vue'
-import OwnerActionCenter from '~/components/dashboard/OwnerActionCenter.vue'
+import OwnerTopSellingMenu from '~/components/dashboard/OwnerTopSellingMenu.vue'
 import type { BranchSummary } from '~/services/OwnerProfileService'
 import type { SubscriptionItem } from '~/services/SubscriptionService'
 
@@ -34,6 +34,7 @@ const currentPlanName = ref('')
 const totalEarnings = ref(0)
 const detailedStats = ref<{ today_revenue: number, today_orders: number, avg_order_value: number, active_customers: number } | null>(null)
 const chartData = ref<{ month: string, revenue: number }[]>([])
+const topSellingItems = ref<any[]>([])
 
 async function loadDashboardData() {
   loading.value = true
@@ -70,6 +71,7 @@ async function loadDashboardData() {
       totalEarnings.value = statsRes.total_earnings || 0
       if (statsRes.detailed_stats) detailedStats.value = statsRes.detailed_stats
       if (statsRes.chart_data) chartData.value = statsRes.chart_data
+      if (statsRes.top_selling_items) topSellingItems.value = statsRes.top_selling_items
     }
   } catch (err) {
     console.warn('Dashboard fetch error:', err)
@@ -136,7 +138,7 @@ onMounted(loadDashboardData)
         <div class="lg:col-span-2 flex flex-col gap-6">
           <OwnerDetailedStats :stats="detailedStats" :loading="loading" />
           <OwnerAnalyticsChart :chart-data="chartData" :loading="loading" />
-          <OwnerActionCenter />
+          <OwnerTopSellingMenu :top-items="topSellingItems" />
         </div>
         
         <!-- Right side quick links or extra info -->

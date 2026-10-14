@@ -455,10 +455,6 @@ function viewCafePicture() {
                                                     <p class="text-[#9E7060] font-semibold mb-1 text-[12px] uppercase tracking-wide">Date Registered</p>
                                                     <p class="text-[#3B1F0E] font-medium">{{ formatDate(doc.registered_at) }}</p>
                                                 </div>
-                                                <div>
-                                                    <p class="text-[#9E7060] font-semibold mb-1 text-[12px] uppercase tracking-wide">Expiry Date</p>
-                                                    <p class="text-[#3B1F0E] font-medium">{{ formatDate(doc.expired_at) }}</p>
-                                                </div>
                                             </div>
                                         </div>
                                     </div>

@@ -1,5 +1,7 @@
 <!-- components/ConfirmDialog.vue -->
 <script setup lang="ts">
+import DialogShell from '~/components/common/DialogShell.vue'
+
 interface Props {
   open: boolean
   title: string
@@ -7,12 +9,15 @@ interface Props {
   confirmLabel?: string
   cancelLabel?: string
   danger?: boolean
+  /** Disables both actions while the confirmed work is in flight. */
+  loading?: boolean
 }
 
 withDefaults(defineProps<Props>(), {
   confirmLabel: 'Confirm',
   cancelLabel: 'Cancel',
   danger: false,
+  loading: false,
 })
 
 const emit = defineEmits<{
@@ -22,36 +27,40 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <Teleport to="body">
-    <div
-      v-if="open"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-[#3B1F0E]/40 backdrop-blur-sm"
-      @click.self="emit('cancel')"
-    >
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
-        <h2 class="font-display text-lg font-semibold text-[#3B1F0E]">{{ title }}</h2>
-        <p class="font-sans text-sm text-[#3B1F0E]/70 mt-2">{{ message }}</p>
+  <!-- Focus starts on the safe action, not the destructive one. -->
+  <DialogShell
+    :open="open"
+    :title="title"
+    :message="message"
+    :tone="danger ? 'danger' : 'info'"
+    :icon="danger ? 'heroicons:exclamation-triangle' : 'heroicons:question-mark-circle'"
+    :busy="loading"
+    @close="emit('cancel')"
+  >
+    <slot />
 
-        <div class="flex items-center justify-end gap-3 mt-6">
-          <button
-            type="button"
-            class="rounded-lg px-4 py-2 font-sans text-sm font-medium text-[#3B1F0E]/70 hover:bg-[#F3E7D2] transition-colors"
-            @click="emit('cancel')"
-          >
-            {{ cancelLabel }}
-          </button>
-          <button
-            type="button"
-            class="rounded-lg px-4 py-2 font-sans text-sm font-semibold transition-colors"
-            :class="danger
-              ? 'bg-[#D9534F] text-white hover:bg-[#C24541]'
-              : 'bg-[#3B1F0E] text-[#FDF3E7] hover:bg-[#2C1609]'"
-            @click="emit('confirm')"
-          >
-            {{ confirmLabel }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </Teleport>
+    <template #actions>
+      <button
+        type="button"
+        data-autofocus
+        :disabled="loading"
+        class="whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold bg-transparent text-[#5E4A42] border border-[#DED4CA] hover:bg-[#F1E9DE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFFDF9] focus-visible:ring-[#7D5A50] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        @click="emit('cancel')"
+      >
+        {{ cancelLabel }}
+      </button>
+      <button
+        type="button"
+        :disabled="loading"
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFFDF9] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        :class="danger
+          ? 'bg-[#9E4F47] hover:bg-[#8A423B] focus-visible:ring-[#9E4F47]'
+          : 'bg-[#3A2923] hover:bg-[#2C1E19] focus-visible:ring-[#3A2923]'"
+        @click="emit('confirm')"
+      >
+        <Icon v-if="loading" name="heroicons:arrow-path" class="size-4 animate-spin motion-reduce:animate-pulse" aria-hidden="true" />
+        {{ confirmLabel }}
+      </button>
+    </template>
+  </DialogShell>
 </template>
