@@ -609,6 +609,8 @@ async function openTransactions() {
     const res = await devicePosService.getTransactions()
     if (res.success) {
       transactionsData.value = res
+    } else {
+      transactionsError.value = 'Transactions could not be loaded.'
     }
   } catch (e: any) {
     transactionsError.value = navigator.onLine ? 'Transactions could not be loaded.' : 'No internet connection.'
@@ -1031,71 +1033,18 @@ function formatCurrency(amount: number) {
         </div>
       </div>
 
-      <!-- ── TRANSACTIONS MODAL ───────────────────────────────────────────── -->
-      <div v-if="isTransactionsModalOpen" role="dialog" aria-modal="true" aria-labelledby="txn-title" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4" @click.self="isTransactionsModalOpen = false">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl flex flex-col overflow-hidden modal-pop max-h-[85vh]">
-          
-          <div class="px-5 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-            <h2 id="txn-title" class="text-xl font-bold text-[#7B5A50]">Transaction History</h2>
-            <div class="flex items-center gap-2">
-              <button @click="exportTransactionsCSV" class="px-3 min-h-11 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-md flex items-center gap-1.5 shadow-sm transition-colors">
-                <Icon name="heroicons:arrow-down-tray" class="w-4 h-4" /> Export CSV
-              </button>
-              <button @click="printZReading" class="px-3 min-h-11 bg-[#7B5A50] hover:bg-[#65463D] text-white text-sm font-semibold rounded-md flex items-center gap-1.5 shadow-sm transition-colors">
-                <Icon name="heroicons:printer" class="w-4 h-4" /> Print Z-Reading
-              </button>
-              <button @click="isTransactionsModalOpen = false" aria-label="Close transactions" class="w-11 h-11 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors bg-white border border-gray-200 hover:bg-gray-100 rounded-md">
-                <Icon name="heroicons:x-mark" class="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div class="p-5 flex-1 overflow-y-auto">
-            <div v-if="isLoadingTransactions" class="flex justify-center py-10">
-              <Icon name="heroicons:arrow-path" class="w-6 h-6 animate-spin text-gray-400" />
-            </div>
-            <div v-else-if="transactionsError" role="alert" class="py-10 text-center">
-              <p class="text-base text-gray-700">{{ transactionsError }}</p>
-              <button @click="openTransactions" class="mt-3 min-h-11 px-5 bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-md">Try again</button>
-            </div>
-            <div v-else-if="transactionsData">
-              <!-- Stats Row -->
-              <div class="grid grid-cols-2 gap-4 mb-6">
-                <div class="bg-[#7B5A50]/10 border border-[#7B5A50]/20 rounded-lg p-4">
-                  <p class="text-sm font-semibold text-[#7B5A50] uppercase tracking-wider mb-1">Today's Sales</p>
-                  <p class="text-3xl font-bold text-[#7B5A50]">{{ formatCurrency(transactionsData.today_total) }}</p>
-                </div>
-                <div class="bg-[#7B5A50]/10 border border-[#7B5A50]/20 rounded-lg p-4">
-                  <p class="text-sm font-semibold text-[#7B5A50] uppercase tracking-wider mb-1">This Month's Sales</p>
-                  <p class="text-3xl font-bold text-[#7B5A50]">{{ formatCurrency(transactionsData.month_total) }}</p>
-                </div>
-              </div>
-
-              <!-- Transactions List -->
-              <h3 class="font-bold text-gray-800 text-base mb-3">Recent Transactions</h3>
-              <div v-if="transactionsData.transactions.length === 0" class="text-center py-8 text-gray-500 text-base">
-                No transactions recorded yet.
-              </div>
-              <div v-else class="space-y-2">
-                <div v-for="txn in transactionsData.transactions" :key="txn.uuid" class="flex items-center justify-between p-3 border border-gray-200 rounded-md bg-white hover:bg-gray-50 transition-colors">
-                  <div class="flex flex-col gap-0.5">
-                    <div class="flex items-center gap-2">
-                      <span class="font-bold text-gray-900 text-base">{{ formatCurrency(txn.total_amount) }}</span>
-                      <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">{{ txn.receipt_number || 'N/A' }}</span>
-                    </div>
-                    <span class="text-sm text-gray-500">{{ new Date(txn.created_at).toLocaleString() }} &bull; Staff: {{ txn.staff_name }}</span>
-                  </div>
-                  <div class="flex items-center gap-3">
-                    <span class="text-sm font-medium bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded uppercase">{{ txn.status }}</span>
-                    <span class="text-sm text-gray-500 font-medium">{{ txn.items_count }} items</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
+      <!-- ── TODAY'S SALES ──────────────────────────────────────────────── -->
+      <PosTransactionsPanel
+        v-if="isTransactionsModalOpen"
+        :data="transactionsData"
+        :loading="isLoadingTransactions"
+        :error="transactionsError"
+        :branch-name="device.branch_name"
+        @close="isTransactionsModalOpen = false"
+        @retry="openTransactions"
+        @export="exportTransactionsCSV"
+        @print="printZReading"
+      />
 
       <!-- ── SIZE AND ADD-ON PICKER ───────────────────────────────────────── -->
       <div v-if="optionsItem" role="dialog" aria-modal="true" aria-labelledby="options-title" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4 print:hidden" @click.self="closeOptions">
@@ -1280,12 +1229,20 @@ function formatCurrency(amount: number) {
       </div>
 
       <div v-if="transactionsData" class="space-y-2 border-b border-black pb-4 border-dashed mb-4">
-        <div class="flex justify-between font-bold text-lg">
+        <div class="flex justify-between">
           <span>GROSS SALES</span>
+          <span>{{ formatCurrency(transactionsData.gross_total ?? transactionsData.today_total) }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span>VOIDS ({{ transactionsData.void_count ?? 0 }})</span>
+          <span>-{{ formatCurrency(transactionsData.void_total ?? 0) }}</span>
+        </div>
+        <div class="flex justify-between font-bold text-lg border-t border-black border-dashed pt-1">
+          <span>NET SALES</span>
           <span>{{ formatCurrency(transactionsData.today_total) }}</span>
         </div>
         <div class="flex justify-between">
-          <span>Total Transactions</span>
+          <span>Settled Transactions</span>
           <span>{{ transactionsData.today_count }}</span>
         </div>
       </div>

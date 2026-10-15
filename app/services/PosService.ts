@@ -24,6 +24,28 @@ export interface LockScreenStaff {
     pin_must_change: boolean
 }
 
+export interface PosTransactionDetail {
+    uuid: string
+    receipt_number: string
+    created_at: string
+    staff_name: string
+    status: string
+    subtotal: number
+    discount_type: string | null
+    discount_amount: number
+    total_amount: number
+    payment: { method: string; reference_number: string | null; amount_tendered: number; change: number } | null
+    items: {
+        uuid: string
+        menu_name: string
+        size_name: string | null
+        quantity: number
+        unit_price: number
+        line_total: number
+        addons: { name: string; quantity: number; price: number }[]
+    }[]
+}
+
 export class PosService extends BaseService {
     // ── Setup API (Uses Owner/Manager auth_token) ────────────────────────────────
 
@@ -68,7 +90,11 @@ export class DevicePosService extends BaseService {
     }
 
     getTransactions() {
-        return this.get<{ success: boolean; today_total: number; today_count: number; month_total: number; transactions: any[] }>('/pos/device/transactions')
+        return this.get<{ success: boolean; today_total: number; today_count: number; gross_total: number; void_count: number; void_total: number; month_total: number; transactions: any[] }>('/pos/device/transactions')
+    }
+
+    getTransaction(transactionUuid: string) {
+        return this.get<{ success: boolean; transaction: PosTransactionDetail }>('/pos/device/transactions/' + transactionUuid)
     }
 
     checkout(items: any[], paymentMethod: string, amountTendered: number, referenceNumber?: string, discountType?: string, discountAmount?: number) {
