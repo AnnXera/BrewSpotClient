@@ -155,7 +155,9 @@ defineExpose({ focus: () => button.value?.focus() })
       :disabled="disabled"
       :title="title"
       :class="[
-        'w-full text-left focus:outline-none transition-shadow disabled:opacity-60 disabled:cursor-not-allowed',
+        // block: an inline button would sit on the text baseline and leave a gap below it,
+        // pushing the label above the chevron in the bare (sort pill) style.
+        'block w-full text-left focus:outline-none transition-shadow disabled:opacity-60 disabled:cursor-not-allowed',
         bare
           ? 'bg-transparent text-inherit pr-6 rounded-md focus-visible:ring-2 focus-visible:ring-[#B4846C]'
           : [
