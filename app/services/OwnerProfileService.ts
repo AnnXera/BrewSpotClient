@@ -64,11 +64,16 @@ export class OwnerProfileService extends BaseService {
         const params: Record<string, any> = { per_page: perPage, page }
         if (search) params.search = search
         if (status) params.status = status
-        return this.get<{ success: boolean; cafe_name: string | null; branches: Paginated<BranchSummary> }>('/owner/branches', params)
+        return this.get<{ success: boolean; cafe_name: string | null; main_tin_prefix?: string | null; branches: Paginated<BranchSummary> }>('/owner/branches', params)
     }
 
     createBranch(payload: FormData | Record<string, any>) {
         return this.post<{ success: boolean; message: string; branch?: any }>('/owner/branches', payload)
+    }
+
+    // 422 with errors.cafe_email / errors.cafe_phonenumber when either is taken
+    checkBranchContact(payload: { cafe_email: string; cafe_phonenumber: string }) {
+        return this.post<{ success: boolean }>('/owner/branches/check-contact', payload)
     }
 
     updateBranch(uuid: string, payload: { status?: string; [key: string]: any }) {
@@ -84,13 +89,81 @@ export class OwnerProfileService extends BaseService {
         return this.put<{ success: boolean; message: string; data?: ApiOpeningHour[] }>('/owner/opening-hours', { hours })
     }
 
-    getDashboardStats() {
-        return this.get<{ 
-            success: boolean; 
-            total_earnings?: number; 
-            detailed_stats?: { today_revenue: number, today_orders: number, avg_order_value: number, active_customers: number };
-            chart_data?: { month: string, revenue: number }[];
-            top_selling_items?: { rank: number, name: string, category: string, orders: number, percentage: number, revenue: number }[]
-        }>('/owner/dashboard-stats')
+    // Totals across every branch, plus one range's income series. Trending items,
+    // categories and branches cover the same window as the series.
+    getDashboardStats(range: DashboardRange = 'daily') {
+        return this.get<OwnerDashboardStats>('/owner/dashboard-stats', { range })
     }
+}
+
+export type DashboardRange = 'daily' | 'weekly' | 'monthly'
+
+export interface DashboardSeriesPoint {
+    start: string // Y-m-d
+    end: string
+    label: string
+    revenue: number
+    orders: number
+    upcoming: boolean // later this week; nothing to show yet
+}
+
+export interface DashboardTrendingItem {
+    rank: number
+    uuid: string
+    name: string
+    category: string
+    orders: number // orders that included the item
+    quantity: number
+    sales: number
+    share: number // percent of all orders in the window
+}
+
+export interface DashboardCategory {
+    uuid: string | null
+    name: string
+    orders: number // orders that included the category
+    quantity: number
+    sales: number
+    items: number
+    share: number // percent of all orders in the window; can sum past 100
+}
+
+export interface DashboardBranch {
+    uuid: string
+    name: string
+    branch_type: string
+    status: string
+    revenue: number
+    orders: number
+    share: number
+}
+
+export interface OwnerDashboardStats {
+    success: boolean
+    generated_at: string
+    totals: {
+        branches: number
+        active_branches: number
+        pending_branches: number
+        orders: number
+        revenue: number
+        today_revenue: number
+        today_orders: number
+    }
+    period: {
+        range: DashboardRange
+        from: string
+        to: string
+        revenue: number
+        orders: number
+        avg_order_value: number
+        previous_revenue: number
+        previous_orders: number
+        revenue_change: number | null
+        orders_change: number | null
+    }
+    series: DashboardSeriesPoint[]
+    trending_items: DashboardTrendingItem[]
+    top_categories: DashboardCategory[]
+    branches: DashboardBranch[]
 }

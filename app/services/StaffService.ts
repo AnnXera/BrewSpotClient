@@ -79,6 +79,27 @@ export interface CreateStaffResponse {
     errors?: Record<string, string[]>
 }
 
+// Every field is optional; only what changed needs to be sent.
+// employment_status can't be 'terminated' here (use terminateBranchStaff).
+export interface UpdateStaffPayload {
+    firstname?: string
+    middlename?: string | null
+    lastname?: string
+    phone_number?: string
+    email?: string
+    address?: string | null
+    role?: StaffRole
+    hired_at?: string | null
+    employment_status?: Exclude<EmploymentStatus, 'terminated'>
+}
+
+export interface StaffSaveResponse {
+    success: boolean
+    message: string
+    staff?: StaffMember
+    warnings?: string[]
+}
+
 export interface BranchStaffFilters {
     search?: string
     status?: EmploymentStatus | ''
@@ -115,6 +136,21 @@ export class StaffService extends BaseService {
     // One employee as seen from this branch (details page).
     getBranchStaff(branchUuid: string, userUuid: string) {
         return this.get<{ success: boolean; message?: string; staff?: StaffMember }>(`${this.base(branchUuid)}/${userUuid}`)
+    }
+
+    // Personal info applies everywhere; hired_at / employment_status to this branch only.
+    updateBranchStaff(branchUuid: string, userUuid: string, payload: UpdateStaffPayload) {
+        return this.patch<StaffSaveResponse>(`${this.base(branchUuid)}/${userUuid}`, payload as Record<string, any>)
+    }
+
+    // Replaces the whole weekly schedule at this branch.
+    updateBranchStaffSchedule(branchUuid: string, userUuid: string, schedule: StaffScheduleInput[]) {
+        return this.put<StaffSaveResponse>(`${this.base(branchUuid)}/${userUuid}/schedule`, { schedule })
+    }
+
+    // Sets (or resets) their register PIN and unlocks it if it was locked.
+    setBranchStaffPin(branchUuid: string, userUuid: string, pin: string) {
+        return this.put<{ success: boolean; message: string }>(`${this.base(branchUuid)}/${userUuid}/pin`, { pin })
     }
 
     // Ends their employment at this branch only.

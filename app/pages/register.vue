@@ -2,6 +2,27 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import logoFull from '~/assets/images/logo-with-tag.svg'
+import DropdownList, { type DropdownListOption } from '~/components/common/DropdownList.vue'
+
+const PHONE_TYPE_OPTIONS: DropdownListOption<'mobile' | 'telephone'>[] = [
+  { value: 'mobile', label: 'Phone (+63)' },
+  { value: 'telephone', label: 'Landline' }
+]
+
+const ID_TYPE_OPTIONS: DropdownListOption<string>[] = [
+  { value: 'drivers_license', label: "Driver's License" },
+  { value: 'passport', label: 'Passport' },
+  { value: 'national_id', label: 'National ID' },
+  { value: 'sss', label: 'SSS ID' },
+  { value: 'philhealth', label: 'PhilHealth ID' },
+  { value: 'pagibig', label: 'Pag-IBIG ID' },
+  { value: 'voters_id', label: "Voter's ID" }
+]
+
+const CAFE_DOC_TYPE_OPTIONS: DropdownListOption<'DTI' | 'SEC'>[] = [
+  { value: 'DTI', label: 'DTI' },
+  { value: 'SEC', label: 'SEC' }
+]
 
 const authService = useAuthService()
 
@@ -26,6 +47,7 @@ let cooldownTimer: ReturnType<typeof setInterval> | null = null
 
 // Step 3: Your Details
 const userUuid = ref('')
+const verifiedEmail = ref('') // the email userUuid was verified for; going back with it skips the code
 const firstname = ref('')
 const middlename = ref('')
 const lastname = ref('')
@@ -273,18 +295,20 @@ const dtiSecFileName = ref('')
 const dtiSecFileSize = ref('')
 const dtiSecFilePath = ref('')
 
+// Optional café picture (shown publicly on the branch)
+const cafePictureName = ref('')
+const cafePicturePath = ref('')
+const cafePicturePreview = ref('') // object URL; empty after a draft restore, when only the name is known
+
 // BIR Certificate Additional Details
 const birRegisteredAt = ref('')
 const tinNumber = ref('')
 const vat = ref<'vat-registered' | 'non-vat'>('non-vat')
 
+// XXX-XXX-XXX-XXXXX: 9-digit TIN + 5-digit branch code (00000 = head office / main branch)
 function formatTinNumber(val: string): string {
-  const raw = val.replace(/[^0-9]/g, '').slice(0, 12)
-  const parts: string[] = []
-  for (let i = 0; i < raw.length; i += 3) {
-    parts.push(raw.slice(i, i + 3))
-  }
-  return parts.join('-')
+  const raw = val.replace(/[^0-9]/g, '').slice(0, 14)
+  return [raw.slice(0, 3), raw.slice(3, 6), raw.slice(6, 9), raw.slice(9, 14)].filter(Boolean).join('-')
 }
 
 function onTinInput(event: Event) {
@@ -326,6 +350,7 @@ function clearAllInputs() {
   }
   // Step 3
   userUuid.value = ''
+  verifiedEmail.value = ''
   firstname.value = ''
   middlename.value = ''
   lastname.value = ''
@@ -361,6 +386,7 @@ function clearAllInputs() {
   dtiSecFileName.value = ''
   dtiSecFileSize.value = ''
   dtiSecFilePath.value = ''
+  clearCafePicture()
   birRegisteredAt.value = ''
   tinNumber.value = ''
   vat.value = 'non-vat'
@@ -389,6 +415,11 @@ async function handleSendCode() {
   }
   if (!isValidEmail(trimmedEmail)) {
     error.value = 'Invalid email format. Email must follow standard user@domain.com syntax with an "@" symbol and a valid domain (e.g., name@gmail.com).'
+    return
+  }
+  // Already verified this email in this tab: go straight back to the application.
+  if (userUuid.value && trimmedEmail.toLowerCase() === verifiedEmail.value.toLowerCase()) {
+    currentStep.value = 3
     return
   }
   loading.value = true
@@ -481,6 +512,7 @@ async function handleVerifyOTP() {
     const res = await authService.verifyRegistrationCode(email.value.trim(), otpCode.value) as any
     if (res.user_uuid) {
       userUuid.value = res.user_uuid
+      verifiedEmail.value = email.value.trim()
       currentStep.value = 3
     } else {
       error.value = res.message || 'That code did not work. Check it and try again.'
@@ -997,6 +1029,51 @@ function clearDtiSecFile() {
   dtiSecFilePath.value = ''
 }
 
+async function onCafePictureChange(event: Event) {
+  error.value = ''
+  delete fieldErrors.value.cafe_picture
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  if (!['image/jpeg', 'image/png'].includes(file.type)) {
+    error.value = 'Café picture must be a JPG or PNG image.'
+    input.value = ''
+    return
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    error.value = 'Café picture must not exceed 2MB.'
+    input.value = ''
+    return
+  }
+
+  loading.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await authService.uploadTempFile(formData)
+    if (res.success && res.path) {
+      clearCafePicture()
+      cafePicturePath.value = res.path
+      cafePictureName.value = file.name
+      cafePicturePreview.value = URL.createObjectURL(file)
+    } else {
+      error.value = res.message || 'Failed to upload café picture.'
+    }
+  } catch (e: any) {
+    error.value = extractErrorMessage(e, 'Upload failed.')
+  } finally {
+    input.value = ''
+    loading.value = false
+  }
+}
+
+function clearCafePicture() {
+  if (cafePicturePreview.value) URL.revokeObjectURL(cafePicturePreview.value)
+  cafePicturePreview.value = ''
+  cafePictureName.value = ''
+  cafePicturePath.value = ''
+}
+
 async function handleFinalSubmit() {
   error.value = ''
   success.value = ''
@@ -1022,9 +1099,14 @@ async function handleFinalSubmit() {
       return
     }
     const tinRaw = tinNumber.value.replace(/[^0-9]/g, '')
-    if (tinRaw.length < 12) {
-      fieldErrors.value.tin_number = 'TIN Number must follow format XXX-XXX-XXX-XXX.'
-      error.value = 'TIN Number must follow format XXX-XXX-XXX-XXX.'
+    if (tinRaw.length !== 14) {
+      fieldErrors.value.tin_number = 'TIN Number must follow format XXX-XXX-XXX-00000.'
+      error.value = 'TIN Number must follow format XXX-XXX-XXX-00000.'
+      return
+    }
+    if (!tinRaw.endsWith('00000')) {
+      fieldErrors.value.tin_number = 'Main branch TIN must end in 00000 (head office branch code).'
+      error.value = 'Main branch TIN must end in 00000 (head office branch code).'
       return
     }
     if (!vat.value) {
@@ -1080,6 +1162,7 @@ async function handleFinalSubmit() {
     payload.append('address', address.value)
     payload.append('cafe_phonenumber', cafePhone.value)
     payload.append('cafe_email', cafeEmail.value)
+    if (cafePicturePath.value) payload.append('cafe_picture', cafePicturePath.value)
 
     payload.append('bir_file', birFilePath.value)
     payload.append('dti_sec_file', dtiSecFilePath.value)
@@ -1103,6 +1186,17 @@ async function handleFinalSubmit() {
           fieldErrors.value[k] = msgs[0] as string
         }
       }
+      // An expired/missing upload: drop the stale file so its upload box shows again.
+      if (fieldErrors.value.file) {
+        governmentIdFile.value = null; governmentIdFileName.value = ''; governmentIdFilePath.value = ''
+      }
+      if (fieldErrors.value.file_back) {
+        governmentIdFileBack.value = null; governmentIdFileBackName.value = ''; governmentIdFileBackPath.value = ''
+      }
+      if (fieldErrors.value.bir_file) clearBirFile()
+      if (fieldErrors.value.dti_sec_file) clearDtiSecFile()
+      if (fieldErrors.value.cafe_picture) clearCafePicture()
+
       const personalFields = ['username', 'phone_number', 'firstname', 'middlename', 'lastname', 'owner_address', 'id_type', 'file', 'file_back']
       const businessFields = ['cafe_name', 'branch_name', 'address', 'cafe_email', 'cafe_phonenumber', 'cafe_picture', 'cafe_doc_type']
 
@@ -1130,6 +1224,11 @@ async function handleFinalSubmit() {
 // Data Loss Prevention & Drafting
 function saveDraft() {
   const draft = {
+    // Where to resume: only the application steps, once the email is verified
+    userUuid: userUuid.value,
+    verifiedEmail: verifiedEmail.value,
+    step: currentStep.value === 4 ? 4 : 3,
+    businessSubPage: businessSubPage.value,
     email: email.value,
     firstname: firstname.value,
     middlename: middlename.value,
@@ -1155,6 +1254,8 @@ function saveDraft() {
     governmentIdFileBackPath: governmentIdFileBackPath.value,
     birFilePath: birFilePath.value,
     dtiSecFilePath: dtiSecFilePath.value,
+    cafePicturePath: cafePicturePath.value,
+    cafePictureName: cafePictureName.value,
     // File names for display
     governmentIdFileName: governmentIdFileName.value,
     governmentIdFileBackName: governmentIdFileBackName.value,
@@ -1213,6 +1314,18 @@ function restoreDraft() {
         dtiSecFileName.value = draft.dtiSecFileName || 'Uploaded File'
         dtiSecFile.value = new File([''], dtiSecFileName.value, { type: 'application/octet-stream' })
       }
+
+      // Email already verified: resume the application instead of the email step
+      if (draft.userUuid) {
+        userUuid.value = draft.userUuid
+        verifiedEmail.value = draft.verifiedEmail || draft.email || ''
+        currentStep.value = draft.step === 4 ? 4 : 3
+        if (draft.businessSubPage === 2) businessSubPage.value = 2
+      }
+      if (draft.cafePicturePath) {
+        cafePicturePath.value = draft.cafePicturePath
+        cafePictureName.value = draft.cafePictureName || 'Uploaded Picture'
+      }
     } catch (e) {
       console.warn('Failed to parse draft from sessionStorage', e)
     }
@@ -1220,7 +1333,7 @@ function restoreDraft() {
 }
 
 watch(
-  [email, firstname, middlename, lastname, username, phoneType, mobileDigits, landlineDigits, ownerAddress, idType, cafeName, cafeDocType, branchName, address, cafePhoneType, cafeMobileDigits, cafeLandlineDigits, cafeEmail, birRegisteredAt, tinNumber, vat, governmentIdFilePath, governmentIdFileBackPath, birFilePath, dtiSecFilePath],
+  [userUuid, currentStep, businessSubPage, email, firstname, middlename, lastname, username, phoneType, mobileDigits, landlineDigits, ownerAddress, idType, cafeName, cafeDocType, branchName, address, cafePhoneType, cafeMobileDigits, cafeLandlineDigits, cafeEmail, birRegisteredAt, tinNumber, vat, governmentIdFilePath, governmentIdFileBackPath, birFilePath, dtiSecFilePath, cafePicturePath],
   () => {
     saveDraft()
   },
@@ -1569,20 +1682,18 @@ onBeforeUnmount(() => {
               <div class="space-y-1">
                 <label class="block text-sm font-medium text-[#2d201b]">Contact No. *</label>
                 <div
-                  class="flex items-center rounded-md border bg-white overflow-hidden transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
+                  class="flex items-center rounded-md border bg-white transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
                   :class="fieldErrors.phone_number ? 'border-red-500' : 'border-gray-300'"
                 >
                   <!-- Box-type Type Selector beside input number -->
-                  <div class="relative bg-gray-100 border-r border-gray-300 shrink-0 h-full flex items-center">
-                    <select
+                  <div class="bg-gray-100 border-r border-gray-300 rounded-l-md shrink-0 h-full flex items-center px-3 text-[#2d201b] font-semibold text-xs">
+                    <DropdownList
                       v-model="phoneType"
+                      :options="PHONE_TYPE_OPTIONS"
+                      bare
+                      aria-label="Contact number type"
                       @change="onPhoneTypeChange"
-                      class="h-full bg-transparent text-[#2d201b] font-semibold text-xs pl-3 pr-7 outline-none cursor-pointer appearance-none z-10"
-                    >
-                      <option value="mobile">Phone (+63)</option>
-                      <option value="telephone">Landline</option>
-                    </select>
-                    <Icon name="heroicons:chevron-down" class="w-3.5 h-3.5 text-gray-500 absolute right-2 pointer-events-none" />
+                    />
                   </div>
 
                   <!-- Mobile Input (10 digits starting with 9) -->
@@ -1635,18 +1746,13 @@ onBeforeUnmount(() => {
               
               <div class="space-y-1 w-full sm:w-1/2">
                 <label class="block text-sm font-medium text-[#2d201b]">ID Type</label>
-                <select
+                <DropdownList
                   v-model="idType"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm font-medium text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20 cursor-pointer"
-                >
-                  <option value="drivers_license">Driver's License</option>
-                  <option value="passport">Passport</option>
-                  <option value="national_id">National ID</option>
-                  <option value="sss">SSS ID</option>
-                  <option value="philhealth">PhilHealth ID</option>
-                  <option value="pagibig">Pag-IBIG ID</option>
-                  <option value="voters_id">Voter's ID</option>
-                </select>
+                  :options="ID_TYPE_OPTIONS"
+                  size="sm"
+                  white
+                  :invalid="!!fieldErrors.id_type"
+                />
                 <p v-if="fieldErrors.id_type" class="text-xs text-red-600 font-medium">{{ fieldErrors.id_type }}</p>
               </div>
 
@@ -1776,13 +1882,12 @@ onBeforeUnmount(() => {
                   </div>
                   <div class="col-span-2 sm:col-span-1">
                     <label class="block text-sm font-medium mb-1 text-[#2d201b]">Document Type *</label>
-                    <select
+                    <DropdownList
                       v-model="cafeDocType"
-                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                    >
-                      <option value="DTI">DTI</option>
-                      <option value="SEC">SEC</option>
-                    </select>
+                      :options="CAFE_DOC_TYPE_OPTIONS"
+                      size="sm"
+                      white
+                    />
                   </div>
                   <div class="col-span-2">
                     <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Name</label>
@@ -1797,6 +1902,39 @@ onBeforeUnmount(() => {
                 </div>
               </div>
 
+              <!-- Café Picture (optional) -->
+              <div class="space-y-3 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                  <Icon name="heroicons:photo" class="w-4 h-4 text-[#7B5A50]" /> Café Picture
+                  <span class="text-xs font-normal text-gray-500">(optional)</span>
+                </h3>
+                <div v-if="!cafePicturePath">
+                  <input
+                    type="file"
+                    @change="onCafePictureChange"
+                    accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                    class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                  />
+                  <p class="text-xs text-gray-500 mt-1.5">A photo of your café's storefront or interior. JPG or PNG, up to 2MB.</p>
+                </div>
+                <div v-else class="flex items-center gap-3 text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
+                  <img
+                    v-if="cafePicturePreview"
+                    :src="cafePicturePreview"
+                    alt="Café picture preview"
+                    class="w-14 h-14 rounded-md object-cover shrink-0"
+                  />
+                  <p class="font-medium truncate flex-1">{{ cafePictureName || 'Uploaded Picture' }}</p>
+                  <button
+                    type="button"
+                    @click="clearCafePicture"
+                    class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
+                    title="Remove picture"
+                  >&times;</button>
+                </div>
+                <p v-if="fieldErrors.cafe_picture" class="text-xs text-red-600 font-medium">{{ fieldErrors.cafe_picture }}</p>
+              </div>
+
               <!-- Contact Info -->
               <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
                 <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
@@ -1806,20 +1944,18 @@ onBeforeUnmount(() => {
                   <div class="space-y-1">
                   <label class="block text-sm font-medium text-[#2d201b]">Branch Phone *</label>
                   <div
-                    class="flex items-center rounded-md border bg-white overflow-hidden transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
+                    class="flex items-center rounded-md border bg-white transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
                     :class="fieldErrors.cafe_phonenumber ? 'border-red-500' : 'border-gray-300'"
                   >
                     <!-- Box-type Type Selector beside input number -->
-                    <div class="relative bg-gray-100 border-r border-gray-300 shrink-0 h-full flex items-center">
-                      <select
+                    <div class="bg-gray-100 border-r border-gray-300 rounded-l-md shrink-0 h-full flex items-center px-3 text-[#2d201b] font-semibold text-xs">
+                      <DropdownList
                         v-model="cafePhoneType"
+                        :options="PHONE_TYPE_OPTIONS"
+                        bare
+                        aria-label="Branch phone type"
                         @change="onCafePhoneTypeChange"
-                        class="h-full bg-transparent text-[#2d201b] font-semibold text-xs pl-3 pr-7 outline-none cursor-pointer appearance-none z-10"
-                      >
-                        <option value="mobile">Phone (+63)</option>
-                        <option value="telephone">Landline</option>
-                      </select>
-                      <Icon name="heroicons:chevron-down" class="w-3.5 h-3.5 text-gray-500 absolute right-2 pointer-events-none" />
+                      />
                     </div>
 
                     <!-- Mobile Input (10 digits starting with 9) -->
@@ -2031,8 +2167,8 @@ onBeforeUnmount(() => {
                     <input
                       v-model="tinNumber"
                       type="text"
-                      placeholder="XXX-XXX-XXX-XXX"
-                      maxlength="15"
+                      placeholder="XXX-XXX-XXX-00000"
+                      maxlength="17"
                       :class="[
                         'w-full h-10 rounded-md border px-3 outline-none transition bg-white text-xs text-[#2d201b] font-mono tracking-wider',
                         fieldErrors.tin_number

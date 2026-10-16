@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, toRef } from 'vue'
 import { useMenuService } from '~/composables/useMenuService'
+import { useNavCategories } from '~/composables/useNavCategories'
 import { useMenuItemSort } from '~/composables/useMenuItemSort'
 import MenuToolbar from '~/components/menu/MenuToolbar.vue'
 import CategoryMoveWarning from '~/components/menu/CategoryMoveWarning.vue'
@@ -20,6 +21,7 @@ const emit = defineEmits<{
 }>()
 
 const menuService = useMenuService()
+const { refresh: refreshNavCategories } = useNavCategories() // keeps the sidebar's category list current
 const { alertDialog, showAlert } = useDialogs()
 
 const form = ref({
@@ -120,6 +122,7 @@ const saveCategory = async () => {
     } else {
       await menuService.createMenuCategory(formData)
     }
+    refreshNavCategories()
 
     emit('saved')
     emit('close')

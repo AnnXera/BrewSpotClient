@@ -1,208 +1,164 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import RenewalBanner from '~/components/subscription/RenewalBanner.vue'
-import OwnerMetricCards from '~/components/dashboard/OwnerMetricCards.vue'
-import OwnerAnalyticsChart from '~/components/dashboard/OwnerAnalyticsChart.vue'
-import OwnerDetailedStats from '~/components/dashboard/OwnerDetailedStats.vue'
-import OwnerTopSellingMenu from '~/components/dashboard/OwnerTopSellingMenu.vue'
-import type { BranchSummary } from '~/services/OwnerProfileService'
-import type { SubscriptionItem } from '~/services/SubscriptionService'
+import { computed, onMounted, ref, watch } from 'vue'
+import OwnerTotals from '~/components/dashboard/OwnerTotals.vue'
+import OwnerIncomeChart from '~/components/dashboard/OwnerIncomeChart.vue'
+import OwnerBranchBreakdown from '~/components/dashboard/OwnerBranchBreakdown.vue'
+import OwnerTrendingItems from '~/components/dashboard/OwnerTrendingItems.vue'
+import OwnerTopCategories from '~/components/dashboard/OwnerTopCategories.vue'
+import type { DashboardRange, OwnerDashboardStats } from '~/services/OwnerProfileService'
+import { formatSpan } from '~/utils/dashboardFormat'
 
 definePageMeta({
   role: 'Cafe Owner',
 })
 
-const links = [
-  { label: 'Dashboard', to: '/owner/dashboard', icon: 'squares-2x2' },
-  { label: 'Cafe Management', to: '/owner/cafes', icon: 'building-storefront' },
-  { label: 'Menu Management', to: '/owner/menu-management', icon: 'book-open' },
-  { label: 'Subscription', to: '/owner/subscription', icon: 'credit-card' },
-]
+const links = OWNER_NAV_LINKS
 
 const ownerProfileService = useOwnerProfileService()
-const menuService = useMenuService()
-const subService = useSubscriptionService()
+const route = useRoute()
+const router = useRouter()
 
-const loading = ref(true)
-const lastRefreshedAt = ref<string>('')
+const ranges: DashboardRange[] = ['daily', 'weekly', 'monthly']
+const initialRange = ranges.find(r => r === route.query.range) ?? 'daily'
 
-const totalBranches = ref(0)
-const activeBranches = ref(0)
-const recentBranches = ref<BranchSummary[]>([])
-const totalMenuItems = ref(0)
-const currentPlanName = ref('')
-const totalEarnings = ref(0)
-const detailedStats = ref<{ today_revenue: number, today_orders: number, avg_order_value: number, active_customers: number } | null>(null)
-const chartData = ref<{ month: string, revenue: number }[]>([])
-const topSellingItems = ref<any[]>([])
+const range = ref<DashboardRange>(initialRange)
+const stats = ref<OwnerDashboardStats | null>(null)
+const loading = ref(true)     // nothing loaded yet
+const refreshing = ref(false) // reloading with data already on screen
+const error = ref('')
 
-async function loadDashboardData() {
-  loading.value = true
-  lastRefreshedAt.value = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+// A late response for a range the owner already left must not overwrite the newer one.
+let requestId = 0
+
+async function load() {
+  const id = ++requestId
+  if (stats.value) refreshing.value = true
+  error.value = ''
 
   try {
-    // 1. Fetch Branches
-    const branchesRes = await ownerProfileService.getBranches(5, 1)
-    if (branchesRes?.success && branchesRes.branches) {
-      totalBranches.value = branchesRes.branches.total || 0
-      recentBranches.value = branchesRes.branches.data || []
-      
-      // Attempt to find active branches if total matches
-      // (If paginated, this active count might only reflect the first page, 
-      // but without a separate stats endpoint, we do our best. Alternatively we could just say total.)
-      activeBranches.value = recentBranches.value.filter(b => b.status === 'approved' || b.status === 'active').length
-    }
-
-    // 2. Fetch Menu Items Count
-    const menuRes = await menuService.getMenuItems({ per_page: 1 })
-    if (menuRes?.success && menuRes.items && 'total' in menuRes.items) {
-      totalMenuItems.value = menuRes.items.total || 0
-    }
-
-    // 3. Fetch Subscription
-    const subRes = await subService.getCurrentPlan()
-    if (subRes?.success && subRes.subscription) {
-      currentPlanName.value = subRes.subscription.plan?.sub_name || 'Active Plan'
-    }
-
-    // 4. Fetch Dashboard Stats (Earnings and Analytics)
-    const statsRes = await ownerProfileService.getDashboardStats()
-    if (statsRes?.success) {
-      totalEarnings.value = statsRes.total_earnings || 0
-      if (statsRes.detailed_stats) detailedStats.value = statsRes.detailed_stats
-      if (statsRes.chart_data) chartData.value = statsRes.chart_data
-      if (statsRes.top_selling_items) topSellingItems.value = statsRes.top_selling_items
-    }
+    const res = await ownerProfileService.getDashboardStats(range.value)
+    if (id !== requestId) return
+    if (res?.success) stats.value = res
+    else error.value = 'The dashboard figures could not be loaded.'
   } catch (err) {
+    if (id !== requestId) return
     console.warn('Dashboard fetch error:', err)
+    error.value = 'The dashboard figures could not be loaded. Check your connection and try again.'
   } finally {
-    loading.value = false
+    if (id === requestId) {
+      loading.value = false
+      refreshing.value = false
+    }
   }
 }
 
-onMounted(loadDashboardData)
+watch(range, (value) => {
+  router.replace({ query: { ...route.query, range: value === 'daily' ? undefined : value } })
+  load()
+})
+
+onMounted(load)
+
+const span = computed(() => (stats.value ? formatSpan(stats.value.period.from, stats.value.period.to) : ''))
+const updatedAt = computed(() =>
+  stats.value ? new Date(stats.value.generated_at).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : '',
+)
+const branchCount = computed(() => stats.value?.totals.branches ?? 0)
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row min-h-screen bg-[#FDF3E7]">
+  <div class="dashboard flex min-h-screen flex-col bg-[#FDF3E7] md:flex-row">
     <NavBar :links="links" />
-    
-    <main class="flex-1 p-6 md:p-12 overflow-x-hidden space-y-6">
-      <RenewalBanner />
-      
-      <!-- Top Title Header Banner -->
-      <div class="flex flex-col lg:flex-row lg:items-center justify-between mb-2 gap-4">
-        <div>
-          <div class="flex items-center gap-2">
-            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#7D5A50]/10 text-[#7D5A50]">
-              Cafe Owner
-            </span>
-            <span class="text-xs text-[#8B6656] font-medium flex items-center gap-1">
-              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              Live
-            </span>
-          </div>
-          <h1 class="font-display text-2xl md:text-3xl font-bold text-[#3D2B24] mt-1">
-            Owner Dashboard
-          </h1>
-          <p class="font-sans text-sm text-[#8B6656] mt-1">
-            Welcome back! Here's an overview of your cafe operations.
-          </p>
-        </div>
 
-        <div class="flex items-center gap-3">
+    <main class="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10 xl:px-12">
+      <div class="mx-auto max-w-[1360px] space-y-6">
+        <!-- Header -->
+        <header class="flex flex-wrap items-end justify-between gap-4 pb-1">
+          <div>
+            <h1 class="font-display text-[28px] md:text-[34px] font-semibold leading-tight tracking-[-0.015em] text-[#3B1F0E]">
+              Dashboard
+            </h1>
+            <p class="mt-1 text-sm text-[#8B6656]">
+              <template v-if="stats">
+                Every branch combined{{ branchCount ? `, ${branchCount} in all` : '' }}.
+              </template>
+              <template v-else>Every branch combined.</template>
+            </p>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <p v-if="updatedAt" class="text-[13px] text-[#9E7060]" aria-live="polite">Updated {{ updatedAt }}</p>
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 rounded-xl border border-[#E3CFB4] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#7D5A50] transition-colors hover:border-[#7D5A50] hover:bg-[#FFF8EA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FDF3E7] disabled:cursor-wait disabled:opacity-60"
+              :disabled="loading || refreshing"
+              @click="load"
+            >
+              <Icon name="heroicons:arrow-path-20-solid" class="h-4 w-4" :class="{ 'animate-spin': loading || refreshing }" />
+              Refresh
+            </button>
+          </div>
+        </header>
+
+        <div
+          v-if="error"
+          role="alert"
+          class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#F1C9C2] bg-[#FDF0EE] px-5 py-4"
+        >
+          <p class="flex items-center gap-2 text-sm font-medium text-[#8E2F25]">
+            <Icon name="heroicons:exclamation-triangle-20-solid" class="h-5 w-5 shrink-0" />
+            {{ error }}
+          </p>
           <button
             type="button"
-            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-display text-sm font-semibold bg-[#7D5A50] text-[#FFF0D1] hover:bg-[#684940] transition-colors shadow-sm"
-            @click="loadDashboardData"
+            class="rounded-lg bg-[#8E2F25] px-3.5 py-1.5 text-[13px] font-semibold text-white hover:bg-[#74261E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8E2F25] focus-visible:ring-offset-2"
+            @click="load"
           >
-            <Icon name="heroicons:arrow-path" class="w-4 h-4" :class="{ 'animate-spin': loading }" />
-            <span>Refresh</span>
+            Try again
           </button>
         </div>
-      </div>
 
-      <!-- Metric Cards -->
-      <OwnerMetricCards
-        :total-branches="totalBranches"
-        :active-branches="activeBranches"
-        :total-menu-items="totalMenuItems"
-        :subscription-plan="currentPlanName"
-        :total-earnings="totalEarnings"
-        :loading="loading"
-      />
+        <template v-if="stats || !error">
+          <OwnerTotals :totals="stats?.totals ?? null" :loading="loading" />
 
-      <!-- Content Area -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Main left column for Branches & Analytics -->
-        <div class="lg:col-span-2 flex flex-col gap-6">
-          <OwnerDetailedStats :stats="detailedStats" :loading="loading" />
-          <OwnerAnalyticsChart :chart-data="chartData" :loading="loading" />
-          <OwnerTopSellingMenu :top-items="topSellingItems" />
-        </div>
-        
-        <!-- Right side quick links or extra info -->
-        <div class="space-y-6">
-          <div class="bg-white border border-[#EEDFC4] p-6 rounded-2xl shadow-sm">
-            <h3 class="font-display font-semibold text-[#3B1F0E] mb-4 flex items-center gap-2">
-              <Icon name="heroicons:rocket-launch" class="w-5 h-5 text-amber-500" />
-              Quick Links
-            </h3>
-            <div class="space-y-3">
-              <NuxtLink to="/owner/cafes" class="group flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:border-[#EEDFC4] hover:bg-[#FFF0D1]/30 transition-all">
-                <div class="flex items-center gap-3">
-                  <div class="w-8 h-8 rounded-lg bg-[#7D5A50]/10 text-[#7D5A50] flex items-center justify-center">
-                    <Icon name="heroicons:plus" class="w-4 h-4" />
-                  </div>
-                  <span class="text-sm font-medium text-[#3B1F0E]">Add New Branch</span>
-                </div>
-                <Icon name="heroicons:chevron-right" class="w-4 h-4 text-gray-400 group-hover:text-[#7D5A50]" />
-              </NuxtLink>
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            <OwnerIncomeChart
+              v-model:range="range"
+              class="lg:col-span-12 xl:col-span-8"
+              :period="stats?.period ?? null"
+              :series="stats?.series ?? []"
+              :loading="loading"
+              :refreshing="refreshing"
+            />
+            <OwnerBranchBreakdown
+              class="lg:col-span-12 xl:col-span-4"
+              :branches="stats?.branches ?? []"
+              :span="span"
+              :loading="loading"
+            />
 
-              <NuxtLink to="/owner/menu-management" class="group flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:border-[#EEDFC4] hover:bg-[#FFF0D1]/30 transition-all">
-                <div class="flex items-center gap-3">
-                  <div class="w-8 h-8 rounded-lg bg-[#7D5A50]/10 text-[#7D5A50] flex items-center justify-center">
-                    <Icon name="heroicons:book-open" class="w-4 h-4" />
-                  </div>
-                  <span class="text-sm font-medium text-[#3B1F0E]">Update Menu</span>
-                </div>
-                <Icon name="heroicons:chevron-right" class="w-4 h-4 text-gray-400 group-hover:text-[#7D5A50]" />
-              </NuxtLink>
-              
-              <NuxtLink to="/owner/subscription" class="group flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:border-[#EEDFC4] hover:bg-[#FFF0D1]/30 transition-all">
-                <div class="flex items-center gap-3">
-                  <div class="w-8 h-8 rounded-lg bg-[#7D5A50]/10 text-[#7D5A50] flex items-center justify-center">
-                    <Icon name="heroicons:arrow-up-circle" class="w-4 h-4" />
-                  </div>
-                  <span class="text-sm font-medium text-[#3B1F0E]">Upgrade Subscription</span>
-                </div>
-                <Icon name="heroicons:chevron-right" class="w-4 h-4 text-gray-400 group-hover:text-[#7D5A50]" />
-              </NuxtLink>
-            </div>
+            <OwnerTrendingItems
+              class="lg:col-span-7"
+              :items="stats?.trending_items ?? []"
+              :loading="loading"
+            />
+            <OwnerTopCategories
+              class="lg:col-span-5"
+              :categories="stats?.top_categories ?? []"
+              :span="span"
+              :loading="loading"
+            />
           </div>
-          
-          <div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 p-6 rounded-2xl shadow-sm relative overflow-hidden">
-             <div class="absolute -right-4 -top-4 w-24 h-24 bg-amber-200 rounded-full blur-2xl opacity-50"></div>
-             <h3 class="font-display font-semibold text-amber-900 mb-2 relative z-10">Need Help?</h3>
-             <p class="text-xs text-amber-700 mb-4 relative z-10">Check our comprehensive documentation to make the most out of BrewSpot features.</p>
-             <button class="bg-white text-amber-600 px-4 py-2 rounded-lg text-xs font-semibold shadow-sm hover:shadow-md transition-all relative z-10 border border-amber-100 w-full">
-               View Documentation
-             </button>
-          </div>
-        </div>
+        </template>
       </div>
-      
-      <!-- Footer System Status Bar -->
-      <div class="mt-8 border-t border-[#EEDFC4] pt-4 flex flex-col sm:flex-row items-center justify-between text-xs text-[#8B6656] gap-2">
-        <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span class="font-medium text-[#3B1F0E]">System Operational</span>
-        </div>
-        <div class="font-mono">
-          Last Synced: {{ lastRefreshedAt || 'Just now' }}
-        </div>
-      </div>
-      
     </main>
   </div>
 </template>
+
+<style>
+/* Not scoped: ::selection has to reach every child component. */
+.dashboard ::selection {
+  background: #EEDFC4;
+  color: #3B1F0E;
+}
+</style>

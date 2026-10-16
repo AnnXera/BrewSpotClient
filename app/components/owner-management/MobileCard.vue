@@ -93,7 +93,7 @@ function formatDate(value: string | null) {
                   min-[360px]:gap-3">
         <button
           type="button"
-          class="p-1.5 rounded-lg text-[#9E7060] hover:text-[#7D5A50] hover:bg-[#F3E7D2]/50 transition-all focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
+          class="inline-flex items-center justify-center p-1.5 rounded-lg text-[#9E7060] hover:text-[#7D5A50] hover:bg-[#F3E7D2]/50 transition-all focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
           title="View"
           @click="emit('view', owner)"
         >
@@ -103,7 +103,7 @@ function formatDate(value: string | null) {
         <button
           v-if="owner.status === 'active'"
           type="button"
-          class="p-1.5 rounded-lg text-[#9E7060] hover:text-[#D9622B] hover:bg-[#F3E7D2]/50 transition-all disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
+          class="inline-flex items-center justify-center p-1.5 rounded-lg text-[#9E7060] hover:text-[#D9622B] hover:bg-[#F3E7D2]/50 transition-all disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
           :disabled="statusChangeLoading"
           title="Suspend"
           @click="emit('status-change', owner, 'suspended')"
@@ -114,7 +114,7 @@ function formatDate(value: string | null) {
         <button
           v-else-if="owner.status === 'suspended'"
           type="button"
-          class="p-1.5 rounded-lg text-[#9E7060] hover:text-[#2E9E5B] hover:bg-[#F3E7D2]/50 transition-all disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
+          class="inline-flex items-center justify-center p-1.5 rounded-lg text-[#9E7060] hover:text-[#2E9E5B] hover:bg-[#F3E7D2]/50 transition-all disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
           :disabled="statusChangeLoading"
           title="Reactivate"
           @click="emit('status-change', owner, 'active')"

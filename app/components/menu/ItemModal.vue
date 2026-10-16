@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
 import { useMenuService } from '~/composables/useMenuService'
-import { INGREDIENT_UNITS } from '~/utils/constants'
+import { INGREDIENT_UNITS, INGREDIENT_UNIT_OPTIONS } from '~/utils/constants'
 import { parseQuantity, formatQuantity, sanitizeQuantity } from '~/utils/fraction'
 import type { Ingredient, MenuAddon } from '~/services/MenuService'
 import IngredientPicker from '~/components/menu/IngredientPicker.vue'
-import SelectMenu from '~/components/common/SelectMenu.vue'
+import DropdownList from '~/components/common/DropdownList.vue'
 import ConfirmModal from '~/components/common/ConfirmModal.vue'
 import AlertModal from '~/components/common/AlertModal.vue'
 import { useDialogs } from '~/composables/useDialogs'
@@ -143,6 +143,53 @@ const rowErrors = computed(() => {
   return result
 })
 
+// Same rule as the server's RecipeResolver: an ingredient set for one size must
+// be set for every size (or for all sizes). Keyed by the ingredient's first row,
+// the sizes it still needs.
+const missingSizes = computed(() => {
+  const result: Record<number, string[]> = {}
+  if (!form.value.has_sizes) return result
+
+  const groups = new Map<string, { first: number; sizes: Set<string>; allSizes: boolean }>()
+  form.value.recipes.forEach((r, i) => {
+    const key = normalizeName(r.ingredient_name)
+    if (!key) return
+    const group = groups.get(key) ?? { first: i, sizes: new Set<string>(), allSizes: false }
+    if (r.size_key) group.sizes.add(r.size_key)
+    else group.allSizes = true
+    groups.set(key, group)
+  })
+
+  for (const group of groups.values()) {
+    if (group.allSizes) continue
+    const missing = form.value.sizes.filter(s => !group.sizes.has(s.key)).map(s => s.key)
+    if (missing.length) result[group.first] = missing
+  }
+  return result
+})
+
+// Set once Confirm is pressed: from then on a missing size shows as an error.
+const triedSave = ref(false)
+
+// Adds the ingredient for a size it's missing, right after its last row.
+async function addMissingSize(index: number, sizeKey: string) {
+  const source = form.value.recipes[index]
+  const key = normalizeName(source.ingredient_name)
+  const last = form.value.recipes.reduce((at, r, i) => normalizeName(r.ingredient_name) === key ? i : at, index)
+
+  form.value.recipes.splice(last + 1, 0, {
+    ingredient_uuid: source.ingredient_uuid,
+    ingredient_name: source.ingredient_name,
+    quantity_display: '',
+    unit: source.unit,
+    size_key: sizeKey
+  })
+  serverRowErrors.value = {} // row indexes shifted
+
+  await nextTick()
+  bodyEl.value?.querySelectorAll<HTMLInputElement>('[data-amount-input]')[last + 1]?.focus()
+}
+
 // --- Sizes ---
 
 const sizeErrors = ref<Record<number, { name?: string; price?: string }>>({})
@@ -261,6 +308,11 @@ const categoryOptions = computed(() => [
   ...realCategories.value.map(cat => ({ value: cat.uuid as string, label: cat.name as string }))
 ])
 
+const sizeOptions = computed(() => [
+  { value: null as string | null, label: 'All sizes' },
+  ...form.value.sizes.map((size, i) => ({ value: size.key as string | null, label: sizeLabel(size, i) }))
+])
+
 const isDirty = ref(false)
 const errors = ref({
   menu_name: '',
@@ -273,6 +325,7 @@ watch(() => props.show, (newVal) => {
     serverRowErrors.value = {}
     sizeErrors.value = {}
     sizesError.value = ''
+    triedSave.value = false
     loadIngredients()
     loadAddons()
     if (props.item) {
@@ -401,6 +454,9 @@ const saveItem = async () => {
   if (!validateSizes()) hasError = true
 
   if (Object.keys(rowErrors.value).length) hasError = true
+
+  triedSave.value = true
+  if (Object.keys(missingSizes.value).length) hasError = true
 
   if (hasError) {
     scrollToFirstError()
@@ -598,7 +654,7 @@ const saveItem = async () => {
             <div class="flex flex-col sm:flex-row gap-5">
               <div class="flex-1">
                 <label class="block text-sm font-bold text-[#B4846C] uppercase tracking-wider mb-2">Category</label>
-                <SelectMenu v-model="form.category_uuid" :options="categoryOptions" />
+                <DropdownList v-model="form.category_uuid" :options="categoryOptions" />
               </div>
 
               <div class="flex-1">
@@ -766,31 +822,20 @@ const saveItem = async () => {
                   v-model:name="recipe.ingredient_name"
                   :ingredients="ingredients"
                   :used-names="usedNamesExcept(index)"
-                  :invalid="!!rowErrors[index]"
+                  :invalid="!!rowErrors[index] || (triedSave && !!missingSizes[index])"
                   @pick="onPick(recipe, index, $event)"
                   @enter="handleEnterOnIngredient(index)"
                 />
-                <p v-if="rowErrors[index]" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ rowErrors[index] }}</p>
               </div>
 
               <!-- Size the amount is for -->
               <div v-if="form.has_sizes" class="w-full">
                 <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">For</label>
-                <div class="relative">
-                  <select
-                    v-model="recipe.size_key"
-                    @change="serverRowErrors = {}"
-                    class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl pl-4 pr-10 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent"
-                  >
-                    <option :value="null">All sizes</option>
-                    <option v-for="(size, sizeIndex) in form.sizes" :key="size.key" :value="size.key">
-                      {{ sizeLabel(size, sizeIndex) }}
-                    </option>
-                  </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-[#B4846C]">
-                    <Icon name="heroicons:chevron-down" class="w-5 h-5" />
-                  </div>
-                </div>
+                <DropdownList
+                  v-model="recipe.size_key"
+                  :options="sizeOptions"
+                  @change="serverRowErrors = {}"
+                />
               </div>
 
               <!-- Amount -->
@@ -799,6 +844,7 @@ const saveItem = async () => {
                 <input
                   :value="recipe.quantity_display"
                   @input="onQuantityInput(recipe, $event)"
+                  data-amount-input
                   type="text"
                   inputmode="decimal"
                   placeholder="e.g. 1/4 or 2.5"
@@ -810,23 +856,13 @@ const saveItem = async () => {
               <!-- Unit -->
               <div class="w-full relative">
                 <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Unit</label>
-                <div class="relative">
-                  <!-- An existing ingredient is always measured in its own unit. -->
-                  <select 
-                    v-model="recipe.unit"
-                    :disabled="!!recipe.ingredient_uuid"
-                    :title="recipe.ingredient_uuid ? `${recipe.ingredient_name} is measured in ${recipe.unit}` : undefined"
-                    @keydown.enter.prevent="handleEnterOnIngredient(index)"
-                    class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl pl-4 pr-10 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <option v-for="unit in INGREDIENT_UNITS" :key="unit" :value="unit">
-                      {{ unit }}
-                    </option>
-                  </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-[#B4846C]">
-                    <Icon name="heroicons:chevron-down" class="w-5 h-5" />
-                  </div>
-                </div>
+                <!-- An existing ingredient is always measured in its own unit. -->
+                <DropdownList
+                  v-model="recipe.unit"
+                  :options="INGREDIENT_UNIT_OPTIONS"
+                  :disabled="!!recipe.ingredient_uuid"
+                  :title="recipe.ingredient_uuid ? `${recipe.ingredient_name} is measured in ${recipe.unit}` : undefined"
+                />
               </div>
 
               <!-- Delete Button -->
@@ -838,6 +874,29 @@ const saveItem = async () => {
                 >
                   <Icon name="heroicons:trash" class="w-4 h-4" />
                 </button>
+              </div>
+
+              <!-- Messages get their own line under the row, so the inputs above stay aligned -->
+              <div v-if="rowErrors[index] || missingSizes[index]" class="w-full md:col-span-full -mt-2 md:-mt-3">
+                <p v-if="rowErrors[index]" data-row-error class="text-red-500 text-xs font-bold ml-1">{{ rowErrors[index] }}</p>
+                <!-- Set for some sizes only: offer the missing ones -->
+                <p
+                  v-else-if="missingSizes[index]"
+                  :data-row-error="triedSave ? '' : undefined"
+                  :class="['text-xs font-bold ml-1 flex flex-wrap items-center gap-x-2 gap-y-1', triedSave ? 'text-red-500' : 'text-[#9E7060]']"
+                >
+                  <span>Also needs an amount for</span>
+                  <button
+                    v-for="sizeKey in missingSizes[index]"
+                    :key="sizeKey"
+                    type="button"
+                    @click="addMissingSize(index, sizeKey)"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-current hover:bg-[#FBF2E1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B4846C]"
+                  >
+                    <Icon name="heroicons:plus" class="w-3 h-3" />
+                    {{ sizeLabel(form.sizes.find(s => s.key === sizeKey)!, form.sizes.findIndex(s => s.key === sizeKey)) }}
+                  </button>
+                </p>
               </div>
             </div>
           </div>

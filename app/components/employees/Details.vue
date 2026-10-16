@@ -22,6 +22,9 @@ const confirmTerminate = ref(false)
 const terminating = ref(false)
 const actionError = ref('')
 const actionNotice = ref('')
+const actionWarnings = ref<string[]>([])
+
+const showEditModal = ref(false)
 
 async function load() {
   loading.value = true
@@ -76,11 +79,28 @@ const week = computed(() =>
   }))
 )
 
+function openEdit() {
+  actionError.value = ''
+  actionNotice.value = ''
+  actionWarnings.value = []
+  showEditModal.value = true
+}
+
+async function onEdited(result: { message: string; warnings: string[] }) {
+  showEditModal.value = false
+  // Reload rather than trusting the last response: the schedule and details
+  // are saved by separate calls, and the PIN response carries no staff record.
+  await load()
+  actionNotice.value = result.message
+  actionWarnings.value = result.warnings
+}
+
 async function terminate() {
   if (!member.value) return
   terminating.value = true
   actionError.value = ''
   actionNotice.value = ''
+  actionWarnings.value = []
   try {
     const res = await staffService.terminateBranchStaff(props.branchUuid, member.value.uuid)
     confirmTerminate.value = false
@@ -110,12 +130,10 @@ async function terminate() {
 
       <div v-if="member" class="flex items-center gap-3 sm:gap-[18px]">
         <template v-if="member.can_manage && !isTerminated">
-          <!-- The edit form isn't built yet. -->
           <button
             type="button"
-            disabled
-            title="Editing employees is coming soon"
-            class="inline-flex items-center gap-2 px-4 py-3 rounded-[10px] bg-[#7D5A50] font-display font-semibold text-sm text-[#FFF0D1] opacity-60 cursor-not-allowed"
+            class="inline-flex items-center gap-2 px-4 py-3 rounded-[10px] bg-[#7D5A50] font-display font-semibold text-sm text-[#FFF0D1] hover:bg-[#6A4B42] transition-colors"
+            @click="openEdit"
           >
             <Icon name="heroicons:pencil-square" class="w-4 h-4" />
             Edit Employee
@@ -141,9 +159,15 @@ async function terminate() {
       </div>
     </div>
 
-    <p v-if="actionNotice" class="mt-4 text-sm font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
-      {{ actionNotice }}
-    </p>
+    <div v-if="actionNotice" class="mt-4 text-sm font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+      <p>{{ actionNotice }}</p>
+      <ul v-if="actionWarnings.length" class="mt-1.5 space-y-0.5 text-[#8A5A00]">
+        <li v-for="warning in actionWarnings" :key="warning" class="flex items-start gap-1.5">
+          <Icon name="heroicons:exclamation-triangle" class="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{{ warning }}</span>
+        </li>
+      </ul>
+    </div>
 
     <p v-if="actionError" class="mt-4 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
       {{ actionError }}
@@ -241,6 +265,14 @@ async function terminate() {
         </ul>
       </section>
     </div>
+
+    <EmployeesFormModal
+      :show="showEditModal"
+      :branch-uuid="branchUuid"
+      :employee="member"
+      @close="showEditModal = false"
+      @saved="onEdited"
+    />
 
     <ConfirmDialog
       :open="confirmTerminate"

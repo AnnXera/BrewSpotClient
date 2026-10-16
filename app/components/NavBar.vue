@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import logoFull from '~/assets/images/logo.svg'
 import logoIcon from '~/assets/images/logo-icon.svg'
-import { useMenuService } from '~/composables/useMenuService'
+import { useNavCategories } from '~/composables/useNavCategories'
 
 interface NavLink {
   label: string
@@ -11,7 +11,14 @@ interface NavLink {
   isDropdown?: boolean
   children?: NavLink[]
   isHeader?: boolean
+  isCategory?: boolean // a menu category, listed in its own scrolling box
 }
+
+// Past this many categories, their list scrolls instead of growing the sidebar.
+const CATEGORIES_BEFORE_SCROLL = 3
+
+const staticChildren = (link: NavLink) => (link.children ?? []).filter(c => !c.isCategory)
+const categoryChildren = (link: NavLink) => (link.children ?? []).filter(c => c.isCategory)
 
 const props = defineProps<{
   links: NavLink[]
@@ -20,7 +27,7 @@ const props = defineProps<{
 const route = useRoute()
 const authStore = useAuthStore()
 const logout = useLogout()
-const menuService = useMenuService()
+const { categories: navCategories, refresh: refreshNavCategories } = useNavCategories()
 
 const mobileOpen = ref(false)   // mobile drawer
 const profileDropdownOpen = ref(false)
@@ -44,35 +51,26 @@ onMounted(async () => {
         openNavDropdowns.value['Menu Management'] = true
     }
 
-    // Synchronously set up the dropdown structure to prevent layout stutter
-    const baseMenuChildren: NavLink[] = [
-      { label: 'Menu Items', to: '/owner/menu-management/items' },
-      { label: 'Ingredients', to: '/owner/menu-management/ingredients' },
-      { label: 'Add-ons', to: '/owner/menu-management/addons' },
-      { label: 'CATEGORIES', to: '', isHeader: true }
-    ]
     dynamicLinks.value[menuIndex].isDropdown = true
-    dynamicLinks.value[menuIndex].children = [...baseMenuChildren]
 
-    try {
-      const res = await menuService.getMenuCategories()
-      // ensure we get array of categories
-      const categories = res.categories?.data || res.categories || []
-      
-      const updatedChildren = [...baseMenuChildren]
-      categories.forEach((cat: any) => {
-        updatedChildren.push({
-          label: cat.name || 'Category',
-          to: `/owner/menu-management/category/${cat.uuid || cat.id}`
-        })
-      })
-      
-      dynamicLinks.value[menuIndex].children = updatedChildren
-    } catch (e) {
-      console.error('Failed to fetch menu categories for sidebar', e)
-    }
+    // Rebuilt whenever a page adds, renames or deletes a category (useNavCategories().refresh()).
+    watch(navCategories, (categories) => {
+      dynamicLinks.value[menuIndex].children = [
+        ...baseMenuChildren,
+        ...categories.map(cat => ({ label: cat.name, to: `/owner/menu-management/category/${cat.uuid}`, isCategory: true }))
+      ]
+    }, { immediate: true })
+
+    await refreshNavCategories()
   }
 })
+
+const baseMenuChildren: NavLink[] = [
+  { label: 'Menu Items', to: '/owner/menu-management/items' },
+  { label: 'Ingredients', to: '/owner/menu-management/ingredients' },
+  { label: 'Add-ons', to: '/owner/menu-management/addons' },
+  { label: 'CATEGORIES', to: '', isHeader: true }
+]
 
 function isActive(link: NavLink) {
   if (link.isHeader) return false
@@ -156,18 +154,18 @@ function toggleDropdown(link: NavLink) {
   <!-- ============ DESKTOP SIDEBAR (md and up) ============ -->
   <!-- Removed hover expansion, permanently expanded width: 289px -->
   <aside
-    class="hidden md:flex h-screen sticky top-0 bg-[#7D5A50] flex-col p-6 overflow-y-auto w-[289px] shrink-0"
+    class="hidden md:flex h-screen sticky top-0 bg-[#7D5A50] flex-col p-6 w-[289px] shrink-0"
   >
-    <!-- Logo -->
-    <div class="h-12 flex items-center justify-start">
+    <!-- Logo (stays put; only the nav below scrolls) -->
+    <div class="h-12 flex items-center justify-start shrink-0">
       <img :src="logoFull" alt="Brewspot" class="h-auto w-full max-w-[195px]" />
     </div>
 
     <!-- Divider (logo → nav) -->
     <div class="h-px bg-[#B4846C] mt-6 shrink-0" />
 
-    <!-- Nav items -->
-    <nav class="flex flex-col gap-2 mt-6">
+    <!-- Nav items: fills the space between logo and profile, scrolls if taller -->
+    <nav class="flex-1 min-h-0 overflow-y-auto nav-scroll flex flex-col gap-2 mt-6 -mx-2 px-2">
       <template v-for="link in dynamicLinks" :key="link.to">
         <!-- Parent Link / Dropdown Toggle -->
         <div v-if="link.isDropdown" class="flex flex-col">
@@ -192,7 +190,7 @@ function toggleDropdown(link: NavLink) {
           
           <!-- Dropdown Children -->
           <div v-if="openNavDropdowns[link.label]" class="flex flex-col mt-2 pl-[42px] gap-2">
-            <template v-for="child in link.children" :key="child.label">
+            <template v-for="child in staticChildren(link)" :key="child.label">
               <!-- Header style -->
               <span v-if="child.isHeader" class="text-[10px] tracking-wider font-semibold text-[#FFF0D1]/70 uppercase mt-2 mb-1">
                 {{ child.label }}
@@ -207,6 +205,23 @@ function toggleDropdown(link: NavLink) {
                 {{ child.label }}
               </NuxtLink>
             </template>
+
+            <!-- Categories: past 3 they scroll in a box about 3 rows tall -->
+            <div
+              v-if="categoryChildren(link).length"
+              class="flex flex-col gap-2"
+              :class="categoryChildren(link).length > CATEGORIES_BEFORE_SCROLL ? 'max-h-[124px] overflow-y-auto nav-scroll pr-1' : ''"
+            >
+              <NuxtLink
+                v-for="child in categoryChildren(link)"
+                :key="child.to"
+                :to="child.to"
+                class="rounded-lg flex items-center transition-colors px-3 py-2 text-sm shrink-0"
+                :class="isActive(child) ? 'text-white font-semibold' : 'text-[#FFF0D1]/80 hover:text-white'"
+              >
+                <span class="truncate">{{ child.label }}</span>
+              </NuxtLink>
+            </div>
           </div>
         </div>
 
@@ -228,14 +243,11 @@ function toggleDropdown(link: NavLink) {
       </template>
     </nav>
 
-    <!-- Spacer pushes profile to bottom -->
-    <div class="flex-1" />
-
     <!-- Divider (nav → profile) -->
     <div class="h-px bg-[#B4846C] my-6 shrink-0" />
 
-    <!-- Profile -->
-    <div ref="profileRef" class="relative">
+    <!-- Profile (stays put at the bottom) -->
+    <div ref="profileRef" class="relative shrink-0">
       <!-- Dropdown -->
       <div
         v-if="profileDropdownOpen"
@@ -339,10 +351,10 @@ function toggleDropdown(link: NavLink) {
         >
           <aside
             v-if="mobileOpen"
-            class="h-full w-[280px] bg-[#7D5A50] flex flex-col p-6 overflow-y-auto"
+            class="h-full w-[280px] bg-[#7D5A50] flex flex-col p-6"
           >
-            <!-- Header: logo + close -->
-            <div class="flex items-center justify-between h-12 mb-6">
+            <!-- Header: logo + close (stays put; only the nav scrolls) -->
+            <div class="flex items-center justify-between h-12 mb-6 shrink-0">
               <img :src="logoFull" alt="Brewspot" class="h-auto w-full max-w-[160px]" />
               <button
                 type="button"
@@ -353,10 +365,10 @@ function toggleDropdown(link: NavLink) {
               </button>
             </div>
 
-            <div class="h-px bg-[#B4846C] mb-6" />
+            <div class="h-px bg-[#B4846C] mb-6 shrink-0" />
 
             <!-- Nav items -->
-            <nav class="flex flex-col gap-2">
+            <nav class="flex-1 min-h-0 overflow-y-auto nav-scroll flex flex-col gap-2 -mx-2 px-2">
               <template v-for="link in dynamicLinks" :key="link.to">
                 <div v-if="link.isDropdown" class="flex flex-col">
                   <button
@@ -379,7 +391,7 @@ function toggleDropdown(link: NavLink) {
                   </button>
                   
                   <div v-if="openNavDropdowns[link.label]" class="flex flex-col mt-2 pl-[42px] gap-2">
-                    <template v-for="child in link.children" :key="child.label">
+                    <template v-for="child in staticChildren(link)" :key="child.label">
                       <span v-if="child.isHeader" class="text-[10px] tracking-wider font-semibold text-[#FFF0D1]/70 uppercase mt-2 mb-1">
                         {{ child.label }}
                       </span>
@@ -393,6 +405,23 @@ function toggleDropdown(link: NavLink) {
                         {{ child.label }}
                       </NuxtLink>
                     </template>
+
+                    <div
+                      v-if="categoryChildren(link).length"
+                      class="flex flex-col gap-2"
+                      :class="categoryChildren(link).length > CATEGORIES_BEFORE_SCROLL ? 'max-h-[124px] overflow-y-auto nav-scroll pr-1' : ''"
+                    >
+                      <NuxtLink
+                        v-for="child in categoryChildren(link)"
+                        :key="child.to"
+                        :to="child.to"
+                        class="rounded-lg flex items-center transition-colors px-3 py-2 text-sm shrink-0"
+                        :class="isActive(child) ? 'text-white font-semibold' : 'text-[#FFF0D1]/80 hover:text-white'"
+                        @click="mobileOpen = false"
+                      >
+                        <span class="truncate">{{ child.label }}</span>
+                      </NuxtLink>
+                    </div>
                   </div>
                 </div>
 
@@ -420,3 +449,21 @@ function toggleDropdown(link: NavLink) {
     </Transition>
   </Teleport>
 </template>
+
+<style scoped>
+/* Thin scrollbar in the sidebar's colors */
+.nav-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #B4846C transparent;
+}
+.nav-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.nav-scroll::-webkit-scrollbar-thumb {
+  background: #B4846C;
+  border-radius: 9999px;
+}
+.nav-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+</style>

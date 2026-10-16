@@ -8,12 +8,7 @@ definePageMeta({
   role: 'Cafe Owner',
 })
 
-const links = [
-  { label: 'Dashboard', to: '/owner/dashboard', icon: 'squares-2x2' },
-  { label: 'Cafe Management', to: '/owner/cafes', icon: 'building-storefront' },
-  { label: 'Menu Management', to: '/owner/menu-management', icon: 'book-open' },
-  { label: 'Subscription', to: '/owner/subscription', icon: 'credit-card' },
-]
+const links = OWNER_NAV_LINKS
 
 const ownerService = useOwnerProfileService()
 const { hasFeature, fetchCurrentSubscription } = usePlanFeature()
@@ -33,6 +28,7 @@ const status = ref('')
 
 // Business Info
 const cafeName = ref('')
+const mainTinPrefix = ref<string | null>(null)
 
 // Modal Controls
 const isAddBranchOpen = ref(false)
@@ -74,6 +70,7 @@ async function fetchBranches() {
     if (res.success && res.cafe_name) {
       cafeName.value = res.cafe_name
     }
+    if (res.success) mainTinPrefix.value = res.main_tin_prefix ?? null
     if (res.success && res.branches?.data) {
       branches.value = res.branches.data
       currentPage.value = res.branches.current_page
@@ -331,6 +328,7 @@ function viewDetails(uuid: string) {
         :show="isAddBranchOpen"
         :saving="savingBranch"
         :backend-errors="backendErrors"
+        :main-tin-prefix="mainTinPrefix"
         @close="isAddBranchOpen = false"
         @save="handleCreateBranch"
       />

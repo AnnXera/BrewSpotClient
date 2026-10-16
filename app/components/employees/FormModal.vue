@@ -1,11 +1,21 @@
 <!-- app/components/employees/FormModal.vue -->
-<!-- Add Employee modal (owner side). Edit mode comes later and will reuse this form. -->
+<!-- Add / Edit Employee modal (owner side). Pass `employee` to edit an existing person. -->
 <script setup lang="ts">
-import type { CreateStaffPayload, StaffMember, StaffRole, StaffScheduleInput } from '~/services/StaffService'
+import type {
+  CreateStaffPayload,
+  EmploymentStatus,
+  StaffMember,
+  StaffRole,
+  StaffScheduleInput,
+  UpdateStaffPayload,
+} from '~/services/StaffService'
+import DropdownList from '~/components/common/DropdownList.vue'
 
 const props = defineProps<{
   show: boolean
   branchUuid: string
+  // When set, the form edits this person instead of adding a new one.
+  employee?: StaffMember | null
 }>()
 
 const emit = defineEmits<{
@@ -14,6 +24,15 @@ const emit = defineEmits<{
 }>()
 
 const staffService = useStaffService('owner')
+
+const isEdit = computed(() => !!props.employee)
+
+type EditableStatus = Exclude<EmploymentStatus, 'terminated'>
+const statusOptions: { value: EditableStatus; label: string }[] = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'suspended', label: 'Suspended' },
+]
 
 const positionOptions: { value: StaffRole; label: string; hint: string }[] = [
   {
@@ -32,6 +51,8 @@ const positionOptions: { value: StaffRole; label: string; hint: string }[] = [
     hint: 'Records only (e.g. barista, kitchen staff). No login and no register access.',
   },
 ]
+// The hints are full sentences shown under the field, not in the list.
+const positionSelectOptions = positionOptions.map(({ value, label }) => ({ value, label }))
 
 function defaultSchedule(): StaffScheduleInput[] {
   // Sunday (0) and Saturday (6) off; weekdays 9–5.
@@ -52,13 +73,49 @@ function emptyForm() {
     email: '',
     address: '',
     role: '' as StaffRole | '',
-    hired_at: new Date().toISOString().split('T')[0],
+    hired_at: new Date().toISOString().split('T')[0] as string,
+    employment_status: 'active' as EditableStatus,
     pin: '',
     schedule: defaultSchedule(),
   }
 }
 
+// Days that were never set start as a day off, so saving without touching them changes nothing.
+function formFrom(member: StaffMember): ReturnType<typeof emptyForm> {
+  const status = member.assignment?.employment_status
+  return {
+    firstname: member.firstname,
+    middlename: member.middlename ?? '',
+    lastname: member.lastname,
+    phone_number: cleanMobileDigits(member.phone_number ?? ''),
+    email: member.email,
+    address: member.address ?? '',
+    role: member.role,
+    hired_at: member.assignment?.hired_at ?? '',
+    employment_status: status && status !== 'terminated' ? status : 'active',
+    pin: '',
+    schedule: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => {
+      const day = member.schedule.find(s => s.day_of_week === dayOfWeek)
+      return day
+        ? { day_of_week: dayOfWeek, is_day_off: day.is_day_off, start_time: day.start_time, end_time: day.end_time }
+        : { day_of_week: dayOfWeek, is_day_off: true, start_time: '09:00', end_time: '17:00' }
+    }),
+  }
+}
+
+// Deep copy that also unwraps nested reactive proxies. structuredClone can't:
+// the schedule editor emits a new array that still holds proxied day objects,
+// so structuredClone(toRaw(...)) throws a DataCloneError.
+function snapshot<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value))
+}
+
 const form = ref(emptyForm())
+// What the server has right now (edit mode), to send only what changed.
+const baseline = ref(emptyForm())
+// Steps already saved during this edit, in case a later step fails and the modal is closed.
+const savedSteps = ref<{ message: string; warnings: string[]; staff?: StaffMember }[]>([])
+const pinSaved = ref(false)
 const errors = ref<Record<string, string>>({})
 const scheduleErrors = ref<Record<number, string>>({})
 const serverError = ref('')
@@ -66,11 +123,16 @@ const saving = ref(false)
 
 // Managers choose their own PIN when they set up their password.
 const usesPin = computed(() => form.value.role === 'Cashier')
+// When editing, a cashier who already has a PIN keeps it unless a new one is typed.
+const pinRequired = computed(() => usesPin.value && !(isEdit.value && (props.employee?.pin_set || pinSaved.value)))
 const positionHint = computed(() => positionOptions.find(o => o.value === form.value.role)?.hint ?? '')
 
 watch(() => props.show, (open) => {
   if (open) {
-    form.value = emptyForm()
+    form.value = props.employee ? formFrom(props.employee) : emptyForm()
+    baseline.value = snapshot(form.value)
+    savedSteps.value = []
+    pinSaved.value = false
     errors.value = {}
     scheduleErrors.value = {}
     serverError.value = ''
@@ -112,7 +174,7 @@ function validate() {
   if (!f.address.trim()) e.address = 'Address is required.'
   if (!f.role) e.role = 'Select a position.'
   if (!f.hired_at) e.hired_at = 'Hired date is required.'
-  if (usesPin.value && !/^\d{6}$/.test(f.pin)) e.pin = 'PIN must be exactly 6 digits.'
+  if (usesPin.value && (pinRequired.value || f.pin) && !/^\d{6}$/.test(f.pin)) e.pin = 'PIN must be exactly 6 digits.'
 
   const se: Record<number, string> = {}
   for (const day of f.schedule) {
@@ -146,9 +208,105 @@ function applyServerErrors(raw: Record<string, string[]> | undefined) {
   scheduleErrors.value = se
 }
 
+function cleanSchedule(schedule: StaffScheduleInput[]): StaffScheduleInput[] {
+  return schedule.map(day => ({
+    day_of_week: day.day_of_week,
+    is_day_off: day.is_day_off,
+    start_time: day.is_day_off ? null : day.start_time,
+    end_time: day.is_day_off ? null : day.end_time,
+  }))
+}
+
+// The PATCH body for fields that differ from what the server has.
+function changedFields(): UpdateStaffPayload {
+  const f = form.value
+  const b = baseline.value
+  const payload: UpdateStaffPayload = {}
+  if (f.firstname.trim() !== b.firstname.trim()) payload.firstname = f.firstname.trim()
+  if (f.middlename.trim() !== b.middlename.trim()) payload.middlename = f.middlename.trim() || null
+  if (f.lastname.trim() !== b.lastname.trim()) payload.lastname = f.lastname.trim()
+  if (f.phone_number !== b.phone_number) payload.phone_number = `+63${f.phone_number}`
+  if (f.email.trim() !== b.email.trim()) payload.email = f.email.trim()
+  if (f.address.trim() !== b.address.trim()) payload.address = f.address.trim()
+  if (f.role !== b.role) payload.role = f.role as StaffRole
+  if (f.hired_at !== b.hired_at) payload.hired_at = f.hired_at
+  if (f.employment_status !== b.employment_status) payload.employment_status = f.employment_status
+  return payload
+}
+
+function scheduleChanged() {
+  return JSON.stringify(cleanSchedule(form.value.schedule)) !== JSON.stringify(cleanSchedule(baseline.value.schedule))
+}
+
+function savedResult() {
+  return {
+    message: savedSteps.value.map(step => step.message).join(' '),
+    warnings: savedSteps.value.flatMap(step => step.warnings),
+    staff: [...savedSteps.value].reverse().find(step => step.staff)?.staff,
+  }
+}
+
+function onSaveError(e: any, fallback: string) {
+  if (e?.status === 422 && e?.data?.errors) {
+    applyServerErrors(e.data.errors)
+    serverError.value = 'Please fix the highlighted fields.'
+  } else {
+    serverError.value = e?.data?.message || fallback
+  }
+  if (savedSteps.value.length) serverError.value = `Some changes were saved. ${serverError.value}`
+}
+
+// Edit runs up to three calls: details, then schedule, then PIN (a PIN can
+// only be set once the person is a cashier). Each step that succeeds becomes
+// the new baseline, so retrying after a failure doesn't resend it.
+async function submitEdit() {
+  const employee = props.employee!
+  const details = changedFields()
+  const newSchedule = scheduleChanged() ? cleanSchedule(form.value.schedule) : null
+  const newPin = usesPin.value && form.value.pin ? form.value.pin : null
+
+  if (!Object.keys(details).length && !newSchedule && !newPin) {
+    close()
+    return
+  }
+
+  saving.value = true
+  try {
+    if (Object.keys(details).length) {
+      const res = await staffService.updateBranchStaff(props.branchUuid, employee.uuid, details)
+      if (!res.success) throw { data: { message: res.message } }
+      savedSteps.value.push({ message: res.message, warnings: [], staff: res.staff })
+      const f = snapshot(form.value)
+      baseline.value = { ...f, schedule: baseline.value.schedule }
+    }
+
+    if (newSchedule) {
+      const res = await staffService.updateBranchStaffSchedule(props.branchUuid, employee.uuid, newSchedule)
+      if (!res.success) throw { data: { message: res.message } }
+      savedSteps.value.push({ message: res.message, warnings: res.warnings ?? [], staff: res.staff })
+      baseline.value.schedule = snapshot(form.value.schedule)
+    }
+
+    if (newPin) {
+      const res = await staffService.setBranchStaffPin(props.branchUuid, employee.uuid, newPin)
+      if (!res.success) throw { data: { message: res.message } }
+      savedSteps.value.push({ message: res.message, warnings: [] })
+      pinSaved.value = true
+      form.value.pin = ''
+    }
+
+    emit('saved', savedResult())
+  } catch (e: any) {
+    onSaveError(e, 'Could not save the changes. Please try again.')
+  } finally {
+    saving.value = false
+  }
+}
+
 async function submit() {
   serverError.value = ''
   if (!validate() || saving.value) return
+  if (isEdit.value) return submitEdit()
 
   const f = form.value
   const payload: CreateStaffPayload = {
@@ -160,12 +318,7 @@ async function submit() {
     address: f.address.trim(),
     role: f.role as StaffRole,
     hired_at: f.hired_at || undefined,
-    schedule: f.schedule.map(day => ({
-      day_of_week: day.day_of_week,
-      is_day_off: day.is_day_off,
-      start_time: day.is_day_off ? null : day.start_time,
-      end_time: day.is_day_off ? null : day.end_time,
-    })),
+    schedule: cleanSchedule(f.schedule),
   }
   if (usesPin.value) payload.pin = f.pin
 
@@ -178,19 +331,17 @@ async function submit() {
       serverError.value = res.message || 'Could not add the employee.'
     }
   } catch (e: any) {
-    if (e?.status === 422 && e?.data?.errors) {
-      applyServerErrors(e.data.errors)
-      serverError.value = 'Please fix the highlighted fields.'
-    } else {
-      serverError.value = e?.data?.message || 'Could not add the employee. Please try again.'
-    }
+    onSaveError(e, 'Could not add the employee. Please try again.')
   } finally {
     saving.value = false
   }
 }
 
 function close() {
-  if (!saving.value) emit('close')
+  if (saving.value) return
+  // A partly saved edit still changed the employee, so the page should refresh.
+  if (savedSteps.value.length) emit('saved', savedResult())
+  else emit('close')
 }
 
 function onKeydown(event: KeyboardEvent) {
@@ -234,7 +385,7 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
         <!-- Header -->
         <div class="flex items-center justify-between gap-4 px-4 py-4 border-b border-[#EDD8CC] sm:px-[22px] sm:py-[18px]">
           <h2 id="employee-form-title" class="font-display font-semibold text-xl text-[#3D2B24] sm:text-2xl">
-            Add Employee Information
+            {{ isEdit ? 'Edit Employee Information' : 'Add Employee Information' }}
           </h2>
           <button
             type="button"
@@ -326,24 +477,18 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
 
             <div class="flex flex-col gap-3 sm:flex-row sm:gap-4">
               <!-- Position -->
-              <label class="flex flex-col gap-1.5 flex-1 min-w-0">
+              <div class="flex flex-col gap-1.5 flex-1 min-w-0">
                 <span :class="labelClass">Position*</span>
-                <div :class="fieldClass('role')" class="relative">
-                  <Icon name="heroicons:user-circle" class="w-4 h-4 shrink-0 text-[#7D5A50]" />
-                  <select
-                    v-model="form.role"
-                    class="flex-1 min-w-0 appearance-none bg-transparent font-sans text-sm pr-6 cursor-pointer focus:outline-none"
-                    :class="form.role ? 'text-black' : 'text-[#7D5A50]/40'"
-                  >
-                    <option value="" disabled>Select position</option>
-                    <option v-for="opt in positionOptions" :key="opt.value" :value="opt.value" class="text-black">
-                      {{ opt.label }}
-                    </option>
-                  </select>
-                  <Icon name="heroicons:chevron-down" class="w-4 h-4 text-[#7D5A50] absolute right-3 pointer-events-none" />
-                </div>
+                <DropdownList
+                  v-model="form.role"
+                  :options="positionSelectOptions"
+                  placeholder="Select position"
+                  icon="heroicons:user-circle"
+                  size="sm"
+                  :invalid="!!errors.role"
+                />
                 <span v-if="errors.role" class="font-sans text-xs text-red-600">{{ errors.role }}</span>
-              </label>
+              </div>
 
               <!-- Hired At -->
               <label class="flex flex-col gap-1.5 flex-1 min-w-0">
@@ -357,7 +502,7 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
 
               <!-- PIN (Cashier only) -->
               <label v-if="usesPin" class="flex flex-col gap-1.5 sm:w-[173px] sm:shrink-0">
-                <span :class="labelClass">PIN*</span>
+                <span :class="labelClass">{{ pinRequired ? 'PIN*' : 'New PIN' }}</span>
                 <div :class="fieldClass('pin')">
                   <Icon name="heroicons:finger-print" class="w-4 h-4 shrink-0 text-[#7D5A50]" />
                   <input
@@ -365,7 +510,7 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
                     type="text"
                     inputmode="numeric"
                     autocomplete="off"
-                    placeholder="6 digits"
+                    :placeholder="pinRequired ? '6 digits' : 'Keep current'"
                     :class="inputClass"
                     @input="onPinInput"
                   />
@@ -375,6 +520,19 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
             </div>
 
             <p v-if="positionHint" class="-mt-2 font-sans text-xs text-[#9E7060]">{{ positionHint }}</p>
+
+            <!-- Employment status (edit only; ending employment is done with Terminate) -->
+            <div v-if="isEdit" class="flex flex-col gap-1.5 sm:max-w-[calc(50%-8px)]">
+              <span :class="labelClass">Status*</span>
+              <DropdownList
+                v-model="form.employment_status"
+                :options="statusOptions"
+                icon="heroicons:signal"
+                size="sm"
+                :invalid="!!errors.employment_status"
+              />
+              <span v-if="errors.employment_status" class="font-sans text-xs text-red-600">{{ errors.employment_status }}</span>
+            </div>
 
             <!-- Weekly schedule -->
             <div class="flex flex-col gap-3">
@@ -393,7 +551,7 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
             class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-[10px] bg-[#3D2B24] font-display font-semibold text-base text-[#FFF0D1] hover:bg-[#2C1609] transition-colors disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
           >
             <Icon v-if="saving" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
-            {{ saving ? 'Saving…' : 'Save Employee' }}
+            {{ saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Save Employee' }}
           </button>
           <button
             type="button"

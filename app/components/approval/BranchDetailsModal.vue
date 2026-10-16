@@ -204,24 +204,47 @@ function viewCafePicture() {
                     <div
                       v-for="doc in relevantBranch?.documents ?? []"
                       :key="doc.branch_doc_id"
-                      class="flex items-center justify-between bg-white border border-[#EDD8CC] rounded-[12px] px-[12px] py-[12px]"
+                      class="bg-white border border-[#EDD8CC] rounded-[12px] overflow-hidden"
                     >
-                      <div class="flex items-center gap-3 font-display">
-                        <div class="w-[36px] h-[36px] rounded-[8px] bg-[#FFF8EA] flex items-center justify-center shrink-0">
-                          <Icon name="heroicons:document-text" class="w-[20px] h-[20px] text-[#7D5A50]" />
+                      <div class="flex items-center justify-between px-[12px] py-[12px]">
+                        <div class="flex items-center gap-3 font-display">
+                          <div class="w-[36px] h-[36px] rounded-[8px] bg-[#FFF8EA] flex items-center justify-center shrink-0">
+                            <Icon name="heroicons:document-text" class="w-[20px] h-[20px] text-[#7D5A50]" />
+                          </div>
+                          <p class="text-[14px] font-semibold text-[#3D2B24] capitalize">
+                            {{ doc.doc_type.replace(/_/g, ' ') }}
+                          </p>
                         </div>
-                        <p class="text-[14px] font-semibold text-[#3D2B24] capitalize">
-                          {{ doc.doc_type.replace(/_/g, ' ') }}
-                        </p>
+
+                        <button
+                          type="button"
+                          class="cursor-pointer font-semibold text-[14px] text-[#FFF0D1] rounded-[10px] border px-[20px] py-[6px] bg-[#7D5A50]"
+                          @click="viewDocument(doc.download_url)"
+                        >
+                          View
+                        </button>
                       </div>
 
-                      <button
-                        type="button"
-                        class="cursor-pointer font-semibold text-[14px] text-[#FFF0D1] rounded-[10px] border px-[20px] py-[6px] bg-[#7D5A50]"
-                        @click="viewDocument(doc.download_url)"
+                      <!-- Additional details for BIR -->
+                      <div
+                        v-if="doc.doc_type?.toUpperCase() === 'BIR'"
+                        class="border-t border-[#EDD8CC] bg-[#FAFAF8] px-[16px] py-[16px] font-display text-[13px]"
                       >
-                        View
-                      </button>
+                        <div class="grid grid-cols-2 gap-y-[16px] gap-x-[16px]">
+                          <div>
+                            <p class="text-[#9E7060] font-semibold mb-1 text-[12px] uppercase tracking-wide">TIN Number</p>
+                            <p class="text-[#3B1F0E] font-medium">{{ doc.tin_number || '—' }}</p>
+                          </div>
+                          <div>
+                            <p class="text-[#9E7060] font-semibold mb-1 text-[12px] uppercase tracking-wide">VAT Type</p>
+                            <p class="text-[#3B1F0E] font-medium capitalize">{{ doc.vat ? doc.vat.replace('-', ' ') : '—' }}</p>
+                          </div>
+                          <div>
+                            <p class="text-[#9E7060] font-semibold mb-1 text-[12px] uppercase tracking-wide">Date Registered</p>
+                            <p class="text-[#3B1F0E] font-medium">{{ formatDate(doc.registered_at) }}</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
