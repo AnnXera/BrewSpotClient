@@ -104,6 +104,7 @@ export interface DashboardSeriesPoint {
     label: string
     revenue: number
     orders: number
+    upcoming: boolean // later this week; nothing to show yet
 }
 
 export interface DashboardTrendingItem {
@@ -111,21 +112,20 @@ export interface DashboardTrendingItem {
     uuid: string
     name: string
     category: string
-    picture: string | null
+    orders: number // orders that included the item
     quantity: number
     sales: number
-    share: number
-    previous_quantity: number
-    change: number | null // null = nothing sold in the previous window
+    share: number // percent of all orders in the window
 }
 
 export interface DashboardCategory {
     uuid: string | null
     name: string
+    orders: number // orders that included the category
     quantity: number
     sales: number
     items: number
-    share: number
+    share: number // percent of all orders in the window; can sum past 100
 }
 
 export interface DashboardBranch {

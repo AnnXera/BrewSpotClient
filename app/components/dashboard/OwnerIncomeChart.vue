@@ -13,13 +13,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{ 'update:range': [DashboardRange] }>()
 
-const ranges: { value: DashboardRange; label: string; compare: string }[] = [
-  { value: 'daily', label: 'Daily', compare: 'previous 14 days' },
-  { value: 'weekly', label: 'Weekly', compare: 'previous 12 weeks' },
-  { value: 'monthly', label: 'Monthly', compare: 'previous 12 months' },
+// The comparison covers the same stretch of the window before (e.g. last week up to the same day).
+const ranges: { value: DashboardRange; label: string; compare: string; none: string }[] = [
+  { value: 'daily', label: 'Daily', compare: 'last week, same days', none: 'No sales last week to compare with' },
+  { value: 'weekly', label: 'Weekly', compare: 'the 12 weeks before', none: 'No sales in the 12 weeks before to compare with' },
+  { value: 'monthly', label: 'Monthly', compare: 'the 12 months before', none: 'No sales in the 12 months before to compare with' },
 ]
 
-const compareLabel = computed(() => ranges.find(r => r.value === props.range)?.compare ?? '')
+const currentRange = computed(() => ranges.find(r => r.value === props.range))
 
 const max = computed(() => niceMax(Math.max(0, ...props.series.map(p => p.revenue))))
 const ticks = computed(() => [1, 0.75, 0.5, 0.25, 0].map(f => max.value * f))
@@ -35,12 +36,19 @@ function barClip(revenue: number) {
   return `inset(${hidden} 0 0 0 round 4px 4px 0 0)`
 }
 
-// The last bucket is still running (today / this week / this month).
-const lastIndex = computed(() => props.series.length - 1)
+// The bucket still running (today / this week / this month). In the daily week,
+// the days after it are upcoming and stay empty.
+const currentIndex = computed(() => {
+  const i = props.series.findIndex(p => p.upcoming)
+  return (i === -1 ? props.series.length : i) - 1
+})
 
 function barLabel(i: number) {
   const p = props.series[i]!
   if (props.range === 'monthly') return formatDay(p.start, { month: 'short' })
+  if (props.range === 'daily') {
+    return i === currentIndex.value ? 'Today' : `${formatDay(p.start, { weekday: 'short' })} ${formatDay(p.start, { day: 'numeric' })}`
+  }
   return formatDay(p.start)
 }
 
@@ -53,7 +61,7 @@ function bucketTitle(i: number) {
 
 function onKey(e: KeyboardEvent, i: number) {
   const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null
-  if (next === null || next < 0 || next > lastIndex.value) return
+  if (next === null || next < 0 || next > currentIndex.value) return
   e.preventDefault()
   const el = (e.currentTarget as HTMLElement).parentElement?.children[next] as HTMLElement | undefined
   el?.focus()
@@ -111,8 +119,8 @@ function tooltipAlign(i: number) {
             <Icon :name="period.revenue_change >= 0 ? 'heroicons:arrow-up-20-solid' : 'heroicons:arrow-down-20-solid'" class="h-3.5 w-3.5" />
             <span class="sr-only">{{ period.revenue_change >= 0 ? 'Up' : 'Down' }}</span>{{ Math.abs(period.revenue_change) }}%
           </span>
-          <span v-if="period.revenue_change !== null">vs {{ compareLabel }}</span>
-          <span v-else>No sales in the {{ compareLabel }} to compare with</span>
+          <span v-if="period.revenue_change !== null">vs {{ currentRange?.compare }}</span>
+          <span v-else>{{ currentRange?.none }}</span>
         </p>
       </div>
       <dl v-if="period" class="flex gap-8 pb-0.5">
@@ -130,7 +138,7 @@ function tooltipAlign(i: number) {
     <!-- Plot -->
     <div class="relative mt-8 flex-1 min-h-[260px]" :class="{ 'opacity-50 transition-opacity': refreshing }">
       <div v-if="loading" class="absolute inset-0 flex items-end gap-2 pl-14 pb-7">
-        <div v-for="i in 14" :key="i" class="skeleton flex-1 rounded-t" :style="{ height: `${20 + ((i * 37) % 60)}%` }" />
+        <div v-for="i in (range === 'daily' ? 7 : 12)" :key="i" class="skeleton flex-1 rounded-t" :style="{ height: `${20 + ((i * 37) % 60)}%` }" />
       </div>
 
       <template v-else>
@@ -158,10 +166,10 @@ function tooltipAlign(i: number) {
             v-for="(p, i) in series"
             :key="p.start"
             role="listitem"
-            tabindex="0"
-            :aria-label="`${bucketTitle(i)}: ${formatPesoCents(p.revenue)} from ${p.orders} orders`"
+            :tabindex="p.upcoming ? -1 : 0"
+            :aria-label="p.upcoming ? `${bucketTitle(i)}: upcoming` : `${bucketTitle(i)}: ${formatPesoCents(p.revenue)} from ${p.orders} orders`"
             class="group relative flex flex-1 flex-col items-center outline-none"
-            @mouseenter="active = i"
+            @mouseenter="active = p.upcoming ? null : i"
             @focus="active = i"
             @blur="active = null"
             @keydown="onKey($event, i)"
@@ -170,7 +178,7 @@ function tooltipAlign(i: number) {
               <div
                 class="bar h-full w-full max-w-[34px]"
                 :class="[
-                  i === lastIndex ? 'bar--current' : '',
+                  i === currentIndex ? 'bar--current' : '',
                   active === i ? 'bar--active' : '',
                 ]"
                 :style="{ clipPath: barClip(p.revenue) }"
@@ -188,7 +196,7 @@ function tooltipAlign(i: number) {
                 aria-hidden="true"
               >
                 <p class="text-[11px] text-[#D9BFA8]">
-                  {{ bucketTitle(i) }}<span v-if="i === lastIndex" class="text-[#F2B66D]"> · so far</span>
+                  {{ bucketTitle(i) }}<span v-if="i === currentIndex" class="text-[#F2B66D]"> · so far</span>
                 </p>
                 <p class="mt-1 font-display text-base font-semibold text-[#FFF0D1] tabular-nums">{{ formatPesoCents(p.revenue) }}</p>
                 <p class="text-[11px] text-[#D9BFA8] tabular-nums">{{ formatCount(p.orders) }} {{ p.orders === 1 ? 'order' : 'orders' }}</p>
@@ -197,11 +205,11 @@ function tooltipAlign(i: number) {
             <span
               class="h-7 pt-2 text-[11px] whitespace-nowrap tabular-nums"
               :class="[
-                active === i ? 'text-[#3B1F0E] font-semibold' : 'text-[#9E7060]',
-                i % 2 === 1 && i !== lastIndex ? 'max-sm:invisible' : '',
+                active === i || (i === currentIndex && range === 'daily') ? 'text-[#3B1F0E] font-semibold' : p.upcoming ? 'text-[#C2A592]' : 'text-[#9E7060]',
+                series.length > 7 && i % 2 === 1 && i !== currentIndex ? 'max-sm:invisible' : '',
               ]"
               aria-hidden="true"
-            >{{ i === lastIndex && range === 'daily' ? 'Today' : barLabel(i) }}</span>
+            >{{ barLabel(i) }}</span>
 
           </div>
         </div>

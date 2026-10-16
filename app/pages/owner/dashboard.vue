@@ -145,7 +145,6 @@ const branchCount = computed(() => stats.value?.totals.branches ?? 0)
             <OwnerTrendingItems
               class="lg:col-span-7"
               :items="stats?.trending_items ?? []"
-              :span="span"
               :loading="loading"
             />
             <OwnerTopCategories

@@ -2,7 +2,7 @@
 import type { DashboardCategory } from '~/services/OwnerProfileService'
 import { formatCount, formatPeso } from '~/utils/dashboardFormat'
 
-// Menu categories ranked by gross sales across every branch.
+// Menu categories ranked by how many orders included them, across every branch.
 const props = defineProps<{
   categories: DashboardCategory[]
   span: string
@@ -10,14 +10,14 @@ const props = defineProps<{
 }>()
 
 // Bars are scaled to the leader so the ranking reads at a glance; the label carries the true share.
-const lead = () => Math.max(1, ...props.categories.map(c => c.sales))
+const lead = () => Math.max(1, ...props.categories.map(c => c.orders))
 </script>
 
 <template>
   <section class="rounded-[22px] border border-[#EEDFC4] bg-white p-5 sm:p-7 shadow-[0_1px_2px_rgba(59,31,14,0.04)]" aria-labelledby="categories-heading">
     <header>
       <h2 id="categories-heading" class="font-display text-lg font-semibold text-[#3B1F0E]">Top categories</h2>
-      <p class="mt-1 text-[13px] text-[#8B6656]">By sales across all branches · {{ span }}</p>
+      <p class="mt-1 text-[13px] text-[#8B6656]">By orders across all branches · {{ span }}</p>
     </header>
 
     <ol v-if="loading" class="mt-6 space-y-5" aria-hidden="true">
@@ -33,17 +33,19 @@ const lead = () => Math.max(1, ...props.categories.map(c => c.sales))
           <p class="min-w-0 truncate text-[14px] font-semibold text-[#3D2B24]">
             <span class="mr-1.5 font-display tabular-nums text-[#C2A592]">{{ i + 1 }}</span>{{ c.name }}
           </p>
-          <p class="shrink-0 text-[14px] font-semibold text-[#3D2B24] tabular-nums">{{ formatPeso(c.sales) }}</p>
+          <p class="shrink-0 text-[14px] font-semibold text-[#3D2B24] tabular-nums">
+            {{ formatCount(c.orders) }} <span class="font-normal text-[#9E7060]">{{ c.orders === 1 ? 'order' : 'orders' }}</span>
+          </p>
         </div>
         <div class="mt-2 h-2.5 overflow-hidden rounded-full bg-[#F3E7D2]">
           <div
             class="h-full rounded-full transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
             :class="i === 0 ? 'bg-[#7D5A50]' : 'bg-[#B4846C]'"
-            :style="{ width: `${(c.sales / lead()) * 100}%` }"
+            :style="{ width: `${(c.orders / lead()) * 100}%` }"
           />
         </div>
         <p class="mt-1.5 text-[12px] text-[#9E7060] tabular-nums">
-          {{ c.share }}% of item sales · {{ formatCount(c.quantity) }} units · {{ c.items }} {{ c.items === 1 ? 'item' : 'items' }}
+          In {{ c.share }}% of orders · {{ formatPeso(c.sales) }} · {{ formatCount(c.quantity) }} units
         </p>
       </li>
     </ol>
