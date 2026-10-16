@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import type { BranchStaffStats, EmploymentStatus, StaffMember, StaffRole } from '~/services/StaffService'
 import DropdownList from '~/components/common/DropdownList.vue'
+import SearchInput from '~/components/common/SearchInput.vue'
 
 const props = defineProps<{
   branchUuid: string
@@ -211,25 +212,17 @@ onBeforeUnmount(() => {
                     xl:flex-row xl:items-center xl:justify-between xl:gap-6">
           <div class="flex flex-col gap-3 flex-1 min-w-0 sm:flex-row sm:items-center">
             <!-- Search -->
-            <div class="relative flex-1 min-w-0">
-              <Icon name="heroicons:magnifying-glass" class="w-4 h-4 text-[#7D5A50]/60 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                v-model="search"
-                type="text"
-                placeholder="Search Employee"
-                class="w-full h-11 rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] pl-10 pr-3 font-sans text-sm text-[#3D2B24] placeholder:text-[#7D5A50]/40 hover:border-[#D9C4B8] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-              />
-            </div>
+            <SearchInput v-model="search" placeholder="Search Employee" class="flex-1" />
 
             <div class="grid grid-cols-2 gap-3 sm:flex">
               <!-- Status -->
               <div class="sm:w-[160px]">
-                <DropdownList v-model="status" :options="statusOptions" size="sm" aria-label="Status" />
+                <DropdownList v-model="status" :options="statusOptions" size="sm" class="font-sans" aria-label="Status" />
               </div>
 
               <!-- Position -->
               <div class="sm:w-[160px]">
-                <DropdownList v-model="position" :options="positionOptions" size="sm" aria-label="Position" />
+                <DropdownList v-model="position" :options="positionOptions" size="sm" class="font-sans" aria-label="Position" />
               </div>
             </div>
           </div>

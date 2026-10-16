@@ -1,5 +1,6 @@
 <!--app/pages/admin/approvals.vue-->
 <script setup lang="ts">
+import SearchInput from '~/components/common/SearchInput.vue'
 import type { ApprovalListItem, ApprovalStats, Paginated } from '~/services/OwnerManagementService'
 
 definePageMeta({
@@ -261,18 +262,7 @@ onMounted(async () => {
         <!-- Search + Status Tabs Bar -->
         <div class="flex items-center gap-[24px] px-[20px] py-[18px] border-b border-[#F3E7D2]">
           <!-- Search -->
-          <div class="relative flex-1 min-w-[220px] max-h-full">
-            <Icon
-              name="heroicons:magnifying-glass"
-              class="absolute left-[12px] top-1/2 -translate-y-1/2 w-[24px] h-[24px] text-[#9E7060]"
-            />
-            <input
-              v-model="search"
-              type="text"
-              placeholder="Search owner"
-              class="w-full rounded-[12px] border border-[#EEDFC4] bg-[#FFFBF3] pl-[48px] py-[12px] font-sans text-[14px] text-[#3B1F0E] placeholder:text-[#B4846C] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
-            />
-          </div>
+          <SearchInput v-model="search" placeholder="Search owner" class="flex-1 min-w-[220px]" />
 
           <!-- General / Pending / Approved / Rejected -->
           <div class="inline-flex items-center bg-white border border-[#EDD8CC] rounded-xl gap-1 p-[8px] font-display font-medium text-[16px]">

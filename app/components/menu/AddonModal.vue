@@ -9,6 +9,7 @@ import type { Ingredient, MenuAddon } from '~/services/MenuService'
 import IngredientPicker from '~/components/menu/IngredientPicker.vue'
 import ConfirmModal from '~/components/common/ConfirmModal.vue'
 import DropdownList from '~/components/common/DropdownList.vue'
+import SearchInput from '~/components/common/SearchInput.vue'
 import AlertModal from '~/components/common/AlertModal.vue'
 import { useDialogs } from '~/composables/useDialogs'
 
@@ -427,12 +428,7 @@ const inputClass = (invalid: boolean) => [
               <h3 class="text-2xl font-display font-bold text-[#3B1F0E]">Offered On</h3>
               <p class="text-sm text-[#9E7060] mt-1">{{ form.item_uuids.length }} of {{ menuItems.length }} menu items</p>
             </div>
-            <input
-              v-model="itemSearch"
-              type="search"
-              placeholder="Search items"
-              class="sm:w-56 bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#B4846C]"
-            />
+            <SearchInput v-model="itemSearch" placeholder="Search items" clearable class="sm:w-56" />
           </div>
 
           <p v-if="menuItems.length === 0" class="text-sm text-[#7D5A50]">No menu items yet.</p>

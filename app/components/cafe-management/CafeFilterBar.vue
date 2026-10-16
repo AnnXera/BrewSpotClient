@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import DropdownList from '~/components/common/DropdownList.vue'
+import SearchInput from '~/components/common/SearchInput.vue'
 
 const props = defineProps<{
   search: string
@@ -64,19 +65,12 @@ const emit = defineEmits<{
 
     <template v-else>
       <!-- Search Input -->
-      <div class="relative flex-1 max-w-md">
-        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-          <Icon name="heroicons:magnifying-glass" class="h-5 w-5 text-[#B4846C]" />
-        </div>
-        <input
-          :value="search"
-          @input="emit('update:search', ($event.target as HTMLInputElement).value)"
-          type="text"
-          aria-label="Search owner or cafe"
-          placeholder="Search owner or cafe"
-          class="block w-full pl-10 pr-4 py-2.5 border border-[#EEDFC4] rounded-xl bg-[#FDF8F3] text-sm placeholder-[#B4846C]/60 text-[#3B1F0E] focus:outline-none focus:ring-1 focus:ring-[#7D5A50] focus:border-[#7D5A50]"
-        />
-      </div>
+      <SearchInput
+        :model-value="search"
+        placeholder="Search owner or cafe"
+        class="flex-1 max-w-md"
+        @update:model-value="emit('update:search', $event)"
+      />
       
       <!-- Status Dropdown -->
       <div class="w-44">
@@ -89,6 +83,7 @@ const emit = defineEmits<{
             { value: 'inactive', label: 'Inactive' }
           ]"
           size="sm"
+          class="font-sans"
           aria-label="Filter by status"
           @update:model-value="emit('update:status', $event)"
         />

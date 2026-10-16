@@ -1,6 +1,7 @@
 <!-- app/pages/manager/servings.vue -->
 <script setup lang="ts">
 import DropdownList from '~/components/common/DropdownList.vue'
+import SearchInput from '~/components/common/SearchInput.vue'
 import type {
   IngredientUsage,
   IngredientUsageSort,
@@ -186,16 +187,8 @@ onBeforeUnmount(() => {
         <!-- Categories -->
         <section class="bg-white border border-[#EDD8CC] rounded-2xl overflow-hidden">
           <div class="flex items-center justify-between gap-3 px-[22px] py-[18px] border-b border-[#EDD8CC]">
-            <div class="flex-1 flex items-center gap-3 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl p-3">
-              <Icon name="heroicons:magnifying-glass" class="w-4 h-4 text-[#7D5A50]/60 shrink-0" />
-              <input
-                v-model="categorySearch"
-                type="text"
-                placeholder="Search Category"
-                class="w-full bg-transparent outline-none text-[14px] text-[#3D2B24] placeholder:text-[#7D5A50]/40"
-              >
-            </div>
-            <div class="flex items-center gap-1.5 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl p-3 text-[14px] font-medium text-[#7D5A50]">
+            <SearchInput v-model="categorySearch" placeholder="Search Category" class="flex-1" />
+            <div class="flex items-center gap-1.5 h-11 px-3 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl font-sans text-sm font-medium text-[#7D5A50]">
               <Icon name="heroicons:bars-3-bottom-left" class="w-4 h-4" />
               <DropdownList v-model="categorySort" :options="categorySortOptions" bare align="right" aria-label="Sort categories" />
             </div>

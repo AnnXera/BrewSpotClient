@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
 import DropdownList from '~/components/common/DropdownList.vue'
+import SearchInput from '~/components/common/SearchInput.vue'
 
 definePageMeta({
   role: 'Admin',
@@ -310,22 +311,7 @@ onMounted(fetchOwner)
                         min-[360px]:px-[12px] min-[360px]:py-[14px] min-[360px]:gap-[12px]
                         md:flex-row md:items-center md:p-6 md:gap-[24px]">
               <!-- Search Input -->
-              <div class="relative flex-1 w-full min-w-0">
-                <Icon
-                  name="heroicons:magnifying-glass"
-                  class="text-[#3B1F0E]/40 absolute top-1/2 -translate-y-1/2
-                         min-[360px]:left-[10px] min-[360px]:w-[16px] min-[360px]:h-[16px]
-                         md:left-[12px] md:w-[24px] md:h-[24px]"
-                />
-                <input
-                  v-model="branchSearchQuery"
-                  type="text"
-                  placeholder="Search branches by name or address..."
-                  class="w-full rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] font-sans text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40
-                         min-[360px]:py-[10px] min-[360px]:text-[12px] min-[360px]:pl-[34px]
-                         md:py-[12px] md:text-[14px] md:pl-[48px]"
-                />
-              </div>
+              <SearchInput v-model="branchSearchQuery" placeholder="Search branches by name or address..." class="flex-1" />
 
               <!-- Dropdown -->
               <div class="w-full md:w-auto">
@@ -340,6 +326,7 @@ onMounted(fetchOwner)
                       { value: 'rejected', label: 'Rejected' }
                     ]"
                     size="sm"
+                    class="font-sans"
                     aria-label="Filter by status"
                   />
                 </div>
