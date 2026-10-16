@@ -17,3 +17,6 @@ export const INGREDIENT_UNITS = [
     'stick',
     'pint'
 ];
+
+// INGREDIENT_UNITS as DropdownList options.
+export const INGREDIENT_UNIT_OPTIONS = INGREDIENT_UNITS.map(unit => ({ value: unit, label: unit }));

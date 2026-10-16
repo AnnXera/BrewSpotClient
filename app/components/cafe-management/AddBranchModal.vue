@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import DropdownList from '~/components/common/DropdownList.vue'
 
 const props = defineProps<{
   show: boolean
@@ -319,10 +320,12 @@ function handleSubmit() {
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">VAT Status *</label>
-                <select v-model="form.vat" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]">
-                  <option value="vat-registered">VAT Registered</option>
-                  <option value="non-vat">Non-VAT</option>
-                </select>
+                <DropdownList
+                  v-model="form.vat"
+                  :options="[{ value: 'vat-registered', label: 'VAT Registered' }, { value: 'non-vat', label: 'Non-VAT' }]"
+                  size="sm"
+                  :invalid="!!fieldError('vat')"
+                />
                 <p v-if="fieldError('vat')" class="text-xs text-red-600 mt-1 font-medium">{{ fieldError('vat') }}</p>
               </div>
               <div>

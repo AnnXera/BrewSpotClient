@@ -2,6 +2,27 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import logoFull from '~/assets/images/logo-with-tag.svg'
+import DropdownList, { type DropdownListOption } from '~/components/common/DropdownList.vue'
+
+const PHONE_TYPE_OPTIONS: DropdownListOption<'mobile' | 'telephone'>[] = [
+  { value: 'mobile', label: 'Phone (+63)' },
+  { value: 'telephone', label: 'Landline' }
+]
+
+const ID_TYPE_OPTIONS: DropdownListOption<string>[] = [
+  { value: 'drivers_license', label: "Driver's License" },
+  { value: 'passport', label: 'Passport' },
+  { value: 'national_id', label: 'National ID' },
+  { value: 'sss', label: 'SSS ID' },
+  { value: 'philhealth', label: 'PhilHealth ID' },
+  { value: 'pagibig', label: 'Pag-IBIG ID' },
+  { value: 'voters_id', label: "Voter's ID" }
+]
+
+const CAFE_DOC_TYPE_OPTIONS: DropdownListOption<'DTI' | 'SEC'>[] = [
+  { value: 'DTI', label: 'DTI' },
+  { value: 'SEC', label: 'SEC' }
+]
 
 const authService = useAuthService()
 
@@ -1571,20 +1592,18 @@ onBeforeUnmount(() => {
               <div class="space-y-1">
                 <label class="block text-sm font-medium text-[#2d201b]">Contact No. *</label>
                 <div
-                  class="flex items-center rounded-md border bg-white overflow-hidden transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
+                  class="flex items-center rounded-md border bg-white transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
                   :class="fieldErrors.phone_number ? 'border-red-500' : 'border-gray-300'"
                 >
                   <!-- Box-type Type Selector beside input number -->
-                  <div class="relative bg-gray-100 border-r border-gray-300 shrink-0 h-full flex items-center">
-                    <select
+                  <div class="bg-gray-100 border-r border-gray-300 rounded-l-md shrink-0 h-full flex items-center px-3 text-[#2d201b] font-semibold text-xs">
+                    <DropdownList
                       v-model="phoneType"
+                      :options="PHONE_TYPE_OPTIONS"
+                      bare
+                      aria-label="Contact number type"
                       @change="onPhoneTypeChange"
-                      class="h-full bg-transparent text-[#2d201b] font-semibold text-xs pl-3 pr-7 outline-none cursor-pointer appearance-none z-10"
-                    >
-                      <option value="mobile">Phone (+63)</option>
-                      <option value="telephone">Landline</option>
-                    </select>
-                    <Icon name="heroicons:chevron-down" class="w-3.5 h-3.5 text-gray-500 absolute right-2 pointer-events-none" />
+                    />
                   </div>
 
                   <!-- Mobile Input (10 digits starting with 9) -->
@@ -1637,18 +1656,12 @@ onBeforeUnmount(() => {
               
               <div class="space-y-1 w-full sm:w-1/2">
                 <label class="block text-sm font-medium text-[#2d201b]">ID Type</label>
-                <select
+                <DropdownList
                   v-model="idType"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm font-medium text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20 cursor-pointer"
-                >
-                  <option value="drivers_license">Driver's License</option>
-                  <option value="passport">Passport</option>
-                  <option value="national_id">National ID</option>
-                  <option value="sss">SSS ID</option>
-                  <option value="philhealth">PhilHealth ID</option>
-                  <option value="pagibig">Pag-IBIG ID</option>
-                  <option value="voters_id">Voter's ID</option>
-                </select>
+                  :options="ID_TYPE_OPTIONS"
+                  size="sm"
+                  :invalid="!!fieldErrors.id_type"
+                />
                 <p v-if="fieldErrors.id_type" class="text-xs text-red-600 font-medium">{{ fieldErrors.id_type }}</p>
               </div>
 
@@ -1778,13 +1791,11 @@ onBeforeUnmount(() => {
                   </div>
                   <div class="col-span-2 sm:col-span-1">
                     <label class="block text-sm font-medium mb-1 text-[#2d201b]">Document Type *</label>
-                    <select
+                    <DropdownList
                       v-model="cafeDocType"
-                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
-                    >
-                      <option value="DTI">DTI</option>
-                      <option value="SEC">SEC</option>
-                    </select>
+                      :options="CAFE_DOC_TYPE_OPTIONS"
+                      size="sm"
+                    />
                   </div>
                   <div class="col-span-2">
                     <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Name</label>
@@ -1808,20 +1819,18 @@ onBeforeUnmount(() => {
                   <div class="space-y-1">
                   <label class="block text-sm font-medium text-[#2d201b]">Branch Phone *</label>
                   <div
-                    class="flex items-center rounded-md border bg-white overflow-hidden transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
+                    class="flex items-center rounded-md border bg-white transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
                     :class="fieldErrors.cafe_phonenumber ? 'border-red-500' : 'border-gray-300'"
                   >
                     <!-- Box-type Type Selector beside input number -->
-                    <div class="relative bg-gray-100 border-r border-gray-300 shrink-0 h-full flex items-center">
-                      <select
+                    <div class="bg-gray-100 border-r border-gray-300 rounded-l-md shrink-0 h-full flex items-center px-3 text-[#2d201b] font-semibold text-xs">
+                      <DropdownList
                         v-model="cafePhoneType"
+                        :options="PHONE_TYPE_OPTIONS"
+                        bare
+                        aria-label="Branch phone type"
                         @change="onCafePhoneTypeChange"
-                        class="h-full bg-transparent text-[#2d201b] font-semibold text-xs pl-3 pr-7 outline-none cursor-pointer appearance-none z-10"
-                      >
-                        <option value="mobile">Phone (+63)</option>
-                        <option value="telephone">Landline</option>
-                      </select>
-                      <Icon name="heroicons:chevron-down" class="w-3.5 h-3.5 text-gray-500 absolute right-2 pointer-events-none" />
+                      />
                     </div>
 
                     <!-- Mobile Input (10 digits starting with 9) -->

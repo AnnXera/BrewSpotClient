@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import DropdownList from '~/components/common/DropdownList.vue'
+
 const props = defineProps<{
   search: string
   status: string
@@ -77,21 +79,19 @@ const emit = defineEmits<{
       </div>
       
       <!-- Status Dropdown -->
-      <div class="relative w-44">
-        <select
-          :value="status"
-          @change="emit('update:status', ($event.target as HTMLSelectElement).value)"
+      <div class="w-44">
+        <DropdownList
+          :model-value="status"
+          :options="[
+            { value: '', label: 'All Statuses' },
+            { value: 'active', label: 'Active' },
+            { value: 'pending', label: 'Pending' },
+            { value: 'inactive', label: 'Inactive' }
+          ]"
+          size="sm"
           aria-label="Filter by status"
-          class="block w-full pl-3.5 pr-10 py-2.5 border border-[#EEDFC4] rounded-xl bg-[#FDF8F3] text-sm text-[#B4846C] appearance-none focus:outline-none focus:ring-1 focus:ring-[#7D5A50] focus:border-[#7D5A50]"
-        >
-          <option value="">Status</option>
-          <option value="active">Active</option>
-          <option value="pending">Pending</option>
-          <option value="inactive">Inactive</option>
-        </select>
-        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-          <Icon name="heroicons:chevron-down" class="h-5 w-5 text-[#B4846C]" />
-        </div>
+          @update:model-value="emit('update:status', $event)"
+        />
       </div>
 
       <!-- Add Branch Button -->

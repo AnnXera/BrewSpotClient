@@ -47,19 +47,17 @@
             />
           </div>
 
-          <div class="relative w-full sm:w-auto min-w-[160px]">
-            <select
+          <div class="w-full sm:w-56">
+            <DropdownList
               v-model="selectedStatus"
-              class="w-full appearance-none pl-4 pr-10 py-2.5 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm font-medium text-[#3B1F0E] focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] shadow-sm"
-            >
-              <option value="">All Payment Statuses</option>
-              <option value="success">Success / Active</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Failed / Cancelled</option>
-            </select>
-            <Icon
-              name="heroicons:chevron-down"
-              class="w-4 h-4 text-[#9E7060] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+              :options="[
+                { value: '', label: 'All Payment Statuses' },
+                { value: 'success', label: 'Success / Active' },
+                { value: 'pending', label: 'Pending' },
+                { value: 'failed', label: 'Failed / Cancelled' }
+              ]"
+              size="sm"
+              aria-label="Filter by payment status"
             />
           </div>
 
@@ -294,6 +292,8 @@
 </template>
 
 <script setup lang="ts">
+import DropdownList from '~/components/common/DropdownList.vue'
+
 export interface PaymentTransaction {
   transaction_id: string
   date: string | null

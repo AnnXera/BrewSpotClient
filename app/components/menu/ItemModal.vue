@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
 import { useMenuService } from '~/composables/useMenuService'
-import { INGREDIENT_UNITS } from '~/utils/constants'
+import { INGREDIENT_UNITS, INGREDIENT_UNIT_OPTIONS } from '~/utils/constants'
 import { parseQuantity, formatQuantity, sanitizeQuantity } from '~/utils/fraction'
 import type { Ingredient, MenuAddon } from '~/services/MenuService'
 import IngredientPicker from '~/components/menu/IngredientPicker.vue'
-import SelectMenu from '~/components/common/SelectMenu.vue'
+import DropdownList from '~/components/common/DropdownList.vue'
 import ConfirmModal from '~/components/common/ConfirmModal.vue'
 import AlertModal from '~/components/common/AlertModal.vue'
 import { useDialogs } from '~/composables/useDialogs'
@@ -259,6 +259,11 @@ const realCategories = computed(() => props.categories.filter(cat => cat.uuid !=
 const categoryOptions = computed(() => [
   { value: 'uncategorized', label: 'Uncategorized' },
   ...realCategories.value.map(cat => ({ value: cat.uuid as string, label: cat.name as string }))
+])
+
+const sizeOptions = computed(() => [
+  { value: null as string | null, label: 'All sizes' },
+  ...form.value.sizes.map((size, i) => ({ value: size.key as string | null, label: sizeLabel(size, i) }))
 ])
 
 const isDirty = ref(false)
@@ -598,7 +603,7 @@ const saveItem = async () => {
             <div class="flex flex-col sm:flex-row gap-5">
               <div class="flex-1">
                 <label class="block text-sm font-bold text-[#B4846C] uppercase tracking-wider mb-2">Category</label>
-                <SelectMenu v-model="form.category_uuid" :options="categoryOptions" />
+                <DropdownList v-model="form.category_uuid" :options="categoryOptions" />
               </div>
 
               <div class="flex-1">
@@ -776,21 +781,11 @@ const saveItem = async () => {
               <!-- Size the amount is for -->
               <div v-if="form.has_sizes" class="w-full">
                 <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">For</label>
-                <div class="relative">
-                  <select
-                    v-model="recipe.size_key"
-                    @change="serverRowErrors = {}"
-                    class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl pl-4 pr-10 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent"
-                  >
-                    <option :value="null">All sizes</option>
-                    <option v-for="(size, sizeIndex) in form.sizes" :key="size.key" :value="size.key">
-                      {{ sizeLabel(size, sizeIndex) }}
-                    </option>
-                  </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-[#B4846C]">
-                    <Icon name="heroicons:chevron-down" class="w-5 h-5" />
-                  </div>
-                </div>
+                <DropdownList
+                  v-model="recipe.size_key"
+                  :options="sizeOptions"
+                  @change="serverRowErrors = {}"
+                />
               </div>
 
               <!-- Amount -->
@@ -810,23 +805,13 @@ const saveItem = async () => {
               <!-- Unit -->
               <div class="w-full relative">
                 <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Unit</label>
-                <div class="relative">
-                  <!-- An existing ingredient is always measured in its own unit. -->
-                  <select 
-                    v-model="recipe.unit"
-                    :disabled="!!recipe.ingredient_uuid"
-                    :title="recipe.ingredient_uuid ? `${recipe.ingredient_name} is measured in ${recipe.unit}` : undefined"
-                    @keydown.enter.prevent="handleEnterOnIngredient(index)"
-                    class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl pl-4 pr-10 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <option v-for="unit in INGREDIENT_UNITS" :key="unit" :value="unit">
-                      {{ unit }}
-                    </option>
-                  </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-[#B4846C]">
-                    <Icon name="heroicons:chevron-down" class="w-5 h-5" />
-                  </div>
-                </div>
+                <!-- An existing ingredient is always measured in its own unit. -->
+                <DropdownList
+                  v-model="recipe.unit"
+                  :options="INGREDIENT_UNIT_OPTIONS"
+                  :disabled="!!recipe.ingredient_uuid"
+                  :title="recipe.ingredient_uuid ? `${recipe.ingredient_name} is measured in ${recipe.unit}` : undefined"
+                />
               </div>
 
               <!-- Delete Button -->

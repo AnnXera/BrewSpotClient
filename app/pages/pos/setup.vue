@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import DropdownList from '~/components/common/DropdownList.vue'
+
 // Owner or Manager needs to be logged in to set up a POS device
 definePageMeta({
   role: ['Cafe Owner', 'Manager'],
@@ -15,6 +17,7 @@ const errorMessage = ref('')
 const branches = ref<any[]>([])
 
 const selectedBranch = ref('')
+const branchOptions = computed(() => branches.value.map(branch => ({ value: branch.uuid as string, label: branch.branch_name as string })))
 const deviceName = ref('')
 
 async function fetchBranches() {
@@ -86,16 +89,12 @@ onMounted(() => {
       <form @submit.prevent="registerDevice" class="space-y-5">
         <div>
           <label class="block text-sm font-bold text-[#3D2B24] mb-2">Branch</label>
-          <select 
-            v-model="selectedBranch" 
-            class="w-full bg-[#FDF3E7] border border-[#EDD8CC] text-[#3D2B24] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#7D5A50]"
+          <DropdownList
+            v-model="selectedBranch"
+            :options="branchOptions"
+            placeholder="Select a branch"
             :disabled="loading"
-          >
-            <option disabled value="">Select a branch</option>
-            <option v-for="branch in branches" :key="branch.uuid" :value="branch.uuid">
-              {{ branch.branch_name }}
-            </option>
-          </select>
+          />
         </div>
 
         <div>

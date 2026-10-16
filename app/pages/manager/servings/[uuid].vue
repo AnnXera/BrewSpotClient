@@ -1,6 +1,7 @@
 <!-- app/pages/manager/servings/[uuid].vue -->
 <!-- One category's items: set each item's daily limit and switch it on or off for today, then Save Changes. -->
 <script setup lang="ts">
+import DropdownList from '~/components/common/DropdownList.vue'
 import type {
   CategoryServingChange,
   CategoryServingItem,
@@ -232,12 +233,10 @@ onBeforeUnmount(() => {
                 class="w-full bg-transparent outline-none text-[14px] text-[#3D2B24] placeholder:text-[#7D5A50]/40"
               >
             </div>
-            <label class="flex items-center gap-1.5 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl p-3 text-[14px] font-medium text-[#7D5A50]">
+            <div class="flex items-center gap-1.5 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl p-3 text-[14px] font-medium text-[#7D5A50]">
               <Icon name="heroicons:bars-3-bottom-left" class="w-4 h-4" />
-              <select v-model="sort" class="bg-transparent outline-none cursor-pointer" aria-label="Sort items">
-                <option v-for="o in sortOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-              </select>
-            </label>
+              <DropdownList v-model="sort" :options="sortOptions" bare align="right" aria-label="Sort items" />
+            </div>
           </div>
           <button
             type="button"

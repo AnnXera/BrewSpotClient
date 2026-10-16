@@ -1,5 +1,6 @@
 <!-- app/pages/manager/servings.vue -->
 <script setup lang="ts">
+import DropdownList from '~/components/common/DropdownList.vue'
 import type {
   IngredientUsage,
   IngredientUsageSort,
@@ -31,6 +32,7 @@ const service = useServingService('manager')
 
 const branches = ref<ManagedBranch[]>([])
 const branchUuid = ref('')
+const branchOptions = computed(() => branches.value.map(b => ({ value: b.uuid, label: b.branch_name })))
 
 // Live clock in the header
 const { timeLabel, dateLabel } = useNowClock()
@@ -161,14 +163,9 @@ onBeforeUnmount(() => {
           <p class="font-display text-[12px] text-[#9E7060]">Manage your servings portions here.</p>
         </div>
         <div class="flex items-center gap-3">
-          <select
-            v-if="branches.length > 1"
-            v-model="branchUuid"
-            class="bg-white border border-[#3D2B24] rounded-2xl px-4 py-[18px] text-[16px] outline-none"
-            aria-label="Branch"
-          >
-            <option v-for="b in branches" :key="b.uuid" :value="b.uuid">{{ b.branch_name }}</option>
-          </select>
+          <div v-if="branches.length > 1" class="w-56">
+            <DropdownList v-model="branchUuid" :options="branchOptions" icon="heroicons:building-storefront" aria-label="Branch" />
+          </div>
           <div class="bg-white border border-[#3D2B24] rounded-2xl p-[18px] flex items-center gap-3 text-[16px] text-black whitespace-nowrap">
             <span>{{ timeLabel }}</span>
             <span>|</span>
@@ -198,12 +195,10 @@ onBeforeUnmount(() => {
                 class="w-full bg-transparent outline-none text-[14px] text-[#3D2B24] placeholder:text-[#7D5A50]/40"
               >
             </div>
-            <label class="flex items-center gap-1.5 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl p-3 text-[14px] font-medium text-[#7D5A50]">
+            <div class="flex items-center gap-1.5 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl p-3 text-[14px] font-medium text-[#7D5A50]">
               <Icon name="heroicons:bars-3-bottom-left" class="w-4 h-4" />
-              <select v-model="categorySort" class="bg-transparent outline-none cursor-pointer" aria-label="Sort categories">
-                <option v-for="o in categorySortOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-              </select>
-            </label>
+              <DropdownList v-model="categorySort" :options="categorySortOptions" bare align="right" aria-label="Sort categories" />
+            </div>
           </div>
 
           <div class="px-[22px] py-[18px] min-h-[120px]">

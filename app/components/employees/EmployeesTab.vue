@@ -2,6 +2,7 @@
 <!-- Employees tab of a branch (owner side). View Positions / View Details emit events until those screens exist. -->
 <script setup lang="ts">
 import type { BranchStaffStats, EmploymentStatus, StaffMember, StaffRole } from '~/services/StaffService'
+import DropdownList from '~/components/common/DropdownList.vue'
 
 const props = defineProps<{
   branchUuid: string
@@ -223,33 +224,13 @@ onBeforeUnmount(() => {
 
             <div class="grid grid-cols-2 gap-3 sm:flex">
               <!-- Status -->
-              <div class="relative sm:w-[149px]">
-                <select
-                  v-model="status"
-                  aria-label="Status"
-                  class="w-full appearance-none rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] py-3 pl-3 pr-9 font-sans text-sm cursor-pointer hover:border-[#D9C4B8] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-                  :class="status ? 'text-[#3D2B24]' : 'text-[#7D5A50]/40'"
-                >
-                  <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value" class="text-[#3D2B24]">
-                    {{ opt.value ? opt.label : 'Status' }}
-                  </option>
-                </select>
-                <Icon name="heroicons:chevron-down" class="w-4 h-4 text-[#7D5A50]/60 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <div class="sm:w-[160px]">
+                <DropdownList v-model="status" :options="statusOptions" aria-label="Status" />
               </div>
 
               <!-- Position -->
-              <div class="relative sm:w-[149px]">
-                <select
-                  v-model="position"
-                  aria-label="Position"
-                  class="w-full appearance-none rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] py-3 pl-3 pr-9 font-sans text-sm cursor-pointer hover:border-[#D9C4B8] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-                  :class="position ? 'text-[#3D2B24]' : 'text-[#7D5A50]/40'"
-                >
-                  <option v-for="opt in positionOptions" :key="opt.value" :value="opt.value" class="text-[#3D2B24]">
-                    {{ opt.value ? opt.label : 'Position' }}
-                  </option>
-                </select>
-                <Icon name="heroicons:chevron-down" class="w-4 h-4 text-[#7D5A50]/60 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <div class="sm:w-[160px]">
+                <DropdownList v-model="position" :options="positionOptions" aria-label="Position" />
               </div>
             </div>
           </div>

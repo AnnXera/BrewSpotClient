@@ -1,6 +1,7 @@
 <!--app/pages/admin/owners/[uuid].vue -->
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
+import DropdownList from '~/components/common/DropdownList.vue'
 
 definePageMeta({
   role: 'Admin',
@@ -328,22 +329,18 @@ onMounted(fetchOwner)
 
               <!-- Dropdown -->
               <div class="w-full md:w-auto">
-                <div class="relative w-full md:w-auto">
-                  <select
+                <div class="w-full md:w-48">
+                  <DropdownList
                     v-model="branchStatusFilter"
-                    class="w-full appearance-none rounded-xl border border-[#EEDFC4] bg-[#FFFDF9] pl-[12px] pr-[32px] font-sans text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40
-                           min-[360px]:py-[10px] min-[360px]:text-[12px]
-                           md:py-[12px] md:text-[14px] md:w-48"
-                  >
-                    <option value="">All Statuses</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="pending">Pending</option>
-                    <option value="rejected">Rejected</option>
-                  </select>
-                  <Icon
-                    name="heroicons:chevron-down"
-                    class="w-[16px] h-[16px] text-[#3B1F0E]/40 absolute right-[12px] top-1/2 -translate-y-1/2 pointer-events-none"
+                    :options="[
+                      { value: '', label: 'All Statuses' },
+                      { value: 'active', label: 'Active' },
+                      { value: 'inactive', label: 'Inactive' },
+                      { value: 'pending', label: 'Pending' },
+                      { value: 'rejected', label: 'Rejected' }
+                    ]"
+                    size="sm"
+                    aria-label="Filter by status"
                   />
                 </div>
               </div>

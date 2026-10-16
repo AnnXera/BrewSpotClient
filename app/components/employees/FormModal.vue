@@ -8,7 +8,7 @@ import type {
   StaffScheduleInput,
   UpdateStaffPayload,
 } from '~/services/StaffService'
-import SelectMenu from '~/components/common/SelectMenu.vue'
+import DropdownList from '~/components/common/DropdownList.vue'
 
 const props = defineProps<{
   show: boolean
@@ -467,12 +467,12 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
               <!-- Position -->
               <div class="flex flex-col gap-1.5 flex-1 min-w-0">
                 <span :class="labelClass">Position*</span>
-                <SelectMenu
+                <DropdownList
                   v-model="form.role"
                   :options="positionSelectOptions"
                   placeholder="Select position"
                   icon="heroicons:user-circle"
-                  dense
+                  size="sm"
                   :invalid="!!errors.role"
                 />
                 <span v-if="errors.role" class="font-sans text-xs text-red-600">{{ errors.role }}</span>

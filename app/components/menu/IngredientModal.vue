@@ -1,9 +1,10 @@
 <!-- app/components/menu/IngredientModal.vue -->
 <!-- Add or edit an ingredient: rename, change unit (only while unused), retire/restore. -->
 <script setup lang="ts">
-import { INGREDIENT_UNITS } from '~/utils/constants'
+import { INGREDIENT_UNITS, INGREDIENT_UNIT_OPTIONS } from '~/utils/constants'
 import type { Ingredient, IngredientPayload } from '~/services/MenuService'
 import ConfirmModal from '~/components/common/ConfirmModal.vue'
+import DropdownList from '~/components/common/DropdownList.vue'
 
 const props = defineProps<{
   show: boolean
@@ -155,21 +156,12 @@ function toggleActive() {
 
         <div>
           <label class="block text-sm font-bold text-[#B4846C] uppercase tracking-wider mb-2">Unit</label>
-          <div class="relative">
-            <select
-              v-model="form.unit"
-              :disabled="unitLocked"
-              :class="[
-                'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl pl-4 pr-10 py-3 appearance-none focus:outline-none focus:ring-2 focus:border-transparent disabled:opacity-60 disabled:cursor-not-allowed',
-                errors.unit ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
-              ]"
-            >
-              <option v-for="unit in INGREDIENT_UNITS" :key="unit" :value="unit">{{ unit }}</option>
-            </select>
-            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-[#B4846C]">
-              <Icon name="heroicons:chevron-down" class="w-5 h-5" />
-            </div>
-          </div>
+          <DropdownList
+            v-model="form.unit"
+            :options="INGREDIENT_UNIT_OPTIONS"
+            :disabled="unitLocked"
+            :invalid="!!errors.unit"
+          />
           <p v-if="errors.unit" class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.unit }}</p>
           <p v-else-if="unitLocked" class="text-[#9E7060] text-xs mt-1 ml-1">
             Used in {{ ingredient!.used_in }} {{ ingredient!.used_in === 1 ? 'item' : 'items' }}, so the unit can't change.

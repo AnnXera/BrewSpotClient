@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import type { IngredientUsage, IngredientUsageSort } from '~/services/ServingService'
 import { formatQuantity } from '~/utils/fraction'
+import DropdownList from '~/components/common/DropdownList.vue'
 
 defineProps<{ ingredients: IngredientUsage[]; loading: boolean }>()
 
@@ -34,12 +35,10 @@ function unitLabel(quantity: number, unit: string) {
           class="w-full bg-transparent outline-none text-[14px] text-[#3D2B24] placeholder:text-[#7D5A50]/40"
         >
       </div>
-      <label class="flex items-center gap-1.5 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl p-3 text-[14px] font-medium text-[#7D5A50]">
+      <div class="flex items-center gap-1.5 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl p-3 text-[14px] font-medium text-[#7D5A50]">
         <Icon name="heroicons:bars-3-bottom-left" class="w-4 h-4" />
-        <select v-model="sort" class="bg-transparent outline-none cursor-pointer" aria-label="Sort ingredients">
-          <option v-for="o in sortOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-        </select>
-      </label>
+        <DropdownList v-model="sort" :options="sortOptions" bare align="right" aria-label="Sort ingredients" />
+      </div>
     </div>
 
     <div class="flex-1 overflow-y-auto flex flex-col gap-3 pr-2">
