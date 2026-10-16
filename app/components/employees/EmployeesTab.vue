@@ -191,7 +191,7 @@ onBeforeUnmount(() => {
             </li>
           </ul>
         </div>
-        <button type="button" aria-label="Dismiss" class="p-1 rounded hover:bg-black/5" @click="notice = null">
+        <button type="button" aria-label="Dismiss" class="inline-flex items-center justify-center p-1 rounded hover:bg-black/5" @click="notice = null">
           <Icon name="heroicons:x-mark" class="w-4 h-4" />
         </button>
       </div>

@@ -226,7 +226,7 @@ const links = [
           >
             <div v-if="errorMessage" class="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-center justify-between shadow-sm">
               <span class="font-medium text-sm">{{ errorMessage }}</span>
-              <button @click="errorMessage = ''" class="text-red-500 hover:text-red-700 focus:outline-none rounded-lg p-1 hover:bg-red-100 transition-colors">
+              <button @click="errorMessage = ''" class="inline-flex items-center justify-center text-red-500 hover:text-red-700 focus:outline-none rounded-lg p-1 hover:bg-red-100 transition-colors">
                 <Icon name="heroicons:x-mark" class="w-5 h-5"/>
               </button>
             </div>
@@ -298,7 +298,7 @@ const links = [
             <button @click="confirmBulkAction('delete')" :disabled="isBulkLoading" class="px-4 py-2 text-sm font-bold text-[#D9534F] hover:bg-[#FDE8E8] rounded-xl transition-colors disabled:opacity-50">Delete</button>
           </div>
           <div class="h-6 w-[1px] bg-[#EEDFC4]"></div>
-          <button @click="selectedUuids.clear()" class="p-2 text-[#B4846C] hover:bg-[#F5F5F5] rounded-xl transition-colors" title="Clear selection">
+          <button @click="selectedUuids.clear()" class="inline-flex items-center justify-center p-2 text-[#B4846C] hover:bg-[#F5F5F5] rounded-xl transition-colors" title="Clear selection">
             <Icon name="heroicons:x-mark" class="w-5 h-5" />
           </button>
         </div>

@@ -129,7 +129,7 @@
                   <span>{{ formatTxnId(txn.transaction_id) }}</span>
                   <button
                     type="button"
-                    class="opacity-0 group-hover:opacity-100 p-1 text-[#9E7060] hover:text-[#3B1F0E] transition-opacity"
+                    class="inline-flex items-center justify-center opacity-0 group-hover:opacity-100 p-1 text-[#9E7060] hover:text-[#3B1F0E] transition-opacity"
                     title="Copy Transaction ID"
                     @click.stop="copyToClipboard(formatTxnId(txn.transaction_id))"
                   >

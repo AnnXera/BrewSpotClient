@@ -1201,7 +1201,7 @@ onMounted(async () => {
           type="button"
           @click="dismissNotice"
           aria-label="Dismiss message"
-          class="shrink-0 -m-3.5 p-3.5 rounded-lg text-[#7D5A50] hover:bg-[#F3E7D2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B1F0E]/40"
+          class="inline-flex items-center justify-center shrink-0 -m-3.5 p-3.5 rounded-lg text-[#7D5A50] hover:bg-[#F3E7D2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B1F0E]/40"
         >
           <Icon name="heroicons:x-mark" class="w-4 h-4" aria-hidden="true" />
         </button>

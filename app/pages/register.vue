@@ -278,13 +278,10 @@ const birRegisteredAt = ref('')
 const tinNumber = ref('')
 const vat = ref<'vat-registered' | 'non-vat'>('non-vat')
 
+// XXX-XXX-XXX-XXXXX: 9-digit TIN + 5-digit branch code (00000 = head office / main branch)
 function formatTinNumber(val: string): string {
-  const raw = val.replace(/[^0-9]/g, '').slice(0, 12)
-  const parts: string[] = []
-  for (let i = 0; i < raw.length; i += 3) {
-    parts.push(raw.slice(i, i + 3))
-  }
-  return parts.join('-')
+  const raw = val.replace(/[^0-9]/g, '').slice(0, 14)
+  return [raw.slice(0, 3), raw.slice(3, 6), raw.slice(6, 9), raw.slice(9, 14)].filter(Boolean).join('-')
 }
 
 function onTinInput(event: Event) {
@@ -1022,9 +1019,14 @@ async function handleFinalSubmit() {
       return
     }
     const tinRaw = tinNumber.value.replace(/[^0-9]/g, '')
-    if (tinRaw.length < 12) {
-      fieldErrors.value.tin_number = 'TIN Number must follow format XXX-XXX-XXX-XXX.'
-      error.value = 'TIN Number must follow format XXX-XXX-XXX-XXX.'
+    if (tinRaw.length !== 14) {
+      fieldErrors.value.tin_number = 'TIN Number must follow format XXX-XXX-XXX-00000.'
+      error.value = 'TIN Number must follow format XXX-XXX-XXX-00000.'
+      return
+    }
+    if (!tinRaw.endsWith('00000')) {
+      fieldErrors.value.tin_number = 'Main branch TIN must end in 00000 (head office branch code).'
+      error.value = 'Main branch TIN must end in 00000 (head office branch code).'
       return
     }
     if (!vat.value) {
@@ -2031,8 +2033,8 @@ onBeforeUnmount(() => {
                     <input
                       v-model="tinNumber"
                       type="text"
-                      placeholder="XXX-XXX-XXX-XXX"
-                      maxlength="15"
+                      placeholder="XXX-XXX-XXX-00000"
+                      maxlength="17"
                       :class="[
                         'w-full h-10 rounded-md border px-3 outline-none transition bg-white text-xs text-[#2d201b] font-mono tracking-wider',
                         fieldErrors.tin_number

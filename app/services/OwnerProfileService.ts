@@ -64,7 +64,7 @@ export class OwnerProfileService extends BaseService {
         const params: Record<string, any> = { per_page: perPage, page }
         if (search) params.search = search
         if (status) params.status = status
-        return this.get<{ success: boolean; cafe_name: string | null; branches: Paginated<BranchSummary> }>('/owner/branches', params)
+        return this.get<{ success: boolean; cafe_name: string | null; main_tin_prefix?: string | null; branches: Paginated<BranchSummary> }>('/owner/branches', params)
     }
 
     createBranch(payload: FormData | Record<string, any>) {

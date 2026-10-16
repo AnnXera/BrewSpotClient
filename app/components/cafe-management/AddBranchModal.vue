@@ -5,6 +5,8 @@ const props = defineProps<{
   show: boolean
   saving?: boolean
   backendErrors?: Record<string, string[]>
+  // Main branch's 9-digit TIN (XXX-XXX-XXX). Side branches share it and only add their own branch code.
+  mainTinPrefix?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -57,6 +59,20 @@ function onCafeMobileInput(event: Event) {
   target.value = form.value.cafeMobileDigits
 }
 
+// With a main TIN on file, tin_number holds only the 5-digit branch code; otherwise the full TIN
+function onTinInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  const digits = target.value.replace(/[^0-9]/g, '')
+  form.value.tin_number = props.mainTinPrefix
+    ? digits.slice(0, 5)
+    : [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 9), digits.slice(9, 14)].filter(Boolean).join('-')
+  target.value = form.value.tin_number
+}
+
+const fullTin = computed(() =>
+  props.mainTinPrefix ? `${props.mainTinPrefix}-${form.value.tin_number}` : form.value.tin_number
+)
+
 function validateStep(step: number): boolean {
   errors.value = {}
   if (step === 1) {
@@ -71,7 +87,10 @@ function validateStep(step: number): boolean {
 
     if (cafePicture.value && cafePicture.value.size > 2 * 1024 * 1024) errors.value.cafe_picture = 'Branch picture must not exceed 2MB.'
   } else if (step === 2) {
-    if (!form.value.tin_number.trim()) errors.value.tin_number = 'TIN number is required'
+    const tinDigits = fullTin.value.replace(/[^0-9]/g, '')
+    if (!form.value.tin_number.trim()) errors.value.tin_number = props.mainTinPrefix ? 'Branch code is required' : 'TIN number is required'
+    else if (tinDigits.length !== 14) errors.value.tin_number = props.mainTinPrefix ? 'Branch code must be 5 digits (e.g. 00001).' : 'TIN must follow the format XXX-XXX-XXX-XXXXX.'
+    else if (tinDigits.endsWith('00000')) errors.value.tin_number = 'Branch code 00000 is reserved for the main branch.'
     if (!form.value.bir_registered_at) errors.value.bir_registered_at = 'BIR registered date is required'
     if (!birFile.value) errors.value.bir_file = 'BIR file is required'
     else if (birFile.value.size > 5 * 1024 * 1024) errors.value.bir_file = 'BIR file must not exceed 5MB.'
@@ -135,7 +154,7 @@ function handleSubmit() {
   formData.append('cafe_phonenumber', `+63${form.value.cafeMobileDigits}`)
   if (cafePicture.value) formData.append('cafe_picture', cafePicture.value)
 
-  formData.append('tin_number', form.value.tin_number.trim())
+  formData.append('tin_number', fullTin.value)
   formData.append('vat', form.value.vat)
   formData.append('bir_registered_at', form.value.bir_registered_at)
   if (birFile.value) formData.append('bir_file', birFile.value)
@@ -167,7 +186,7 @@ function handleSubmit() {
               <p class="text-xs text-[#9E7060]">Register an additional branch location with its details and legal documents.</p>
             </div>
           </div>
-          <button @click="emit('close')" class="p-2 rounded-lg text-[#9E7060] hover:bg-[#FDF3E7] transition-colors">
+          <button @click="emit('close')" class="inline-flex items-center justify-center p-2 rounded-lg text-[#9E7060] hover:bg-[#FDF3E7] transition-colors">
             <Icon name="heroicons:x-mark" class="w-6 h-6" />
           </button>
         </div>
@@ -266,14 +285,37 @@ function handleSubmit() {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">TIN Number *</label>
+                <div
+                  v-if="mainTinPrefix"
+                  class="flex items-center rounded-xl border bg-[#FDF8F3] overflow-hidden transition focus-within:border-[#7D5A50] focus-within:ring-2 focus-within:ring-[#7D5A50]/20 h-[42px]"
+                  :class="fieldError('tin_number') ? 'border-red-500' : 'border-[#EEDFC4]'"
+                >
+                  <span class="bg-gray-100 border-r border-[#EEDFC4] shrink-0 h-full flex items-center px-3 text-[#3D2B24] font-semibold text-xs font-mono tracking-wider">{{ mainTinPrefix }}-</span>
+                  <input
+                    :value="form.tin_number"
+                    type="text"
+                    inputmode="numeric"
+                    maxlength="5"
+                    placeholder="00001"
+                    class="w-full h-full px-3 text-sm text-[#3D2B24] bg-transparent outline-none font-mono tracking-wider"
+                    @input="onTinInput"
+                  />
+                </div>
                 <input
+                  v-else
+                  :value="form.tin_number"
                   type="text"
-                  v-model="form.tin_number"
-                  maxlength="50"
-                  placeholder="e.g. 123-456-789-000"
-                  class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]"
+                  inputmode="numeric"
+                  maxlength="17"
+                  placeholder="XXX-XXX-XXX-00001"
+                  class="w-full px-4 py-2.5 rounded-xl border bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50] font-mono tracking-wider"
+                  :class="fieldError('tin_number') ? 'border-red-500' : 'border-[#EEDFC4]'"
+                  @input="onTinInput"
                 />
                 <p v-if="fieldError('tin_number')" class="text-xs text-red-600 mt-1 font-medium">{{ fieldError('tin_number') }}</p>
+                <p v-else class="text-[11px] text-[#9E7060] mt-1">
+                  {{ mainTinPrefix ? 'Same TIN as your main branch. Enter this branch\'s 5-digit BIR branch code.' : 'Your 9-digit TIN followed by this branch\'s 5-digit BIR branch code.' }}
+                </p>
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">VAT Status *</label>

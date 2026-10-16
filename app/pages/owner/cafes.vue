@@ -33,6 +33,7 @@ const status = ref('')
 
 // Business Info
 const cafeName = ref('')
+const mainTinPrefix = ref<string | null>(null)
 
 // Modal Controls
 const isAddBranchOpen = ref(false)
@@ -74,6 +75,7 @@ async function fetchBranches() {
     if (res.success && res.cafe_name) {
       cafeName.value = res.cafe_name
     }
+    if (res.success) mainTinPrefix.value = res.main_tin_prefix ?? null
     if (res.success && res.branches?.data) {
       branches.value = res.branches.data
       currentPage.value = res.branches.current_page
@@ -331,6 +333,7 @@ function viewDetails(uuid: string) {
         :show="isAddBranchOpen"
         :saving="savingBranch"
         :backend-errors="backendErrors"
+        :main-tin-prefix="mainTinPrefix"
         @close="isAddBranchOpen = false"
         @save="handleCreateBranch"
       />
