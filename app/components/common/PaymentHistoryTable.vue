@@ -6,26 +6,12 @@
       <!-- Top Feature Bar: Search, Filters & Export CSV -->
       <div v-if="showControls" class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-6 border-b border-[#F3E7D2]">
         <!-- Search Input -->
-        <div class="relative w-full sm:w-80">
-          <Icon
-            name="heroicons:magnifying-glass"
-            class="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9E7060]"
-          />
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search TXN ID, activity, amount..."
-            class="w-full pl-10 pr-4 py-2.5 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm text-[#3B1F0E] placeholder-[#9E7060]/60 focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] transition-all shadow-sm"
-          />
-          <button
-            v-if="searchQuery"
-            type="button"
-            class="absolute right-3 top-1/2 -translate-y-1/2 text-[#9E7060] hover:text-[#3B1F0E]"
-            @click="searchQuery = ''"
-          >
-            <Icon name="heroicons:x-mark" class="w-4 h-4" />
-          </button>
-        </div>
+        <SearchInput
+          v-model="searchQuery"
+          placeholder="Search TXN ID, activity, amount..."
+          clearable
+          class="sm:w-80"
+        />
 
         <!-- Action Buttons & Filters -->
         <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
@@ -35,31 +21,30 @@
             <input 
               type="date" 
               v-model="startDate" 
-              class="w-full sm:w-auto px-3 py-2 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm text-[#3B1F0E] focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] shadow-sm"
+              class="w-full sm:w-auto h-11 px-3 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl font-sans text-sm text-[#3D2B24] hover:border-[#D9C4B8] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
               title="Start Date"
             />
             <span class="text-[#8B6656] font-sans text-sm font-medium">to</span>
             <input 
               type="date" 
               v-model="endDate" 
-              class="w-full sm:w-auto px-3 py-2 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm text-[#3B1F0E] focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] shadow-sm"
+              class="w-full sm:w-auto h-11 px-3 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl font-sans text-sm text-[#3D2B24] hover:border-[#D9C4B8] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
               title="End Date"
             />
           </div>
 
-          <div class="relative w-full sm:w-auto min-w-[160px]">
-            <select
+          <div class="w-full sm:w-56">
+            <DropdownList
               v-model="selectedStatus"
-              class="w-full appearance-none pl-4 pr-10 py-2.5 bg-[#FFFDF9] border border-[#EEDFC4] rounded-xl font-sans text-sm font-medium text-[#3B1F0E] focus:outline-none focus:border-[#7D5A50] focus:ring-1 focus:ring-[#7D5A50] shadow-sm"
-            >
-              <option value="">All Payment Statuses</option>
-              <option value="success">Success / Active</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Failed / Cancelled</option>
-            </select>
-            <Icon
-              name="heroicons:chevron-down"
-              class="w-4 h-4 text-[#9E7060] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+              :options="[
+                { value: '', label: 'All Payment Statuses' },
+                { value: 'success', label: 'Success / Active' },
+                { value: 'pending', label: 'Pending' },
+                { value: 'failed', label: 'Failed / Cancelled' }
+              ]"
+              size="sm"
+              class="font-sans"
+              aria-label="Filter by payment status"
             />
           </div>
 
@@ -129,7 +114,7 @@
                   <span>{{ formatTxnId(txn.transaction_id) }}</span>
                   <button
                     type="button"
-                    class="opacity-0 group-hover:opacity-100 p-1 text-[#9E7060] hover:text-[#3B1F0E] transition-opacity"
+                    class="inline-flex items-center justify-center opacity-0 group-hover:opacity-100 p-1 text-[#9E7060] hover:text-[#3B1F0E] transition-opacity"
                     title="Copy Transaction ID"
                     @click.stop="copyToClipboard(formatTxnId(txn.transaction_id))"
                   >
@@ -294,6 +279,9 @@
 </template>
 
 <script setup lang="ts">
+import DropdownList from '~/components/common/DropdownList.vue'
+import SearchInput from '~/components/common/SearchInput.vue'
+
 export interface PaymentTransaction {
   transaction_id: string
   date: string | null

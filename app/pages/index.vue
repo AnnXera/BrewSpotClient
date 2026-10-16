@@ -262,7 +262,7 @@ onUnmounted(() => {
         <!-- Mobile Menu Toggle Button -->
         <button
           @click="isMobileMenuOpen = !isMobileMenuOpen"
-          class="lg:hidden p-2.5 rounded-xl text-[#FFF8EA] hover:bg-[#FFF8EA]/10 focus:outline-none"
+          class="inline-flex items-center justify-center lg:hidden p-2.5 rounded-xl text-[#FFF8EA] hover:bg-[#FFF8EA]/10 focus:outline-none"
           aria-label="Toggle menu"
         >
           <Icon :name="isMobileMenuOpen ? 'heroicons:x-mark' : 'heroicons:bars-3'" class="w-7 h-7" />

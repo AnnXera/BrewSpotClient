@@ -94,7 +94,7 @@ function formatPrice(val: string | number): string {
       <div class="inline-flex items-center gap-1">
         <button
           type="button"
-          class="p-2 rounded-lg text-[#7D5A50] hover:bg-[#F3E7D2] transition-colors"
+          class="inline-flex items-center justify-center p-2 rounded-lg text-[#7D5A50] hover:bg-[#F3E7D2] transition-colors"
           title="Edit Plan"
           @click="emit('edit', plan)"
         >
@@ -102,7 +102,7 @@ function formatPrice(val: string | number): string {
         </button>
         <button
           type="button"
-          class="p-2 rounded-lg text-[#D9534F] hover:bg-red-50 transition-colors"
+          class="inline-flex items-center justify-center p-2 rounded-lg text-[#D9534F] hover:bg-red-50 transition-colors"
           title="Deactivate Plan"
           @click="emit('delete', plan)"
         >

@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import type { TableStatus } from '~/services/FloorPlanService'
 import { TABLE_SHAPES, assetFor, doorAsset, hasEndsOption, nearestSeats, tableAsset, type TableShape } from '~/utils/floorPlanCatalog'
+import DropdownList from '~/components/common/DropdownList.vue'
 
 export interface EditorTable {
   uid: string
@@ -57,7 +58,13 @@ const title = computed(() => {
 })
 const shape = computed<TableShape>(() => tableAsset(props.table?.asset_key)?.shape ?? 'square')
 // Seats a shape can have: each one is a different drawing, so changing it swaps the table's look.
-const seatOptions = computed(() => TABLE_SHAPES[shape.value].seats)
+const seatOptions = computed(() => TABLE_SHAPES[shape.value].seats.map(n => ({ value: n, label: String(n) })))
+const shapeOptions = (Object.keys(TABLE_SHAPES) as TableShape[]).map(key => ({ value: key, label: TABLE_SHAPES[key].label }))
+const statusOptions = computed(() => props.statuses.map(s => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) })))
+const CHAIR_OPTIONS = [
+  { value: false, label: 'All along the sides' },
+  { value: true, label: 'Two at the ends' }
+]
 
 function setShape(next: TableShape) {
   const a = assetFor(next, nearestSeats(next, props.table?.capacity ?? 4))
@@ -101,31 +108,24 @@ function num(e: Event) {
       <!-- Table -->
       <template v-if="table">
         <div class="grid grid-cols-2 gap-[10px]">
-          <label class="flex flex-col gap-1 text-[10px] text-[#736761]">
+          <div class="flex flex-col gap-1 text-[10px] text-[#736761]">
             Shape
-            <select :class="field" :value="shape" @change="setShape(($event.target as HTMLSelectElement).value as TableShape)">
-              <option v-for="(s, key) in TABLE_SHAPES" :key="key" :value="key">{{ s.label }}</option>
-            </select>
-          </label>
-          <label class="flex flex-col gap-1 text-[10px] text-[#736761]">
+            <DropdownList :model-value="shape" :options="shapeOptions" size="xs" aria-label="Shape" @change="setShape" />
+          </div>
+          <div class="flex flex-col gap-1 text-[10px] text-[#736761]">
             Seats
-            <select :class="field" :value="table.capacity" @change="setSeats(Number(($event.target as HTMLSelectElement).value))">
-              <option v-for="n in seatOptions" :key="n" :value="n">{{ n }}</option>
-            </select>
-          </label>
+            <DropdownList :model-value="table.capacity" :options="seatOptions" size="xs" aria-label="Seats" @change="setSeats" />
+          </div>
         </div>
 
         <p v-if="shape === 'bar'" class="text-[10px] leading-[1.4] text-[#736761]">
           Booked by seat: several parties can share this counter while their seats fit.
         </p>
 
-        <label v-if="showEnds" class="flex flex-col gap-1 text-[10px] text-[#736761]">
+        <div v-if="showEnds" class="flex flex-col gap-1 text-[10px] text-[#736761]">
           Chairs
-          <select :class="field" :value="ends ? 'ends' : 'sides'" @change="setEnds(($event.target as HTMLSelectElement).value === 'ends')">
-            <option value="sides">All along the sides</option>
-            <option value="ends">Two at the ends</option>
-          </select>
-        </label>
+          <DropdownList :model-value="ends" :options="CHAIR_OPTIONS" size="xs" aria-label="Chairs" @change="setEnds" />
+        </div>
 
         <label class="flex flex-col gap-1 text-[10px] text-[#736761]">
           Table Name
@@ -139,18 +139,18 @@ function num(e: Event) {
           <span v-if="errors?.table_name" class="text-[#B31E1E]">{{ errors.table_name }}</span>
         </label>
 
-        <label class="flex flex-col gap-1 text-[10px] text-[#736761]">
+        <div class="flex flex-col gap-1 text-[10px] text-[#736761]">
           Status
-          <select
-            :class="field"
-            :value="table.status"
+          <DropdownList
+            :model-value="table.status"
+            :options="statusOptions"
+            size="xs"
+            aria-label="Status"
             :disabled="!canSetStatus || statusBusy"
-            @change="emit('status', ($event.target as HTMLSelectElement).value as TableStatus)"
-          >
-            <option v-for="s in statuses" :key="s" :value="s" class="capitalize">{{ s }}</option>
-          </select>
+            @change="emit('status', $event)"
+          />
           <span v-if="!canSetStatus" class="text-[#736761]">Save the layout to set a status.</span>
-        </label>
+        </div>
       </template>
 
       <!-- Element -->

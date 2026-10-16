@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useMenuService } from '~/composables/useMenuService'
+import { useNavCategories } from '~/composables/useNavCategories'
 import { useMenuItemSort } from '~/composables/useMenuItemSort'
 import MenuPageHeader from '~/components/menu/MenuPageHeader.vue'
 import MenuToolbar from '~/components/menu/MenuToolbar.vue'
@@ -21,6 +22,7 @@ definePageMeta({
 const route = useRoute()
 const router = useRouter()
 const menuService = useMenuService()
+const { refresh: refreshNavCategories } = useNavCategories() // keeps the sidebar's category list current
 const { confirmDialog, alertDialog, askConfirm, runConfirm, showAlert } = useDialogs()
 
 const currentCategoryUuid = computed(() => route.params.uuid as string)
@@ -157,6 +159,7 @@ function handleDeleteCategory() {
       isDeletingCategory.value = true
       try {
         await menuService.deleteMenuCategory(category.uuid)
+        refreshNavCategories()
         await router.push('/owner/menu-management')
       } catch (error) {
         console.error('Failed to delete category', error)
@@ -196,12 +199,7 @@ async function onAssignItemsConfirm(selectedItemUuids: string[]) {
   }
 }
 
-const links = [
-  { label: 'Dashboard', to: '/owner/dashboard', icon: 'squares-2x2' },
-  { label: 'Cafe Management', to: '/owner/cafes', icon: 'building-storefront' },
-  { label: 'Menu Management', to: '/owner/menu-management', icon: 'book-open' },
-  { label: 'Subscription', to: '/owner/subscription', icon: 'credit-card' },
-]
+const links = OWNER_NAV_LINKS
 </script>
 
 <template>
