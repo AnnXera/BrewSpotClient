@@ -1,5 +1,5 @@
 <!-- app/components/employees/EmployeesTab.vue -->
-<!-- Employees tab of a branch (owner side). View Positions / View Details emit events until those screens exist. -->
+<!-- Employees tab of a branch (owner side). View Details emits an event for the parent to open the employee. -->
 <script setup lang="ts">
 import type { BranchStaffStats, EmploymentStatus, StaffMember, StaffRole } from '~/services/StaffService'
 import DropdownList from '~/components/common/DropdownList.vue'
@@ -10,7 +10,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'view-employee': [member: StaffMember]
-  'view-positions': []
 }>()
 
 const showAddModal = ref(false)
@@ -218,32 +217,25 @@ onBeforeUnmount(() => {
                 v-model="search"
                 type="text"
                 placeholder="Search Employee"
-                class="w-full rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] py-3 pl-10 pr-3 font-sans text-sm text-[#3D2B24] placeholder:text-[#7D5A50]/40 hover:border-[#D9C4B8] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
+                class="w-full h-11 rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] pl-10 pr-3 font-sans text-sm text-[#3D2B24] placeholder:text-[#7D5A50]/40 hover:border-[#D9C4B8] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
               />
             </div>
 
             <div class="grid grid-cols-2 gap-3 sm:flex">
               <!-- Status -->
               <div class="sm:w-[160px]">
-                <DropdownList v-model="status" :options="statusOptions" aria-label="Status" />
+                <DropdownList v-model="status" :options="statusOptions" size="sm" aria-label="Status" />
               </div>
 
               <!-- Position -->
               <div class="sm:w-[160px]">
-                <DropdownList v-model="position" :options="positionOptions" aria-label="Position" />
+                <DropdownList v-model="position" :options="positionOptions" size="sm" aria-label="Position" />
               </div>
             </div>
           </div>
 
           <!-- Actions -->
-          <div class="grid grid-cols-2 gap-3 sm:flex sm:gap-4 sm:justify-end">
-            <button
-              type="button"
-              class="px-4 py-3 rounded-[10px] bg-[#7D5A50] font-display font-semibold text-sm text-[#FFF0D1] whitespace-nowrap hover:bg-[#6B4A40] transition-colors focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-              @click="emit('view-positions')"
-            >
-              View Positions
-            </button>
+          <div class="flex flex-col sm:flex-row sm:justify-end">
             <button
               type="button"
               class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-[10px] bg-[#7D5A50] font-display font-semibold text-sm text-[#FFF0D1] whitespace-nowrap hover:bg-[#6B4A40] transition-colors focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"

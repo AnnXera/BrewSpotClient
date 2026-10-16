@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import type {
   CreateStaffPayload,
+  EmploymentStatus,
   StaffMember,
   StaffRole,
   StaffScheduleInput,
@@ -25,6 +26,13 @@ const emit = defineEmits<{
 const staffService = useStaffService('owner')
 
 const isEdit = computed(() => !!props.employee)
+
+type EditableStatus = Exclude<EmploymentStatus, 'terminated'>
+const statusOptions: { value: EditableStatus; label: string }[] = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'suspended', label: 'Suspended' },
+]
 
 const positionOptions: { value: StaffRole; label: string; hint: string }[] = [
   {
@@ -66,6 +74,7 @@ function emptyForm() {
     address: '',
     role: '' as StaffRole | '',
     hired_at: new Date().toISOString().split('T')[0] as string,
+    employment_status: 'active' as EditableStatus,
     pin: '',
     schedule: defaultSchedule(),
   }
@@ -73,6 +82,7 @@ function emptyForm() {
 
 // Days that were never set start as a day off, so saving without touching them changes nothing.
 function formFrom(member: StaffMember): ReturnType<typeof emptyForm> {
+  const status = member.assignment?.employment_status
   return {
     firstname: member.firstname,
     middlename: member.middlename ?? '',
@@ -82,6 +92,7 @@ function formFrom(member: StaffMember): ReturnType<typeof emptyForm> {
     address: member.address ?? '',
     role: member.role,
     hired_at: member.assignment?.hired_at ?? '',
+    employment_status: status && status !== 'terminated' ? status : 'active',
     pin: '',
     schedule: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => {
       const day = member.schedule.find(s => s.day_of_week === dayOfWeek)
@@ -219,6 +230,7 @@ function changedFields(): UpdateStaffPayload {
   if (f.address.trim() !== b.address.trim()) payload.address = f.address.trim()
   if (f.role !== b.role) payload.role = f.role as StaffRole
   if (f.hired_at !== b.hired_at) payload.hired_at = f.hired_at
+  if (f.employment_status !== b.employment_status) payload.employment_status = f.employment_status
   return payload
 }
 
@@ -508,6 +520,19 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
             </div>
 
             <p v-if="positionHint" class="-mt-2 font-sans text-xs text-[#9E7060]">{{ positionHint }}</p>
+
+            <!-- Employment status (edit only; ending employment is done with Terminate) -->
+            <div v-if="isEdit" class="flex flex-col gap-1.5 sm:max-w-[calc(50%-8px)]">
+              <span :class="labelClass">Status*</span>
+              <DropdownList
+                v-model="form.employment_status"
+                :options="statusOptions"
+                icon="heroicons:signal"
+                size="sm"
+                :invalid="!!errors.employment_status"
+              />
+              <span v-if="errors.employment_status" class="font-sans text-xs text-red-600">{{ errors.employment_status }}</span>
+            </div>
 
             <!-- Weekly schedule -->
             <div class="flex flex-col gap-3">
