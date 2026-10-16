@@ -14,6 +14,8 @@ const props = defineProps<{
   options: SelectMenuOption<T>[]
   placeholder?: string
   invalid?: boolean
+  icon?: string // leading icon inside the button
+  dense?: boolean // 44px tall, to line up with compact inputs
 }>()
 
 const emit = defineEmits<{
@@ -84,13 +86,18 @@ onUnmounted(() => document.removeEventListener('pointerdown', onDocumentPointer)
       :aria-controls="listId"
       aria-haspopup="listbox"
       :class="[
-        'w-full bg-[#fef8f0] border text-left rounded-xl pl-4 pr-10 py-3 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow',
+        'w-full bg-[#fef8f0] border text-left rounded-xl pr-10 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow',
+        icon ? 'pl-10' : 'pl-4',
+        dense ? 'h-11 text-sm' : 'py-3',
         invalid ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]',
         selected ? 'text-[#3B1F0E]' : 'text-[#B4846C]/70'
       ]"
       @click="open ? close() : openList()"
       @keydown="onKeydown"
     >
+      <span v-if="icon" class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[#7D5A50]">
+        <Icon :name="icon" class="w-4 h-4" />
+      </span>
       <span class="block truncate">{{ selected?.label ?? placeholder ?? 'Select' }}</span>
       <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-[#B4846C]">
         <Icon name="heroicons:chevron-down" class="w-5 h-5 transition-transform" :class="open ? 'rotate-180' : ''" />

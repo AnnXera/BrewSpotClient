@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { useOperatingHours } from '~/composables/useOperatingHours'
 
 const props = defineProps<{
   show: boolean
@@ -10,35 +9,26 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'save', data: typeof form.value): void
+  (e: 'save', data: FormData): void
 }>()
 
-const { formattedSummary } = useOperatingHours()
+// Mirrors StoreBranchRequest on the server
+const STEP_FIELDS: Record<number, string[]> = {
+  1: ['branch_name', 'address', 'cafe_email', 'cafe_phonenumber', 'cafe_picture'],
+  2: ['tin_number', 'vat', 'bir_registered_at', 'bir_file']
+}
+
+const ownerService = useOwnerProfileService()
 
 const currentStep = ref(1)
+const checkingContact = ref(false)
 
 const form = ref({
   branch_name: '',
-  branch_type: 'SIDE',
   address: '',
-  storePhoneType: 'mobile',
-  storeMobileDigits: '',
-  storeLandlineDigits: '',
-  manager_name: '',
-  managerPhoneType: 'mobile',
-  managerMobileDigits: '',
-  managerLandlineDigits: '',
-  manager_email: '',
-  seating_capacity: 40,
-  has_drivethru: false,
-  use_general_hours: true,
-  custom_open_time: '07:00',
-  custom_close_time: '22:00',
-  amenities: ['High-speed WiFi', 'Airconditioned', 'Power Outlets'],
   cafe_email: '',
-  cafePhoneType: 'mobile',
   cafeMobileDigits: '',
-  cafeLandlineDigits: '',
+  tin_number: '',
   vat: 'vat-registered',
   bir_registered_at: ''
 })
@@ -47,31 +37,18 @@ const cafePicture = ref<File | null>(null)
 
 const errors = ref<Record<string, string>>({})
 
-const availableAmenities = [
-  'High-speed WiFi',
-  'Airconditioned',
-  'Outdoor Dining',
-  'Power Outlets',
-  'Pet-Friendly',
-  'Parking Space',
-  'Drive-Thru Window'
-]
-
 const hasBackendErrors = computed(() => Object.keys(props.backendErrors || {}).length > 0)
 
+// Jump to the first step that has a backend error
 watch(() => props.backendErrors, (newVal) => {
-  if (newVal && Object.keys(newVal).length > 0) {
-    currentStep.value = 1
-  }
+  if (!newVal || Object.keys(newVal).length === 0) return
+  const fields = Object.keys(newVal)
+  const step = Object.keys(STEP_FIELDS).map(Number).find(s => STEP_FIELDS[s]!.some(f => fields.includes(f)))
+  currentStep.value = step ?? 1
 }, { deep: true })
 
-function toggleAmenity(amenity: string) {
-  const index = form.value.amenities.indexOf(amenity)
-  if (index > -1) {
-    form.value.amenities.splice(index, 1)
-  } else {
-    form.value.amenities.push(amenity)
-  }
+function fieldError(key: string): string | undefined {
+  return errors.value[key] || props.backendErrors?.[key]?.[0]
 }
 
 function onCafeMobileInput(event: Event) {
@@ -80,64 +57,56 @@ function onCafeMobileInput(event: Event) {
   target.value = form.value.cafeMobileDigits
 }
 
-function onCafeLandlineInput(event: Event) {
-  const target = event.target as HTMLInputElement
-  form.value.cafeLandlineDigits = target.value.replace(/[^0-9\-]/g, '').slice(0, 15)
-  target.value = form.value.cafeLandlineDigits
-}
-
-function onStoreMobileInput(event: Event) {
-  const target = event.target as HTMLInputElement
-  form.value.storeMobileDigits = target.value.replace(/[^0-9]/g, '').slice(0, 10)
-  target.value = form.value.storeMobileDigits
-}
-
-function onStoreLandlineInput(event: Event) {
-  const target = event.target as HTMLInputElement
-  form.value.storeLandlineDigits = target.value.replace(/[^0-9\-]/g, '').slice(0, 15)
-  target.value = form.value.storeLandlineDigits
-}
-
-function onManagerMobileInput(event: Event) {
-  const target = event.target as HTMLInputElement
-  form.value.managerMobileDigits = target.value.replace(/[^0-9]/g, '').slice(0, 10)
-  target.value = form.value.managerMobileDigits
-}
-
-function onManagerLandlineInput(event: Event) {
-  const target = event.target as HTMLInputElement
-  form.value.managerLandlineDigits = target.value.replace(/[^0-9\-]/g, '').slice(0, 15)
-  target.value = form.value.managerLandlineDigits
-}
-
 function validateStep(step: number): boolean {
   errors.value = {}
   if (step === 1) {
     if (!form.value.branch_name.trim()) errors.value.branch_name = 'Branch name is required'
     if (!form.value.address.trim()) errors.value.address = 'Branch address is required'
-  } else if (step === 3) {
-    if (form.value.seating_capacity < 1) errors.value.seating_capacity = 'Must be at least 1 seat'
-  } else if (step === 4) {
-    if (!form.value.cafe_email.trim()) errors.value.cafe_email = 'Cafe email is required'
-    
-    if (form.value.cafePhoneType === 'mobile') {
-      if (!form.value.cafeMobileDigits) errors.value.cafe_phonenumber = 'Phone number is required'
-      else if (form.value.cafeMobileDigits.length < 10) errors.value.cafe_phonenumber = 'Phone number must be 10 digits starting with 9.'
-      else if (!form.value.cafeMobileDigits.startsWith('9')) errors.value.cafe_phonenumber = 'Phone number must start with 9.'
-    } else {
-      if (!form.value.cafeLandlineDigits) errors.value.cafe_phonenumber = 'Landline number is required'
-    }
-    
-    if (!form.value.bir_registered_at.trim()) errors.value.bir_registered_at = 'BIR Registration date is required'
-    if (!birFile.value) errors.value.bir_file = 'BIR File is required'
+
+    if (!form.value.cafe_email.trim()) errors.value.cafe_email = 'Branch email is required'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.cafe_email.trim())) errors.value.cafe_email = 'Enter a valid email address'
+
+    if (!form.value.cafeMobileDigits) errors.value.cafe_phonenumber = 'Branch phone number is required'
+    else if (!/^9\d{9}$/.test(form.value.cafeMobileDigits)) errors.value.cafe_phonenumber = 'Phone number must be 10 digits starting with 9.'
+
+    if (cafePicture.value && cafePicture.value.size > 2 * 1024 * 1024) errors.value.cafe_picture = 'Branch picture must not exceed 2MB.'
+  } else if (step === 2) {
+    if (!form.value.tin_number.trim()) errors.value.tin_number = 'TIN number is required'
+    if (!form.value.bir_registered_at) errors.value.bir_registered_at = 'BIR registered date is required'
+    if (!birFile.value) errors.value.bir_file = 'BIR file is required'
+    else if (birFile.value.size > 5 * 1024 * 1024) errors.value.bir_file = 'BIR file must not exceed 5MB.'
   }
   return Object.keys(errors.value).length === 0
 }
 
-function nextStep() {
-  if (validateStep(currentStep.value)) {
-    currentStep.value++
+// Asks the server whether the email / phone is already used by another branch or user
+async function checkContactAvailability(): Promise<boolean> {
+  checkingContact.value = true
+  try {
+    await ownerService.checkBranchContact({
+      cafe_email: form.value.cafe_email.trim(),
+      cafe_phonenumber: `+63${form.value.cafeMobileDigits}`
+    })
+    return true
+  } catch (e: any) {
+    const serverErrors = (e?.response?._data || e?.response?.data || e?.data)?.errors as Record<string, string[]> | undefined
+    if (serverErrors) {
+      for (const [key, msgs] of Object.entries(serverErrors)) {
+        if (msgs?.[0]) errors.value[key] = msgs[0]
+      }
+      return false
+    }
+    // Network or unexpected error: let the final submit validate instead of blocking here
+    return true
+  } finally {
+    checkingContact.value = false
   }
+}
+
+async function nextStep() {
+  if (!validateStep(currentStep.value)) return
+  if (currentStep.value === 1 && !(await checkContactAvailability())) return
+  currentStep.value++
 }
 
 function prevStep() {
@@ -153,33 +122,25 @@ function handleFileChange(e: Event, type: 'bir' | 'picture') {
 }
 
 function handleSubmit() {
-  if (!validateStep(4)) return
-  
-  const finalPhoneNumber = form.value.cafePhoneType === 'mobile' 
-    ? `+63${form.value.cafeMobileDigits}`
-    : form.value.cafeLandlineDigits
-
-  const finalStorePhoneNumber = form.value.storeMobileDigits || form.value.storeLandlineDigits 
-    ? (form.value.storePhoneType === 'mobile' ? `+63${form.value.storeMobileDigits}` : form.value.storeLandlineDigits)
-    : ''
-
-  const finalManagerPhoneNumber = form.value.managerMobileDigits || form.value.managerLandlineDigits 
-    ? (form.value.managerPhoneType === 'mobile' ? `+63${form.value.managerMobileDigits}` : form.value.managerLandlineDigits)
-    : ''
+  if (!validateStep(1)) {
+    currentStep.value = 1
+    return
+  }
+  if (!validateStep(2)) return
 
   const formData = new FormData()
-  Object.keys(form.value).forEach(key => {
-    if (['cafePhoneType', 'cafeMobileDigits', 'cafeLandlineDigits', 'storePhoneType', 'storeMobileDigits', 'storeLandlineDigits', 'managerPhoneType', 'managerMobileDigits', 'managerLandlineDigits'].includes(key)) return
-    formData.append(key, (form.value as any)[key])
-  })
-  formData.append('cafe_phonenumber', finalPhoneNumber)
-  if (finalStorePhoneNumber) formData.append('phone_number', finalStorePhoneNumber)
-  if (finalManagerPhoneNumber) formData.append('manager_phone', finalManagerPhoneNumber)
-
-  if (birFile.value) formData.append('bir_file', birFile.value)
+  formData.append('branch_name', form.value.branch_name.trim())
+  formData.append('address', form.value.address.trim())
+  formData.append('cafe_email', form.value.cafe_email.trim())
+  formData.append('cafe_phonenumber', `+63${form.value.cafeMobileDigits}`)
   if (cafePicture.value) formData.append('cafe_picture', cafePicture.value)
 
-  emit('save', formData as any)
+  formData.append('tin_number', form.value.tin_number.trim())
+  formData.append('vat', form.value.vat)
+  formData.append('bir_registered_at', form.value.bir_registered_at)
+  if (birFile.value) formData.append('bir_file', birFile.value)
+
+  emit('save', formData)
 }
 </script>
 
@@ -203,7 +164,7 @@ function handleSubmit() {
             </div>
             <div>
               <h2 class="font-display font-extrabold text-xl text-[#3D2B24]">Add New Cafe Branch</h2>
-              <p class="text-xs text-[#9E7060]">Register an additional branch location with capacity and operating hours.</p>
+              <p class="text-xs text-[#9E7060]">Register an additional branch location with its details and legal documents.</p>
             </div>
           </div>
           <button @click="emit('close')" class="p-2 rounded-lg text-[#9E7060] hover:bg-[#FDF3E7] transition-colors">
@@ -226,30 +187,19 @@ function handleSubmit() {
 
         <!-- Form Fields -->
         <form @submit.prevent="handleSubmit" class="flex-1 overflow-y-auto py-3 pr-1">
-          <!-- SECTION 1: Branch Details -->
+          <!-- SECTION 1: General Information -->
           <div v-show="currentStep === 1" class="space-y-4">
-            <h3 class="text-sm font-extrabold text-[#7D5A50] uppercase tracking-wider">1. Branch Info</h3>
+            <h3 class="text-sm font-extrabold text-[#7D5A50] uppercase tracking-wider">1. General Information</h3>
             <div>
               <label class="block text-xs font-bold text-[#3D2B24] mb-1">Branch Name *</label>
               <input
                 type="text"
                 v-model="form.branch_name"
+                maxlength="150"
                 placeholder="e.g. La Vida Cafe - Brew City Branch"
                 class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]"
               />
-              <p v-if="errors.branch_name" class="text-xs text-red-600 mt-1 font-medium">{{ errors.branch_name }}</p>
-            </div>
-
-            <div>
-              <label class="block text-xs font-bold text-[#3D2B24] mb-1">Branch Type *</label>
-              <select
-                v-model="form.branch_type"
-                class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]"
-              >
-                <option value="MAIN">MAIN (Headquarters)</option>
-                <option value="SIDE">SIDE (Secondary Branch)</option>
-                <option value="KIOSK">KIOSK (Express Counter)</option>
-              </select>
+              <p v-if="fieldError('branch_name')" class="text-xs text-red-600 mt-1 font-medium">{{ fieldError('branch_name') }}</p>
             </div>
 
             <div>
@@ -260,225 +210,30 @@ function handleSubmit() {
                 placeholder="e.g. 78 Latte Lane, Espresso Heights, Metro City"
                 class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]"
               />
-              <p v-if="errors.address" class="text-xs text-red-600 mt-1 font-medium">{{ errors.address }}</p>
+              <p v-if="fieldError('address')" class="text-xs text-red-600 mt-1 font-medium">{{ fieldError('address') }}</p>
             </div>
 
-            <div class="space-y-1">
-              <label class="block text-xs font-bold text-[#3D2B24]">Store Direct Phone Number</label>
-              <div class="flex items-center rounded-xl border bg-[#FDF8F3] overflow-hidden transition focus-within:border-[#7D5A50] focus-within:ring-2 focus-within:ring-[#7D5A50]/20 h-[42px] border-[#EEDFC4]">
-                <div class="relative bg-gray-100 border-r border-[#EEDFC4] shrink-0 h-full flex items-center">
-                  <select
-                    v-model="form.storePhoneType"
-                    class="h-full bg-transparent text-[#3D2B24] font-semibold text-xs pl-3 pr-7 outline-none cursor-pointer appearance-none z-10"
-                  >
-                    <option value="mobile">Mobile (+63)</option>
-                    <option value="telephone">Landline</option>
-                  </select>
-                  <Icon name="heroicons:chevron-down" class="w-3.5 h-3.5 text-[#9E7060] absolute right-2 pointer-events-none" />
-                </div>
-                <input
-                  v-if="form.storePhoneType === 'mobile'"
-                  v-model="form.storeMobileDigits"
-                  type="tel"
-                  inputmode="numeric"
-                  maxlength="10"
-                  placeholder="9123456789"
-                  class="w-full h-full px-3 text-sm text-[#3D2B24] bg-transparent outline-none"
-                  @input="onStoreMobileInput"
-                />
-                <input
-                  v-else
-                  v-model="form.storeLandlineDigits"
-                  type="tel"
-                  placeholder="082-299-1234"
-                  maxlength="15"
-                  class="w-full h-full px-3 text-sm text-[#3D2B24] bg-transparent outline-none"
-                  @input="onStoreLandlineInput"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- SECTION 2: Manager & Operating Hours -->
-          <div v-show="currentStep === 2" class="space-y-4">
-            <h3 class="text-sm font-extrabold text-[#7D5A50] uppercase tracking-wider">2. Manager & Operating Hours</h3>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-bold text-[#3D2B24] mb-1">Branch Manager Name</label>
+                <label class="block text-xs font-bold text-[#3D2B24] mb-1">Branch Email *</label>
                 <input
-                  type="text"
-                  v-model="form.manager_name"
-                  placeholder="e.g. Juan Dela Cruz"
+                  type="email"
+                  v-model="form.cafe_email"
+                  maxlength="255"
+                  placeholder="branch@brewspot.com"
                   class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]"
                 />
+                <p v-if="fieldError('cafe_email')" class="text-xs text-red-600 mt-1 font-medium">{{ fieldError('cafe_email') }}</p>
               </div>
 
               <div class="space-y-1">
-                <label class="block text-xs font-bold text-[#3D2B24]">Manager Phone</label>
-                <div class="flex items-center rounded-xl border bg-[#FDF8F3] overflow-hidden transition focus-within:border-[#7D5A50] focus-within:ring-2 focus-within:ring-[#7D5A50]/20 h-[42px] border-[#EEDFC4]">
-                  <div class="relative bg-gray-100 border-r border-[#EEDFC4] shrink-0 h-full flex items-center">
-                    <select
-                      v-model="form.managerPhoneType"
-                      class="h-full bg-transparent text-[#3D2B24] font-semibold text-xs pl-3 pr-7 outline-none cursor-pointer appearance-none z-10"
-                    >
-                      <option value="mobile">Mobile (+63)</option>
-                      <option value="telephone">Landline</option>
-                    </select>
-                    <Icon name="heroicons:chevron-down" class="w-3.5 h-3.5 text-[#9E7060] absolute right-2 pointer-events-none" />
-                  </div>
-                  <input
-                    v-if="form.managerPhoneType === 'mobile'"
-                    v-model="form.managerMobileDigits"
-                    type="tel"
-                    inputmode="numeric"
-                    maxlength="10"
-                    placeholder="9123456789"
-                    class="w-full h-full px-3 text-sm text-[#3D2B24] bg-transparent outline-none"
-                    @input="onManagerMobileInput"
-                  />
-                  <input
-                    v-else
-                    v-model="form.managerLandlineDigits"
-                    type="tel"
-                    placeholder="082-299-1234"
-                    maxlength="15"
-                    class="w-full h-full px-3 text-sm text-[#3D2B24] bg-transparent outline-none"
-                    @input="onManagerLandlineInput"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-bold text-[#3D2B24] mb-1">Manager Email</label>
-              <input
-                type="email"
-                v-model="form.manager_email"
-                placeholder="manager@brewspot.com"
-                class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]"
-              />
-            </div>
-
-            <!-- Operating Hours Option -->
-            <div class="p-4 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] space-y-3">
-              <label class="block text-xs font-bold text-[#3D2B24]">Branch Operating Hours Configuration</label>
-              
-              <div class="flex items-center gap-3">
-                <input
-                  id="inheritHours"
-                  type="radio"
-                  :value="true"
-                  v-model="form.use_general_hours"
-                  class="w-4 h-4 text-[#7D5A50] focus:ring-[#7D5A50]"
-                />
-                <label for="inheritHours" class="text-xs text-[#3D2B24] font-semibold">
-                  Inherit General Store Hours (<span class="text-[#7D5A50] font-extrabold">{{ formattedSummary }}</span>)
-                </label>
-              </div>
-
-              <div class="flex items-center gap-3">
-                <input
-                  id="customHours"
-                  type="radio"
-                  :value="false"
-                  v-model="form.use_general_hours"
-                  class="w-4 h-4 text-[#7D5A50] focus:ring-[#7D5A50]"
-                />
-                <label for="customHours" class="text-xs text-[#3D2B24] font-semibold">
-                  Set Custom Hours for this Branch
-                </label>
-              </div>
-
-              <div v-if="!form.use_general_hours" class="flex items-center gap-3 pt-2 text-xs">
-                <input
-                  type="time"
-                  v-model="form.custom_open_time"
-                  class="px-3 py-1.5 rounded-lg border border-[#EEDFC4] bg-white text-[#3D2B24] font-bold"
-                />
-                <span class="text-[#9E7060]">to</span>
-                <input
-                  type="time"
-                  v-model="form.custom_close_time"
-                  class="px-3 py-1.5 rounded-lg border border-[#EEDFC4] bg-white text-[#3D2B24] font-bold"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- SECTION 3: Capacity & Amenities -->
-          <div v-show="currentStep === 3" class="space-y-4">
-            <h3 class="text-sm font-extrabold text-[#7D5A50] uppercase tracking-wider">3. Capacity & Amenities</h3>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-bold text-[#3D2B24] mb-1">Seating Capacity (Guests)</label>
-                <input
-                  type="number"
-                  v-model.number="form.seating_capacity"
-                  min="1"
-                  placeholder="40"
-                  class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]"
-                />
-              </div>
-
-              <div>
-                <label class="block text-xs font-bold text-[#3D2B24] mb-1">Drive-Thru Service</label>
-                <div class="flex items-center gap-2 pt-2">
-                  <input
-                    id="drivethruToggle"
-                    type="checkbox"
-                    v-model="form.has_drivethru"
-                    class="w-4 h-4 rounded border-[#EEDFC4] text-[#7D5A50] focus:ring-[#7D5A50]"
-                  />
-                  <label for="drivethruToggle" class="text-xs font-bold text-[#3D2B24]">Available at this location</label>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-bold text-[#3D2B24] mb-2">Available Branch Amenities</label>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  v-for="amenity in availableAmenities"
-                  :key="amenity"
-                  @click="toggleAmenity(amenity)"
-                  class="px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5"
-                  :class="form.amenities.includes(amenity) ? 'bg-[#7D5A50] text-white border-[#7D5A50]' : 'bg-[#FDF8F3] text-[#7D5A50] border-[#EEDFC4] hover:bg-[#FCDEC0]/50'"
-                >
-                  <Icon :name="form.amenities.includes(amenity) ? 'heroicons:check-circle' : 'heroicons:plus-circle'" class="w-4 h-4" />
-                  <span>{{ amenity }}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECTION 4: Legal Docs -->
-          <div v-show="currentStep === 4" class="space-y-4">
-            <h3 class="text-sm font-extrabold text-[#7D5A50] uppercase tracking-wider">4. Legal Docs</h3>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-bold text-[#3D2B24] mb-1">Cafe Email *</label>
-                <input type="email" v-model="form.cafe_email" placeholder="hello@brewspot.com" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50] focus:outline-none focus:ring-1 focus:ring-[#7D5A50]" />
-                <p v-if="errors.cafe_email" class="text-xs text-red-600 mt-1 font-medium">{{ errors.cafe_email }}</p>
-              </div>
-              <div class="space-y-1">
-                <label class="block text-xs font-bold text-[#3D2B24]">Cafe Phone Number *</label>
+                <label class="block text-xs font-bold text-[#3D2B24]">Branch Phone Number *</label>
                 <div
-                  class="flex items-center rounded-xl border bg-white overflow-hidden transition focus-within:border-[#7D5A50] focus-within:ring-2 focus-within:ring-[#7D5A50]/20 h-10"
-                  :class="errors.cafe_phonenumber ? 'border-red-500' : 'border-[#EEDFC4]'"
+                  class="flex items-center rounded-xl border bg-[#FDF8F3] overflow-hidden transition focus-within:border-[#7D5A50] focus-within:ring-2 focus-within:ring-[#7D5A50]/20 h-[42px]"
+                  :class="fieldError('cafe_phonenumber') ? 'border-red-500' : 'border-[#EEDFC4]'"
                 >
-                  <div class="relative bg-gray-100 border-r border-[#EEDFC4] shrink-0 h-full flex items-center">
-                    <select
-                      v-model="form.cafePhoneType"
-                      class="h-full bg-transparent text-[#3D2B24] font-semibold text-xs pl-3 pr-7 outline-none cursor-pointer appearance-none z-10"
-                    >
-                      <option value="mobile">Mobile (+63)</option>
-                      <option value="telephone">Landline</option>
-                    </select>
-                    <Icon name="heroicons:chevron-down" class="w-3.5 h-3.5 text-[#9E7060] absolute right-2 pointer-events-none" />
-                  </div>
+                  <span class="bg-gray-100 border-r border-[#EEDFC4] shrink-0 h-full flex items-center px-3 text-[#3D2B24] font-semibold text-xs">+63</span>
                   <input
-                    v-if="form.cafePhoneType === 'mobile'"
                     v-model="form.cafeMobileDigits"
                     type="tel"
                     inputmode="numeric"
@@ -487,29 +242,51 @@ function handleSubmit() {
                     class="w-full h-full px-3 text-sm text-[#3D2B24] bg-transparent outline-none"
                     @input="onCafeMobileInput"
                   />
-                  <input
-                    v-else
-                    v-model="form.cafeLandlineDigits"
-                    type="tel"
-                    placeholder="082-299-1234"
-                    maxlength="15"
-                    class="w-full h-full px-3 text-sm text-[#3D2B24] bg-transparent outline-none"
-                    @input="onCafeLandlineInput"
-                  />
                 </div>
-                <p v-if="errors.cafe_phonenumber" class="text-xs text-red-600 font-medium">{{ errors.cafe_phonenumber }}</p>
+                <p v-if="fieldError('cafe_phonenumber')" class="text-xs text-red-600 font-medium">{{ fieldError('cafe_phonenumber') }}</p>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-[#3D2B24] mb-1">Branch Picture</label>
+              <div class="relative group cursor-pointer border-2 border-dashed border-[#EEDFC4] rounded-xl hover:border-[#7D5A50] hover:bg-[#FDF8F3] transition-all overflow-hidden flex items-center justify-center p-3 h-11 bg-[#FDF8F3]">
+                <input type="file" @change="e => handleFileChange(e, 'picture')" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".jpg,.jpeg,.png,.webp" />
+                <div class="flex items-center gap-2 text-[#9E7060] group-hover:text-[#7D5A50] transition-colors truncate">
+                  <Icon name="heroicons:photo" class="w-5 h-5 shrink-0" />
+                  <span class="text-xs font-bold truncate">{{ cafePicture ? cafePicture.name : 'Upload Branch Picture (JPG, PNG, WEBP, max 2MB)' }}</span>
+                </div>
+              </div>
+              <p v-if="fieldError('cafe_picture')" class="text-xs text-red-600 mt-1 font-medium">{{ fieldError('cafe_picture') }}</p>
+            </div>
+          </div>
+
+          <!-- SECTION 2: Legal Documents -->
+          <div v-show="currentStep === 2" class="space-y-4">
+            <h3 class="text-sm font-extrabold text-[#7D5A50] uppercase tracking-wider">2. Legal Documents (BIR)</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-[#3D2B24] mb-1">TIN Number *</label>
+                <input
+                  type="text"
+                  v-model="form.tin_number"
+                  maxlength="50"
+                  placeholder="e.g. 123-456-789-000"
+                  class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]"
+                />
+                <p v-if="fieldError('tin_number')" class="text-xs text-red-600 mt-1 font-medium">{{ fieldError('tin_number') }}</p>
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">VAT Status *</label>
-                <select v-model="form.vat" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50] focus:outline-none focus:ring-1 focus:ring-[#7D5A50]">
+                <select v-model="form.vat" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]">
                   <option value="vat-registered">VAT Registered</option>
                   <option value="non-vat">Non-VAT</option>
                 </select>
+                <p v-if="fieldError('vat')" class="text-xs text-red-600 mt-1 font-medium">{{ fieldError('vat') }}</p>
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">BIR Registered Date *</label>
-                <input type="date" v-model="form.bir_registered_at" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm focus:border-[#7D5A50] focus:outline-none focus:ring-1 focus:ring-[#7D5A50]" />
-                <p v-if="errors.bir_registered_at" class="text-xs text-red-600 mt-1 font-medium">{{ errors.bir_registered_at }}</p>
+                <input type="date" v-model="form.bir_registered_at" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]" />
+                <p v-if="fieldError('bir_registered_at')" class="text-xs text-red-600 mt-1 font-medium">{{ fieldError('bir_registered_at') }}</p>
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">BIR File *</label>
@@ -517,20 +294,10 @@ function handleSubmit() {
                   <input type="file" @change="e => handleFileChange(e, 'bir')" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".jpg,.jpeg,.png,.pdf" />
                   <div class="flex items-center gap-2 text-[#9E7060] group-hover:text-[#7D5A50] transition-colors truncate">
                     <Icon name="heroicons:arrow-up-tray" class="w-5 h-5 shrink-0" />
-                    <span class="text-xs font-bold truncate">{{ birFile ? birFile.name : 'Upload BIR Document' }}</span>
+                    <span class="text-xs font-bold truncate">{{ birFile ? birFile.name : 'Upload BIR Document (JPG, PNG, PDF, max 5MB)' }}</span>
                   </div>
                 </div>
-                <p v-if="errors.bir_file" class="text-xs text-red-600 mt-1 font-medium">{{ errors.bir_file }}</p>
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-[#3D2B24] mb-1">Cafe Picture</label>
-                <div class="relative group cursor-pointer border-2 border-dashed border-[#EEDFC4] rounded-xl hover:border-[#7D5A50] hover:bg-[#FDF8F3] transition-all overflow-hidden flex items-center justify-center p-3 h-11 bg-[#FDF8F3]">
-                  <input type="file" @change="e => handleFileChange(e, 'picture')" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".jpg,.jpeg,.png,.webp" />
-                  <div class="flex items-center gap-2 text-[#9E7060] group-hover:text-[#7D5A50] transition-colors truncate">
-                    <Icon name="heroicons:photo" class="w-5 h-5 shrink-0" />
-                    <span class="text-xs font-bold truncate">{{ cafePicture ? cafePicture.name : 'Upload Branch Picture' }}</span>
-                  </div>
-                </div>
+                <p v-if="fieldError('bir_file')" class="text-xs text-red-600 mt-1 font-medium">{{ fieldError('bir_file') }}</p>
               </div>
             </div>
           </div>
@@ -547,11 +314,13 @@ function handleSubmit() {
                 Back
               </button>
               <button
-                v-if="currentStep < 4"
+                v-if="currentStep < 2"
                 type="button"
                 @click="nextStep"
-                class="px-4 py-2 rounded-xl bg-[#FDF8F3] border border-[#EEDFC4] text-[#7D5A50] font-bold text-xs hover:bg-[#FCDEC0]/40 transition"
+                :disabled="checkingContact"
+                class="px-4 py-2 rounded-xl bg-[#FDF8F3] border border-[#EEDFC4] text-[#7D5A50] font-bold text-xs hover:bg-[#FCDEC0]/40 transition flex items-center gap-1.5 disabled:opacity-50"
               >
+                <Icon v-if="checkingContact" name="heroicons:arrow-path" class="w-3.5 h-3.5 animate-spin" />
                 Next Step
               </button>
             </div>
@@ -565,7 +334,7 @@ function handleSubmit() {
                 Cancel
               </button>
               <button
-                v-if="currentStep === 4"
+                v-if="currentStep === 2"
                 type="button"
                 @click="handleSubmit"
                 :disabled="saving"

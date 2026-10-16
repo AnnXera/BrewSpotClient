@@ -71,6 +71,11 @@ export class OwnerProfileService extends BaseService {
         return this.post<{ success: boolean; message: string; branch?: any }>('/owner/branches', payload)
     }
 
+    // 422 with errors.cafe_email / errors.cafe_phonenumber when either is taken
+    checkBranchContact(payload: { cafe_email: string; cafe_phonenumber: string }) {
+        return this.post<{ success: boolean }>('/owner/branches/check-contact', payload)
+    }
+
     updateBranch(uuid: string, payload: { status?: string; [key: string]: any }) {
         return this.patch<{ success: boolean; message: string; branch?: any }>(`/owner/branches/${uuid}`, payload)
     }

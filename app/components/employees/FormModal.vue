@@ -3,12 +3,12 @@
 <script setup lang="ts">
 import type {
   CreateStaffPayload,
-  EmploymentStatus,
   StaffMember,
   StaffRole,
   StaffScheduleInput,
   UpdateStaffPayload,
 } from '~/services/StaffService'
+import SelectMenu from '~/components/common/SelectMenu.vue'
 
 const props = defineProps<{
   show: boolean
@@ -25,13 +25,6 @@ const emit = defineEmits<{
 const staffService = useStaffService('owner')
 
 const isEdit = computed(() => !!props.employee)
-
-type EditableStatus = Exclude<EmploymentStatus, 'terminated'>
-const statusOptions: { value: EditableStatus; label: string }[] = [
-  { value: 'active', label: 'Active' },
-  { value: 'inactive', label: 'Inactive' },
-  { value: 'suspended', label: 'Suspended' },
-]
 
 const positionOptions: { value: StaffRole; label: string; hint: string }[] = [
   {
@@ -50,6 +43,8 @@ const positionOptions: { value: StaffRole; label: string; hint: string }[] = [
     hint: 'Records only (e.g. barista, kitchen staff). No login and no register access.',
   },
 ]
+// The hints are full sentences shown under the field, not in the list.
+const positionSelectOptions = positionOptions.map(({ value, label }) => ({ value, label }))
 
 function defaultSchedule(): StaffScheduleInput[] {
   // Sunday (0) and Saturday (6) off; weekdays 9–5.
@@ -71,7 +66,6 @@ function emptyForm() {
     address: '',
     role: '' as StaffRole | '',
     hired_at: new Date().toISOString().split('T')[0] as string,
-    employment_status: 'active' as EditableStatus,
     pin: '',
     schedule: defaultSchedule(),
   }
@@ -79,7 +73,6 @@ function emptyForm() {
 
 // Days that were never set start as a day off, so saving without touching them changes nothing.
 function formFrom(member: StaffMember): ReturnType<typeof emptyForm> {
-  const status = member.assignment?.employment_status
   return {
     firstname: member.firstname,
     middlename: member.middlename ?? '',
@@ -89,7 +82,6 @@ function formFrom(member: StaffMember): ReturnType<typeof emptyForm> {
     address: member.address ?? '',
     role: member.role,
     hired_at: member.assignment?.hired_at ?? '',
-    employment_status: status && status !== 'terminated' ? status : 'active',
     pin: '',
     schedule: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => {
       const day = member.schedule.find(s => s.day_of_week === dayOfWeek)
@@ -98,6 +90,13 @@ function formFrom(member: StaffMember): ReturnType<typeof emptyForm> {
         : { day_of_week: dayOfWeek, is_day_off: true, start_time: '09:00', end_time: '17:00' }
     }),
   }
+}
+
+// Deep copy that also unwraps nested reactive proxies. structuredClone can't:
+// the schedule editor emits a new array that still holds proxied day objects,
+// so structuredClone(toRaw(...)) throws a DataCloneError.
+function snapshot<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value))
 }
 
 const form = ref(emptyForm())
@@ -120,7 +119,7 @@ const positionHint = computed(() => positionOptions.find(o => o.value === form.v
 watch(() => props.show, (open) => {
   if (open) {
     form.value = props.employee ? formFrom(props.employee) : emptyForm()
-    baseline.value = structuredClone(toRaw(form.value))
+    baseline.value = snapshot(form.value)
     savedSteps.value = []
     pinSaved.value = false
     errors.value = {}
@@ -220,7 +219,6 @@ function changedFields(): UpdateStaffPayload {
   if (f.address.trim() !== b.address.trim()) payload.address = f.address.trim()
   if (f.role !== b.role) payload.role = f.role as StaffRole
   if (f.hired_at !== b.hired_at) payload.hired_at = f.hired_at
-  if (f.employment_status !== b.employment_status) payload.employment_status = f.employment_status
   return payload
 }
 
@@ -266,7 +264,7 @@ async function submitEdit() {
       const res = await staffService.updateBranchStaff(props.branchUuid, employee.uuid, details)
       if (!res.success) throw { data: { message: res.message } }
       savedSteps.value.push({ message: res.message, warnings: [], staff: res.staff })
-      const f = structuredClone(toRaw(form.value))
+      const f = snapshot(form.value)
       baseline.value = { ...f, schedule: baseline.value.schedule }
     }
 
@@ -274,7 +272,7 @@ async function submitEdit() {
       const res = await staffService.updateBranchStaffSchedule(props.branchUuid, employee.uuid, newSchedule)
       if (!res.success) throw { data: { message: res.message } }
       savedSteps.value.push({ message: res.message, warnings: res.warnings ?? [], staff: res.staff })
-      baseline.value.schedule = structuredClone(toRaw(form.value.schedule))
+      baseline.value.schedule = snapshot(form.value.schedule)
     }
 
     if (newPin) {
@@ -467,24 +465,18 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
 
             <div class="flex flex-col gap-3 sm:flex-row sm:gap-4">
               <!-- Position -->
-              <label class="flex flex-col gap-1.5 flex-1 min-w-0">
+              <div class="flex flex-col gap-1.5 flex-1 min-w-0">
                 <span :class="labelClass">Position*</span>
-                <div :class="fieldClass('role')" class="relative">
-                  <Icon name="heroicons:user-circle" class="w-4 h-4 shrink-0 text-[#7D5A50]" />
-                  <select
-                    v-model="form.role"
-                    class="flex-1 min-w-0 appearance-none bg-transparent font-sans text-sm pr-6 cursor-pointer focus:outline-none"
-                    :class="form.role ? 'text-black' : 'text-[#7D5A50]/40'"
-                  >
-                    <option value="" disabled>Select position</option>
-                    <option v-for="opt in positionOptions" :key="opt.value" :value="opt.value" class="text-black">
-                      {{ opt.label }}
-                    </option>
-                  </select>
-                  <Icon name="heroicons:chevron-down" class="w-4 h-4 text-[#7D5A50] absolute right-3 pointer-events-none" />
-                </div>
+                <SelectMenu
+                  v-model="form.role"
+                  :options="positionSelectOptions"
+                  placeholder="Select position"
+                  icon="heroicons:user-circle"
+                  dense
+                  :invalid="!!errors.role"
+                />
                 <span v-if="errors.role" class="font-sans text-xs text-red-600">{{ errors.role }}</span>
-              </label>
+              </div>
 
               <!-- Hired At -->
               <label class="flex flex-col gap-1.5 flex-1 min-w-0">
@@ -516,22 +508,6 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
             </div>
 
             <p v-if="positionHint" class="-mt-2 font-sans text-xs text-[#9E7060]">{{ positionHint }}</p>
-
-            <!-- Employment status (edit only; ending employment is done with Terminate) -->
-            <label v-if="isEdit" class="flex flex-col gap-1.5 sm:max-w-[calc(50%-8px)]">
-              <span :class="labelClass">Status*</span>
-              <div :class="fieldClass('employment_status')" class="relative">
-                <Icon name="heroicons:signal" class="w-4 h-4 shrink-0 text-[#7D5A50]" />
-                <select
-                  v-model="form.employment_status"
-                  class="flex-1 min-w-0 appearance-none bg-transparent font-sans text-sm text-black pr-6 cursor-pointer focus:outline-none"
-                >
-                  <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
-                <Icon name="heroicons:chevron-down" class="w-4 h-4 text-[#7D5A50] absolute right-3 pointer-events-none" />
-              </div>
-              <span v-if="errors.employment_status" class="font-sans text-xs text-red-600">{{ errors.employment_status }}</span>
-            </label>
 
             <!-- Weekly schedule -->
             <div class="flex flex-col gap-3">
