@@ -42,21 +42,12 @@ const statusLabel: Record<string, string> = {
     <div v-else-if="data?.branches.length" class="-mx-5 overflow-x-auto sm:-mx-6">
       <table class="w-full min-w-[560px] text-[13px]">
         <thead>
-<<<<<<< HEAD
           <tr class="border-y border-[#EDD8CC] bg-[#FFF8EA]">
             <th scope="col" class="py-4 pl-5 pr-2 text-left whitespace-nowrap font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060] sm:pl-6">Branch</th>
             <th scope="col" class="w-[38%] px-2 py-4 text-left whitespace-nowrap font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060]">Income</th>
             <th scope="col" class="px-2 py-4 text-right whitespace-nowrap font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060]">Orders</th>
             <th scope="col" class="px-2 py-4 text-right whitespace-nowrap font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060]">Avg order</th>
             <th scope="col" class="py-4 pl-2 pr-5 text-right whitespace-nowrap font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060] sm:pr-6">Change</th>
-=======
-          <tr class="border-b border-[#EEDFC4] text-[#8B6656]">
-            <th scope="col" class="pb-2.5 pl-5 pr-2 text-left font-medium sm:pl-6">Branch</th>
-            <th scope="col" class="w-[38%] px-2 pb-2.5 text-left font-medium">Income</th>
-            <th scope="col" class="px-2 pb-2.5 text-right font-medium">Orders</th>
-            <th scope="col" class="px-2 pb-2.5 text-right font-medium">Avg order</th>
-            <th scope="col" class="pb-2.5 pl-2 pr-5 text-right font-medium sm:pr-6">Change</th>
->>>>>>> 37b60310d9c2e19e03b53b185b0297700cb81d6f
           </tr>
         </thead>
         <tbody>
