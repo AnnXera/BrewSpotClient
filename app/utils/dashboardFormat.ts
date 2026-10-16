@@ -37,3 +37,27 @@ export function niceMax(value: number): number {
     const step = steps.find(s => s * exp >= value) ?? 10
     return step * exp
 }
+
+// Local calendar day as Y-m-d (what the API filters take).
+export function toDay(d: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+const percent = new Intl.NumberFormat('en-PH', { maximumFractionDigits: 1 })
+export const formatPercent = (n: number) => `${percent.format(n)}%`
+
+// 0..23 as "9 AM" / "12 PM".
+export function formatHour(h: number): string {
+    const suffix = h < 12 ? 'AM' : 'PM'
+    return `${h % 12 === 0 ? 12 : h % 12} ${suffix}`
+}
+
+export const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+export const WEEKDAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+// Payment method keys from the POS ("gcash", "card") as display labels.
+export function formatMethod(key: string): string {
+    const known: Record<string, string> = { cash: 'Cash', gcash: 'GCash', maya: 'Maya', paymaya: 'Maya', card: 'Card', unknown: 'Not recorded' }
+    return known[key.toLowerCase()] ?? key.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
