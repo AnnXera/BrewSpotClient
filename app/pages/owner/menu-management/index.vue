@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useMenuService } from '~/composables/useMenuService'
+import { useNavCategories } from '~/composables/useNavCategories'
 import MenuPageHeader from '~/components/menu/MenuPageHeader.vue'
 import MenuToolbar from '~/components/menu/MenuToolbar.vue'
 import CategoryCard from '~/components/menu/CategoryCard.vue'
@@ -17,6 +18,7 @@ definePageMeta({
 const route = useRoute()
 const router = useRouter()
 const menuService = useMenuService()
+const { refresh: refreshNavCategories } = useNavCategories() // keeps the sidebar's category list current
 const { confirmDialog, alertDialog, askConfirm, runConfirm, showAlert } = useDialogs()
 
 const categories = ref<any[]>([])
@@ -145,7 +147,10 @@ function handleDeleteCategory(catUuid: string) {
     confirmText: 'Delete',
     isDestructive: true,
     onConfirm: () => menuService.deleteMenuCategory(catUuid)
-      .then(() => fetchData())
+      .then(() => {
+        fetchData()
+        refreshNavCategories()
+      })
       .catch((error) => {
         console.error('Failed to delete category', error)
         showAlert('Delete Failed', 'Failed to delete category. Please try again.')
