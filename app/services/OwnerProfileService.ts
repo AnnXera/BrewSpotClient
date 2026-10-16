@@ -89,13 +89,81 @@ export class OwnerProfileService extends BaseService {
         return this.put<{ success: boolean; message: string; data?: ApiOpeningHour[] }>('/owner/opening-hours', { hours })
     }
 
-    getDashboardStats() {
-        return this.get<{ 
-            success: boolean; 
-            total_earnings?: number; 
-            detailed_stats?: { today_revenue: number, today_orders: number, avg_order_value: number, active_customers: number };
-            chart_data?: { month: string, revenue: number }[];
-            top_selling_items?: { rank: number, name: string, category: string, orders: number, percentage: number, revenue: number }[]
-        }>('/owner/dashboard-stats')
+    // Totals across every branch, plus one range's income series. Trending items,
+    // categories and branches cover the same window as the series.
+    getDashboardStats(range: DashboardRange = 'daily') {
+        return this.get<OwnerDashboardStats>('/owner/dashboard-stats', { range })
     }
+}
+
+export type DashboardRange = 'daily' | 'weekly' | 'monthly'
+
+export interface DashboardSeriesPoint {
+    start: string // Y-m-d
+    end: string
+    label: string
+    revenue: number
+    orders: number
+}
+
+export interface DashboardTrendingItem {
+    rank: number
+    uuid: string
+    name: string
+    category: string
+    picture: string | null
+    quantity: number
+    sales: number
+    share: number
+    previous_quantity: number
+    change: number | null // null = nothing sold in the previous window
+}
+
+export interface DashboardCategory {
+    uuid: string | null
+    name: string
+    quantity: number
+    sales: number
+    items: number
+    share: number
+}
+
+export interface DashboardBranch {
+    uuid: string
+    name: string
+    branch_type: string
+    status: string
+    revenue: number
+    orders: number
+    share: number
+}
+
+export interface OwnerDashboardStats {
+    success: boolean
+    generated_at: string
+    totals: {
+        branches: number
+        active_branches: number
+        pending_branches: number
+        orders: number
+        revenue: number
+        today_revenue: number
+        today_orders: number
+    }
+    period: {
+        range: DashboardRange
+        from: string
+        to: string
+        revenue: number
+        orders: number
+        avg_order_value: number
+        previous_revenue: number
+        previous_orders: number
+        revenue_change: number | null
+        orders_change: number | null
+    }
+    series: DashboardSeriesPoint[]
+    trending_items: DashboardTrendingItem[]
+    top_categories: DashboardCategory[]
+    branches: DashboardBranch[]
 }
