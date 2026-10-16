@@ -25,7 +25,8 @@ const registrationTab = ref<RegistrationTab>('owner')
 const statusTab = ref<StatusTab>('general')
 const search = ref('')
 
-const stats = ref<ApprovalStats | null>(null)
+const statsByType = ref<Record<RegistrationTab, ApprovalStats | null>>({ owner: null, branch: null })
+const stats = computed(() => statsByType.value[registrationTab.value])
 const approvals = ref<ApprovalListItem[]>([])
 const loading = ref(false)
 
@@ -34,13 +35,17 @@ const lastPage = ref(1)
 const total = ref(0)
 const perPage = 15
 
+// Fetch both types so the registration tabs can show their pending counts
 async function fetchStats() {
-  try {
-    const res = await ownerService.approvalStats(registrationTab.value)
-    if (res.success) stats.value = res.stats
-  } catch {
-    // badges just show placeholders if this fails
-  }
+  const types: RegistrationTab[] = ['owner', 'branch']
+  await Promise.all(types.map(async (type) => {
+    try {
+      const res = await ownerService.approvalStats(type)
+      if (res.success) statsByType.value[type] = res.stats
+    } catch {
+      // badges just show placeholders if this fails
+    }
+  }))
 }
 
 async function fetchApprovals() {
@@ -77,7 +82,6 @@ function switchRegistrationTab(tab: RegistrationTab) {
   statusTab.value = 'general'
   search.value = ''
   currentPage.value = 1
-  fetchStats()
   fetchApprovals()
 }
 
@@ -237,21 +241,33 @@ onMounted(async () => {
       <div class="relative flex items-center mb-6 border-b border-[#EEDFC4]">
         <button
           type="button"
-          class="px-5 py-[10px] font-display text-[16px] transition-colors relative z-10"
+          class="flex items-center gap-2 px-5 py-[10px] font-display text-[16px] transition-colors relative z-10"
           :class="registrationTab === 'owner' ? 'text-[#3B1F0E] font-bold' : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
           @click="switchRegistrationTab('owner')"
         >
           Owner Registration
+          <span
+            v-if="statsByType.owner?.pending_approval"
+            class="rounded-full px-2 py-0.5 text-[11px] font-bold font-sans"
+            :class="registrationTab === 'owner' ? 'bg-[#7D5A50] text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+            :title="`${statsByType.owner.pending_approval} pending`"
+          >{{ statsByType.owner.pending_approval }}</span>
           <span v-if="registrationTab === 'owner'" class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full" />
         </button>
 
         <button
           type="button"
-          class="px-5 py-[10px] font-display text-[16px] transition-colors relative z-10"
+          class="flex items-center gap-2 px-5 py-[10px] font-display text-[16px] transition-colors relative z-10"
           :class="registrationTab === 'branch' ? 'text-[#3B1F0E] font-bold' : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
           @click="switchRegistrationTab('branch')"
         >
           Branch Registration
+          <span
+            v-if="statsByType.branch?.pending_approval"
+            class="rounded-full px-2 py-0.5 text-[11px] font-bold font-sans"
+            :class="registrationTab === 'branch' ? 'bg-[#7D5A50] text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+            :title="`${statsByType.branch.pending_approval} pending`"
+          >{{ statsByType.branch.pending_approval }}</span>
           <span v-if="registrationTab === 'branch'" class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full" />
         </button>
       </div>

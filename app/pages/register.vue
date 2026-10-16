@@ -47,6 +47,7 @@ let cooldownTimer: ReturnType<typeof setInterval> | null = null
 
 // Step 3: Your Details
 const userUuid = ref('')
+const verifiedEmail = ref('') // the email userUuid was verified for; going back with it skips the code
 const firstname = ref('')
 const middlename = ref('')
 const lastname = ref('')
@@ -294,6 +295,11 @@ const dtiSecFileName = ref('')
 const dtiSecFileSize = ref('')
 const dtiSecFilePath = ref('')
 
+// Optional café picture (shown publicly on the branch)
+const cafePictureName = ref('')
+const cafePicturePath = ref('')
+const cafePicturePreview = ref('') // object URL; empty after a draft restore, when only the name is known
+
 // BIR Certificate Additional Details
 const birRegisteredAt = ref('')
 const tinNumber = ref('')
@@ -344,6 +350,7 @@ function clearAllInputs() {
   }
   // Step 3
   userUuid.value = ''
+  verifiedEmail.value = ''
   firstname.value = ''
   middlename.value = ''
   lastname.value = ''
@@ -379,6 +386,7 @@ function clearAllInputs() {
   dtiSecFileName.value = ''
   dtiSecFileSize.value = ''
   dtiSecFilePath.value = ''
+  clearCafePicture()
   birRegisteredAt.value = ''
   tinNumber.value = ''
   vat.value = 'non-vat'
@@ -407,6 +415,11 @@ async function handleSendCode() {
   }
   if (!isValidEmail(trimmedEmail)) {
     error.value = 'Invalid email format. Email must follow standard user@domain.com syntax with an "@" symbol and a valid domain (e.g., name@gmail.com).'
+    return
+  }
+  // Already verified this email in this tab: go straight back to the application.
+  if (userUuid.value && trimmedEmail.toLowerCase() === verifiedEmail.value.toLowerCase()) {
+    currentStep.value = 3
     return
   }
   loading.value = true
@@ -499,6 +512,7 @@ async function handleVerifyOTP() {
     const res = await authService.verifyRegistrationCode(email.value.trim(), otpCode.value) as any
     if (res.user_uuid) {
       userUuid.value = res.user_uuid
+      verifiedEmail.value = email.value.trim()
       currentStep.value = 3
     } else {
       error.value = res.message || 'That code did not work. Check it and try again.'
@@ -1015,6 +1029,51 @@ function clearDtiSecFile() {
   dtiSecFilePath.value = ''
 }
 
+async function onCafePictureChange(event: Event) {
+  error.value = ''
+  delete fieldErrors.value.cafe_picture
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  if (!['image/jpeg', 'image/png'].includes(file.type)) {
+    error.value = 'Café picture must be a JPG or PNG image.'
+    input.value = ''
+    return
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    error.value = 'Café picture must not exceed 2MB.'
+    input.value = ''
+    return
+  }
+
+  loading.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await authService.uploadTempFile(formData)
+    if (res.success && res.path) {
+      clearCafePicture()
+      cafePicturePath.value = res.path
+      cafePictureName.value = file.name
+      cafePicturePreview.value = URL.createObjectURL(file)
+    } else {
+      error.value = res.message || 'Failed to upload café picture.'
+    }
+  } catch (e: any) {
+    error.value = extractErrorMessage(e, 'Upload failed.')
+  } finally {
+    input.value = ''
+    loading.value = false
+  }
+}
+
+function clearCafePicture() {
+  if (cafePicturePreview.value) URL.revokeObjectURL(cafePicturePreview.value)
+  cafePicturePreview.value = ''
+  cafePictureName.value = ''
+  cafePicturePath.value = ''
+}
+
 async function handleFinalSubmit() {
   error.value = ''
   success.value = ''
@@ -1103,6 +1162,7 @@ async function handleFinalSubmit() {
     payload.append('address', address.value)
     payload.append('cafe_phonenumber', cafePhone.value)
     payload.append('cafe_email', cafeEmail.value)
+    if (cafePicturePath.value) payload.append('cafe_picture', cafePicturePath.value)
 
     payload.append('bir_file', birFilePath.value)
     payload.append('dti_sec_file', dtiSecFilePath.value)
@@ -1126,6 +1186,17 @@ async function handleFinalSubmit() {
           fieldErrors.value[k] = msgs[0] as string
         }
       }
+      // An expired/missing upload: drop the stale file so its upload box shows again.
+      if (fieldErrors.value.file) {
+        governmentIdFile.value = null; governmentIdFileName.value = ''; governmentIdFilePath.value = ''
+      }
+      if (fieldErrors.value.file_back) {
+        governmentIdFileBack.value = null; governmentIdFileBackName.value = ''; governmentIdFileBackPath.value = ''
+      }
+      if (fieldErrors.value.bir_file) clearBirFile()
+      if (fieldErrors.value.dti_sec_file) clearDtiSecFile()
+      if (fieldErrors.value.cafe_picture) clearCafePicture()
+
       const personalFields = ['username', 'phone_number', 'firstname', 'middlename', 'lastname', 'owner_address', 'id_type', 'file', 'file_back']
       const businessFields = ['cafe_name', 'branch_name', 'address', 'cafe_email', 'cafe_phonenumber', 'cafe_picture', 'cafe_doc_type']
 
@@ -1153,6 +1224,11 @@ async function handleFinalSubmit() {
 // Data Loss Prevention & Drafting
 function saveDraft() {
   const draft = {
+    // Where to resume: only the application steps, once the email is verified
+    userUuid: userUuid.value,
+    verifiedEmail: verifiedEmail.value,
+    step: currentStep.value === 4 ? 4 : 3,
+    businessSubPage: businessSubPage.value,
     email: email.value,
     firstname: firstname.value,
     middlename: middlename.value,
@@ -1178,6 +1254,8 @@ function saveDraft() {
     governmentIdFileBackPath: governmentIdFileBackPath.value,
     birFilePath: birFilePath.value,
     dtiSecFilePath: dtiSecFilePath.value,
+    cafePicturePath: cafePicturePath.value,
+    cafePictureName: cafePictureName.value,
     // File names for display
     governmentIdFileName: governmentIdFileName.value,
     governmentIdFileBackName: governmentIdFileBackName.value,
@@ -1236,6 +1314,18 @@ function restoreDraft() {
         dtiSecFileName.value = draft.dtiSecFileName || 'Uploaded File'
         dtiSecFile.value = new File([''], dtiSecFileName.value, { type: 'application/octet-stream' })
       }
+
+      // Email already verified: resume the application instead of the email step
+      if (draft.userUuid) {
+        userUuid.value = draft.userUuid
+        verifiedEmail.value = draft.verifiedEmail || draft.email || ''
+        currentStep.value = draft.step === 4 ? 4 : 3
+        if (draft.businessSubPage === 2) businessSubPage.value = 2
+      }
+      if (draft.cafePicturePath) {
+        cafePicturePath.value = draft.cafePicturePath
+        cafePictureName.value = draft.cafePictureName || 'Uploaded Picture'
+      }
     } catch (e) {
       console.warn('Failed to parse draft from sessionStorage', e)
     }
@@ -1243,7 +1333,7 @@ function restoreDraft() {
 }
 
 watch(
-  [email, firstname, middlename, lastname, username, phoneType, mobileDigits, landlineDigits, ownerAddress, idType, cafeName, cafeDocType, branchName, address, cafePhoneType, cafeMobileDigits, cafeLandlineDigits, cafeEmail, birRegisteredAt, tinNumber, vat, governmentIdFilePath, governmentIdFileBackPath, birFilePath, dtiSecFilePath],
+  [userUuid, currentStep, businessSubPage, email, firstname, middlename, lastname, username, phoneType, mobileDigits, landlineDigits, ownerAddress, idType, cafeName, cafeDocType, branchName, address, cafePhoneType, cafeMobileDigits, cafeLandlineDigits, cafeEmail, birRegisteredAt, tinNumber, vat, governmentIdFilePath, governmentIdFileBackPath, birFilePath, dtiSecFilePath, cafePicturePath],
   () => {
     saveDraft()
   },
@@ -1660,6 +1750,7 @@ onBeforeUnmount(() => {
                   v-model="idType"
                   :options="ID_TYPE_OPTIONS"
                   size="sm"
+                  white
                   :invalid="!!fieldErrors.id_type"
                 />
                 <p v-if="fieldErrors.id_type" class="text-xs text-red-600 font-medium">{{ fieldErrors.id_type }}</p>
@@ -1795,6 +1886,7 @@ onBeforeUnmount(() => {
                       v-model="cafeDocType"
                       :options="CAFE_DOC_TYPE_OPTIONS"
                       size="sm"
+                      white
                     />
                   </div>
                   <div class="col-span-2">
@@ -1808,6 +1900,39 @@ onBeforeUnmount(() => {
                     />
                   </div>
                 </div>
+              </div>
+
+              <!-- Café Picture (optional) -->
+              <div class="space-y-3 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                  <Icon name="heroicons:photo" class="w-4 h-4 text-[#7B5A50]" /> Café Picture
+                  <span class="text-xs font-normal text-gray-500">(optional)</span>
+                </h3>
+                <div v-if="!cafePicturePath">
+                  <input
+                    type="file"
+                    @change="onCafePictureChange"
+                    accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                    class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                  />
+                  <p class="text-xs text-gray-500 mt-1.5">A photo of your café's storefront or interior. JPG or PNG, up to 2MB.</p>
+                </div>
+                <div v-else class="flex items-center gap-3 text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
+                  <img
+                    v-if="cafePicturePreview"
+                    :src="cafePicturePreview"
+                    alt="Café picture preview"
+                    class="w-14 h-14 rounded-md object-cover shrink-0"
+                  />
+                  <p class="font-medium truncate flex-1">{{ cafePictureName || 'Uploaded Picture' }}</p>
+                  <button
+                    type="button"
+                    @click="clearCafePicture"
+                    class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
+                    title="Remove picture"
+                  >&times;</button>
+                </div>
+                <p v-if="fieldErrors.cafe_picture" class="text-xs text-red-600 font-medium">{{ fieldErrors.cafe_picture }}</p>
               </div>
 
               <!-- Contact Info -->

@@ -18,6 +18,7 @@ const props = withDefaults(defineProps<{
   icon?: string // leading icon inside the button
   size?: 'md' | 'sm' | 'xs' // md: 48px form field, sm: 44px toolbar/compact field, xs: 36px side panel
   bare?: boolean // no box of its own, for a dropdown sitting inside a styled wrapper (a sort pill, a phone prefix)
+  white?: boolean // plain white box with a gray border, to match plain form inputs (e.g. registration)
   align?: 'left' | 'right' // which edge the open list lines up with
   title?: string
   ariaLabel?: string
@@ -158,11 +159,19 @@ defineExpose({ focus: () => button.value?.focus() })
         bare
           ? 'bg-transparent text-inherit pr-6 rounded-md focus-visible:ring-2 focus-visible:ring-[#B4846C]'
           : [
-              'bg-[#fef8f0] border rounded-xl pr-10 focus:ring-2 focus:border-transparent',
-              icon ? 'pl-10' : (size === 'xs' ? 'pl-3' : 'pl-4'),
+              white
+                ? 'bg-white border rounded-md pr-10 focus:ring-2'
+                : 'bg-[#fef8f0] border rounded-xl pr-10 focus:ring-2 focus:border-transparent',
+              icon ? 'pl-10' : (size === 'xs' || white ? 'pl-3' : 'pl-4'),
               sizeClass,
-              invalid ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]',
-              selected ? 'text-[#3B1F0E]' : 'text-[#B4846C]/70'
+              invalid
+                ? 'border-red-500 focus:ring-red-500'
+                : white
+                  ? 'border-gray-300 focus:border-[#7B5A50] focus:ring-[#7B5A50]/20'
+                  : 'border-[#EEDFC4] focus:ring-[#B4846C]',
+              white
+                ? (selected ? 'text-[#2d201b]' : 'text-gray-400')
+                : (selected ? 'text-[#3B1F0E]' : 'text-[#B4846C]/70')
             ]
       ]"
       @click="open ? close() : openList()"
