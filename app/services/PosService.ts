@@ -46,6 +46,46 @@ export interface PosTransactionDetail {
     }[]
 }
 
+export type SpoilageReason = 'expired' | 'dropped' | 'wrong_order' | 'quality' | 'end_of_day' | 'other'
+
+// One spoiled-servings entry, logged on a register. Voided entries stay listed but no longer count.
+export interface SpoilageLog {
+    uuid: string
+    serving_uuid: string | null
+    menu_item: { uuid: string; menu_name: string } | null
+    size_name: string | null
+    quantity: number
+    unit_value: number | null // price per serving kept when logged (size price, else base price)
+    reason: SpoilageReason | null
+    logged_by: string | null
+    device_name: string | null
+    voided_at: string | null
+    voided_by: string | null
+    created_at: string
+}
+
+export interface SpoilageList {
+    success: boolean
+    date: string
+    total: number // servings, voided entries left out
+    reasons: SpoilageReason[]
+    logs: SpoilageLog[]
+}
+
+export const spoilageReasonLabels: Record<SpoilageReason, string> = {
+    expired: 'Expired',
+    dropped: 'Dropped or spilled',
+    wrong_order: 'Wrong order',
+    quality: 'Quality issue',
+    end_of_day: 'Leftover at closing',
+    other: 'Other',
+}
+
+// "2x Large Spanish Latte"
+export function spoilageItemLabel(log: SpoilageLog) {
+    return [log.size_name, log.menu_item?.menu_name ?? 'Removed item'].filter(Boolean).join(' ')
+}
+
 export class PosService extends BaseService {
     // ── Setup API (Uses Owner/Manager auth_token) ────────────────────────────────
 
@@ -97,7 +137,21 @@ export class DevicePosService extends BaseService {
         return this.get<{ success: boolean; transaction: PosTransactionDetail }>('/pos/device/transactions/' + transactionUuid)
     }
 
-    checkout(items: any[], paymentMethod: string, amountTendered: number, referenceNumber?: string, discountType?: string, discountAmount?: number) {
+    getSpoilage() {
+        return this.get<SpoilageList>('/pos/device/spoilage')
+    }
+
+    // sizeUuid is required for items that come in sizes, and must be null otherwise.
+    logSpoilage(menuItemUuid: string, sizeUuid: string | null, quantity: number, reason: SpoilageReason | null) {
+        return this.post<{ success: boolean; message: string; log: SpoilageLog }>('/pos/device/spoilage', {
+            menu_item_uuid: menuItemUuid,
+            size_uuid: sizeUuid,
+            quantity,
+            reason,
+        })
+    }
+
+    checkout(items: any[], paymentMethod: string,amountTendered: number, referenceNumber?: string, discountType?: string, discountAmount?: number) {
         return this.post<{ success: boolean; message: string; transaction_uuid: string; receipt_number?: string }>('/pos/device/checkout', {
             items,
             payment_method: paymentMethod,

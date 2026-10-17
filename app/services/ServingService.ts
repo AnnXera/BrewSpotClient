@@ -2,6 +2,7 @@
 import type { $Fetch } from 'nitropack'
 import { BaseService } from './BaseService'
 import type { Paginated } from './OwnerManagementService'
+import type { SpoilageList, SpoilageLog } from './PosService'
 
 export type ServingCategorySort = 'name' | 'remaining_desc' | 'remaining_asc'
 export type IngredientUsageSort = 'name' | 'quantity_desc' | 'quantity_asc'
@@ -125,5 +126,15 @@ export class ServingService extends BaseService {
     log(branchUuid: string, params: ServingListParams = {}) {
         return this.get<{ success: boolean; date: string; log: Paginated<ServingLogEntry> }>(
             `${this.base(branchUuid)}/log`, this.clean(params))
+    }
+
+    // Today's spoilage entries (logged on the registers), voided ones included.
+    spoilage(branchUuid: string) {
+        return this.get<SpoilageList>(`${this.base(branchUuid)}/spoilage`)
+    }
+
+    voidSpoilage(branchUuid: string, logUuid: string) {
+        return this.post<{ success: boolean; message: string; log: SpoilageLog }>(
+            `${this.base(branchUuid)}/spoilage/${logUuid}/void`)
     }
 }

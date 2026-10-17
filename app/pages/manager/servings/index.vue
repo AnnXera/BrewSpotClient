@@ -10,6 +10,7 @@ import type {
   ServingCategorySummary,
   ServingLogEntry,
 } from '~/services/ServingService'
+import { spoilageItemLabel, type SpoilageLog } from '~/services/PosService'
 
 definePageMeta({
   role: 'Manager',
@@ -58,6 +59,12 @@ const ingredients = ref<IngredientUsage[]>([])
 // Serving log
 const log = ref<ServingLogEntry[]>([])
 
+// Spoilage (logged on the registers; voided here)
+const spoilage = ref<SpoilageLog[]>([])
+const spoilageTotal = ref(0)
+const voidTarget = ref<SpoilageLog | null>(null)
+const voidingUuid = ref<string | null>(null)
+
 const loading = ref(true)
 const errorMessage = ref('')
 const planLocked = ref(false) // API 403: plan has no menu management
@@ -93,11 +100,34 @@ async function loadLog() {
   log.value = res.log.data
 }
 
+async function loadSpoilage() {
+  const res = await service.spoilage(branchUuid.value)
+  spoilage.value = res.logs
+  spoilageTotal.value = res.total
+}
+
+async function confirmVoid() {
+  const entry = voidTarget.value
+  voidTarget.value = null
+  if (!entry) return
+  voidingUuid.value = entry.uuid
+  errorMessage.value = ''
+  try {
+    await service.voidSpoilage(branchUuid.value, entry.uuid)
+    // Remaining servings on the category cards change with it.
+    await Promise.all([loadSpoilage(), loadCategories()])
+  } catch (e: any) {
+    failure(e, 'Could not void the spoilage entry.')
+  } finally {
+    voidingUuid.value = null
+  }
+}
+
 async function loadAll() {
   if (!branchUuid.value) return
   errorMessage.value = ''
   try {
-    await Promise.all([loadCategories(), loadIngredients(), loadLog()])
+    await Promise.all([loadCategories(), loadIngredients(), loadLog(), loadSpoilage()])
   } catch (e: any) {
     failure(e, 'Could not load servings.')
   }
@@ -223,7 +253,25 @@ onBeforeUnmount(() => {
           />
           <ServingsServingLogPanel :entries="log" :loading="loading" />
         </div>
+
+        <ServingsSpoilagePanel
+          :entries="spoilage"
+          :total="spoilageTotal"
+          :loading="loading"
+          :voiding-uuid="voidingUuid"
+          @void="voidTarget = $event"
+        />
       </template>
+
+      <CommonConfirmModal
+        :show="!!voidTarget"
+        title="Void this spoilage entry?"
+        :message="voidTarget ? `${voidTarget.quantity} ${spoilageItemLabel(voidTarget)} logged by ${voidTarget.logged_by ?? 'staff'} will go back into today's servings. The entry stays in the list as voided.` : ''"
+        confirm-text="Void entry"
+        is-destructive
+        @close="voidTarget = null"
+        @confirm="confirmVoid"
+      />
     </main>
   </div>
 </template>

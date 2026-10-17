@@ -24,7 +24,10 @@ function unitLabel(quantity: number, unit: string) {
 
 <template>
   <section class="bg-white border border-[#EDD8CC] rounded-2xl px-[22px] py-[18px] flex flex-col gap-4 h-[551px]">
-    <h2 class="font-display font-semibold text-[24px] text-[#3D2B24]">Ingredients Used</h2>
+    <div class="flex flex-col gap-1">
+      <h2 class="font-display font-semibold text-[24px] text-[#3D2B24]">Ingredients Used in Sales</h2>
+      <p class="font-display text-[12px] text-[#9E7060]">From each sold item's recipe. Spoiled servings are not included.</p>
+    </div>
 
     <div class="flex items-center justify-between gap-3 pb-4 border-b border-[#EDD8CC]">
       <SearchInput v-model="search" placeholder="Search Ingredient" class="flex-1" />
@@ -36,7 +39,7 @@ function unitLabel(quantity: number, unit: string) {
 
     <div class="flex-1 overflow-y-auto flex flex-col gap-3 pr-2">
       <p v-if="loading" class="text-[14px] text-[#9E7060]">Loading...</p>
-      <p v-else-if="!ingredients.length" class="text-[14px] text-[#9E7060]">No ingredients used yet today.</p>
+      <p v-else-if="!ingredients.length" class="text-[14px] text-[#9E7060]">No sales yet today, so no ingredients used.</p>
       <div v-for="i in ingredients" :key="`${i.name}-${i.unit}`" class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between font-display font-medium text-[16px] text-[#3D2B24]">
           <span class="truncate">{{ i.name }}</span>

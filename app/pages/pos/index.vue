@@ -192,6 +192,7 @@ function onEscape(e: KeyboardEvent) {
   else if (optionsItem.value) closeOptions()
   else if (isPaymentModalOpen.value) closePayment()
   else if (isTransactionsModalOpen.value) isTransactionsModalOpen.value = false
+  else if (isSpoilageOpen.value) isSpoilageOpen.value = false
 }
 onMounted(() => window.addEventListener('keydown', onEscape))
 onUnmounted(() => window.removeEventListener('keydown', onEscape))
@@ -619,6 +620,24 @@ async function openTransactions() {
   }
 }
 
+// Spoilage: logged entries come out of the item's servings, so the menu's stock is reloaded.
+const isSpoilageOpen = ref(false)
+
+async function onSpoilageLogged() {
+  try {
+    const m = await devicePosService.getMenu()
+    if (!m.success) return
+    menuItems.value = m.items
+  } catch {
+    return
+  }
+  // The open order can now ask for more than is left; checkout re-checks, but say so now.
+  for (const uuid of new Set(cart.value.map(i => i.uuid))) {
+    const item = menuItems.value.find(i => i.uuid === uuid)
+    if (item && inCart(uuid) > item.available_stock) showNotice(`Only ${item.available_stock} ${item.menu_name} left now. Adjust the order.`)
+  }
+}
+
 function printZReading() {
   window.print()
 }
@@ -710,8 +729,11 @@ function formatCurrency(amount: number) {
             <button @click="openTransactions" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 min-h-11 rounded-md text-base font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
               <Icon name="heroicons:document-text" class="w-4 h-4" /> Transactions
             </button>
+            <button @click="isSpoilageOpen = true" title="Log servings that were thrown away" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 min-h-11 rounded-md text-base font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
+              <Icon name="heroicons:trash" class="w-4 h-4" /> Spoilage
+            </button>
             <button @click="lockRegister" title="Lock the register and clear the current order" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 min-h-11 rounded-md text-base font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
-              <Icon name="heroicons:arrow-right-on-rectangle" class="w-4 h-4" /> Lock Register
+              <Icon name="heroicons:arrow-right-on-rectangle" class="w-4 h-4" />
             </button>
           </template>
           <template v-else>
@@ -1044,6 +1066,14 @@ function formatCurrency(amount: number) {
         @retry="openTransactions"
         @export="exportTransactionsCSV"
         @print="printZReading"
+      />
+
+      <!-- ── SPOILAGE ───────────────────────────────────────────────────── -->
+      <PosSpoilagePanel
+        v-if="isSpoilageOpen"
+        :items="menuItems"
+        @close="isSpoilageOpen = false"
+        @logged="onSpoilageLogged"
       />
 
       <!-- ── SIZE AND ADD-ON PICKER ───────────────────────────────────────── -->
