@@ -1,18 +1,19 @@
 <!-- app/components/employees/Details.vue -->
 <!-- One employee inside a branch's Employees tab: information card + weekly schedule. -->
 <script setup lang="ts">
-import type { StaffMember, StaffScheduleDay } from '~/services/StaffService'
+import type { StaffActor, StaffMember, StaffScheduleDay } from '~/services/StaffService'
 
 const props = defineProps<{
   branchUuid: string
   employeeUuid: string
+  scope?: 'owner' | 'manager'
 }>()
 
 const emit = defineEmits<{
   back: []
 }>()
 
-const staffService = useStaffService('owner')
+const staffService = useStaffService(props.scope ?? 'owner')
 
 const member = ref<StaffMember | null>(null)
 const loading = ref(true)
@@ -68,6 +69,19 @@ const hiredDisplay = computed(() => {
   const [y, m, d] = value.split('-').map(Number)
   return new Date(y!, (m ?? 1) - 1, d ?? 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 })
+
+const terminatedDisplay = computed(() => {
+  const value = member.value?.assignment?.terminated_at
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+})
+
+// "Juan Dela Cruz (Manager)"; owners show as "(Owner)".
+function actorDisplay(actor: StaffActor | null | undefined) {
+  if (!actor) return '—'
+  if (!actor.role) return actor.name
+  return `${actor.name} (${actor.role === 'Cafe Owner' ? 'Owner' : actor.role})`
+}
 
 // Always Sunday → Saturday, even if some days were never set.
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -211,6 +225,20 @@ async function terminate() {
             <dt class="font-display font-bold text-xs uppercase tracking-[0.09px] text-[#9E7060]">Hired At</dt>
             <dd class="font-display font-medium text-base text-[#3D2B24]">{{ hiredDisplay }}</dd>
           </div>
+          <div class="flex flex-col gap-1 min-w-0 sm:col-span-2">
+            <dt class="font-display font-bold text-xs uppercase tracking-[0.09px] text-[#9E7060]">Hired By</dt>
+            <dd class="font-display font-medium text-base text-[#3D2B24] break-words">{{ actorDisplay(member.assignment?.hired_by) }}</dd>
+          </div>
+          <template v-if="isTerminated">
+            <div class="flex flex-col gap-1 min-w-0">
+              <dt class="font-display font-bold text-xs uppercase tracking-[0.09px] text-[#9E7060]">Terminated At</dt>
+              <dd class="font-display font-medium text-base text-[#3D2B24]">{{ terminatedDisplay }}</dd>
+            </div>
+            <div class="flex flex-col gap-1 min-w-0">
+              <dt class="font-display font-bold text-xs uppercase tracking-[0.09px] text-[#9E7060]">Terminated By</dt>
+              <dd class="font-display font-medium text-base text-[#3D2B24] break-words">{{ actorDisplay(member.assignment?.terminated_by) }}</dd>
+            </div>
+          </template>
           <div class="flex flex-col gap-1 min-w-0">
             <dt class="font-display font-bold text-xs uppercase tracking-[0.09px] text-[#9E7060]">Email Address</dt>
             <dd class="font-display font-medium text-base text-[#3D2B24] break-all">{{ member.email }}</dd>
@@ -270,6 +298,7 @@ async function terminate() {
       :show="showEditModal"
       :branch-uuid="branchUuid"
       :employee="member"
+      :scope="scope"
       @close="showEditModal = false"
       @saved="onEdited"
     />

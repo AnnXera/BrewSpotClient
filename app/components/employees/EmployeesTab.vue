@@ -1,5 +1,5 @@
 <!-- app/components/employees/EmployeesTab.vue -->
-<!-- Employees tab of a branch (owner side). View Details emits an event for the parent to open the employee. -->
+<!-- Employees tab of a branch (owner and manager side). View Details emits an event for the parent to open the employee. -->
 <script setup lang="ts">
 import type { BranchStaffStats, EmploymentStatus, StaffMember, StaffRole } from '~/services/StaffService'
 import DropdownList from '~/components/common/DropdownList.vue'
@@ -7,6 +7,7 @@ import SearchInput from '~/components/common/SearchInput.vue'
 
 const props = defineProps<{
   branchUuid: string
+  scope?: 'owner' | 'manager'
 }>()
 
 const emit = defineEmits<{
@@ -23,7 +24,7 @@ function onEmployeeSaved(result: { message: string; warnings: string[] }) {
   refresh()
 }
 
-const staffService = useStaffService('owner')
+const staffService = useStaffService(props.scope ?? 'owner')
 
 const perPage = 10
 
@@ -158,8 +159,10 @@ onBeforeUnmount(() => {
     <div v-if="planLocked" class="bg-white border border-[#EDD8CC] rounded-2xl p-10 flex flex-col items-center gap-3 text-center">
       <Icon name="heroicons:lock-closed" class="w-10 h-10 text-[#9E7060]" />
       <p class="font-display text-lg font-bold text-[#3D2B24]">Employee management isn't in your plan</p>
-      <p class="font-sans text-sm text-[#9E7060] max-w-md">Upgrade your subscription to add employees, set schedules, and give cashiers access to the register.</p>
+      <p v-if="scope === 'manager'" class="font-sans text-sm text-[#9E7060] max-w-md">Ask the cafe owner to upgrade the subscription to manage employees here.</p>
+      <p v-else class="font-sans text-sm text-[#9E7060] max-w-md">Upgrade your subscription to add employees, set schedules, and give cashiers access to the register.</p>
       <NuxtLink
+        v-if="scope !== 'manager'"
         to="/owner/subscription"
         class="mt-2 px-4 py-3 rounded-[10px] bg-[#7D5A50] font-display font-semibold text-sm text-[#FFF0D1] hover:bg-[#6B4A40] transition-colors"
       >
@@ -349,6 +352,7 @@ onBeforeUnmount(() => {
     <EmployeesFormModal
       :show="showAddModal"
       :branch-uuid="branchUuid"
+      :scope="scope"
       @close="showAddModal = false"
       @saved="onEmployeeSaved"
     />

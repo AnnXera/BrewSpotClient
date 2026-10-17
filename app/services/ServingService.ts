@@ -2,6 +2,7 @@
 import type { $Fetch } from 'nitropack'
 import { BaseService } from './BaseService'
 import type { Paginated } from './OwnerManagementService'
+import type { BranchDetail } from './OwnerProfileService'
 import type { SpoilageList, SpoilageLog } from './PosService'
 
 export type ServingCategorySort = 'name' | 'remaining_desc' | 'remaining_asc'
@@ -95,6 +96,11 @@ export class ServingService extends BaseService {
     // Branch switcher (manager only).
     managedBranches() {
         return this.get<{ success: boolean; branches: ManagedBranch[] }>('/manager/branches')
+    }
+
+    // Cafe Management details of one assigned branch (manager only).
+    managedBranch(branchUuid: string) {
+        return this.get<{ success: boolean; message?: string; branch?: BranchDetail }>(`/manager/branches/${branchUuid}`)
     }
 
     categories(branchUuid: string, params: ServingListParams = {}) {
