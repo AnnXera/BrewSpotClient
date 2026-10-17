@@ -46,7 +46,7 @@ const form = ref({
 })
 
 function emptyRow(): RecipeRow {
-  return { ingredient_uuid: null, ingredient_name: '', quantity_display: '', unit: INGREDIENT_UNITS[0] }
+  return { ingredient_uuid: null, ingredient_name: '', quantity_display: '', unit: INGREDIENT_UNITS[0] ?? '' }
 }
 
 const ingredients = ref<Ingredient[]>([])
@@ -244,13 +244,16 @@ async function save() {
     let shownInForm = false
 
     for (const [field, messages] of Object.entries(serverErrors ?? {})) {
+      const message = messages[0]
+      if (message === undefined) continue
       const match = field.match(/^recipes\.(\d+)\./)
       if (match) {
         // Map back past the blank rows that were dropped.
-        const row = form.value.recipes.indexOf(rows[Number(match[1])])
-        if (row >= 0) rowMessages[row] ??= messages[0]
+        const sent = rows[Number(match[1])]
+        const row = sent ? form.value.recipes.indexOf(sent) : -1
+        if (row >= 0) rowMessages[row] ??= message
       } else if (field === 'name' || field === 'price' || field === 'max_quantity') {
-        errors.value[field] = messages[0]
+        errors.value[field] = message
         shownInForm = true
       }
     }

@@ -3,12 +3,16 @@ const props = defineProps<{
   item: {
     id?: number | string
     uuid?: string
-    name: string
-    description?: string
+    name?: string
+    menu_name?: string
+    description?: string | null
     image_url?: string
+    picture?: string | null
+    base_price?: string | number | null
     price?: number
+    sizes?: { uuid: string, name: string, price: string | number }[]
     tags?: string[]
-    recipes_preview?: string
+    recipes_preview?: string | null
     recipes_remaining_count?: number
   }
 }>()
@@ -38,7 +42,7 @@ const getImageUrl = () => {
         :src="getImageUrl() || ''" 
         :alt="item.menu_name"
         class="w-full h-full object-cover"
-        @error="$event.target.style.display = 'none'"
+        @error="($event.target as HTMLImageElement).style.display = 'none'"
       />
       <div v-else class="w-full h-full flex items-center justify-center text-[#B4846C]/30">
         <Icon name="heroicons:photo" class="w-12 h-12" />
@@ -75,7 +79,7 @@ const getImageUrl = () => {
       <p class="font-sans text-xs text-[#757575]/70 leading-snug line-clamp-2 mt-auto">
         <template v-if="item.recipes_preview">
           {{ item.recipes_preview }}
-          <span v-if="item.recipes_remaining_count > 0" class="inline-flex items-center justify-center bg-[#EDEDED] text-[#757575]/70 text-[8px] font-bold px-[5px] py-[2.5px] rounded-full ml-1 align-middle">+{{ item.recipes_remaining_count }}</span>
+          <span v-if="(item.recipes_remaining_count ?? 0) > 0" class="inline-flex items-center justify-center bg-[#EDEDED] text-[#757575]/70 text-[8px] font-bold px-[5px] py-[2.5px] rounded-full ml-1 align-middle">+{{ item.recipes_remaining_count }}</span>
         </template>
         <template v-else>
           No recipes added

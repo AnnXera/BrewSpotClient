@@ -44,18 +44,18 @@ onMounted(async () => {
   document.addEventListener('click', closeProfileDropdown)
   
   // Fetch menu categories if "Menu Management" is in the links
-  const menuIndex = dynamicLinks.value.findIndex(l => l.label === 'Menu Management')
-  if (menuIndex !== -1) {
+  const menuLink = dynamicLinks.value.find(l => l.label === 'Menu Management')
+  if (menuLink) {
     // Open by default if we are on a menu route
     if (route.path.startsWith('/owner/menu')) {
         openNavDropdowns.value['Menu Management'] = true
     }
 
-    dynamicLinks.value[menuIndex].isDropdown = true
+    menuLink.isDropdown = true
 
     // Rebuilt whenever a page adds, renames or deletes a category (useNavCategories().refresh()).
     watch(navCategories, (categories) => {
-      dynamicLinks.value[menuIndex].children = [
+      menuLink.children = [
         ...baseMenuChildren,
         ...categories.map(cat => ({ label: cat.name, to: `/owner/menu-management/category/${cat.uuid}`, isCategory: true }))
       ]
@@ -72,7 +72,7 @@ const baseMenuChildren: NavLink[] = [
   { label: 'CATEGORIES', to: '', isHeader: true }
 ]
 
-function isActive(link: NavLink) {
+function isActive(link: NavLink): boolean {
   if (link.isHeader) return false
   
   // If the link itself has a query string, check if the path and query match

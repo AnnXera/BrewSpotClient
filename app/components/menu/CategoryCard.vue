@@ -8,7 +8,8 @@ const props = defineProps<{
     name: string
     description?: string
     image_url?: string
-    items_preview?: string
+    picture?: string | null
+    items_preview?: string | null
     remaining_count?: number
   }
 }>()
@@ -39,7 +40,7 @@ const getImageUrl = () => {
         :src="getImageUrl() || ''" 
         :alt="category.name"
         class="w-full h-full object-cover"
-        @error="$event.target.style.display = 'none'"
+        @error="($event.target as HTMLImageElement).style.display = 'none'"
       />
       <!-- Fallback pattern if no image -->
       <div v-else class="w-full h-full flex items-center justify-center text-[#B4846C]/30">
@@ -66,7 +67,7 @@ const getImageUrl = () => {
       <p class="font-sans text-xs text-[#B4846C] leading-snug line-clamp-2">
         <template v-if="category.items_preview">
           {{ category.items_preview }}
-          <span v-if="category.remaining_count > 0" class="inline-flex items-center justify-center bg-[#F5F5F5] text-[#7D5A50] text-[10px] font-bold px-1.5 py-0.5 rounded ml-1">+{{ category.remaining_count }}</span>
+          <span v-if="(category.remaining_count ?? 0) > 0" class="inline-flex items-center justify-center bg-[#F5F5F5] text-[#7D5A50] text-[10px] font-bold px-1.5 py-0.5 rounded ml-1">+{{ category.remaining_count }}</span>
         </template>
         <template v-else>
           {{ category.description || 'No items available in this category.' }}

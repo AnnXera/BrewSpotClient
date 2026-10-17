@@ -84,7 +84,7 @@ const getImageUrl = (path: string | null) => {
   if (path.startsWith('http')) return path
   if (path.startsWith('blob:')) return path
   const config = useRuntimeConfig()
-  const apiUrl = config.public.apiBaseUrl
+  const apiUrl = config.public.apiBase
   return `${apiUrl.replace('/api', '')}/storage/${path}`
 }
 
@@ -253,7 +253,7 @@ const saveCategory = async () => {
                 :src="getImageUrl(item.picture) || ''" 
                 :alt="item.menu_name"
                 class="w-full h-full object-cover"
-                @error="$event.target.style.display = 'none'"
+                @error="($event.target as HTMLImageElement).style.display = 'none'"
               />
               <div v-else class="w-full h-full flex items-center justify-center text-[#B4846C]/30">
                 <Icon name="heroicons:photo" class="w-12 h-12" />
