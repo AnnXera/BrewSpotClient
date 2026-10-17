@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
 import logoFull from '~/assets/images/logo-with-tag.svg'
+import { getSafeRedirect } from '~/utils/roleRedirects'
 
 const route = useRoute()
 const notice = ref((route.query.notice as string) || '')
@@ -37,7 +38,8 @@ async function handleLogin() {
     const res = await authService.login(form.email, form.password)
 
     if (res.success && res.requires_2fa) {
-      navigateTo({ path: '/verify-login-code', query: { email: form.email } })
+      const redirect = getSafeRedirect(route.query.redirect)
+      navigateTo({ path: '/verify-login-code', query: { email: form.email, ...(redirect ? { redirect } : {}) } })
     } else {
       errors.auth = res.message
     }

@@ -1,7 +1,7 @@
 //app/composables/useDeviceApi.ts
 export function useDeviceApi() {
     const config = useRuntimeConfig()
-    const token = useCookie<string | null>('pos_device_token')
+    const token = usePosDeviceToken()
 
     const api = $fetch.create({
         baseURL: config.public.apiBase,

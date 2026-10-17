@@ -1,10 +1,12 @@
 <!--Verify login code page-->
 <script setup lang="ts">
 import logoFull from '~/assets/images/logo-with-tag.svg'
-import { getRedirectForRole } from '~/utils/roleRedirects'
+import { getRedirectForRole, getSafeRedirect } from '~/utils/roleRedirects'
 
 const route = useRoute()
 const email = ref((route.query.email as string) || '')
+const redirect = getSafeRedirect(route.query.redirect)
+const loginRoute = { path: '/login', query: redirect ? { redirect } : {} }
 const error = ref('')
 const loading = ref(false)
 const cooldown = ref(0)
@@ -24,7 +26,7 @@ const code = computed(() => digits.value.join(''))
 
 onMounted(() => {
   if (!email.value) {
-    navigateTo('/login')
+    navigateTo(loginRoute)
     return
   }
   inputs.value[0]?.focus()
@@ -111,7 +113,7 @@ async function handleVerify() {
       token.value = res.token
       authStore.setSession(res.user, res.role)
 
-      navigateTo(getRedirectForRole(res.role))
+      navigateTo(redirect ?? getRedirectForRole(res.role))
     } else {
       error.value = res.message || 'That code did not work. Check it and try again.'
       resetDigits()
@@ -153,7 +155,7 @@ async function handleResend() {
 }
 
 function changeEmail() {
-  navigateTo('/login')
+  navigateTo(loginRoute)
 }
 </script>
 

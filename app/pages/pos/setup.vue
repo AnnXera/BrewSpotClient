@@ -9,8 +9,8 @@ definePageMeta({
 
 const posService = usePosService()
 const router = useRouter()
-const authCookie = useCookie<string | null>('auth_token')
-const posDeviceCookie = useCookie<string | null>('pos_device_token')
+const endManagerSession = useLogout({ redirectTo: false })
+const posDeviceCookie = usePosDeviceToken()
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -54,8 +54,8 @@ async function registerDevice() {
       // 1. Save the POS device token
       posDeviceCookie.value = res.device_token
       
-      // 2. Discard the owner/manager auth token from this shared device
-      authCookie.value = null
+      // 2. End the owner/manager session on this shared device (revokes the token server-side too)
+      await endManagerSession()
       
       // 3. Redirect to the actual POS register screen
       router.push('/pos')

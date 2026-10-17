@@ -9,7 +9,7 @@ definePageMeta({
 
 const devicePosService = useDevicePosService()
 const router = useRouter()
-const posDeviceCookie = useCookie<string | null>('pos_device_token')
+const posDeviceCookie = usePosDeviceToken()
 
 const loading = ref(true)
 const errorMessage = ref('')
