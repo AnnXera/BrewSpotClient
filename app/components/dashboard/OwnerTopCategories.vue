@@ -28,7 +28,12 @@ const lead = () => Math.max(1, ...props.categories.map(c => c.orders))
     </ol>
 
     <ol v-else-if="categories.length" class="mt-6 space-y-5">
-      <li v-for="(c, i) in categories" :key="c.uuid ?? 'uncategorized'">
+      <li
+        v-for="(c, i) in categories"
+        :key="c.uuid ?? 'uncategorized'"
+        class="animate-row-enter"
+        :style="{ '--row-delay': `${i * 60}ms` }"
+      >
         <div class="flex items-baseline justify-between gap-3">
           <p class="min-w-0 truncate text-[14px] font-semibold text-[#3D2B24]">
             <span class="mr-1.5 font-display tabular-nums text-[#C2A592]">{{ i + 1 }}</span>{{ c.name }}
@@ -39,9 +44,9 @@ const lead = () => Math.max(1, ...props.categories.map(c => c.orders))
         </div>
         <div class="mt-2 h-2.5 overflow-hidden rounded-full bg-[#F3E7D2]">
           <div
-            class="h-full rounded-full transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+            class="bar-grow-x h-full rounded-full"
             :class="i === 0 ? 'bg-[#7D5A50]' : 'bg-[#B4846C]'"
-            :style="{ width: `${(c.orders / lead()) * 100}%` }"
+            :style="{ width: `${(c.orders / lead()) * 100}%`, '--bar-delay': `${i * 65}ms` }"
           />
         </div>
         <p class="mt-1.5 text-[12px] text-[#9E7060] tabular-nums">
@@ -50,7 +55,7 @@ const lead = () => Math.max(1, ...props.categories.map(c => c.orders))
       </li>
     </ol>
 
-    <div v-else class="mt-6 rounded-2xl bg-[#FDF8F3] px-5 py-8 text-center">
+    <div v-else class="animate-row-enter mt-6 rounded-2xl bg-[#FDF8F3] px-5 py-8 text-center">
       <Icon name="heroicons:squares-2x2" class="mx-auto h-7 w-7 text-[#C2A592]" />
       <p class="mt-2 font-display font-semibold text-[#3B1F0E]">No category sales yet</p>
       <p class="mt-1 text-[13px] text-[#8B6656]">Categories rank here by what they earn.</p>
@@ -70,7 +75,45 @@ const lead = () => Math.max(1, ...props.categories.map(c => c.orders))
   to { background-position: -100% 0; }
 }
 
+@keyframes barGrowX {
+  0% {
+    transform: scaleX(0);
+    opacity: 0.15;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+.bar-grow-x {
+  transform-origin: left;
+  animation: barGrowX 850ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--bar-delay, 0ms);
+  will-change: transform;
+}
+
+@keyframes rowEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-row-enter {
+  animation: rowEnter 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .skeleton { animation: none; }
+  .skeleton, .bar-grow-x, .animate-row-enter {
+    animation: none !important;
+    transform: none !important;
+  }
 }
 </style>

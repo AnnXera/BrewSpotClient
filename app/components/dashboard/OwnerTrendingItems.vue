@@ -18,7 +18,7 @@ defineProps<{
       </div>
       <NuxtLink
         to="/owner/menu-management/items"
-        class="inline-flex shrink-0 items-center gap-1 rounded font-display text-[13px] font-semibold text-[#7D5A50] underline decoration-[#7D5A50]/30 underline-offset-4 hover:decoration-[#7D5A50] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+        class="inline-flex shrink-0 items-center gap-1 rounded font-display text-[13px] font-semibold text-[#7D5A50] underline decoration-[#7D5A50]/30 underline-offset-4 hover:decoration-[#7D5A50] active:scale-[0.97] transition-transform duration-160 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
       >
         View menu
         <Icon name="heroicons:arrow-up-right-20-solid" class="h-3.5 w-3.5" />
@@ -37,7 +37,8 @@ defineProps<{
       <li
         v-for="item in items"
         :key="item.uuid"
-        class="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 border-b border-[#EDD8CC] py-4 font-display sm:grid-cols-[32px_minmax(0,1fr)_180px_120px]"
+        class="animate-row-enter grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 border-b border-[#EDD8CC] py-4 font-display sm:grid-cols-[32px_minmax(0,1fr)_180px_120px]"
+        :style="{ '--row-delay': `${(item.rank - 1) * 60}ms` }"
       >
         <span class="text-[14px] font-bold text-[#9E7060] tabular-nums">#{{ item.rank }}</span>
 
@@ -53,7 +54,10 @@ defineProps<{
             <span class="text-[13px] text-[#9E7060] tabular-nums">{{ Math.round(item.share) }}%</span>
           </div>
           <div class="h-1.5 w-full overflow-hidden rounded-[3px] bg-[#FFF8EA]">
-            <div class="h-full bg-[#7D5A50]" :style="{ width: `${Math.min(100, item.share)}%` }" />
+            <div
+              class="bar-grow-x h-full bg-[#7D5A50]"
+              :style="{ width: `${Math.min(100, item.share)}%`, '--bar-delay': `${(item.rank - 1) * 65}ms` }"
+            />
           </div>
         </div>
 
@@ -63,7 +67,7 @@ defineProps<{
       </li>
     </ol>
 
-    <div v-else class="rounded-2xl bg-[#FDF8F3] px-5 py-8 text-center">
+    <div v-else class="animate-row-enter rounded-2xl bg-[#FDF8F3] px-5 py-8 text-center">
       <Icon name="ph:coffee" class="mx-auto h-7 w-7 text-[#C2A592]" />
       <p class="mt-2 font-display font-semibold text-[#3B1F0E]">Nothing sold yet in this period</p>
       <p class="mt-1 text-[13px] text-[#8B6656]">Your best sellers will rank here once orders come in.</p>
@@ -83,7 +87,45 @@ defineProps<{
   to { background-position: -100% 0; }
 }
 
+@keyframes barGrowX {
+  0% {
+    transform: scaleX(0);
+    opacity: 0.15;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+.bar-grow-x {
+  transform-origin: left;
+  animation: barGrowX 850ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--bar-delay, 0ms);
+  will-change: transform;
+}
+
+@keyframes rowEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-row-enter {
+  animation: rowEnter 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .skeleton { animation: none; }
+  .skeleton, .bar-grow-x, .animate-row-enter {
+    animation: none !important;
+    transform: none !important;
+  }
 }
 </style>

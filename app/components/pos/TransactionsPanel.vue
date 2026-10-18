@@ -29,6 +29,7 @@ const emit = defineEmits<{
   retry: []
   export: []
   print: []
+  refunded: [transaction: any]
 }>()
 
 const closeButton = ref<HTMLButtonElement | null>(null)
@@ -93,11 +94,24 @@ function toggleHour(hour: number) {
 }
 
 const filteredSales = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
+  const rawQ = searchQuery.value.trim().toLowerCase()
+  if (!rawQ) {
+    return sales.value.filter((t) => {
+      if (selectedHour.value !== null && new Date(t.created_at).getHours() !== selectedHour.value) return false
+      return true
+    })
+  }
+
+  // Remove leading '#' or '0's for flexible numeric matching (e.g. "00005", "0005", "5")
+  const qClean = rawQ.replace(/^#/, '')
+  const qNum = qClean.replace(/^0+/, '')
+
   return sales.value.filter((t) => {
     if (selectedHour.value !== null && new Date(t.created_at).getHours() !== selectedHour.value) return false
-    if (!q) return true
-    return t.uuid.toLowerCase().includes(q) || t.staff_name.toLowerCase().includes(q)
+    const receipt = (t.receipt_number || '').toLowerCase()
+    const receiptNum = receipt.replace(/^0+/, '')
+    const matchesReceipt = receipt.includes(qClean) || (qNum !== '' && receiptNum.includes(qNum))
+    return matchesReceipt || t.uuid.toLowerCase().includes(rawQ) || t.staff_name.toLowerCase().includes(rawQ)
   })
 })
 
@@ -139,6 +153,10 @@ function viewSale(txn: PosTransaction, e: Event) {
 function closeSale() {
   openSale.value = null
   nextTick(() => returnFocusTo?.focus())
+}
+
+function handleRefunded(updated: any) {
+  emit('refunded', updated)
 }
 
 // Escape steps back from a sale before it closes the panel (the page listens on window too).
@@ -283,22 +301,38 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown, true))
               </div>
               <ul>
                 <li v-for="txn in group.sales" :key="txn.uuid" class="mx-2">
-                  <button
+                  <div
                     @click="viewSale(txn, $event)"
-                    :aria-label="`View sale ${txn.uuid}, ${formatTime(txn.created_at)}, ${formatCurrency(txn.total_amount)}`"
-                    class="txn-row w-full text-left px-3 py-3 rounded-md grid grid-cols-[4.5rem_1fr_auto_1rem] items-center gap-x-3 hover:bg-[#FBF7F2] active:bg-[#F3EBE2] transition-colors"
+                    :aria-label="`View sale #${txn.receipt_number || txn.uuid}, ${formatTime(txn.created_at)}, ${formatCurrency(txn.total_amount)}`"
+                    role="button"
+                    tabindex="0"
+                    class="txn-row w-full text-left px-3 py-3 rounded-md flex items-center justify-between gap-x-3 hover:bg-[#FBF7F2] active:bg-[#F3EBE2] transition-colors cursor-pointer select-none"
                   >
-                  <span class="text-sm font-medium text-[#6B5048] tabular-nums">{{ formatTime(txn.created_at) }}</span>
-                  <div class="min-w-0">
-                    <p class="flex items-center gap-2 min-w-0">
-                      <span class="text-[13px] font-semibold text-[#2d201b] tabular-nums truncate" :title="txn.uuid">{{ txn.uuid }}</span>
-                      <span v-if="!isSettled(txn.status)" class="shrink-0 text-[11px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-50 text-red-800 border border-red-200">{{ txn.status }}</span>
-                    </p>
-                    <p class="text-sm text-[#6B5048] truncate">{{ txn.staff_name }} &middot; {{ txn.items_count }} {{ txn.items_count === 1 ? 'item' : 'items' }}</p>
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                      <span class="text-sm font-medium text-[#6B5048] tabular-nums shrink-0 w-16">{{ formatTime(txn.created_at) }}</span>
+                      <div class="min-w-0 flex-1">
+                        <p class="flex items-center gap-2 min-w-0">
+                          <span class="text-[13px] font-bold text-[#2d201b] tabular-nums truncate" :title="txn.receipt_number ? `#${txn.receipt_number}` : txn.uuid">
+                            #{{ txn.receipt_number || txn.uuid }}
+                          </span>
+                          <span v-if="txn.status?.toLowerCase() === 'refunded'" class="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300">
+                            REFUNDED
+                          </span>
+                          <span v-else-if="!isSettled(txn.status)" class="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-50 text-red-800 border border-red-200">
+                            {{ txn.status }}
+                          </span>
+                        </p>
+                        <p class="text-xs text-[#6B5048] truncate mt-0.5">{{ txn.staff_name }} &middot; {{ txn.items_count }} {{ txn.items_count === 1 ? 'item' : 'items' }}</p>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center gap-2.5 shrink-0">
+                      <span class="text-sm font-semibold tabular-nums text-right" :class="isSettled(txn.status) ? 'text-[#2d201b]' : 'line-through text-[#8A6E64]'">
+                        {{ formatCurrency(txn.total_amount) }}
+                      </span>
+                      <Icon name="heroicons:chevron-right" class="w-4 h-4 text-[#B89A8E] shrink-0" />
+                    </div>
                   </div>
-                  <span class="text-base font-semibold text-[#2d201b] tabular-nums text-right" :class="{ 'line-through text-[#8A6E64]': !isSettled(txn.status) }">{{ formatCurrency(txn.total_amount) }}</span>
-                    <Icon name="heroicons:chevron-right" class="w-4 h-4 text-[#B89A8E]" />
-                  </button>
                 </li>
               </ul>
             </section>
@@ -334,6 +368,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown, true))
           :transaction-uuid="openSale.uuid"
           :preview="openSale"
           @back="closeSale"
+          @refunded="handleRefunded"
         />
       </div>
     </section>

@@ -30,6 +30,7 @@ export interface PosTransactionDetail {
     created_at: string
     staff_name: string
     status: string
+    walk_in_note?: string | null
     subtotal: number
     discount_type: string | null
     discount_amount: number
@@ -105,6 +106,18 @@ export class DevicePosService extends BaseService {
             reference_number: referenceNumber,
             discount_type: discountType,
             discount_amount: discountAmount
+        })
+    }
+
+    getApprovingManagers() {
+        return this.get<{ success: boolean; managers: { uuid: string; name: string; role: string; has_pin: boolean; is_locked: boolean }[] }>('/pos/device/approving-managers')
+    }
+
+    refundTransaction(transactionUuid: string, managerUuid: string, pin: string, reason?: string) {
+        return this.post<{ success: boolean; message: string; transaction?: PosTransactionDetail }>('/pos/device/transactions/' + transactionUuid + '/refund', {
+            manager_uuid: managerUuid,
+            pin,
+            reason
         })
     }
 }

@@ -1,0 +1,130 @@
+<!-- app/components/manager/ManagerTrendingItems.vue -->
+<script setup lang="ts">
+import type { DashboardTrendingItem } from '~/services/OwnerProfileService'
+import { formatCount, formatPesoCents } from '~/utils/dashboardFormat'
+
+defineProps<{
+  items: DashboardTrendingItem[]
+  loading: boolean
+}>()
+</script>
+
+<template>
+  <section class="flex flex-col gap-4 rounded-[22px] border border-[#EEDFC4] bg-white p-6 shadow-[0_1px_2px_rgba(59,31,14,0.04)]" aria-labelledby="top-selling-heading">
+    <header class="flex items-start justify-between gap-4">
+      <div class="flex flex-col gap-0.5">
+        <h2 id="top-selling-heading" class="font-display text-[18px] font-bold text-[#3D2B24]">Top-Selling Menu Items</h2>
+        <p class="text-[13px] text-[#8B6656]">Top branch performers sorted by order volume and contribution</p>
+      </div>
+      <NuxtLink
+        to="/manager/servings"
+        class="inline-flex shrink-0 items-center gap-1 rounded font-display text-[13px] font-semibold text-[#7D5A50] underline decoration-[#7D5A50]/30 underline-offset-4 hover:decoration-[#7D5A50] active:scale-[0.97] transition-transform duration-160 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+      >
+        View Servings
+        <Icon name="heroicons:arrow-up-right-20-solid" class="h-3.5 w-3.5" />
+      </NuxtLink>
+    </header>
+
+    <ol v-if="loading" class="flex flex-col" aria-hidden="true">
+      <li v-for="i in 4" :key="i" class="flex items-center gap-4 border-b border-[#F6ECDD] py-4">
+        <span class="skeleton h-4 w-6 rounded" />
+        <span class="flex-1 space-y-2"><span class="skeleton block h-3.5 w-1/2 rounded" /><span class="skeleton block h-3 w-1/3 rounded" /></span>
+        <span class="skeleton hidden h-3 w-[180px] rounded sm:block" />
+      </li>
+    </ol>
+
+    <ol v-else-if="items.length" class="flex flex-col divide-y divide-[#F6ECDD]">
+      <li
+        v-for="item in items"
+        :key="item.uuid"
+        class="animate-row-enter grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 py-3.5 font-display sm:grid-cols-[32px_minmax(0,1fr)_180px_120px]"
+        :style="{ '--row-delay': `${(item.rank - 1) * 60}ms` }"
+      >
+        <span class="text-[14px] font-bold text-[#9E7060] tabular-nums">#{{ item.rank }}</span>
+
+        <div class="flex min-w-0 flex-col gap-0.5">
+          <p class="truncate text-[14px] font-bold text-[#3D2B24]">{{ item.name }}</p>
+          <p class="truncate text-xs text-[#8B6656]">{{ item.category }}</p>
+        </div>
+
+        <div class="col-span-2 col-start-2 row-start-2 flex flex-col gap-1.5 sm:col-span-1 sm:col-start-3 sm:row-start-1">
+          <div class="flex items-start justify-between gap-3 whitespace-nowrap text-xs">
+            <span class="font-semibold text-[#3D2B24] tabular-nums">{{ formatCount(item.orders) }} {{ item.orders === 1 ? 'order' : 'orders' }}</span>
+            <span class="text-[#8B6656] tabular-nums">{{ Math.round(item.share) }}%</span>
+          </div>
+          <div class="h-1.5 w-full overflow-hidden rounded-[3px] bg-[#FFF8EA]">
+            <div
+              class="bar-grow-x h-full bg-[#7D5A50]"
+              :style="{ width: `${Math.min(100, item.share)}%`, '--bar-delay': `${(item.rank - 1) * 65}ms` }"
+            />
+          </div>
+        </div>
+
+        <span class="col-start-3 row-start-1 text-right text-[14px] font-bold text-[#3D2B24] tabular-nums sm:col-start-4">
+          {{ formatPesoCents(item.sales) }}
+        </span>
+      </li>
+    </ol>
+
+    <div v-else class="animate-row-enter rounded-2xl bg-[#FDF8F3] px-5 py-8 text-center">
+      <Icon name="ph:coffee" class="mx-auto h-7 w-7 text-[#C2A592]" />
+      <p class="mt-2 font-display font-semibold text-[#3B1F0E]">No item sales recorded</p>
+      <p class="mt-1 text-[13px] text-[#8B6656]">Best-selling items in this period will appear here.</p>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.skeleton {
+  background: linear-gradient(90deg, #F6ECDD, #FBF4EA, #F6ECDD);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@keyframes barGrowX {
+  0% {
+    transform: scaleX(0);
+    opacity: 0.15;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+.bar-grow-x {
+  transform-origin: left;
+  animation: barGrowX 850ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--bar-delay, 0ms);
+  will-change: transform;
+}
+
+@keyframes rowEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-row-enter {
+  animation: rowEnter 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton, .bar-grow-x, .animate-row-enter {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+</style>

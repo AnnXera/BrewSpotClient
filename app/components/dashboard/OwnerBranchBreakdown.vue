@@ -32,10 +32,15 @@ const statusLabel: Record<string, string> = {
     </ul>
 
     <ul v-else-if="branches.length" class="-mx-2 mt-4 flex-1 space-y-1 overflow-y-auto lg:grid lg:grid-cols-2 lg:gap-x-6 lg:space-y-0 xl:block xl:max-h-[420px] xl:space-y-1">
-      <li v-for="b in branches" :key="b.uuid">
+      <li
+        v-for="(b, i) in branches"
+        :key="b.uuid"
+        class="animate-row-enter"
+        :style="{ '--row-delay': `${i * 60}ms` }"
+      >
         <NuxtLink
           :to="`/owner/branches/${b.uuid}`"
-          class="block rounded-xl px-2 py-3 transition-colors hover:bg-[#FDF8F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+          class="block rounded-xl px-2 py-3 transition-all duration-160 ease-out hover:bg-[#FDF8F3] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
         >
           <div class="flex items-baseline justify-between gap-3">
             <p class="min-w-0 truncate text-[14px] font-semibold text-[#3D2B24]">
@@ -45,7 +50,10 @@ const statusLabel: Record<string, string> = {
             <p class="shrink-0 text-[14px] font-semibold text-[#3D2B24] tabular-nums">{{ formatPeso(b.revenue) }}</p>
           </div>
           <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-[#F3E7D2]">
-            <div class="h-full rounded-full bg-[#7D5A50] transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]" :style="{ width: `${b.share}%` }" />
+            <div
+              class="bar-grow-x h-full rounded-full bg-[#7D5A50]"
+              :style="{ width: `${b.share}%`, '--bar-delay': `${i * 65}ms` }"
+            />
           </div>
           <p class="mt-1.5 flex items-center justify-between gap-2 text-[12px] text-[#9E7060] tabular-nums">
             <span>{{ formatCount(b.orders) }} {{ b.orders === 1 ? 'order' : 'orders' }}</span>
@@ -59,7 +67,7 @@ const statusLabel: Record<string, string> = {
       </li>
     </ul>
 
-    <div v-else class="mt-6 flex-1 rounded-2xl bg-[#FDF8F3] px-5 py-8 text-center">
+    <div v-else class="animate-row-enter mt-6 flex-1 rounded-2xl bg-[#FDF8F3] px-5 py-8 text-center">
       <Icon name="heroicons:building-storefront" class="mx-auto h-7 w-7 text-[#C2A592]" />
       <p class="mt-2 font-display font-semibold text-[#3B1F0E]">No branches yet</p>
       <NuxtLink to="/owner/cafes" class="mt-2 inline-block rounded text-[13px] font-semibold text-[#7D5A50] underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]">Add a branch</NuxtLink>
@@ -79,7 +87,45 @@ const statusLabel: Record<string, string> = {
   to { background-position: -100% 0; }
 }
 
+@keyframes barGrowX {
+  0% {
+    transform: scaleX(0);
+    opacity: 0.15;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+.bar-grow-x {
+  transform-origin: left;
+  animation: barGrowX 850ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--bar-delay, 0ms);
+  will-change: transform;
+}
+
+@keyframes rowEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-row-enter {
+  animation: rowEnter 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .skeleton { animation: none; }
+  .skeleton, .bar-grow-x, .animate-row-enter {
+    animation: none !important;
+    transform: none !important;
+  }
 }
 </style>

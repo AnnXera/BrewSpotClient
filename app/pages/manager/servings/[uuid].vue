@@ -3,6 +3,8 @@
 <script setup lang="ts">
 import DropdownList from '~/components/common/DropdownList.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
+import CommonPagination from '~/components/common/Pagination.vue'
+import ServingsItemCard from '~/components/servings/ItemCard.vue'
 import type {
   CategoryServingChange,
   CategoryServingItem,
@@ -49,6 +51,9 @@ const errorMessage = ref('')
 const successMessage = ref('')
 const rowErrors = ref<Record<string, string>>({}) // item uuid -> message from the server
 const planLocked = ref(false)
+
+// Activate scroll reveal when items load
+useScrollReveal(items)
 
 function limitOf(i: CategoryServingItem) {
   return drafts.value[i.uuid]?.daily_limit ?? i.daily_limit
@@ -121,7 +126,6 @@ async function save() {
     successMessage.value = res.message
     await load()
   } catch (e: any) {
-    // Errors come back keyed "items.N.field"; N is the row in what we sent.
     const errors = e?.data?.errors as Record<string, string[]> | undefined
     for (const [key, messages] of Object.entries(errors ?? {})) {
       const row = key.match(/^items\.(\d+)\./)
@@ -148,7 +152,6 @@ watch(sort, () => {
 })
 watch(page, load)
 
-// Rows are saved only on Save Changes, so warn before losing them.
 onBeforeRouteLeave(() => {
   if (dirtyCount.value && !window.confirm('You have unsaved changes. Leave without saving?')) return false
 })
@@ -183,87 +186,205 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row min-h-screen bg-[#FFF8EA]">
+  <div class="dashboard flex min-h-screen flex-col bg-[#FDF3E7] md:flex-row">
     <NavBar :links="links" />
-    <main class="flex-1 min-w-0 p-6 lg:p-12 flex flex-col gap-6">
-      <header class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div class="flex flex-col gap-3">
-          <nav aria-label="Breadcrumb" class="flex items-center gap-2 font-display text-[14px]">
-            <NuxtLink
-              :to="{ path: '/manager/servings', query: { branch: branchUuid } }"
-              class="font-medium text-[#9E7060] hover:text-[#3D2B24]"
+
+    <main class="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10 xl:px-12">
+      <div class="mx-auto max-w-[1360px] space-y-6">
+        
+        <!-- Header: Breadcrumbs, Category Title, Time -->
+        <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between pb-2">
+          <div class="min-w-0">
+            <!-- Breadcrumb Navigation -->
+            <nav aria-label="Breadcrumb" class="flex items-center gap-2 text-[13px] font-medium mb-1.5">
+              <NuxtLink
+                :to="{ path: '/manager/servings', query: { branch: branchUuid } }"
+                class="inline-flex items-center gap-1.5 text-[#8B6656] hover:text-[#3B1F0E] transition-colors duration-160"
+              >
+                <Icon name="heroicons:arrow-left" class="w-3.5 h-3.5 text-[#B4846C]" />
+                <span>Servings Management</span>
+              </NuxtLink>
+              <span class="text-[#D9C3A5]">/</span>
+              <span class="text-[#3B1F0E] font-semibold truncate">{{ categoryName || 'Loading...' }}</span>
+            </nav>
+
+            <!-- Title & Status Tag -->
+            <div class="flex flex-wrap items-baseline gap-3">
+              <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">
+                {{ categoryName || 'Category Items' }}
+              </h1>
+              <span
+                v-if="dirtyCount"
+                class="inline-block rounded-md border border-amber-300 bg-amber-50 px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-amber-800 animate-pulse"
+              >
+                {{ dirtyCount }} unsaved change{{ dirtyCount === 1 ? '' : 's' }}
+              </span>
+            </div>
+
+            <!-- Subtitle -->
+            <p class="mt-1 text-[13px] text-[#8B6656]">
+              Set daily limits and switch items on/off for today's service.
+            </p>
+          </div>
+
+          <!-- Live Time Pill -->
+          <div class="inline-flex items-center gap-2 rounded-xl border border-[#E3CFB4] bg-white px-3.5 py-2 text-[13px] font-medium text-[#7D5A50] shadow-2xs shrink-0 self-start sm:self-auto">
+            <span class="relative flex h-2 w-2">
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            <span class="tabular-nums font-mono">{{ timeLabel }}</span>
+            <span class="text-[#D9C3A5]">/</span>
+            <span>{{ dateLabel }}</span>
+          </div>
+        </header>
+
+        <!-- Error Notification -->
+        <div
+          v-if="errorMessage"
+          role="alert"
+          class="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-[14px] text-rose-800 shadow-2xs"
+        >
+          <Icon name="heroicons:exclamation-circle" class="h-5 w-5 shrink-0 text-rose-600" />
+          <p class="font-medium">{{ errorMessage }}</p>
+        </div>
+
+        <!-- Success Notification -->
+        <div
+          v-else-if="successMessage"
+          role="status"
+          class="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-[14px] text-emerald-800 shadow-2xs"
+        >
+          <Icon name="heroicons:check-circle" class="h-5 w-5 shrink-0 text-emerald-600" />
+          <p class="font-medium">{{ successMessage }}</p>
+        </div>
+
+        <!-- Items Card Section with Scroll Reveal -->
+        <section v-if="!planLocked && branchUuid" class="scroll-reveal bg-white border border-[#E3CFB4] rounded-2xl shadow-xs overflow-hidden">
+          <!-- Toolbar: Search, Sort, Save Button -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 border-b border-[#E3CFB4] bg-[#FFFDF9]/60">
+            <div class="flex-1 flex items-center gap-3">
+              <SearchInput v-model="search" placeholder="Search item..." class="flex-1 sm:max-w-xs" />
+              <div class="flex items-center gap-1.5 h-11 px-3 bg-white border border-[#E3CFB4] rounded-xl font-sans text-sm font-medium text-[#7D5A50] shrink-0 shadow-2xs">
+                <Icon name="heroicons:bars-3-bottom-left" class="w-4 h-4 text-[#B4846C]" />
+                <DropdownList v-model="sort" :options="sortOptions" bare align="right" aria-label="Sort items" />
+              </div>
+            </div>
+
+            <!-- Save Changes Button with Tactile Active State -->
+            <button
+              type="button"
+              class="save-btn inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-display font-semibold text-[13px] shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+              :class="[
+                dirtyCount
+                  ? 'bg-[#7D5A50] text-[#FFF0D1] hover:bg-[#684940] active:scale-[0.97] cursor-pointer'
+                  : 'bg-[#FAF4ED] text-[#A89F91] border border-[#EBE0D2] cursor-not-allowed opacity-75'
+              ]"
+              :disabled="!dirtyCount || saving"
+              @click="save"
             >
-              Servings Management
-            </NuxtLink>
-            <span class="font-medium text-[#9E7060]">/</span>
-            <span class="font-semibold text-[#3D2B24]">{{ categoryName || '...' }}</span>
-          </nav>
-          <h1 class="font-display font-bold text-[36px] leading-[39px] text-[#3D2B24]">{{ categoryName || '...' }}</h1>
-        </div>
-        <div class="bg-white border border-[#3D2B24] rounded-2xl p-[18px] flex items-center gap-3 text-[16px] text-black whitespace-nowrap self-start sm:self-auto">
-          <span>{{ timeLabel }}</span>
-          <span>|</span>
-          <span>{{ dateLabel }}</span>
-        </div>
-      </header>
+              <Icon v-if="saving" name="heroicons:arrow-path" class="w-4 h-4 animate-spin text-[#FFF0D1]" />
+              <Icon v-else name="heroicons:check" class="w-4 h-4" />
+              <span>{{ saving ? 'Saving...' : dirtyCount ? `Save Changes (${dirtyCount})` : 'Save Changes' }}</span>
+            </button>
+          </div>
 
-      <p
-        v-if="errorMessage"
-        role="alert"
-        class="bg-[#FFE0E0] text-[#B31E1E] border border-[#B31E1E]/20 rounded-xl px-4 py-3 text-[14px]"
-      >
-        {{ errorMessage }}
-      </p>
-      <p
-        v-else-if="successMessage"
-        role="status"
-        class="bg-[#D4EDDA] text-[#28A745] border border-[#28A745]/20 rounded-xl px-4 py-3 text-[14px]"
-      >
-        {{ successMessage }}
-      </p>
+          <!-- Items Content -->
+          <div class="p-5 min-h-[160px]">
+            <!-- Loading Skeletons -->
+            <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              <div v-for="n in 6" :key="n" class="h-[180px] rounded-2xl bg-[#FAF4ED]/60 border border-[#E3CFB4]/60 animate-pulse p-5 flex flex-col gap-3">
+                <div class="flex items-center gap-3">
+                  <div class="size-10 rounded-xl bg-[#EBE0D2]" />
+                  <div class="h-5 w-32 bg-[#EBE0D2] rounded" />
+                </div>
+                <div class="flex-1 rounded-xl bg-[#EBE0D2]/50" />
+              </div>
+            </div>
 
-      <section v-if="!planLocked && branchUuid" class="bg-white border border-[#EDD8CC] rounded-2xl overflow-hidden">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-[22px] py-[18px] border-b border-[#EDD8CC]">
-          <div class="flex-1 flex items-center gap-3">
-            <SearchInput v-model="search" placeholder="Search Item" class="flex-1" />
-            <div class="flex items-center gap-1.5 h-11 px-3 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl font-sans text-sm font-medium text-[#7D5A50]">
-              <Icon name="heroicons:bars-3-bottom-left" class="w-4 h-4" />
-              <DropdownList v-model="sort" :options="sortOptions" bare align="right" aria-label="Sort items" />
+            <!-- Empty State -->
+            <div v-else-if="!items.length" class="flex flex-col items-center justify-center py-12 text-center">
+              <div class="size-14 rounded-full bg-[#FDF3E7] border border-[#E3CFB4] flex items-center justify-center text-[#9E7060] mb-3">
+                <Icon name="heroicons:cake" class="w-7 h-7" />
+              </div>
+              <p class="font-display font-semibold text-[16px] text-[#3B1F0E]">No items found</p>
+              <p class="text-[13px] text-[#8B6656] mt-1 max-w-sm">
+                {{ search ? 'No items match your search.' : 'This category has no items yet.' }}
+              </p>
+            </div>
+
+            <!-- Items Grid with Stagger Motion -->
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
+              <div
+                v-for="(i, idx) in items"
+                :key="i.uuid"
+                class="stagger-card"
+                :style="{ animationDelay: `${idx * 40}ms` }"
+              >
+                <ServingsItemCard
+                  :item="i"
+                  :limit="limitOf(i)"
+                  :enabled="enabledOf(i)"
+                  :error="rowErrors[i.uuid]"
+                  @update:limit="setLimit(i, $event)"
+                  @toggle="toggle(i)"
+                />
+              </div>
             </div>
           </div>
-          <button
-            type="button"
-            class="bg-[#7D5A50] text-[#FFF0D1] font-display font-semibold text-[14px] rounded-[10px] px-4 py-3 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#6a4b42] transition-colors"
-            :disabled="!dirtyCount || saving"
-            @click="save"
-          >
-            {{ saving ? 'Saving...' : dirtyCount ? `Save Changes (${dirtyCount})` : 'Save Changes' }}
-          </button>
-        </div>
 
-        <div class="px-[22px] py-[18px] min-h-[120px]">
-          <p v-if="loading" class="text-[14px] text-[#9E7060]">Loading...</p>
-          <p v-else-if="!items.length" class="text-[14px] text-[#9E7060]">
-            {{ search ? 'No items match your search.' : 'This category has no items yet.' }}
-          </p>
-          <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-            <ServingsItemCard
-              v-for="i in items"
-              :key="i.uuid"
-              :item="i"
-              :limit="limitOf(i)"
-              :enabled="enabledOf(i)"
-              :error="rowErrors[i.uuid]"
-              @update:limit="setLimit(i, $event)"
-              @toggle="toggle(i)"
-            />
+          <!-- Pagination Footer -->
+          <div class="border-t border-[#E3CFB4] bg-[#FFFDF9]/60 px-5">
+            <CommonPagination :page="page" :last-page="lastPage" @change="page = $event" />
           </div>
-        </div>
-
-        <div class="border-t border-[#EDD8CC]">
-          <CommonPagination :page="page" :last-page="lastPage" @change="page = $event" />
-        </div>
-      </section>
+        </section>
+      </div>
     </main>
   </div>
 </template>
+
+<style scoped>
+/* Scroll reveal: Elements start slightly offset and fade/translate in when scrolled into view */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 750ms cubic-bezier(0.16, 1, 0.3, 1), transform 750ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes staggerIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.stagger-card {
+  animation: staggerIn 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.save-btn {
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+              background-color 160ms ease-out,
+              color 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-reveal,
+  .stagger-card,
+  .save-btn {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
+</style>

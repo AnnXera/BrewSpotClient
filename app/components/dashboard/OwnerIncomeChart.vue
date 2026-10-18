@@ -13,6 +13,15 @@ const props = defineProps<{
 
 const emit = defineEmits<{ 'update:range': [DashboardRange] }>()
 
+// Bar key for range changes (not on refresh)
+const barsKey = ref(0)
+watch(
+  () => props.range,
+  () => {
+    barsKey.value++
+  }
+)
+
 // The comparison covers the same stretch of the window before (e.g. last week up to the same day).
 const ranges: { value: DashboardRange; label: string; compare: string; none: string }[] = [
   { value: 'daily', label: 'Daily', compare: 'last week, same days', none: 'No sales last week to compare with' },
@@ -95,7 +104,7 @@ function tooltipAlign(i: number) {
           role="radio"
           :aria-checked="range === r.value"
           :class="range === r.value ? 'bg-white text-[#3B1F0E] shadow-[0_1px_3px_rgba(59,31,14,0.18)]' : 'text-[#8B6656] hover:text-[#3B1F0E]'"
-          class="relative rounded-[9px] px-3.5 py-1.5 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+          class="relative rounded-[9px] px-3.5 py-1.5 text-[13px] font-semibold transition-all duration-160 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
           @click="emit('update:range', r.value)"
         >
           {{ r.label }}
@@ -104,7 +113,10 @@ function tooltipAlign(i: number) {
     </header>
 
     <!-- Period summary -->
-    <div class="mt-6 flex flex-wrap items-end gap-x-8 gap-y-3">
+    <div
+      :key="barsKey"
+      class="animate-summary-enter mt-6 flex flex-wrap items-end gap-x-8 gap-y-3"
+    >
       <div>
         <p class="font-display text-[34px] leading-none font-semibold tracking-[-0.02em] text-[#3B1F0E] tabular-nums">
           <span v-if="!period" class="skeleton inline-block h-8 w-40 rounded-md align-middle" />
@@ -157,6 +169,7 @@ function tooltipAlign(i: number) {
 
         <!-- Bars -->
         <div
+          :key="barsKey"
           class="absolute inset-0 left-12 flex"
           role="list"
           aria-label="Income per period"
@@ -181,7 +194,10 @@ function tooltipAlign(i: number) {
                   i === currentIndex ? 'bar--current' : '',
                   active === i ? 'bar--active' : '',
                 ]"
-                :style="{ clipPath: barClip(p.revenue) }"
+                :style="{
+                  clipPath: barClip(p.revenue),
+                  '--bar-delay': `${i * 65}ms`,
+                }"
               />
               <span
                 class="pointer-events-none absolute inset-x-0.5 bottom-0 top-0 rounded-md ring-2 ring-[#7D5A50] opacity-0 group-focus-visible:opacity-100"
@@ -266,9 +282,24 @@ function tooltipAlign(i: number) {
   background: #F3E7D2;
 }
 
+@keyframes barGrow {
+  0% {
+    transform: scaleY(0);
+    opacity: 0.15;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
 .bar {
   background: #B4846C;
-  transition: clip-path 520ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease;
+  transform-origin: bottom;
+  animation: barGrow 850ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--bar-delay, 0ms);
+  transition: clip-path 600ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease;
+  will-change: transform;
 }
 
 .group:hover .bar,
@@ -308,7 +339,23 @@ function tooltipAlign(i: number) {
   from { opacity: 0; transform: translate(-50%, 4px); }
 }
 
+@keyframes summaryEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-summary-enter {
+  animation: summaryEnter 750ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .bar, .tooltip, .skeleton { transition: none; animation: none; }
+  .bar, .tooltip, .skeleton, .animate-summary-enter { transition: none; animation: none; transform: none; }
 }
 </style>

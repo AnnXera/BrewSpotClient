@@ -71,11 +71,29 @@ async function loadDeviceData() {
   }
 }
 
+const activePinKey = ref<string | null>(null)
+let pinKeyFeedbackTimeout: any = null
+
+function triggerPinKeyFeedback(key: string) {
+  activePinKey.value = key
+  if (pinKeyFeedbackTimeout) clearTimeout(pinKeyFeedbackTimeout)
+  pinKeyFeedbackTimeout = setTimeout(() => {
+    activePinKey.value = null
+  }, 120)
+}
+
 function handleNumpad(num: string) {
   if (isChangingPin.value) {
     if (newPinInput.value.length < 6) newPinInput.value += num
   } else {
-    if (pinInput.value.length < 6) pinInput.value += num
+    if (pinInput.value.length < 6) {
+      pinInput.value += num
+      if (pinInput.value.length === 6) {
+        nextTick(() => {
+          submitPin()
+        })
+      }
+    }
   }
 }
 
@@ -106,7 +124,15 @@ function cancelUnlock() {
 }
 
 async function submitPin() {
-  if (!selectedStaff.value) return
+  if (!selectedStaff.value || loading.value) return
+  
+  const currentPin = isChangingPin.value ? newPinInput.value : pinInput.value
+  if (!currentPin || currentPin.length === 0) return
+
+  if (isChangingPin.value && newPinInput.value.length < 6) {
+    errorMessage.value = 'New PIN must be 6 digits'
+    return
+  }
   
   loading.value = true
   errorMessage.value = ''
@@ -154,6 +180,73 @@ async function submitPin() {
   }
 }
 
+function handlePinKeyDown(e: KeyboardEvent) {
+  // Only handle keys if we are on the PIN lock screen (staff selected and register locked)
+  if (!selectedStaff.value || device.value?.active_staff) return
+
+  // Let browser shortcuts with modifier keys (e.g. Ctrl+R, Alt+Tab, etc.) work normally
+  if (e.ctrlKey || e.altKey || e.metaKey) return
+
+  // Prevent Spacebar from activating currently focused element
+  if (e.key === ' ') {
+    e.preventDefault()
+    return
+  }
+
+  // Handle Escape: cancel unlock and return to staff selection
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    triggerPinKeyFeedback('Escape')
+    cancelUnlock()
+    return
+  }
+
+  // Handle Backspace / Delete
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    e.preventDefault()
+    if (loading.value) return
+    triggerPinKeyFeedback('Backspace')
+    handleBackspace()
+    return
+  }
+
+  // Handle Enter (both main keyboard Enter and Numpad Enter)
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    if (loading.value) return
+    triggerPinKeyFeedback('Enter')
+    submitPin()
+    return
+  }
+
+  // Handle Digits 0-9 (from top row numbers or numpad, even with NumLock off)
+  let digit: string | null = null
+  if (/^[0-9]$/.test(e.key)) {
+    digit = e.key
+  } else if (/^Numpad[0-9]$/.test(e.code)) {
+    digit = e.code.replace('Numpad', '')
+  }
+
+  if (digit !== null) {
+    e.preventDefault()
+    if (loading.value) return
+    triggerPinKeyFeedback(digit)
+    handleNumpad(digit)
+    return
+  }
+}
+
+function handlePinPaste(e: ClipboardEvent) {
+  if (!selectedStaff.value || device.value?.active_staff || loading.value) return
+  const text = e.clipboardData?.getData('text') || ''
+  const digits = text.replace(/\D/g, '')
+  if (!digits) return
+  e.preventDefault()
+  for (const char of digits.slice(0, 6)) {
+    handleNumpad(char)
+  }
+}
+
 async function lockRegister() {
   loading.value = true
   try {
@@ -193,8 +286,16 @@ function onEscape(e: KeyboardEvent) {
   else if (isPaymentModalOpen.value) closePayment()
   else if (isTransactionsModalOpen.value) isTransactionsModalOpen.value = false
 }
-onMounted(() => window.addEventListener('keydown', onEscape))
-onUnmounted(() => window.removeEventListener('keydown', onEscape))
+onMounted(() => {
+  window.addEventListener('keydown', onEscape)
+  window.addEventListener('keydown', handlePinKeyDown)
+  window.addEventListener('paste', handlePinPaste)
+})
+onUnmounted(() => {
+  window.removeEventListener('keydown', onEscape)
+  window.removeEventListener('keydown', handlePinKeyDown)
+  window.removeEventListener('paste', handlePinPaste)
+})
 
 // -- CONNECTIVITY -----------------------------------------------------------
 const isOnline = ref(true)
@@ -623,6 +724,19 @@ function printZReading() {
   window.print()
 }
 
+async function onTransactionRefunded() {
+  await openTransactions()
+  try {
+    const menuRes = await devicePosService.getMenu()
+    if (menuRes.success) {
+      categories.value = [{ uuid: 'all', name: 'All Items' }, ...menuRes.categories]
+      menuItems.value = menuRes.items
+    }
+  } catch (err) {
+    console.error('Failed to refresh menu after refund', err)
+  }
+}
+
 function printReceipt() {
   // Briefly hide the Z-reading and show the receipt, then print
   const zReading = document.getElementById('z-reading-print')
@@ -754,6 +868,9 @@ function formatCurrency(amount: number) {
             <p class="text-base text-gray-500">
               {{ isChangingPin ? 'Enter new PIN' : 'Enter PIN to unlock' }}
             </p>
+            <p class="text-xs text-gray-400 mt-1">
+              Type on keyboard or use keypad
+            </p>
           </div>
 
           <div v-if="errorMessage" class="mb-4 p-2 bg-red-50 text-red-700 border border-red-200 rounded-md text-sm font-medium text-center">
@@ -771,23 +888,28 @@ function formatCurrency(amount: number) {
           <!-- Numpad -->
           <div class="grid grid-cols-3 gap-2 mb-4">
             <button v-for="n in ['1','2','3','4','5','6','7','8','9']" :key="n" @click="handleNumpad(n)" 
-                    class="bg-white border border-gray-200 rounded-lg h-12 text-xl font-semibold text-gray-800 hover:bg-gray-50 active:bg-gray-200 active:scale-95 transition-all shadow-sm">
+                    class="bg-white border border-gray-200 rounded-lg h-12 text-xl font-semibold text-gray-800 hover:bg-gray-50 active:bg-gray-200 active:scale-95 transition-all shadow-sm select-none"
+                    :class="{ 'ring-2 ring-[#7B5A50] bg-gray-100 scale-95': activePinKey === n }">
               {{ n }}
             </button>
-            <button @click="cancelUnlock" aria-label="Choose a different staff member" class="bg-gray-100 border border-gray-200 rounded-lg h-12 text-sm font-semibold text-gray-600 hover:bg-gray-200 active:scale-95 transition-all">
+            <button @click="cancelUnlock" aria-label="Choose a different staff member" class="bg-gray-100 border border-gray-200 rounded-lg h-12 text-sm font-semibold text-gray-600 hover:bg-gray-200 active:scale-95 transition-all select-none"
+                    :class="{ 'ring-2 ring-gray-400 bg-gray-200 scale-95': activePinKey === 'Escape' }">
               Cancel
             </button>
-            <button @click="handleNumpad('0')" class="bg-white border border-gray-200 rounded-lg h-12 text-xl font-semibold text-gray-800 hover:bg-gray-50 active:bg-gray-200 active:scale-95 transition-all shadow-sm">
+            <button @click="handleNumpad('0')" class="bg-white border border-gray-200 rounded-lg h-12 text-xl font-semibold text-gray-800 hover:bg-gray-50 active:bg-gray-200 active:scale-95 transition-all shadow-sm select-none"
+                    :class="{ 'ring-2 ring-[#7B5A50] bg-gray-100 scale-95': activePinKey === '0' }">
               0
             </button>
-            <button @click="handleBackspace" aria-label="Delete last digit" class="bg-gray-100 border border-gray-200 rounded-lg h-12 flex items-center justify-center text-gray-600 hover:bg-gray-200 active:scale-95 transition-all">
+            <button @click="handleBackspace" aria-label="Delete last digit" class="bg-gray-100 border border-gray-200 rounded-lg h-12 flex items-center justify-center text-gray-600 hover:bg-gray-200 active:scale-95 transition-all select-none"
+                    :class="{ 'ring-2 ring-[#7B5A50] bg-gray-200 scale-95': activePinKey === 'Backspace' }">
               <Icon name="heroicons:backspace" class="w-5 h-5" />
             </button>
           </div>
 
           <button 
             @click="submitPin" 
-            class="w-full bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-lg py-3 text-base transition-colors shadow-sm flex items-center justify-center gap-2"
+            class="w-full bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-lg py-3 text-base transition-all shadow-sm flex items-center justify-center gap-2 select-none"
+            :class="{ 'ring-2 ring-[#533830] bg-[#533830] scale-[0.98]': activePinKey === 'Enter' }"
             :disabled="loading"
           >
             <Icon v-if="loading" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
@@ -1044,6 +1166,7 @@ function formatCurrency(amount: number) {
         @retry="openTransactions"
         @export="exportTransactionsCSV"
         @print="printZReading"
+        @refunded="onTransactionRefunded"
       />
 
       <!-- ── SIZE AND ADD-ON PICKER ───────────────────────────────────────── -->
