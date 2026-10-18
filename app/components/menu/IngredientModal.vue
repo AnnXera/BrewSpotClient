@@ -18,7 +18,10 @@ const emit = defineEmits<{
 
 const menuService = useMenuService()
 
-const form = ref({ name: '', unit: INGREDIENT_UNITS[0] })
+// INGREDIENT_UNITS is a non-empty literal list; the fallback only satisfies strict indexing.
+const DEFAULT_UNIT = INGREDIENT_UNITS[0] ?? ''
+
+const form = ref({ name: '', unit: DEFAULT_UNIT })
 const errors = ref<{ name?: string; unit?: string; general?: string }>({})
 const isSubmitting = ref(false)
 
@@ -41,7 +44,7 @@ watch(() => props.show, (open) => {
   errors.value = {}
   form.value = props.ingredient
     ? { name: props.ingredient.name, unit: props.ingredient.unit }
-    : { name: '', unit: INGREDIENT_UNITS[0] }
+    : { name: '', unit: DEFAULT_UNIT }
 })
 
 function applyServerErrors(error: any) {

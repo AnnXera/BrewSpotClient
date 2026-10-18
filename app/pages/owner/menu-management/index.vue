@@ -79,8 +79,8 @@ async function fetchData() {
       menuService.getMenuItems()
     ])
 
-    const fetchedCats = catsRes.categories?.data || catsRes.categories || []
-    items.value = itemsRes.items?.data || itemsRes.items || []
+    const fetchedCats = (Array.isArray(catsRes.categories) ? catsRes.categories : catsRes.categories?.data || [])
+    items.value = (Array.isArray(itemsRes.items) ? itemsRes.items : itemsRes.items?.data || [])
 
     const hasUncategorizedItems = items.value.some((item: any) => !item.category_uuid)
 

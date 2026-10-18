@@ -3,7 +3,9 @@ import { computed, toRef } from 'vue'
 import AnalyticsPanel from './AnalyticsPanel.vue'
 import AnalyticsBarChart, { type BarPoint } from './AnalyticsBarChart.vue'
 import AnalyticsStatus from './AnalyticsStatus.vue'
+import AnalyticsChange from './AnalyticsChange.vue'
 import type { AnalyticsFilters } from '~/services/OwnerAnalyticsService'
+import { spoilageReasonLabels, type SpoilageReason } from '~/services/PosService'
 import { WEEKDAYS_LONG, WEEKDAYS_SHORT, formatCount, formatPeso, formatPesoCents } from '~/utils/dashboardFormat'
 
 const props = defineProps<{ filters: AnalyticsFilters }>()
@@ -20,10 +22,20 @@ const wasteStats = computed(() => {
     { label: 'Planned', value: formatCount(w.expected) },
     { label: 'Sold', value: formatCount(w.sold) },
     { label: 'Sell-through', value: w.sell_through === null ? '—' : `${w.sell_through}%` },
-    { label: 'Spoiled', value: formatCount(w.spoilage), warn: w.spoilage > 0 },
+    {
+      label: 'Spoiled',
+      value: formatCount(w.spoilage),
+      warn: w.spoilage > 0,
+      change: w.spoilage_change,
+      sub: w.spoilage_rate ? `${w.spoilage_rate}% of planned` : undefined,
+    },
+    { label: 'Spoilage cost', value: formatPeso(w.spoilage_value), warn: w.spoilage_value > 0, sub: 'Size price when logged' },
     { label: 'Sold-out days', value: formatCount(w.sold_out_days) },
   ]
 })
+
+const reasonLabel = (r: SpoilageReason | 'unspecified') => (r === 'unspecified' ? 'No reason given' : spoilageReasonLabels[r] ?? r)
+const reasonMax = computed(() => Math.max(1, ...(data.value?.waste.reasons ?? []).map(r => r.quantity)))
 
 const reservationStats = computed(() => {
   const r = data.value?.reservations
@@ -50,7 +62,11 @@ const weekdayPoints = computed<BarPoint[]>(() =>
   })),
 )
 
-const formatQty = (n: number) => new Intl.NumberFormat('en-PH', { maximumFractionDigits: 2 }).format(n)
+const upcoming = computed(() => data.value?.reservations.upcoming)
+const formatSlot = (iso: string) =>
+  new Intl.DateTimeFormat('en-PH', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(iso))
+
+const formatQty =(n: number) => new Intl.NumberFormat('en-PH', { maximumFractionDigits: 2 }).format(n)
 </script>
 
 <template>
@@ -63,12 +79,12 @@ const formatQty = (n: number) => new Intl.NumberFormat('en-PH', { maximumFractio
       <div v-else-if="data?.staff.length" class="-mx-5 overflow-x-auto sm:-mx-6">
         <table class="w-full min-w-[480px] text-[13px]">
           <thead>
-            <tr class="border-b border-[#EEDFC4] text-[#8B6656]">
-              <th scope="col" class="pb-2.5 pl-5 pr-2 text-left font-medium sm:pl-6">Staff</th>
-              <th scope="col" class="px-2 pb-2.5 text-right font-medium">Orders</th>
-              <th scope="col" class="px-2 pb-2.5 text-right font-medium">Sales</th>
-              <th scope="col" class="px-2 pb-2.5 text-right font-medium">Avg order</th>
-              <th scope="col" class="pb-2.5 pl-2 pr-5 text-right font-medium sm:pr-6">Discounts</th>
+            <tr class="border-y border-[#EDD8CC] bg-[#FFF8EA]">
+              <th scope="col" class="py-4 pl-5 pr-2 text-left whitespace-nowrap font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060] sm:pl-6">Staff</th>
+              <th scope="col" class="px-2 py-4 text-right whitespace-nowrap font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060]">Orders</th>
+              <th scope="col" class="px-2 py-4 text-right whitespace-nowrap font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060]">Sales</th>
+              <th scope="col" class="px-2 py-4 text-right whitespace-nowrap font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060]">Avg order</th>
+              <th scope="col" class="py-4 pl-2 pr-5 text-right whitespace-nowrap font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060] sm:pr-6">Discounts</th>
             </tr>
           </thead>
           <tbody>
@@ -126,37 +142,95 @@ const formatQty = (n: number) => new Intl.NumberFormat('en-PH', { maximumFractio
           />
         </template>
         <p v-else class="mt-5 text-[13px] text-[#8B6656]">No reservations booked for this period.</p>
+
+        <!-- Ahead of today, so it shows whatever period is picked -->
+        <div v-if="upcoming" class="mt-6 border-t border-[#F3E7D2] pt-5">
+          <p class="text-[12px] font-medium text-[#8B6656]">Upcoming, next {{ upcoming.days }} days</p>
+          <template v-if="upcoming.total">
+            <p class="mt-1 text-[13px] text-[#3D2B24]">
+              <span class="font-semibold tabular-nums">{{ formatCount(upcoming.total) }}</span> {{ upcoming.total === 1 ? 'booking' : 'bookings' }},
+              <span class="font-semibold tabular-nums">{{ formatCount(upcoming.guests) }}</span> {{ upcoming.guests === 1 ? 'guest' : 'guests' }}<template v-if="upcoming.pending">,
+                <span class="font-semibold text-[#A2352A]">{{ upcoming.pending }} awaiting confirmation</span></template>
+            </p>
+            <ul class="mt-3 divide-y divide-[#F3E7D2]">
+              <li v-for="r in upcoming.next" :key="r.uuid" class="flex items-baseline justify-between gap-3 py-2 text-[13px] first:pt-0 last:pb-0">
+                <span class="min-w-0">
+                  <span class="block font-semibold tabular-nums text-[#3D2B24]">{{ formatSlot(r.date) }}</span>
+                  <span class="block truncate text-[12px] text-[#9E7060]">{{ r.table }} · {{ r.branch }}</span>
+                </span>
+                <span class="shrink-0 text-right">
+                  <span class="block tabular-nums text-[#3D2B24]">{{ r.party_size }} {{ r.party_size === 1 ? 'guest' : 'guests' }}</span>
+                  <span class="block text-[11px]" :class="r.status === 'pending' ? 'text-[#A2352A]' : 'text-[#9E7060]'">{{ statusLabel[r.status] }}</span>
+                </span>
+              </li>
+            </ul>
+          </template>
+          <p v-else class="mt-1 text-[13px] text-[#8B6656]">No bookings coming up.</p>
+        </div>
       </template>
     </AnalyticsPanel>
 
     <!-- Waste -->
-    <AnalyticsPanel class="xl:col-span-7" title="Waste and sell-outs" note="Daily servings planned vs sold, from the servings log">
+    <AnalyticsPanel class="xl:col-span-7" title="Waste and sell-outs" note="Daily servings planned vs sold, and spoilage logged on the registers">
       <div v-if="loading" class="space-y-3"><span class="skeleton block h-14 rounded" /><span v-for="i in 4" :key="i" class="skeleton block h-8 rounded" /></div>
       <template v-else-if="data?.waste.summary.expected">
-        <dl class="grid grid-cols-3 gap-x-4 gap-y-4 sm:grid-cols-5">
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3">
           <div v-for="s in wasteStats" :key="s.label">
             <dt class="text-[12px] text-[#8B6656]">{{ s.label }}</dt>
-            <dd class="mt-0.5 font-display text-xl font-semibold tabular-nums" :class="s.warn ? 'text-[#A2352A]' : 'text-[#3B1F0E]'">{{ s.value }}</dd>
+            <dd class="mt-0.5 flex flex-wrap items-center gap-2">
+              <span class="font-display text-xl font-semibold tabular-nums" :class="s.warn ? 'text-[#A2352A]' : 'text-[#3B1F0E]'">{{ s.value }}</span>
+              <AnalyticsChange v-if="'change' in s" :value="s.change ?? null" invert size="xs" />
+            </dd>
+            <dd v-if="s.sub" class="text-[11px] text-[#9E7060]">{{ s.sub }}</dd>
           </div>
         </dl>
+
+        <!-- Why servings were thrown away, from the entries logged on the registers -->
+        <div v-if="data.waste.summary.spoilage" class="mt-6">
+          <p class="mb-3 text-[12px] font-medium text-[#8B6656]">Why servings were spoiled</p>
+          <ul class="space-y-2">
+            <li v-for="r in data.waste.reasons" :key="r.reason" class="grid grid-cols-[112px_1fr_auto] items-center gap-3 text-[12px] sm:grid-cols-[132px_1fr_72px]">
+              <span :class="r.reason === 'unspecified' ? 'italic text-[#9E7060]' : 'text-[#5C4037]'">{{ reasonLabel(r.reason) }}</span>
+              <span class="h-2 overflow-hidden rounded-full bg-[#F3E7D2]">
+                <span
+                  class="block h-full rounded-full"
+                  :class="r.reason === 'unspecified' ? 'bg-[#D9C3B5]' : 'bg-[#C9786A]'"
+                  :style="{ width: `${(r.quantity / reasonMax) * 100}%` }"
+                />
+              </span>
+              <span class="text-right tabular-nums text-[#3D2B24]"><span class="font-semibold">{{ formatCount(r.quantity) }}</span> <span class="text-[#9E7060]">· {{ r.share }}%</span></span>
+            </li>
+          </ul>
+          <p v-if="data.waste.voided.entries" class="mt-3 text-[12px] text-[#8B6656]">
+            {{ data.waste.voided.entries }} {{ data.waste.voided.entries === 1 ? 'entry' : 'entries' }}
+            ({{ formatCount(data.waste.voided.quantity) }} {{ data.waste.voided.quantity === 1 ? 'serving' : 'servings' }})
+            voided by managers as mistakes, not counted.
+          </p>
+        </div>
         <div class="-mx-5 mt-6 overflow-x-auto sm:-mx-6">
           <table class="w-full min-w-[440px] text-[13px]">
             <thead>
-              <tr class="border-b border-[#EEDFC4] text-[#8B6656]">
-                <th scope="col" class="pb-2.5 pl-5 pr-2 text-left font-medium sm:pl-6">Item</th>
-                <th scope="col" class="px-2 pb-2.5 text-right font-medium">Sold / planned</th>
-                <th scope="col" class="px-2 pb-2.5 text-right font-medium">Spoiled</th>
-                <th scope="col" class="pb-2.5 pl-2 pr-5 text-right font-medium sm:pr-6">Sold out</th>
+              <tr class="border-y border-[#EDD8CC] bg-[#FFF8EA]">
+                <th scope="col" class="py-4 pl-5 pr-2 text-left whitespace-nowrap font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060] sm:pl-6">Item</th>
+                <th scope="col" class="px-2 py-4 text-right whitespace-nowrap font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060]">Sold / planned</th>
+                <th scope="col" class="px-2 py-4 text-right whitespace-nowrap font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060]">Spoiled</th>
+                <th scope="col" class="py-4 pl-2 pr-5 text-right whitespace-nowrap font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060] sm:pr-6">Sold out</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="w in data.waste.items" :key="w.uuid" class="border-b border-[#F3E7D2] last:border-0">
-                <td class="py-2.5 pl-5 pr-2 font-semibold text-[#3D2B24] sm:pl-6">{{ w.name }}</td>
+                <td class="py-2.5 pl-5 pr-2 font-semibold text-[#3D2B24] sm:pl-6">
+                  {{ w.name }}
+                  <span v-if="w.removed" class="ml-1 inline-block rounded-full bg-[#F3E7D2] px-2 py-0.5 align-middle text-[10px] font-semibold text-[#8B6656]" title="Deleted from the menu since">Removed</span>
+                </td>
                 <td class="px-2 py-2.5 text-right tabular-nums text-[#3D2B24]">
                   {{ formatCount(w.sold) }} / {{ formatCount(w.expected) }}
                   <span v-if="w.sell_through !== null" class="block text-[11px] text-[#9E7060]">{{ w.sell_through }}%</span>
                 </td>
-                <td class="px-2 py-2.5 text-right tabular-nums" :class="w.spoilage ? 'font-semibold text-[#A2352A]' : 'text-[#9E7060]'">{{ formatCount(w.spoilage) }}</td>
+                <td class="px-2 py-2.5 text-right tabular-nums" :class="w.spoilage ? 'font-semibold text-[#A2352A]' : 'text-[#9E7060]'">
+                  {{ formatCount(w.spoilage) }}
+                  <span v-if="w.spoilage_value" class="block text-[11px] font-normal text-[#9E7060]">{{ formatPeso(w.spoilage_value) }}</span>
+                </td>
                 <td class="py-2.5 pl-2 pr-5 text-right tabular-nums text-[#3D2B24] sm:pr-6">
                   {{ w.sold_out_days ? `${w.sold_out_days} of ${w.days} days` : '—' }}
                 </td>

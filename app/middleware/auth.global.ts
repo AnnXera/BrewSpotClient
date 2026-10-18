@@ -1,6 +1,6 @@
 //auth.global.ts
 import { useAuthStore } from "~/stores/auth"
-import { getRedirectForRole } from "~/utils/roleRedirects"
+import { getRedirectForRole, getSafeRedirect } from "~/utils/roleRedirects"
 
 export default defineNuxtRouteMiddleware((to) => {
     const token = useCookie<string | null>('auth_token')
@@ -36,13 +36,14 @@ export default defineNuxtRouteMiddleware((to) => {
 
     // 3. Protect authenticated routes for unauthenticated users
     if (!token.value && !isPublic && !isPosRegister) {
-        return navigateTo('/login', { replace: true })
+        // Remember where they were going so login can bring them back (e.g. /pos/setup)
+        return navigateTo({ path: '/login', query: { redirect: to.fullPath } }, { replace: true })
     }
 
     // 4. Redirect logged-in users trying to access auth pages (login/register) back to their dashboard
     const authPagesOnly = ['/login', '/verify-login-code', '/register', '/setup-password']
     if (token.value && authStore.role && authPagesOnly.some((p) => to.path === p || to.path.startsWith(p + '/'))) {
-        return navigateTo(getRedirectForRole(authStore.role), { replace: true })
+        return navigateTo(getSafeRedirect(to.query.redirect) ?? getRedirectForRole(authStore.role), { replace: true })
     }
 
     // 5. Role permissions check

@@ -12,11 +12,11 @@ export function parseQuantity(value: string | number): number {
   // Handle mixed fractions like "1 1/2"
   if (str.includes(' ') && str.includes('/')) {
     const parts = str.split(' ');
-    const whole = parseFloat(parts[0]) || 0;
-    const fractionParts = parts[1].split('/');
+    const whole = parseFloat(parts[0] ?? '') || 0;
+    const fractionParts = (parts[1] ?? '').split('/');
     if (fractionParts.length === 2) {
-      const num = parseFloat(fractionParts[0]) || 0;
-      const den = parseFloat(fractionParts[1]) || 1;
+      const num = parseFloat(fractionParts[0] ?? '') || 0;
+      const den = parseFloat(fractionParts[1] ?? '') || 1;
       return whole + (num / den);
     }
   }
@@ -25,8 +25,8 @@ export function parseQuantity(value: string | number): number {
   if (str.includes('/')) {
     const parts = str.split('/');
     if (parts.length === 2) {
-      const num = parseFloat(parts[0]) || 0;
-      const den = parseFloat(parts[1]) || 1;
+      const num = parseFloat(parts[0] ?? '') || 0;
+      const den = parseFloat(parts[1] ?? '') || 1;
       return num / den;
     }
   }

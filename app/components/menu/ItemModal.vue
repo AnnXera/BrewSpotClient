@@ -59,7 +59,7 @@ const form = ref({
 })
 
 function emptyRow(sizeKey: string | null = null): RecipeRow {
-  return { ingredient_uuid: null, ingredient_name: '', quantity_display: '', unit: INGREDIENT_UNITS[0], size_key: sizeKey }
+  return { ingredient_uuid: null, ingredient_name: '', quantity_display: '', unit: INGREDIENT_UNITS[0] ?? '', size_key: sizeKey }
 }
 
 // The cafe's ingredient list, loaded each time the modal opens.
@@ -107,7 +107,9 @@ const scopesClash = (a: string, b: string) => a === ALL_SIZES || b === ALL_SIZES
 // "All sizes", and picking Espresso there should still be possible so it can be
 // set for Large next (onPick moves it to a size without it).
 function usedNamesExcept(index: number) {
-  const scope = scopeOf(form.value.recipes[index])
+  const row = form.value.recipes[index]
+  if (!row) return []
+  const scope = scopeOf(row)
   return form.value.recipes
     .filter((r, i) => i !== index && r.ingredient_name.trim() && scopeOf(r) === scope)
     .map(r => normalizeName(r.ingredient_name))
@@ -174,6 +176,7 @@ const triedSave = ref(false)
 // Adds the ingredient for a size it's missing, right after its last row.
 async function addMissingSize(index: number, sizeKey: string) {
   const source = form.value.recipes[index]
+  if (!source) return
   const key = normalizeName(source.ingredient_name)
   const last = form.value.recipes.reduce((at, r, i) => normalizeName(r.ingredient_name) === key ? i : at, index)
 
@@ -207,6 +210,7 @@ function addSize() {
 // The size's own ingredient amounts go with it.
 function removeSize(index: number) {
   const [removed] = form.value.sizes.splice(index, 1)
+  if (!removed) return
   form.value.recipes = form.value.recipes.filter(r => r.size_key !== removed.key)
   if (form.value.recipes.length === 0) form.value.recipes.push(emptyRow())
   sizeErrors.value = {}
@@ -392,9 +396,10 @@ const triggerFileInput = () => {
 
 const onFileChange = (e: Event) => {
   const target = e.target as HTMLInputElement
-  if (target.files && target.files.length > 0) {
-    pictureFile.value = target.files[0]
-    picturePreview.value = URL.createObjectURL(pictureFile.value)
+  const file = target.files?.[0]
+  if (file) {
+    pictureFile.value = file
+    picturePreview.value = URL.createObjectURL(file)
   }
 }
 
@@ -526,22 +531,24 @@ const saveItem = async () => {
     let shownInForm = false
 
     for (const [field, messages] of Object.entries(serverErrors ?? {})) {
+      const message = messages[0]
+      if (message === undefined) continue
       const recipe = field.match(/^recipes\.(\d+)\./)
       const size = field.match(/^sizes\.(\d+)\.(name|price)$/)
       if (recipe) {
-        rowMessages[Number(recipe[1])] ??= messages[0]
+        rowMessages[Number(recipe[1])] ??= message
       } else if (size) {
         const i = Number(size[1])
-        sizeErrors.value[i] = { ...sizeErrors.value[i], [size[2] as 'name' | 'price']: messages[0] }
+        sizeErrors.value[i] = { ...sizeErrors.value[i], [size[2] as 'name' | 'price']: message }
         shownInForm = true
       } else if (field === 'sizes') {
-        sizesError.value = messages[0]
+        sizesError.value = message
         shownInForm = true
       } else if (field === 'base_price') {
-        errors.value.base_price = messages[0]
+        errors.value.base_price = message
         shownInForm = true
       } else if (field === 'addon_uuids') {
-        showAlert('Save Failed', messages[0])
+        showAlert('Save Failed', message)
         loadAddons()
         return
       }

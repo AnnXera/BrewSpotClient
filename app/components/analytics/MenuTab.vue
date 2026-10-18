@@ -88,19 +88,19 @@ const SIZE_TONES = ['#5A3A2C', '#8E6253', '#B98A70', '#D9B597', '#EBD6C1']
           <div class="-mx-5 overflow-x-auto sm:-mx-6">
             <table class="w-full min-w-[460px] text-[13px]">
               <thead>
-                <tr class="border-b border-[#EEDFC4]">
+                <tr class="border-y border-[#EDD8CC] bg-[#FFF8EA]">
                   <th
                     v-for="c in columns"
                     :key="c.key"
                     scope="col"
                     :aria-sort="ariaSort(c.key)"
-                    class="whitespace-nowrap px-2 pb-2.5 font-medium text-[#8B6656] first:pl-5 last:pr-5 sm:first:pl-6 sm:last:pr-6"
+                    class="whitespace-nowrap px-2 py-4 font-sans text-[11px] font-bold uppercase tracking-[0.08px] text-[#9E7060] first:pl-5 last:pr-5 sm:first:pl-6 sm:last:pr-6"
                     :class="c.class"
                   >
                     <button
                       type="button"
-                      class="inline-flex items-center gap-1 rounded hover:text-[#3B1F0E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
-                      :class="sortKey === c.key ? 'text-[#3B1F0E]' : ''"
+                      class="inline-flex items-center gap-1 rounded uppercase hover:text-[#7D5A50] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+                      :class="sortKey === c.key ? 'text-[#7D5A50]' : ''"
                       @click="sortBy(c.key)"
                     >
                       {{ c.label }}

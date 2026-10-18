@@ -1,5 +1,6 @@
 //app/services/OwnerAnalyticsService.ts
 import { BaseService } from './BaseService'
+import type { SpoilageReason } from './PosService'
 
 // Owner Analytics page: one call per tab. Dates are Y-m-d and inclusive;
 // no branch means every branch combined.
@@ -88,8 +89,20 @@ export interface AnalyticsOperations {
     filters: AnalyticsFiltersOut
     staff: { uuid: string | null; name: string; position: string | null; branch: string | null; orders: number; revenue: number; avg_order_value: number; discounts: number }[]
     waste: {
-        summary: { expected: number; sold: number; spoilage: number; sell_through: number | null; spoilage_rate: number | null; sold_out_days: number }
-        items: { uuid: string; name: string; expected: number; sold: number; spoilage: number; sold_out_days: number; days: number; sell_through: number | null }[]
+        summary: {
+            expected: number
+            sold: number
+            spoilage: number
+            spoilage_value: number // pesos at each entry's size price when logged; base price for older spoilage
+            spoilage_change: number | null // % vs the previous period, null when it had none
+            sell_through: number | null
+            spoilage_rate: number | null
+            sold_out_days: number
+        }
+        // Adds up to summary.spoilage; 'unspecified' covers entries without a reason.
+        reasons: { reason: SpoilageReason | 'unspecified'; quantity: number; share: number }[]
+        voided: { entries: number; quantity: number } // logged by mistake and voided, not counted
+        items: { uuid: string; name: string; removed: boolean; expected: number; sold: number; spoilage: number; spoilage_value: number; sold_out_days: number; days: number; sell_through: number | null }[]
     }
     ingredients: { name: string; unit: string; quantity: number; items: number }[]
     reservations: {
@@ -100,6 +113,14 @@ export interface AnalyticsOperations {
         no_show_rate: number | null
         cancel_rate: number | null
         by_weekday: { weekday: number; count: number }[]
+        // Pending and confirmed bookings from now on; ignores the period, which always ends today.
+        upcoming: {
+            days: number
+            total: number
+            guests: number
+            pending: number
+            next: { uuid: string; date: string; party_size: number; status: 'pending' | 'confirmed'; table: string; branch: string }[]
+        }
     }
 }
 

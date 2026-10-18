@@ -61,10 +61,10 @@ async function fetchData() {
       menuService.getMenuCategories()
     ])
     
-    items.value = res.items?.data || res.items || []
-    allCafeItems.value = allItemsRes.items?.data || allItemsRes.items || []
+    items.value = (Array.isArray(res.items) ? res.items : res.items?.data || [])
+    allCafeItems.value = (Array.isArray(allItemsRes.items) ? allItemsRes.items : allItemsRes.items?.data || [])
     
-    const allCats = catRes.categories?.data || catRes.categories || []
+    const allCats = (Array.isArray(catRes.categories) ? catRes.categories : catRes.categories?.data || [])
     categories.value = allCats
     
     if (currentCategoryUuid.value === 'uncategorized') {

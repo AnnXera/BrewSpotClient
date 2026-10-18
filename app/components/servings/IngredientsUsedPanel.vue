@@ -97,8 +97,8 @@ watch(() => props.ingredients, () => {
           <Icon name="heroicons:scale" class="w-4 h-4" />
         </div>
         <div>
-          <h2 class="font-display font-bold text-[18px] text-[#3B1F0E] leading-tight">Ingredients Used</h2>
-          <p class="text-[12px] text-[#8B6656]">Tracked ingredient usage for today</p>
+          <h2 class="font-display font-bold text-[18px] text-[#3B1F0E] leading-tight">Ingredients Used in Sales</h2>
+          <p class="text-[12px] text-[#8B6656]">From each sold item's recipe. Spoiled servings are not included.</p>
         </div>
       </div>
       <span class="rounded-full bg-[#FDF3E7] border border-[#E3CFB4] px-2.5 py-0.5 text-xs font-semibold text-[#7D5A50] tabular-nums">
@@ -133,7 +133,7 @@ watch(() => props.ingredients, () => {
         <div class="size-12 rounded-full bg-[#FDF3E7] border border-[#E3CFB4] flex items-center justify-center text-[#9E7060] mb-2">
           <Icon name="heroicons:scale" class="w-6 h-6" />
         </div>
-        <p class="font-display font-medium text-[14px] text-[#3B1F0E]">No ingredients used yet today</p>
+        <p class="font-display font-medium text-[14px] text-[#3B1F0E]">No sales yet today, so no ingredients used.</p>
         <p class="text-[12px] text-[#8B6656] mt-0.5">Ingredients will appear here as orders are prepared.</p>
       </div>
 

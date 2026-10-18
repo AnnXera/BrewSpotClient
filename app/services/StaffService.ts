@@ -15,6 +15,11 @@ export interface StaffScheduleDay {
     end_time: string | null
 }
 
+export interface StaffActor {
+    name: string
+    role: string | null // 'Cafe Owner' | 'Manager'
+}
+
 export interface StaffMember {
     uuid: string
     firstname: string
@@ -36,6 +41,9 @@ export interface StaffMember {
         employment_status: EmploymentStatus
         hired_at: string | null
         terminated_at: string | null
+        // Owner or manager who did it; null for records from before this was tracked.
+        hired_by: StaffActor | null
+        terminated_by: StaffActor | null
     } | null
     other_branches: { uuid: string | null; branch_name: string | null }[]
     schedule: StaffScheduleDay[]

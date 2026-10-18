@@ -14,6 +14,7 @@ import type {
   ServingCategorySummary,
   ServingLogEntry,
 } from '~/services/ServingService'
+import { spoilageItemLabel, type SpoilageLog } from '~/services/PosService'
 
 definePageMeta({
   role: 'Manager',
@@ -21,7 +22,9 @@ definePageMeta({
 
 const links = [
   { label: 'Dashboard', to: '/manager/dashboard', icon: 'squares-2x2' },
+  { label: 'Cafe Management', to: '/manager/cafe', icon: 'building-storefront' },
   { label: 'Servings', to: '/manager/servings', icon: 'cake' },
+  { label: 'Reservations', to: '/manager/reservations', icon: 'calendar-days' },
   { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
 ]
 
@@ -61,6 +64,12 @@ const ingredients = ref<IngredientUsage[]>([])
 
 // Serving log
 const log = ref<ServingLogEntry[]>([])
+
+// Spoilage (logged on the registers; voided here)
+const spoilage = ref<SpoilageLog[]>([])
+const spoilageTotal = ref(0)
+const voidTarget = ref<SpoilageLog | null>(null)
+const voidingUuid = ref<string | null>(null)
 
 const loading = ref(true)
 const errorMessage = ref('')
@@ -103,12 +112,34 @@ async function loadLog() {
   log.value = res.log.data
 }
 
+async function loadSpoilage() {
+  const res = await service.spoilage(branchUuid.value)
+  spoilage.value = res.logs
+  spoilageTotal.value = res.total
+}
+
+async function confirmVoid() {
+  const entry = voidTarget.value
+  voidTarget.value = null
+  if (!entry) return
+  voidingUuid.value = entry.uuid
+  errorMessage.value = ''
+  try {
+    await service.voidSpoilage(branchUuid.value, entry.uuid)
+    // Remaining servings on the category cards change with it.
+    await Promise.all([loadSpoilage(), loadCategories()])
+  } catch (e: any) {
+    failure(e, 'Could not void the spoilage entry.')
+  } finally {
+    voidingUuid.value = null
+  }
+}
+
 async function loadAll() {
   if (!branchUuid.value) return
   errorMessage.value = ''
   try {
-    await Promise.all([loadCategories(), loadIngredients(), loadLog()])
-    refreshKey.value++
+    await Promise.all([loadCategories(), loadIngredients(), loadLog(), loadSpoilage()])
   } catch (e: any) {
     failure(e, 'Could not load servings.')
   }
@@ -316,19 +347,34 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-          <!-- Lower Panels: Ingredients Used & Serving Log with Scroll Reveal -->
-          <div class="scroll-reveal grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <ServingsIngredientsUsedPanel
-              v-model:search="ingredientSearch"
-              v-model:sort="ingredientSort"
-              :ingredients="ingredients"
-              :loading="loading"
-              :refresh-trigger="refreshKey"
-            />
-            <ServingsServingLogPanel :entries="log" :loading="loading" />
-          </div>
-        </template>
-      </div>
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          <ServingsIngredientsUsedPanel
+            v-model:search="ingredientSearch"
+            v-model:sort="ingredientSort"
+            :ingredients="ingredients"
+            :loading="loading"
+          />
+          <ServingsServingLogPanel :entries="log" :loading="loading" />
+        </div>
+
+        <ServingsSpoilagePanel
+          :entries="spoilage"
+          :total="spoilageTotal"
+          :loading="loading"
+          :voiding-uuid="voidingUuid"
+          @void="voidTarget = $event"
+        />
+      </template>
+
+      <CommonConfirmModal
+        :show="!!voidTarget"
+        title="Void this spoilage entry?"
+        :message="voidTarget ? `${voidTarget.quantity} ${spoilageItemLabel(voidTarget)} logged by ${voidTarget.logged_by ?? 'staff'} will go back into today's servings. The entry stays in the list as voided.` : ''"
+        confirm-text="Void entry"
+        is-destructive
+        @close="voidTarget = null"
+        @confirm="confirmVoid"
+      />
     </main>
   </div>
 </template>

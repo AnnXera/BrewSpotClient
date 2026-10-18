@@ -1,5 +1,5 @@
 <!-- app/components/employees/FormModal.vue -->
-<!-- Add / Edit Employee modal (owner side). Pass `employee` to edit an existing person. -->
+<!-- Add / Edit Employee modal (owner and manager side). Pass `employee` to edit an existing person. -->
 <script setup lang="ts">
 import type {
   CreateStaffPayload,
@@ -16,6 +16,8 @@ const props = defineProps<{
   branchUuid: string
   // When set, the form edits this person instead of adding a new one.
   employee?: StaffMember | null
+  // 'manager': only Cashier / Staff can be added, and the position can't be changed (server enforces both).
+  scope?: 'owner' | 'manager'
 }>()
 
 const emit = defineEmits<{
@@ -23,7 +25,8 @@ const emit = defineEmits<{
   saved: [result: { message: string; warnings: string[]; staff?: StaffMember }]
 }>()
 
-const staffService = useStaffService('owner')
+const isManager = computed(() => props.scope === 'manager')
+const staffService = useStaffService(props.scope ?? 'owner')
 
 const isEdit = computed(() => !!props.employee)
 
@@ -52,7 +55,10 @@ const positionOptions: { value: StaffRole; label: string; hint: string }[] = [
   },
 ]
 // The hints are full sentences shown under the field, not in the list.
-const positionSelectOptions = positionOptions.map(({ value, label }) => ({ value, label }))
+// Managers adding someone only get Cashier / Staff; when editing, the current role stays listed so it still shows.
+const positionSelectOptions = computed(() => positionOptions
+  .filter(o => !isManager.value || o.value !== 'Manager' || (isEdit.value && props.employee?.role === 'Manager'))
+  .map(({ value, label }) => ({ value, label })))
 
 function defaultSchedule(): StaffScheduleInput[] {
   // Sunday (0) and Saturday (6) off; weekdays 9–5.
@@ -486,8 +492,10 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
                   icon="heroicons:user-circle"
                   size="sm"
                   :invalid="!!errors.role"
+                  :disabled="isManager && isEdit"
                 />
                 <span v-if="errors.role" class="font-sans text-xs text-red-600">{{ errors.role }}</span>
+                <span v-else-if="isManager && isEdit" class="font-sans text-xs text-[#9E7060]">Only the owner can change an employee's position.</span>
               </div>
 
               <!-- Hired At -->

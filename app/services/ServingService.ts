@@ -2,6 +2,8 @@
 import type { $Fetch } from 'nitropack'
 import { BaseService } from './BaseService'
 import type { Paginated } from './OwnerManagementService'
+import type { BranchDetail } from './OwnerProfileService'
+import type { SpoilageList, SpoilageLog } from './PosService'
 
 export type ServingCategorySort = 'name' | 'remaining_desc' | 'remaining_asc'
 export type IngredientUsageSort = 'name' | 'quantity_desc' | 'quantity_asc'
@@ -96,6 +98,11 @@ export class ServingService extends BaseService {
         return this.get<{ success: boolean; branches: ManagedBranch[] }>('/manager/branches')
     }
 
+    // Cafe Management details of one assigned branch (manager only).
+    managedBranch(branchUuid: string) {
+        return this.get<{ success: boolean; message?: string; branch?: BranchDetail }>(`/manager/branches/${branchUuid}`)
+    }
+
     categories(branchUuid: string, params: ServingListParams = {}) {
         return this.get<{ success: boolean; date: string; categories: Paginated<ServingCategorySummary> }>(
             `${this.base(branchUuid)}/categories`, this.clean(params))
@@ -125,5 +132,15 @@ export class ServingService extends BaseService {
     log(branchUuid: string, params: ServingListParams = {}) {
         return this.get<{ success: boolean; date: string; log: Paginated<ServingLogEntry> }>(
             `${this.base(branchUuid)}/log`, this.clean(params))
+    }
+
+    // Today's spoilage entries (logged on the registers), voided ones included.
+    spoilage(branchUuid: string) {
+        return this.get<SpoilageList>(`${this.base(branchUuid)}/spoilage`)
+    }
+
+    voidSpoilage(branchUuid: string, logUuid: string) {
+        return this.post<{ success: boolean; message: string; log: SpoilageLog }>(
+            `${this.base(branchUuid)}/spoilage/${logUuid}/void`)
     }
 }
