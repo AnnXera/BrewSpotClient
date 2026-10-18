@@ -113,6 +113,14 @@ export interface AnalyticsOperations {
         no_show_rate: number | null
         cancel_rate: number | null
         by_weekday: { weekday: number; count: number }[]
+        // Pending and confirmed bookings from now on; ignores the period, which always ends today.
+        upcoming: {
+            days: number
+            total: number
+            guests: number
+            pending: number
+            next: { uuid: string; date: string; party_size: number; status: 'pending' | 'confirmed'; table: string; branch: string }[]
+        }
     }
 }
 

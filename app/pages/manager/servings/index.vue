@@ -20,8 +20,8 @@ const links = [
   { label: 'Dashboard', to: '/manager/dashboard', icon: 'squares-2x2' },
   { label: 'Cafe Management', to: '/manager/cafe', icon: 'building-storefront' },
   { label: 'Servings', to: '/manager/servings', icon: 'cake' },
-  { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
   { label: 'Reservations', to: '/manager/reservations', icon: 'calendar-days' },
+  { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
 ]
 
 // Opens the category's items; the branch rides along since a manager can have several.

@@ -62,7 +62,11 @@ const weekdayPoints = computed<BarPoint[]>(() =>
   })),
 )
 
-const formatQty = (n: number) => new Intl.NumberFormat('en-PH', { maximumFractionDigits: 2 }).format(n)
+const upcoming = computed(() => data.value?.reservations.upcoming)
+const formatSlot = (iso: string) =>
+  new Intl.DateTimeFormat('en-PH', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(iso))
+
+const formatQty =(n: number) => new Intl.NumberFormat('en-PH', { maximumFractionDigits: 2 }).format(n)
 </script>
 
 <template>
@@ -138,6 +142,31 @@ const formatQty = (n: number) => new Intl.NumberFormat('en-PH', { maximumFractio
           />
         </template>
         <p v-else class="mt-5 text-[13px] text-[#8B6656]">No reservations booked for this period.</p>
+
+        <!-- Ahead of today, so it shows whatever period is picked -->
+        <div v-if="upcoming" class="mt-6 border-t border-[#F3E7D2] pt-5">
+          <p class="text-[12px] font-medium text-[#8B6656]">Upcoming, next {{ upcoming.days }} days</p>
+          <template v-if="upcoming.total">
+            <p class="mt-1 text-[13px] text-[#3D2B24]">
+              <span class="font-semibold tabular-nums">{{ formatCount(upcoming.total) }}</span> {{ upcoming.total === 1 ? 'booking' : 'bookings' }},
+              <span class="font-semibold tabular-nums">{{ formatCount(upcoming.guests) }}</span> {{ upcoming.guests === 1 ? 'guest' : 'guests' }}<template v-if="upcoming.pending">,
+                <span class="font-semibold text-[#A2352A]">{{ upcoming.pending }} awaiting confirmation</span></template>
+            </p>
+            <ul class="mt-3 divide-y divide-[#F3E7D2]">
+              <li v-for="r in upcoming.next" :key="r.uuid" class="flex items-baseline justify-between gap-3 py-2 text-[13px] first:pt-0 last:pb-0">
+                <span class="min-w-0">
+                  <span class="block font-semibold tabular-nums text-[#3D2B24]">{{ formatSlot(r.date) }}</span>
+                  <span class="block truncate text-[12px] text-[#9E7060]">{{ r.table }} · {{ r.branch }}</span>
+                </span>
+                <span class="shrink-0 text-right">
+                  <span class="block tabular-nums text-[#3D2B24]">{{ r.party_size }} {{ r.party_size === 1 ? 'guest' : 'guests' }}</span>
+                  <span class="block text-[11px]" :class="r.status === 'pending' ? 'text-[#A2352A]' : 'text-[#9E7060]'">{{ statusLabel[r.status] }}</span>
+                </span>
+              </li>
+            </ul>
+          </template>
+          <p v-else class="mt-1 text-[13px] text-[#8B6656]">No bookings coming up.</p>
+        </div>
       </template>
     </AnalyticsPanel>
 

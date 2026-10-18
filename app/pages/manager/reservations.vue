@@ -2,7 +2,7 @@
 import type { FloorPlan, FloorPlanElement, FloorPlanTable } from '~/services/FloorPlanService'
 import type { ReservationRecord } from '~/services/ReservationService'
 import type { OpeningHour, ReservationStatus } from '~/services/ReservationService'
-import { doorAsset, tableAsset } from '~/utils/floorPlanCatalog'
+import { FLOOR_TAB_LIMIT, doorAsset, tableAsset } from '~/utils/floorPlanCatalog'
 
 definePageMeta({
   role: 'Manager',
@@ -12,8 +12,8 @@ const links = [
   { label: 'Dashboard', to: '/manager/dashboard', icon: 'squares-2x2' },
   { label: 'Cafe Management', to: '/manager/cafe', icon: 'building-storefront' },
   { label: 'Servings', to: '/manager/servings', icon: 'cake' },
-  { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
   { label: 'Reservations', to: '/manager/reservations', icon: 'calendar-days' },
+  { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
 ]
 
 // Statuses that hold a table for their window (mirrors floor_plan.blocking_reservation_statuses).
@@ -817,7 +817,8 @@ onBeforeUnmount(() => {
           <!-- Floor plan -->
           <section class="rounded-2xl border border-[#E8D7C7] bg-white p-4 md:p-5" aria-label="Floor plan">
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <div v-if="plans.length > 1" class="flex w-full gap-1 overflow-x-auto rounded-lg bg-[#F8EFE7] p-1 sm:w-auto" role="group" aria-label="Floor plan area">
+              <FloorPlanSwitcher v-if="plans.length > FLOOR_TAB_LIMIT" :plans="plans" :current-uuid="activePlan?.uuid" @select="switchPlan" />
+              <div v-else-if="plans.length > 1" class="flex w-full gap-1 overflow-x-auto rounded-lg bg-[#F8EFE7] p-1 sm:w-auto" role="group" aria-label="Floor plan area">
                 <button
                   v-for="plan in plans"
                   :key="plan.uuid"

@@ -13,6 +13,7 @@ import type { DialogItem } from '~/composables/useFloorPlanDialog'
 import {
   DOOR_ASSETS,
   DRAWN,
+  FLOOR_TAB_LIMIT,
   doorAsset,
   tableAsset,
   assetFor,
@@ -28,8 +29,8 @@ const links = [
   { label: 'Dashboard', to: '/manager/dashboard', icon: 'squares-2x2' },
   { label: 'Cafe Management', to: '/manager/cafe', icon: 'building-storefront' },
   { label: 'Servings', to: '/manager/servings', icon: 'cake' },
-  { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
   { label: 'Reservations', to: '/manager/reservations', icon: 'calendar-days' },
+  { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
 ]
 
 const DEFAULT_CANVAS = { width: 760, height: 640 }
@@ -51,9 +52,7 @@ function showAlert(title: string, message: string) {
   })
 }
 
-// Up to this many floors show as tabs (one click, like the design); more become a dropdown.
-const TAB_LIMIT = 3
-const manyFloors = computed(() => plans.value.length > TAB_LIMIT)
+const manyFloors = computed(() => plans.value.length > FLOOR_TAB_LIMIT)
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 

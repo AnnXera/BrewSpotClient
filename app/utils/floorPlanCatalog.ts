@@ -70,6 +70,9 @@ export const DOOR_ASSETS = [
   { key: 'door_double', name: 'Double door', note: 'Double swing', src: doorDouble, w: 122, h: 64 },
 ]
 
+// Up to this many floors show as tabs (one click); more become the FloorPlanSwitcher dropdown.
+export const FLOOR_TAB_LIMIT = 3
+
 export const tableAsset = (key: string | null | undefined) => TABLE_ASSETS.find((a) => a.key === key)
 export const doorAsset = (key: string | null | undefined) => DOOR_ASSETS.find((a) => a.key === key)
 
