@@ -20,6 +20,15 @@ export interface ReservationRecord {
   notes?: string | null
 }
 
+export interface OpeningHour {
+  day_of_week: string
+  is_closed: boolean
+  is_24_hours: boolean
+  open_time: string | null
+  close_time: string | null
+  closes_after_midnight: boolean
+}
+
 export type ReservationStatus = 'pending' | 'confirmed' | 'seated' | 'completed' | 'cancelled' | 'no_show'
 
 export class ReservationService extends BaseService {
@@ -36,6 +45,10 @@ export class ReservationService extends BaseService {
       `${this.base(branchUuid)}/reservations`,
       date ? { date, per_page: 100 } : { per_page: 100 },
     )
+  }
+
+  openingHours(branchUuid: string) {
+    return this.get<{ success: boolean; data: OpeningHour[] }>(`${this.base(branchUuid)}/opening-hours`)
   }
 
   create(branchUuid: string, data: {
