@@ -1,5 +1,7 @@
 // app/utils/floorPlanCatalog.ts
 // What the editor can place. Keys must match `assets` in the server's config/floor_plan.php.
+// Backend TODO: register table_round_4, table_communal_8, and table_booth_4 in
+// floor_plan.php, and include chair in drawn_categories.
 import doorSgl from '~/assets/floor-plan/door_sgl.svg'
 import doorDouble from '~/assets/floor-plan/door_double.svg'
 
@@ -8,7 +10,7 @@ export type LibraryCategory = 'tables' | 'fixtures'
 export interface TableAsset {
   key: string
   name: string
-  shape: 'square' | 'long'
+  shape: 'round' | 'square' | 'long' | 'communal'
   seats: number
   w: number
   h: number
@@ -20,6 +22,9 @@ const TABLE_SCALE = 0.8
 const scaled = (n: number) => Math.round(n * TABLE_SCALE)
 
 export const TABLE_ASSETS: TableAsset[] = [
+  { key: 'table_round_4', name: 'Round table', shape: 'round', seats: 4, w: scaled(112), h: scaled(112) },
+  { key: 'table_communal_8', name: 'Communal table', shape: 'communal', seats: 8, w: scaled(70), h: scaled(180) },
+  { key: 'table_booth_4', name: 'Booth table', shape: 'long', seats: 4, w: scaled(137), h: scaled(112) },
   { key: 'table_sqr_1', name: 'Square table', shape: 'square', seats: 1, w: scaled(89), h: scaled(67) },
   { key: 'table_sqr_2', name: 'Square table', shape: 'square', seats: 2, w: scaled(112), h: scaled(67) },
   { key: 'table_sqr_3', name: 'Square table', shape: 'square', seats: 3, w: scaled(112), h: scaled(90) },
@@ -40,6 +45,7 @@ export const doorAsset = (key: string | null | undefined) => DOOR_ASSETS.find((a
 export const DRAWN = {
   wall: { w: 240, h: 8, label: null as string | null },
   counter: { w: 240, h: 36, label: 'Counter' },
+  chair: { w: 32, h: 32, label: null as string | null },
 } as const
 
 // What the library hands to the canvas (by click or drag).
@@ -48,3 +54,4 @@ export type PlaceSpec =
   | { kind: 'door'; key: string }
   | { kind: 'counter' }
   | { kind: 'wall' }
+  | { kind: 'chair' }

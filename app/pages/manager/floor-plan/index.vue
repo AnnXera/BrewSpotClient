@@ -24,6 +24,7 @@ const links = [
   { label: 'Dashboard', to: '/manager/dashboard', icon: 'squares-2x2' },
   { label: 'Servings', to: '/manager/servings', icon: 'cake' },
   { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
+  { label: 'Reservations', to: '/manager/reservations', icon: 'calendar-days' },
 ]
 
 const DEFAULT_CANVAS = { width: 760, height: 640 }
@@ -54,6 +55,8 @@ const panning = ref(false)
 const scrollEl = ref<HTMLElement | null>(null)
 const loading = ref(true)
 const saving = ref(false)
+const savedLayoutNotice = ref(false)
+let savedLayoutNoticeTimer: ReturnType<typeof setTimeout> | undefined
 const statusBusy = ref(false)
 const errorMessage = ref('')
 const planLocked = ref(false) // API 403: plan has no reservations feature
@@ -642,6 +645,11 @@ async function saveLayout() {
     const { tables: t, elements: e } = layoutPayload()
     const res = await service.saveLayout(branchUuid.value, plan.value.uuid, t, e)
     applyPlan(res.floor_plan)
+    savedLayoutNotice.value = true
+    if (savedLayoutNoticeTimer) clearTimeout(savedLayoutNoticeTimer)
+    savedLayoutNoticeTimer = setTimeout(() => {
+      savedLayoutNotice.value = false
+    }, 2500)
     if (keepTable) {
       const hit = tables.value.find((x) => x.table_name === keepTable.trim())
       selected.value = hit ? { type: 'table', uid: hit.uid } : null
@@ -795,6 +803,7 @@ onBeforeRouteLeave(() => {
 })
 
 onBeforeUnmount(() => {
+  if (savedLayoutNoticeTimer) clearTimeout(savedLayoutNoticeTimer)
   window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('beforeunload', onBeforeUnload)
   endDrag()
@@ -833,7 +842,7 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
           <h1 class="font-display font-bold text-[36px] leading-[39px] text-[#3D2B24]">Floor Plan</h1>
           <p class="font-display text-[12px] text-[#7D5A50]">Arrange your cafe, set capacities, and prepare tables for reservations.</p>
         </div>
-        <div class="flex flex-wrap items-center gap-3">
+        <div class="flex flex-wrap items-center justify-end gap-3">
           <select
             v-if="branches.length > 1"
             v-model="branchUuid"
@@ -846,16 +855,26 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
             <Icon name="heroicons:arrow-uturn-left" class="size-4" />
             Undo
           </button>
-          <button
-            type="button"
-            :class="[iconBtn, 'border border-[#DED4CA]', preview ? 'bg-[#F1E9DE]' : 'bg-[#FFFDF9]']"
-            :disabled="!plan"
-            :aria-pressed="preview"
-            @click="togglePreview"
-          >
-            <Icon :name="preview ? 'heroicons:pencil-square' : 'heroicons:eye'" class="size-4" />
-            {{ preview ? 'Edit' : 'Preview' }}
-          </button>
+          <div class="relative">
+            <div
+              v-if="savedLayoutNotice"
+              role="status"
+              class="absolute bottom-full left-1/2 z-50 mb-2 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-lg bg-[#3A2923] px-4 py-3 text-[13px] text-white shadow-lg"
+            >
+              <Icon name="heroicons:check-circle" class="size-5 text-[#B7D7B5]" />
+              Saved layout
+            </div>
+            <button
+              type="button"
+              :class="[iconBtn, 'border border-[#DED4CA]', preview ? 'bg-[#F1E9DE]' : 'bg-[#FFFDF9]']"
+              :disabled="!plan"
+              :aria-pressed="preview"
+              @click="togglePreview"
+            >
+              <Icon :name="preview ? 'heroicons:pencil-square' : 'heroicons:eye'" class="size-4" />
+              {{ preview ? 'Edit' : 'Preview' }}
+            </button>
+          </div>
           <button
             type="button"
             :class="[iconBtn, 'bg-[#3A2923] text-white hover:bg-[#2C1E19]']"
@@ -1016,6 +1035,10 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
                 >
                   {{ el.label }}
                 </div>
+                <div
+                  v-else-if="el.category === 'chair'"
+                  class="size-full rounded-full bg-[#A47564]"
+                />
                 <!-- Walls run half a thickness past each end, so joined walls fill the corner -->
                 <div
                   v-else
@@ -1025,6 +1048,16 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
 
                 <!-- Drag the knob to rotate -->
                 <template v-if="isSelected('element', el.uid) && !preview">
+                  <button
+                    type="button"
+                    class="absolute -right-2 -top-2 z-10 flex size-6 items-center justify-center rounded-full border-2 border-white bg-[#A85F57] text-white shadow-sm transition-colors hover:bg-[#8F4D46]"
+                    aria-label="Remove element from floor plan"
+                    title="Remove from floor plan"
+                    @pointerdown.stop.prevent
+                    @click.stop="removeSelected"
+                  >
+                    <Icon name="heroicons:trash" class="size-3.5" />
+                  </button>
                   <span class="absolute left-1/2 -top-[18px] h-[18px] w-px bg-[#A96746] -translate-x-1/2 pointer-events-none" />
                   <span
                     class="absolute left-1/2 -top-[30px] size-[14px] -translate-x-1/2 rounded-full border-2 border-[#A96746] bg-white cursor-grab touch-none"
@@ -1068,6 +1101,16 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
                 />
 
                 <template v-if="isSelected('table', t.uid) && !preview">
+                  <button
+                    type="button"
+                    class="absolute -right-2 -top-2 z-10 flex size-6 items-center justify-center rounded-full border-2 border-white bg-[#A85F57] text-white shadow-sm transition-colors hover:bg-[#8F4D46]"
+                    aria-label="Remove table from floor plan"
+                    title="Remove from floor plan"
+                    @pointerdown.stop.prevent
+                    @click.stop="removeSelected"
+                  >
+                    <Icon name="heroicons:trash" class="size-3.5" />
+                  </button>
                   <span class="absolute left-1/2 -top-[18px] h-[18px] w-px bg-[#A96746] -translate-x-1/2 pointer-events-none" />
                   <span
                     class="absolute left-1/2 -top-[30px] size-[14px] -translate-x-1/2 rounded-full border-2 border-[#A96746] bg-white cursor-grab touch-none"

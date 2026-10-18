@@ -1,4 +1,4 @@
-<!-- app/components/floor-plan/TableRec2.vue -->
+<!-- app/components/floor-plan/TableRectangle2.vue -->
 <!-- Generated from assets/floor-plan/table_rec_2.svg; the Figma masks were dropped so fill and stroke can be recolored. -->
 <script setup lang="ts">
 import { TABLE_STYLE, type TableVisual } from '~/utils/tableColors'

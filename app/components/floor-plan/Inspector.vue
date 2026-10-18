@@ -53,14 +53,18 @@ const title = computed(() => {
   const el = props.element
   if (!el) return ''
   if (el.category === 'door') return doorAsset(el.asset_key)?.name ?? 'Door'
-  return el.label || (el.category === 'wall' ? 'Wall' : 'Counter')
+  return el.label || (el.category === 'wall' ? 'Wall' : el.category === 'chair' ? 'Chair' : 'Counter')
 })
 const shapeLabel = computed(() => {
   const a = tableAsset(props.table?.asset_key)
-  return a ? `${a.shape === 'square' ? 'Square' : 'Long'} (${a.seats} chairs)` : '-'
+  return a ? `${a.shape === 'square' ? 'Square' : a.shape === 'round' ? 'Round' : a.shape === 'communal' ? 'Communal' : 'Long'} (${a.seats} chairs)` : '-'
 })
 const drawn = computed(() => props.element?.category === 'wall' || props.element?.category === 'counter')
-const seatOptions = computed(() => Array.from({ length: props.maxSeats }, (_, i) => i + 1))
+const seatOptions = computed(() => {
+  const tableSeats = tableAsset(props.table?.asset_key)?.seats
+  const maxSeats = tableSeats ?? props.maxSeats
+  return Array.from({ length: maxSeats }, (_, i) => i + 1)
+})
 // A status only exists on the server once the layout has been saved.
 const canSetStatus = computed(() => !!props.table?.uuid)
 
@@ -111,7 +115,7 @@ function num(e: Event) {
         <label class="flex flex-col gap-1 text-[10px] text-[#736761]">
           Status
           <select
-            :class="field"
+            :class="[field, 'appearance-none']"
             :value="table.status"
             :disabled="!canSetStatus || statusBusy"
             @change="emit('status', ($event.target as HTMLSelectElement).value as TableStatus)"

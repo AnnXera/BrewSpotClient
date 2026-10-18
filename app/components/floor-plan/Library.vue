@@ -1,7 +1,7 @@
 <!-- app/components/floor-plan/Library.vue -->
 <!-- The "Objects" panel: click an item to drop it in the middle of the plan, or drag it to a spot. -->
 <script setup lang="ts">
-import { DOOR_ASSETS, TABLE_ASSETS, type LibraryCategory, type PlaceSpec } from '~/utils/floorPlanCatalog'
+import { DOOR_ASSETS, type LibraryCategory, type PlaceSpec } from '~/utils/floorPlanCatalog'
 
 defineProps<{ disabled?: boolean }>()
 const emit = defineEmits<{ (e: 'add', spec: PlaceSpec): void }>()
@@ -17,18 +17,21 @@ interface Entry {
   name: string
   note: string
   icon: string
+  shape?: 'round' | 'long' | 'square' | 'booth' | 'communal'
   spec: PlaceSpec
 }
 
+const tableEntries: Entry[] = [
+  { id: 'round-table', name: 'Round table', note: '1–4 seats', icon: '', shape: 'round', spec: { kind: 'table', key: 'table_round_4' } },
+  { id: 'long-table', name: 'Long table', note: '1–8 seats', icon: '', shape: 'long', spec: { kind: 'table', key: 'table_rec_4' } },
+  { id: 'square-table', name: 'Square table', note: '1–4 seats', icon: '', shape: 'square', spec: { kind: 'table', key: 'table_sqr_4' } },
+  { id: 'booth-table', name: 'Booth table', note: '1–8 seats', icon: '', shape: 'booth', spec: { kind: 'table', key: 'table_booth_4' } },
+  { id: 'communal-table', name: 'Communal table', note: '1–8 seats', icon: '', shape: 'communal', spec: { kind: 'table', key: 'table_communal_8' } },
+]
+
 const entries = computed<Entry[]>(() => {
   if (category.value === 'tables') {
-    return TABLE_ASSETS.map((a) => ({
-      id: a.key,
-      name: a.name,
-      note: `${a.seats} ${a.seats === 1 ? 'seat' : 'seats'}`,
-      icon: a.shape === 'square' ? 'heroicons:stop' : 'heroicons:rectangle-stack',
-      spec: { kind: 'table', key: a.key },
-    }))
+    return tableEntries
   }
   return [
     ...DOOR_ASSETS.map<Entry>((d) => ({
@@ -36,6 +39,7 @@ const entries = computed<Entry[]>(() => {
       spec: { kind: 'door', key: d.key },
     })),
     { id: 'counter', name: 'Counter', note: 'Labeled bar', icon: 'heroicons:building-storefront', spec: { kind: 'counter' } },
+    { id: 'chair', name: 'Chair', note: 'Single seat', icon: 'heroicons:archive-box', spec: { kind: 'chair' } },
   ]
 })
 
@@ -43,6 +47,7 @@ function onDragStart(e: DragEvent, spec: PlaceSpec) {
   e.dataTransfer?.setData('application/x-floorplan', JSON.stringify(spec))
   if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy'
 }
+
 </script>
 
 <template>
@@ -67,26 +72,27 @@ function onDragStart(e: DragEvent, spec: PlaceSpec) {
       </button>
     </div>
 
-    <div class="grid grid-cols-2 gap-[10px]">
+    <div class="grid grid-cols-2 gap-[14px]">
       <button
         v-for="e in entries"
         :key="e.id"
         type="button"
         :disabled="disabled"
         :draggable="!disabled"
-        class="text-left bg-[#FFFDF9] border border-[#DED4CA] rounded-[10px] p-[11px] flex flex-col gap-2 cursor-grab active:cursor-grabbing hover:border-[#A96746] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        class="text-left bg-[#FFFDF9] border border-[#DED4CA] rounded-[14px] p-[14px] flex flex-col gap-4 cursor-grab active:cursor-grabbing hover:border-[#A96746] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         @click="emit('add', e.spec)"
         @dragstart="onDragStart($event, e.spec)"
       >
         <span class="flex items-start justify-between">
-          <span class="size-[34px] rounded-[10px] bg-[#F1E9DE] flex items-center justify-center">
-            <Icon :name="e.icon" class="size-[17px] text-[#A96746]" />
+          <span class="size-[48px] rounded-[14px] bg-[#F1E9DE] flex items-center justify-center">
+            <FloorPlanTableLibraryIcon v-if="e.shape" :shape="e.shape" />
+            <Icon v-else :name="e.icon" class="size-[24px] text-[#A96746]" />
           </span>
-          <Icon name="heroicons:ellipsis-vertical" class="size-4 text-[#B9AEA6]" />
+          <Icon name="heroicons:ellipsis-vertical" class="size-5 text-[#B9AEA6]" />
         </span>
         <span>
-          <span class="block text-[12px] text-[#2D2521]">{{ e.name }}</span>
-          <span class="block text-[10px] text-[#736761]">{{ e.note }}</span>
+          <span class="block text-[15px] text-[#2D2521]">{{ e.name }}</span>
+          <span class="block text-[13px] text-[#736761]">{{ e.note }}</span>
         </span>
       </button>
     </div>
