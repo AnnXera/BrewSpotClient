@@ -642,6 +642,9 @@ function openOnBookableDay() {
 
 let clock: ReturnType<typeof setInterval> | undefined
 
+// New bookings from the POS floor plan or other managers appear without a manual reload.
+useAutoRefresh(() => Promise.all([loadReservations(), loadDayReservations()]))
+
 onMounted(async () => {
   clock = setInterval(() => { now.value = new Date() }, 60_000)
   updateViewportHeight()

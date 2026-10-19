@@ -48,8 +48,8 @@ async function fetchStats() {
   }))
 }
 
-async function fetchApprovals() {
-  loading.value = true
+async function fetchApprovals(silent = false) {
+  if (!silent) loading.value = true
   try {
     const res = await ownerService.approvals({
       per_page: perPage,
@@ -181,6 +181,8 @@ function closeRejectModal() {
 async function confirmReject() {
   await handleDecision('rejected', rejectReason.value)
 }
+
+useAutoRefresh(() => Promise.all([fetchStats(), fetchApprovals(true)]))
 
 onMounted(async () => {
   fetchStats()

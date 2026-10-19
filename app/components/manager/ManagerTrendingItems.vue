@@ -3,10 +3,13 @@
 import type { DashboardTrendingItem } from '~/services/OwnerProfileService'
 import { formatCount, formatPesoCents } from '~/utils/dashboardFormat'
 
-defineProps<{
+const props = defineProps<{
   items: DashboardTrendingItem[]
   loading: boolean
 }>()
+
+// Bars are relative to the top seller, so the ranking reads at a glance.
+const lead = () => Math.max(1, ...props.items.map(i => i.orders))
 </script>
 
 <template>
@@ -25,45 +28,43 @@ defineProps<{
       </NuxtLink>
     </header>
 
-    <ol v-if="loading" class="flex flex-col" aria-hidden="true">
-      <li v-for="i in 4" :key="i" class="flex items-center gap-4 border-b border-[#F6ECDD] py-4">
-        <span class="skeleton h-4 w-6 rounded" />
-        <span class="flex-1 space-y-2"><span class="skeleton block h-3.5 w-1/2 rounded" /><span class="skeleton block h-3 w-1/3 rounded" /></span>
-        <span class="skeleton hidden h-3 w-[180px] rounded sm:block" />
+    <ol v-if="loading" class="flex flex-col gap-5" aria-hidden="true">
+      <li v-for="i in 4" :key="i" class="space-y-2">
+        <span class="flex justify-between gap-4"><span class="skeleton block h-3.5 w-1/2 rounded" /><span class="skeleton block h-3.5 w-16 rounded" /></span>
+        <span class="skeleton block h-2 rounded-full" :style="{ width: `${100 - i * 18}%` }" />
+        <span class="skeleton block h-3 w-2/5 rounded" />
       </li>
     </ol>
 
-    <ol v-else-if="items.length" class="flex flex-col divide-y divide-[#F6ECDD]">
+    <!-- Stacked rows: the name gets the full card width instead of sharing it with the bar and price -->
+    <ol v-else-if="items.length" class="flex flex-col gap-5">
       <li
-        v-for="item in items"
+        v-for="(item, i) in items"
         :key="item.uuid"
-        class="animate-row-enter grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 py-3.5 font-display sm:grid-cols-[32px_minmax(0,1fr)_180px_120px]"
-        :style="{ '--row-delay': `${(item.rank - 1) * 60}ms` }"
+        class="animate-row-enter"
+        :style="{ '--row-delay': `${i * 60}ms` }"
       >
-        <span class="text-[14px] font-bold tabular-nums" :class="item.rank === 1 ? 'text-[#3B1F0E]' : 'text-[#8B6656]'">{{ item.rank }}</span>
-
-        <div class="flex min-w-0 flex-col gap-0.5">
-          <p class="truncate text-[14px] font-bold text-[#3D2B24]">{{ item.name }}</p>
-          <p class="truncate text-xs text-[#8B6656]">{{ item.category }}</p>
+        <div class="flex items-start justify-between gap-4">
+          <p class="flex min-w-0 items-baseline gap-2 font-display text-[15px] font-semibold leading-snug text-[#3B1F0E]">
+            <span class="shrink-0 tabular-nums" :class="item.rank === 1 ? 'text-[#3B1F0E]' : 'text-[#9E7060]'">{{ item.rank }}</span>
+            <span class="line-clamp-2 break-words" :title="item.name">{{ item.name }}</span>
+          </p>
+          <p class="shrink-0 font-display text-[15px] font-bold text-[#3B1F0E] tabular-nums">{{ formatPesoCents(item.sales) }}</p>
         </div>
 
-        <div class="col-span-2 col-start-2 row-start-2 flex flex-col gap-1.5 sm:col-span-1 sm:col-start-3 sm:row-start-1">
-          <div class="flex items-start justify-between gap-3 whitespace-nowrap text-xs">
-            <span class="font-semibold text-[#3D2B24] tabular-nums">{{ formatCount(item.orders) }} {{ item.orders === 1 ? 'order' : 'orders' }}</span>
-            <span class="text-[#8B6656] tabular-nums">{{ Math.round(item.share) }}%</span>
-          </div>
-          <div class="h-1.5 w-full overflow-hidden rounded-full bg-[#F3E7D2]">
-            <div
-              class="bar-grow-x h-full rounded-full"
-              :class="item.rank === 1 ? 'bg-[#5A3828]' : 'bg-[#7D5A50]'"
-              :style="{ width: `${Math.min(100, item.share)}%`, '--bar-delay': `${(item.rank - 1) * 65}ms` }"
-            />
-          </div>
+        <div class="mt-2 h-2 overflow-hidden rounded-full bg-[#F3E7D2]">
+          <div
+            class="bar-grow-x h-full rounded-full"
+            :class="i === 0 ? 'bg-[#5A3828]' : 'bg-[#B4846C]'"
+            :style="{ width: `${(item.orders / lead()) * 100}%`, '--bar-delay': `${i * 65}ms` }"
+          />
         </div>
 
-        <span class="col-start-3 row-start-1 text-right text-[14px] font-bold text-[#3D2B24] tabular-nums sm:col-start-4">
-          {{ formatPesoCents(item.sales) }}
-        </span>
+        <p class="mt-1.5 text-[12px] text-[#8B6656] tabular-nums">
+          {{ item.category }} &middot;
+          <span class="font-semibold text-[#5C4037]">{{ formatCount(item.orders) }} {{ item.orders === 1 ? 'order' : 'orders' }}</span>
+          &middot; in {{ Math.round(item.share) }}% of orders
+        </p>
       </li>
     </ol>
 

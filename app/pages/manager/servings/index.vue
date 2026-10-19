@@ -175,11 +175,9 @@ watch(branchUuid, async () => {
   loading.value = false
 })
 
-let refreshTimer: ReturnType<typeof setInterval> | undefined
+useAutoRefresh(loadAll, { interval: REFRESH_MS })
 
 onMounted(async () => {
-  refreshTimer = setInterval(loadAll, REFRESH_MS)
-
   try {
     const res = await service.managedBranches()
     branches.value = res.branches
@@ -196,7 +194,6 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  clearInterval(refreshTimer)
   clearTimeout(searchTimer)
 })
 </script>

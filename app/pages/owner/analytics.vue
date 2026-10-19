@@ -7,6 +7,7 @@ import BranchesTab from '~/components/analytics/BranchesTab.vue'
 import OperationsTab from '~/components/analytics/OperationsTab.vue'
 import { ANALYTICS_PRESETS, rangeFor, type AnalyticsFilterState, type AnalyticsPreset, type AnalyticsTab } from '~/utils/analyticsRange'
 import { formatSpan } from '~/utils/dashboardFormat'
+import type { ExcelReport } from '~/composables/useExcelExport'
 
 definePageMeta({
   role: 'Cafe Owner',
@@ -60,11 +61,13 @@ watch([tab, state], () => {
 
 // ── Branch picker ──
 const branches = ref<{ value: string | null; label: string }[]>([{ value: null, label: 'All branches' }])
+const cafeName = ref<string | null>(null)
 
 onMounted(async () => {
   try {
     const res = await ownerProfileService.getBranches(100, 1)
     if (res?.success) {
+      cafeName.value = res.cafe_name
       branches.value = [
         { value: null, label: 'All branches' },
         ...res.branches.data.map(b => ({ value: b.uuid, label: b.branch_name })),
@@ -84,6 +87,28 @@ const scopeLabel = computed(() => {
   return branches.value.find(b => b.value === state.value.branch)?.label ?? 'One branch'
 })
 
+// ── Excel export of the open tab, as loaded with the current filters ──
+// Tabs opt in by exposing excelReport() and exportReady; the rest hide the button.
+const activeTab = ref<{ excelReport?: () => Omit<ExcelReport, 'cafe'> | null; exportReady?: boolean } | null>(null)
+const { exporting, download } = useExcelExport()
+const { alertDialog, showAlert } = useDialogs()
+
+// Names the open tab, so the button doesn't read as "export everything".
+const tabLabel = computed(() => tabs.find(t => t.value === tab.value)!.label)
+const exportLabel = computed(() => `Export ${tabLabel.value} report`)
+const exportHint = computed(() => `Excel file of the ${tabLabel.value} tab for ${formatSpan(state.value.from, state.value.to)} · ${scopeLabel.value}`)
+
+async function exportTab() {
+  const report = activeTab.value?.excelReport?.()
+  if (!report) return
+  try {
+    await download({ ...report, cafe: cafeName.value })
+  } catch (err) {
+    console.warn('Analytics export error:', err)
+    showAlert('Export failed', 'The Excel file could not be created. Please try again.')
+  }
+}
+
 // Arrow keys move between tabs (WAI-ARIA tabs pattern).
 function onTabKey(e: KeyboardEvent, i: number) {
   const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
@@ -101,11 +126,24 @@ function onTabKey(e: KeyboardEvent, i: number) {
 
     <main class="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10 xl:px-12">
       <div class="mx-auto max-w-[1360px] space-y-6">
-        <header>
-          <h1 class="font-display text-[28px] font-semibold leading-tight tracking-[-0.015em] text-[#3B1F0E] md:text-[34px]">Analytics</h1>
-          <p class="mt-1 text-sm text-[#8B6656]">
-            {{ formatSpan(state.from, state.to) }} · {{ scopeLabel }}
-          </p>
+        <header class="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+          <div>
+            <h1 class="font-display text-[28px] font-semibold leading-tight tracking-[-0.015em] text-[#3B1F0E] md:text-[34px]">Analytics</h1>
+            <p class="mt-1 text-sm text-[#8B6656]">
+              {{ formatSpan(state.from, state.to) }} · {{ scopeLabel }}
+            </p>
+          </div>
+          <button
+            v-if="activeTab?.excelReport"
+            type="button"
+            class="inline-flex items-center gap-2 rounded-[12px] border border-[#E9D7BF] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#3B1F0E] shadow-[0_1px_2px_rgba(59,31,14,0.06)] transition-colors hover:bg-[#FBF4EA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="!activeTab.exportReady || exporting"
+            :title="exportHint"
+            @click="exportTab"
+          >
+            <Icon :name="exporting ? 'heroicons:arrow-path' : 'heroicons:arrow-down-tray'" class="h-[18px] w-[18px]" :class="{ 'animate-spin': exporting }" />
+            {{ exporting ? 'Preparing…' : exportLabel }}
+          </button>
         </header>
 
         <AnalyticsFilterBar
@@ -144,11 +182,18 @@ function onTabKey(e: KeyboardEvent, i: number) {
           :aria-labelledby="`analytics-tab-${tab}`"
         >
           <KeepAlive>
-            <component :is="tabComponents[tab]" :key="tab" :filters="filters" />
+            <component :is="tabComponents[tab]" :key="tab" ref="activeTab" :filters="filters" />
           </KeepAlive>
         </div>
       </div>
     </main>
+
+    <AlertModal
+      :show="alertDialog.show"
+      :title="alertDialog.title"
+      :message="alertDialog.message"
+      @close="alertDialog.show = false"
+    />
   </div>
 </template>
 

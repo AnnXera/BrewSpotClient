@@ -11,6 +11,7 @@ import ManagerEmployeesCard from '~/components/manager/ManagerEmployeesCard.vue'
 import ManagerTransactionsCard from '~/components/manager/ManagerTransactionsCard.vue'
 import ManagerTrendingItems from '~/components/manager/ManagerTrendingItems.vue'
 import ManagerTopCategories from '~/components/manager/ManagerTopCategories.vue'
+import ManagerPeakHours from '~/components/manager/ManagerPeakHours.vue'
 import ManagerTransactionModal from '~/components/manager/ManagerTransactionModal.vue'
 import DropdownList from '~/components/common/DropdownList.vue'
 
@@ -137,6 +138,7 @@ watch(branchUuid, (val) => {
 })
 
 onMounted(init)
+useAutoRefresh(refreshAll)
 
 const span = computed(() => (stats.value ? formatSpan(stats.value.period.from, stats.value.period.to) : ''))
 const updatedAt = computed(() =>
@@ -286,30 +288,36 @@ const todayDateFormatted = computed(() => {
               />
             </div>
 
-            <!-- 2. Revenue Chart + Best Sellers & Top Categories -->
-            <div class="scroll-reveal grid grid-cols-1 gap-6 lg:grid-cols-12">
-              <!-- Income Series Chart -->
+            <!-- 2. Revenue Chart (full width) -->
+            <div class="scroll-reveal">
               <ManagerIncomeChart
                 v-model:range="range"
-                class="lg:col-span-12 xl:col-span-7"
                 :period="stats?.period ?? null"
                 :series="stats?.series ?? []"
                 :loading="loading"
                 :refreshing="refreshing"
               />
+            </div>
 
-              <!-- Top Selling Items & Categories -->
-              <div class="lg:col-span-12 xl:col-span-5 space-y-6 flex flex-col justify-between">
-                <ManagerTrendingItems
-                  :items="stats?.trending_items ?? []"
-                  :loading="loading"
-                />
-                <ManagerTopCategories
-                  :categories="stats?.top_categories ?? []"
-                  :span="span"
-                  :loading="loading"
-                />
-              </div>
+            <!-- Top Selling Items & Categories, side by side under the chart -->
+            <div class="scroll-reveal grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <ManagerTrendingItems
+                :items="stats?.trending_items ?? []"
+                :loading="loading"
+              />
+              <ManagerTopCategories
+                :categories="stats?.top_categories ?? []"
+                :span="span"
+                :loading="loading"
+              />
+            </div>
+
+            <!-- Peak Hours: weekday x hour heatmap, last 4 weeks -->
+            <div class="scroll-reveal">
+              <ManagerPeakHours
+                :peak="stats?.peak_hours ?? null"
+                :loading="loading"
+              />
             </div>
 
             <!-- 3. Key Manager Details: Reservations + Employees Side-by-Side -->

@@ -3,7 +3,8 @@ import { computed, ref, toRef } from 'vue'
 import AnalyticsPanel from './AnalyticsPanel.vue'
 import AnalyticsChange from './AnalyticsChange.vue'
 import AnalyticsStatus from './AnalyticsStatus.vue'
-import type { AnalyticsFilters, AnalyticsMenuItem } from '~/services/OwnerAnalyticsService'
+import type { AnalyticsFilters, AnalyticsMenu, AnalyticsMenuItem } from '~/services/OwnerAnalyticsService'
+import type { ExcelFormat, ExcelReport, ExcelSheet } from '~/composables/useExcelExport'
 import { formatCount, formatPeso, formatPesoCents } from '~/utils/dashboardFormat'
 
 const props = defineProps<{ filters: AnalyticsFilters }>()
@@ -57,6 +58,111 @@ function ariaSort(key: SortKey) {
 const categoryMax = computed(() => Math.max(1, ...(data.value?.categories ?? []).map(c => c.orders)))
 // Fixed tones for size segments, darkest first; they follow the size's order, never cycle.
 const SIZE_TONES = ['#5A3A2C', '#8E6253', '#B98A70', '#D9B597', '#EBD6C1']
+
+// ── Excel export, called from the page's Export button ──
+function excelReport(): Omit<ExcelReport, 'cafe'> | null {
+  const d = data.value
+  if (!d) return null
+  const sum = (rows: { sales: number }[]) => rows.reduce((a, r) => a + r.sales, 0)
+
+  type SummaryRow = { metric: string; value: number | string; format: ExcelFormat }
+  const top = [...d.items].sort((a, b) => b.sales - a.sales)[0]
+  const summary: ExcelSheet<SummaryRow> = {
+    name: 'Summary',
+    columns: [
+      { header: 'Metric', value: r => r.metric },
+      { header: 'Value', value: r => r.value, format: r => r.format },
+    ],
+    rows: [
+      { metric: 'Item sales', value: d.summary.sales, format: 'peso' },
+      { metric: 'Units sold', value: d.summary.items_sold, format: 'count' },
+      { metric: 'Items that sold', value: d.summary.distinct_items, format: 'count' },
+      { metric: 'Items that did not sell', value: d.not_selling.length, format: 'count' },
+      ...(top ? [{ metric: 'Top item by sales', value: top.name, format: 'text' as const }] : []),
+    ],
+  }
+
+  // Every item, best sellers first, whatever the table on screen is sorted or searched by.
+  type ItemRow = AnalyticsMenuItem & { total?: boolean }
+  const items: ExcelSheet<ItemRow> = {
+    name: 'Items',
+    columns: [
+      { header: 'Item', value: i => i.total ? 'Total' : i.name },
+      { header: 'Category', value: i => i.category },
+      { header: 'Orders', value: i => i.total ? null : i.orders, format: 'count' },
+      { header: 'Units', value: i => i.quantity, format: 'count' },
+      { header: 'Sales', value: i => i.sales, format: 'peso' },
+      { header: 'Share of sales', value: i => i.total ? null : i.sales_share, format: 'percent' },
+      { header: 'Share of orders', value: i => i.total ? null : i.order_share, format: 'percent' },
+      { header: 'Units before', value: i => i.total ? null : i.previous_quantity, format: 'count' },
+      // No units before means the item is new to this comparison.
+      { header: 'Units vs before', value: i => i.total ? null : (i.change ?? 'New'), format: i => i.change === null ? 'text' : 'percent', signed: true },
+    ],
+    rows: [...d.items].sort((a, b) => b.sales - a.sales),
+    totals: {
+      total: true, uuid: '', name: '', category: '', orders: 0, sales_share: 0, order_share: 0, previous_quantity: 0, change: 0,
+      quantity: d.items.reduce((a, i) => a + i.quantity, 0),
+      sales: sum(d.items),
+    },
+  }
+
+  // Orders don't add up across categories (one order can hold several), so no totals row.
+  const categories: ExcelSheet<AnalyticsMenu['categories'][number]> = {
+    name: 'Categories',
+    columns: [
+      { header: 'Category', value: c => c.name },
+      { header: 'Orders', value: c => c.orders, format: 'count' },
+      { header: 'Units', value: c => c.quantity, format: 'count' },
+      { header: 'Sales', value: c => c.sales, format: 'peso' },
+      { header: 'Share of orders', value: c => c.order_share, format: 'percent' },
+      { header: 'Share of sales', value: c => c.sales_share, format: 'percent' },
+    ],
+    rows: d.categories,
+  }
+
+  type SizeRow = AnalyticsMenu['sizes'][number] & { total?: boolean }
+  const sizes: ExcelSheet<SizeRow> = {
+    name: 'Sizes',
+    columns: [
+      { header: 'Size', value: s => s.total ? 'Total' : s.name },
+      { header: 'Units', value: s => s.quantity, format: 'count' },
+      { header: 'Sales', value: s => s.sales, format: 'peso' },
+      { header: 'Share of units', value: s => s.total ? null : s.share, format: 'percent' },
+    ],
+    rows: d.sizes,
+    totals: { total: true, name: '', share: 0, quantity: d.sizes.reduce((a, s) => a + s.quantity, 0), sales: sum(d.sizes) },
+  }
+
+  const addons: ExcelSheet<AnalyticsMenu['addons'][number]> = {
+    name: 'Add-ons',
+    columns: [
+      { header: 'Add-on', value: a => a.name },
+      { header: 'Times ordered', value: a => a.quantity, format: 'count' },
+      { header: 'Sales', value: a => a.sales, format: 'peso' },
+      { header: 'On items ordered', value: a => a.attach_rate, format: 'percent' },
+    ],
+    rows: d.addons,
+  }
+
+  const notSelling: ExcelSheet<AnalyticsMenu['not_selling'][number]> = {
+    name: 'Not selling',
+    columns: [
+      { header: 'Item', value: i => i.name },
+      { header: 'Category', value: i => i.category },
+    ],
+    rows: d.not_selling,
+  }
+
+  return {
+    title: 'Menu report',
+    from: d.filters.from,
+    to: d.filters.to,
+    scope: d.filters.branch?.name ?? 'All branches',
+    sheets: [summary, items, categories, sizes, addons, notSelling],
+  }
+}
+
+defineExpose({ excelReport, exportReady: computed(() => !!data.value) })
 </script>
 
 <template>

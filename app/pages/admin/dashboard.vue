@@ -52,8 +52,8 @@ const pendingApprovalsList = ref<ApprovalListItem[]>([])
 const transactionsList = ref<PaymentTransaction[]>([])
 const activeSubscribersCount = ref(0)
 
-async function loadDashboardData() {
-  loading.value = true
+async function loadDashboardData(silent = false) {
+  if (!silent) loading.value = true
   lastRefreshedAt.value = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
   try {
@@ -128,7 +128,8 @@ function handleExportDashboardReport() {
   exportToExcel(transactionsList.value, 'Admin Overall Dashboard Report')
 }
 
-onMounted(loadDashboardData)
+onMounted(() => loadDashboardData())
+useAutoRefresh(() => loadDashboardData(true))
 </script>
 
 <template>
@@ -182,7 +183,7 @@ onMounted(loadDashboardData)
           <button
             type="button"
             class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-display text-sm font-semibold bg-[#7D5A50] text-[#FFF0D1] hover:bg-[#684940] transition-colors shadow-sm"
-            @click="loadDashboardData"
+            @click="loadDashboardData()"
           >
             <Icon name="heroicons:arrow-path" class="w-4 h-4" :class="{ 'animate-spin': loading }" />
             <span>Refresh</span>

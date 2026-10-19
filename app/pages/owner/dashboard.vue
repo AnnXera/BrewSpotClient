@@ -64,6 +64,7 @@ watch(range, (value) => {
 })
 
 onMounted(load)
+useAutoRefresh(load)
 
 const span = computed(() => (stats.value ? formatSpan(stats.value.period.from, stats.value.period.to) : ''))
 const updatedAt = computed(() =>

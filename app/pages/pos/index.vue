@@ -760,8 +760,7 @@ function printZReading() {
   window.print()
 }
 
-async function onTransactionRefunded() {
-  await openTransactions()
+async function refreshMenu() {
   try {
     const menuRes = await devicePosService.getMenu()
     if (menuRes.success) {
@@ -769,8 +768,16 @@ async function onTransactionRefunded() {
       menuItems.value = menuRes.items
     }
   } catch (err) {
-    console.error('Failed to refresh menu after refund', err)
+    console.error('Failed to refresh menu', err)
   }
+}
+
+// Keeps available stock current when servings are adjusted or other registers sell.
+useAutoRefresh(refreshMenu, { enabled: () => !!device.value })
+
+async function onTransactionRefunded() {
+  await openTransactions()
+  await refreshMenu()
 }
 
 function printReceipt() {

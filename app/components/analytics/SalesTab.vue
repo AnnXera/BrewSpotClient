@@ -5,8 +5,9 @@ import AnalyticsChange from './AnalyticsChange.vue'
 import AnalyticsBarChart, { type BarPoint } from './AnalyticsBarChart.vue'
 import AnalyticsHeatmap from './AnalyticsHeatmap.vue'
 import AnalyticsStatus from './AnalyticsStatus.vue'
-import type { AnalyticsFilters } from '~/services/OwnerAnalyticsService'
-import { formatCount, formatDay, formatMethod, formatPeso, formatPesoCents, formatPesoCompact, formatSpan } from '~/utils/dashboardFormat'
+import type { AnalyticsFilters, AnalyticsSales } from '~/services/OwnerAnalyticsService'
+import type { ExcelColumn, ExcelFormat, ExcelReport, ExcelSheet } from '~/composables/useExcelExport'
+import { WEEKDAYS_LONG, formatCount, formatDay, formatHour, formatMethod, formatPeso, formatPesoCents, formatPesoCompact, formatSpan } from '~/utils/dashboardFormat'
 
 const props = defineProps<{ filters: AnalyticsFilters }>()
 
@@ -48,6 +49,100 @@ function discountLabel(type: string) {
 }
 
 const paymentMax = computed(() => Math.max(1, ...(data.value?.payments ?? []).map(p => p.orders)))
+
+// ── Excel export, called from the page's Export button ──
+type SummaryRow = { metric: string; current: number; previous: number | null; change: number | null; format: ExcelFormat }
+
+function excelReport(): Omit<ExcelReport, 'cafe'> | null {
+  const d = data.value
+  if (!d) return null
+  const s = d.summary
+
+  const summary: ExcelSheet<SummaryRow> = {
+    name: 'Summary',
+    columns: [
+      { header: 'Metric', value: r => r.metric },
+      { header: 'This period', value: r => r.current, format: r => r.format },
+      { header: 'Previous period', value: r => r.previous, format: r => r.format },
+      { header: 'Change', value: r => r.change, format: 'percent', signed: true },
+    ],
+    rows: [
+      { metric: 'Income', current: s.revenue, previous: s.previous.revenue, change: s.change.revenue, format: 'peso' },
+      { metric: 'Orders', current: s.orders, previous: s.previous.orders, change: s.change.orders, format: 'count' },
+      { metric: 'Average order', current: s.avg_order_value, previous: s.previous.avg_order_value, change: s.change.avg_order_value, format: 'peso' },
+      { metric: 'Items sold', current: s.items_sold, previous: null, change: null, format: 'count' },
+      { metric: 'Discounts given', current: s.discounts, previous: null, change: null, format: 'peso' },
+      { metric: 'Discounted orders', current: s.discounted_orders, previous: null, change: null, format: 'count' },
+      { metric: 'Voided or refunded orders', current: s.voided_orders, previous: null, change: null, format: 'count' },
+      { metric: 'Voided or refunded amount', current: s.voided_amount, previous: null, change: null, format: 'peso' },
+    ],
+  }
+
+  type TrendRow = AnalyticsSales['series'][number] & { total?: boolean }
+  const trend: ExcelSheet<TrendRow> = {
+    name: `Trend by ${unit.value}`,
+    columns: [
+      { header: `${unit.value[0]!.toUpperCase()}${unit.value.slice(1)} starting`, value: p => p.total ? 'Total' : p.start, format: p => p.total ? 'text' : 'date' },
+      { header: 'Ending', value: p => p.end, format: 'date' },
+      { header: 'Income', value: p => p.revenue, format: 'peso' },
+      { header: 'Orders', value: p => p.orders, format: 'count' },
+    ],
+    rows: d.series,
+    totals: { total: true, start: '', end: '', revenue: d.series.reduce((a, p) => a + p.revenue, 0), orders: d.series.reduce((a, p) => a + p.orders, 0) },
+  }
+
+  const payments: ExcelSheet<AnalyticsSales['payments'][number]> = {
+    name: 'Payment methods',
+    columns: [
+      { header: 'Method', value: p => formatMethod(p.method) },
+      { header: 'Orders', value: p => p.orders, format: 'count' },
+      { header: 'Share of orders', value: p => p.share, format: 'percent' },
+      { header: 'Amount', value: p => p.amount, format: 'peso' },
+    ],
+    rows: d.payments,
+  }
+
+  const discounts: ExcelSheet<AnalyticsSales['discounts'][number]> = {
+    name: 'Discounts',
+    columns: [
+      { header: 'Discount', value: x => discountLabel(x.type) },
+      { header: 'Orders', value: x => x.orders, format: 'count' },
+      { header: 'Amount', value: x => x.amount, format: 'peso' },
+    ],
+    rows: d.discounts,
+  }
+
+  // Weekday rows, one column per hour, orders in each cell. Only the hours
+  // that saw an order, like the heatmap on screen.
+  const used = Array.from({ length: 24 }, (_, h) => h).filter(h => d.heatmap.some(day => (day[h]?.orders ?? 0) > 0))
+  const hours = used.length
+    ? Array.from({ length: used[used.length - 1]! - used[0]! + 1 }, (_, i) => used[0]! + i)
+    : []
+  const peak: ExcelSheet<{ day: number }> = {
+    name: 'Peak hours (orders)',
+    columns: [
+      { header: 'Day', value: r => WEEKDAYS_LONG[r.day] },
+      ...hours.map((h): ExcelColumn<{ day: number }> => ({
+        header: formatHour(h),
+        value: r => d.heatmap[r.day]?.[h]?.orders ?? 0,
+        format: 'count',
+        width: 10,
+        heat: true,
+      })),
+    ],
+    rows: d.heatmap.map((_, day) => ({ day })),
+  }
+
+  return {
+    title: 'Sales report',
+    from: d.filters.from,
+    to: d.filters.to,
+    scope: d.filters.branch?.name ?? 'All branches',
+    sheets: [summary, trend, payments, discounts, peak],
+  }
+}
+
+defineExpose({ excelReport, exportReady: computed(() => !!data.value) })
 </script>
 
 <template>

@@ -108,6 +108,11 @@ export interface ManagerDashboardStats {
         list: ManagerEmployeeItem[]
     }
     recent_transactions: ManagerTransactionItem[]
+    peak_hours: {
+        from: string
+        to: string
+        grid: { orders: number; revenue: number }[][] // [weekday 0 = Sunday][hour 0..23]
+    }
 }
 
 export interface ManagerTransactionDetailItem {
