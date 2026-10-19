@@ -46,6 +46,7 @@ const showWaitlist = ref(false)
 const waitlistLoading = ref(false)
 const submitting = ref(false)
 const updatingReservation = ref<string | null>(null)
+const waitlistActionError = ref('')
 const selectedWaitlistReservation = ref<ReservationRecord | null>(null)
 const waitlistSearch = ref('')
 const waitlistStatusFilter = ref('all')
@@ -183,6 +184,12 @@ function reservationDateValue(value: string) {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
+// No-show only once the booked time has arrived; cancelling only before it.
+function reservationStarted(item: ReservationRecord) {
+  const start = reservationDateValue(item.reservation_date)
+  return !!start && start.getTime() <= now.value.getTime()
+}
+
 const activeDayReservations = computed(() =>
   dayReservations.value
     .filter((item) => BLOCKING.includes(item.status))
@@ -284,7 +291,7 @@ function seatIsOccupied(chair: FloorPlanElement) {
 }
 
 function tableVisualStatus(table: FloorPlanTable) {
-  return takenTables.value.has(table.uuid) ? 'reserved' : 'available'
+  return takenTables.value.has(table.uuid) ? 'unavailable' : 'available'
 }
 
 const inspectedHolds = computed(() =>
@@ -510,13 +517,15 @@ async function changeBranch() {
 async function updateReservationStatus(item: ReservationRecord, status: ReservationStatus) {
   if (updatingReservation.value) return
   updatingReservation.value = item.uuid
-  reservationError.value = ''
-  reservations.value = reservations.value.filter((reservation) => reservation.uuid !== item.uuid)
+  waitlistActionError.value = ''
   try {
-    await reservationService.updateStatus(branchUuid.value, item.uuid, status)
+    const response = await reservationService.updateStatus(branchUuid.value, item.uuid, status)
+    // Swap in the server's copy so the row shows its new status and actions right away.
+    reservations.value = reservations.value.map((reservation) => reservation.uuid === item.uuid ? response.reservation : reservation)
     await loadDayReservations()
   } catch (error: any) {
-    reservationError.value = error?.data?.message ?? 'Could not update the reservation status.'
+    // The row stays as it was; the message shows above the list instead of replacing it.
+    waitlistActionError.value = error?.data?.message ?? 'Could not update the reservation status.'
   } finally {
     updatingReservation.value = null
   }
@@ -526,6 +535,7 @@ async function openWaitlist() {
   showWaitlist.value = true
   waitlistLoading.value = true
   reservationError.value = ''
+  waitlistActionError.value = ''
   try {
     await loadReservations()
   } catch (error: any) {
@@ -604,7 +614,6 @@ async function confirmReservation() {
       party_size: reservation.partySize,
       reservation_date: serverDateTime(windowStart.value),
       reservation_end: serverDateTime(windowEnd.value),
-      status: 'pending',
       notes: reservation.notes.trim() || undefined,
     })
     // Clear the selection before reloading, or the watcher reports the new booking as a clash.
@@ -1060,6 +1069,7 @@ onBeforeUnmount(() => {
             <div v-else-if="reservationError" class="text-sm text-[#A96746]">{{ reservationError }}</div>
             <div v-else-if="!reservations.length" class="text-sm text-[#9D877B]">No reservations saved yet.</div>
             <template v-else>
+              <p v-if="waitlistActionError" role="alert" class="mb-3 rounded-lg bg-[#F8E5DC] px-3 py-2 text-xs text-[#8B4F42]">{{ waitlistActionError }}</p>
               <div class="mb-3 flex flex-col gap-2 sm:flex-row">
                 <label class="relative flex-1">
                   <span class="sr-only">Search reservations</span>
@@ -1089,7 +1099,8 @@ onBeforeUnmount(() => {
                   </button>
                   <div class="flex flex-wrap items-center gap-2 text-[#8B756A]">
                     <span class="capitalize">{{ item.status.replace('_', ' ') }}</span>
-                    <template v-if="item.status === 'pending' || item.status === 'confirmed'">
+                    <!-- Bookings are saved confirmed, so the waitlist only seats, marks no-show, or cancels. -->
+                    <template v-if="item.status === 'confirmed'">
                       <button
                         type="button"
                         class="relative z-10 cursor-pointer rounded-md bg-[#3B2A24] px-3 py-1.5 text-[10px] text-white disabled:cursor-wait disabled:opacity-50"
@@ -1100,6 +1111,7 @@ onBeforeUnmount(() => {
                         Arrived
                       </button>
                       <button
+                        v-if="reservationStarted(item)"
                         type="button"
                         class="relative z-10 cursor-pointer rounded-md border border-[#C79679] px-3 py-1.5 text-[10px] text-[#8B4F42] disabled:cursor-wait disabled:opacity-50"
                         :disabled="updatingReservation === item.uuid"
@@ -1108,6 +1120,8 @@ onBeforeUnmount(() => {
                       >
                         No-show
                       </button>
+                    </template>
+                    <template v-if="(item.status === 'pending' || item.status === 'confirmed') && !reservationStarted(item)">
                       <button
                         type="button"
                         class="relative z-10 cursor-pointer rounded-md border border-[#C79679] px-3 py-1.5 text-[10px] text-[#8B4F42] disabled:cursor-wait disabled:opacity-50"

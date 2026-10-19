@@ -59,6 +59,18 @@ function barLabel(i: number) {
   return formatDay(p.start)
 }
 
+// Phone-width label: fits ~30px columns. Dense ranges label every other bar.
+function barLabelShort(i: number) {
+  const p = props.series[i]
+  if (!p) return ''
+  if (props.range === 'daily') {
+    return i === currentIndex.value ? 'Today' : formatDay(p.start, { day: 'numeric' })
+  }
+  if (i % 2 !== 0) return ''
+  if (props.range === 'monthly') return formatDay(p.start, { month: 'short' })
+  return formatDay(p.start, { month: 'numeric', day: 'numeric' })
+}
+
 function bucketTitle(i: number) {
   const p = props.series[i]
   if (!p) return ''
@@ -76,11 +88,11 @@ function tooltipAlign(i: number) {
 </script>
 
 <template>
-  <section class="flex flex-col rounded-[22px] border border-[#EEDFC4] bg-white p-5 sm:p-7 shadow-[0_1px_2px_rgba(59,31,14,0.04)]" aria-labelledby="income-heading">
+  <section class="flex flex-col rounded-[22px] border border-[#EEDFC4] bg-white p-5 shadow-[0_1px_2px_rgba(59,31,14,0.04)] sm:p-6" aria-labelledby="income-heading">
     <!-- Header: title + range pills -->
     <header class="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h2 id="income-heading" class="font-display text-[18px] font-bold text-[#3D2B24]">
+        <h2 id="income-heading" class="font-display text-[18px] font-bold text-[#3B1F0E]">
           Branch Sales & Revenue
         </h2>
         <p class="mt-0.5 text-[13px] text-[#8B6656]">
@@ -90,17 +102,16 @@ function tooltipAlign(i: number) {
 
       <!-- Range switch -->
       <div
-        role="tablist"
+        role="group"
         aria-label="Chart time range"
         class="inline-flex rounded-xl bg-[#F6ECDD] p-1 text-[13px] font-semibold text-[#8B6656]"
       >
         <button
           v-for="r in ranges"
           :key="r.value"
-          role="tab"
           type="button"
-          :aria-selected="range === r.value"
-          class="rounded-lg px-3 py-1.5 transition-all duration-160 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+          :aria-pressed="range === r.value"
+          class="rounded-lg px-3 py-1.5 transition-all duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
           :class="range === r.value ? 'bg-white text-[#3B1F0E] shadow-[0_1px_3px_rgba(59,31,14,0.08)]' : 'hover:text-[#3B1F0E]'"
           @click="emit('update:range', r.value)"
         >
@@ -140,93 +151,127 @@ function tooltipAlign(i: number) {
 
       <div>
         <p class="text-[12px] font-medium text-[#8B6656]">Vs. Prev. Period</p>
-        <p class="mt-1 flex items-center gap-1 font-display text-xl font-bold tabular-nums">
+        <p class="mt-1 font-display text-xl font-bold tabular-nums">
           <span v-if="loading" class="skeleton inline-block h-6 w-16 rounded align-middle" />
-          <template v-else-if="period?.revenue_change !== null && period?.revenue_change !== undefined">
-            <span
-              class="inline-flex items-center gap-0.5 text-sm font-bold"
-              :class="period.revenue_change >= 0 ? 'text-emerald-700' : 'text-red-700'"
-            >
-              <Icon :name="period.revenue_change >= 0 ? 'heroicons:arrow-trending-up' : 'heroicons:arrow-trending-down'" class="h-4 w-4" />
-              {{ period.revenue_change > 0 ? '+' : '' }}{{ period.revenue_change }}%
-            </span>
-          </template>
-          <span v-else class="text-xs font-normal text-[#8B6656]">No prev. data</span>
+          <span
+            v-else-if="period?.revenue_change !== null && period?.revenue_change !== undefined"
+            class="inline-flex items-center gap-1"
+            :class="period.revenue_change >= 0 ? 'text-emerald-700' : 'text-red-700'"
+          >
+            <Icon :name="period.revenue_change >= 0 ? 'heroicons:arrow-trending-up-20-solid' : 'heroicons:arrow-trending-down-20-solid'" class="h-5 w-5" aria-hidden="true" />
+            {{ period.revenue_change > 0 ? '+' : '' }}{{ period.revenue_change }}%
+          </span>
+          <span v-else class="text-[#C2A592]">&ndash;</span>
+        </p>
+        <p v-if="!loading" class="mt-0.5 text-[11px] leading-snug text-[#9E7060]">
+          {{ period?.revenue_change !== null && period?.revenue_change !== undefined ? `vs ${currentRange?.compare}` : currentRange?.none }}
         </p>
       </div>
     </div>
 
-    <!-- Chart container -->
-    <div class="relative mt-6 flex-1 min-h-[220px] flex flex-col justify-end">
-      <!-- Grid lines -->
-      <div class="absolute inset-x-0 inset-y-6 flex flex-col justify-between pointer-events-none" aria-hidden="true">
-        <div v-for="(tick, idx) in ticks" :key="idx" class="border-b border-[#F6ECDD] flex items-center justify-between text-[11px] text-[#A88879]">
-          <span class="bg-white/80 pr-1 tabular-nums">{{ formatPesoCompact(tick) }}</span>
-        </div>
-      </div>
-
-      <!-- Bars -->
-      <div
-        :key="barsKey"
-        class="relative z-10 grid h-[180px] items-end gap-2 sm:gap-3 transition-opacity duration-200"
-        :class="{ 'opacity-50': refreshing }"
-        :style="{ gridTemplateColumns: `repeat(${series.length}, minmax(0, 1fr))` }"
-      >
-        <div
-          v-for="(point, i) in series"
-          :key="point.start"
-          class="group relative flex h-full flex-col justify-end items-center cursor-pointer"
-          tabindex="0"
-          @mouseenter="active = i"
-          @mouseleave="active = null"
-          @focus="active = i"
-          @blur="active = null"
-        >
-          <!-- Bar -->
-          <div
-            v-if="!point.upcoming"
-            class="manager-bar w-full max-w-[38px] rounded-t-md transition-all duration-300"
-            :class="[
-              active === i ? 'bg-[#5A3828] scale-y-[1.02]' : 'bg-[#7D5A50] hover:bg-[#6D4C42]',
-              point.revenue === 0 ? 'h-1 bg-[#E3CFB4]' : 'h-full'
-            ]"
-            :style="point.revenue > 0 ? {
-              clipPath: barClip(point.revenue),
-              '--bar-delay': `${i * 65}ms`
-            } : {}"
-          />
-          <div
-            v-else
-            class="w-full max-w-[38px] h-full border border-dashed border-[#E3CFB4]/60 rounded-t-md"
-          />
-
-          <!-- Tooltip -->
-          <div
-            v-if="active === i && !point.upcoming"
-            class="absolute bottom-[calc(100%+8px)] z-30 pointer-events-none rounded-xl bg-[#2D1B10] px-3.5 py-2.5 text-white shadow-xl text-xs whitespace-nowrap animate-in fade-in zoom-in-95 duration-150"
-            :class="tooltipAlign(i)"
+    <!-- Chart: y-axis gutter + plot. Gridlines share the plot's exact height so ticks match bar values. -->
+    <div class="mt-7 flex flex-1 flex-col justify-end">
+      <div class="grid grid-cols-[44px_minmax(0,1fr)] gap-x-3">
+        <!-- Y-axis labels -->
+        <div class="relative h-[200px]" aria-hidden="true">
+          <span
+            v-for="(tick, idx) in ticks"
+            :key="idx"
+            class="absolute right-0 -translate-y-1/2 text-[11px] leading-none text-[#A88879] tabular-nums"
+            :style="{ top: `${idx * 25}%` }"
           >
-            <p class="font-bold text-[#FFF0D1]">{{ bucketTitle(i) }}</p>
-            <div class="mt-1 flex items-center gap-3 text-[11px]">
-              <span class="font-semibold text-emerald-400 tabular-nums">{{ formatPesoCents(point.revenue) }}</span>
-              <span class="text-[#D9BFA8] tabular-nums">{{ formatCount(point.orders) }} {{ point.orders === 1 ? 'order' : 'orders' }}</span>
+            {{ formatPesoCompact(tick) }}
+          </span>
+        </div>
+
+        <div class="relative h-[200px]">
+          <!-- Grid lines -->
+          <div class="pointer-events-none absolute inset-0" aria-hidden="true">
+            <div
+              v-for="(tick, idx) in ticks"
+              :key="idx"
+              class="absolute inset-x-0 border-t"
+              :class="idx === ticks.length - 1 ? 'border-[#E3CFB4]' : 'border-dashed border-[#F3E5D0]'"
+              :style="{ top: `${idx * 25}%` }"
+            />
+          </div>
+
+          <!-- Bars -->
+          <div
+            :key="barsKey"
+            class="relative z-10 grid h-full items-end gap-2 transition-opacity duration-200 sm:gap-3"
+            :class="{ 'opacity-50': refreshing }"
+            :style="{ gridTemplateColumns: `repeat(${series.length}, minmax(0, 1fr))` }"
+          >
+            <div
+              v-for="(point, i) in series"
+              :key="point.start"
+              class="group relative flex h-full flex-col items-center justify-end rounded-t-md outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] focus-visible:ring-offset-2"
+              :class="point.upcoming ? '' : 'cursor-pointer'"
+              :tabindex="point.upcoming ? -1 : 0"
+              :aria-label="point.upcoming ? `${bucketTitle(i)}: upcoming` : `${bucketTitle(i)}: ${formatPesoCents(point.revenue)}, ${formatCount(point.orders)} ${point.orders === 1 ? 'order' : 'orders'}`"
+              @mouseenter="active = i"
+              @mouseleave="active = null"
+              @focus="active = i"
+              @blur="active = null"
+            >
+              <!-- Bar -->
+              <div
+                v-if="!point.upcoming && point.revenue > 0"
+                class="manager-bar h-full w-full max-w-[38px] rounded-t-md transition-colors duration-200"
+                :class="active === i ? 'bg-[#3B1F0E]' : i === currentIndex ? 'bg-[#5A3828]' : 'bg-[#7D5A50] group-hover:bg-[#6D4C42]'"
+                :style="{ clipPath: barClip(point.revenue), '--bar-delay': `${i * 65}ms` }"
+              />
+              <div
+                v-else-if="!point.upcoming"
+                class="h-[3px] w-full max-w-[38px] rounded-t-sm bg-[#E3CFB4]"
+              />
+              <div
+                v-else
+                class="h-full w-full max-w-[38px] rounded-t-md bg-[#FBF4EA]"
+              />
+
+              <!-- Tooltip -->
+              <div
+                v-if="active === i && !point.upcoming"
+                class="chart-tooltip pointer-events-none absolute bottom-[calc(100%+8px)] z-30 whitespace-nowrap rounded-xl bg-[#2D1B10] px-3.5 py-2.5 text-xs text-white shadow-[0_10px_24px_-8px_rgba(45,27,16,0.55)]"
+                :class="tooltipAlign(i)"
+                role="presentation"
+              >
+                <p class="font-bold text-[#FFF0D1]">{{ bucketTitle(i) }}</p>
+                <div class="mt-1 flex items-center gap-3 text-[11px]">
+                  <span class="font-semibold text-[#9FE0B4] tabular-nums">{{ formatPesoCents(point.revenue) }}</span>
+                  <span class="text-[#D9BFA8] tabular-nums">{{ formatCount(point.orders) }} {{ point.orders === 1 ? 'order' : 'orders' }}</span>
+                </div>
+              </div>
             </div>
+          </div>
+
+          <!-- Empty overlay -->
+          <div
+            v-if="isEmpty"
+            class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
+          >
+            <p class="rounded-lg bg-white px-3 py-1.5 text-[13px] text-[#8B6656] shadow-[0_1px_3px_rgba(59,31,14,0.08)]">
+              No sales recorded in this range yet.
+            </p>
           </div>
         </div>
       </div>
 
       <!-- X-axis Labels -->
       <div
-        class="mt-3 grid gap-2 sm:gap-3 text-center text-[11px] font-medium text-[#8B6656]"
+        class="ml-[56px] mt-3 grid gap-2 text-center text-[11px] font-medium text-[#8B6656] sm:gap-3"
         :style="{ gridTemplateColumns: `repeat(${series.length}, minmax(0, 1fr))` }"
       >
         <span
           v-for="(point, i) in series"
           :key="point.start"
-          class="truncate"
+          class="whitespace-nowrap sm:truncate"
           :class="{ 'font-bold text-[#3B1F0E]': i === currentIndex }"
         >
-          {{ barLabel(i) }}
+          <span class="sm:hidden">{{ barLabelShort(i) }}</span>
+          <span class="hidden sm:inline">{{ barLabel(i) }}</span>
         </span>
       </div>
     </div>
@@ -279,8 +324,23 @@ function tooltipAlign(i: number) {
   will-change: transform, opacity;
 }
 
+@keyframes tooltipIn {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+.chart-tooltip {
+  animation: tooltipIn 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .manager-bar, .skeleton, .animate-summary-enter {
+  .manager-bar, .skeleton, .animate-summary-enter, .chart-tooltip {
     animation: none !important;
     transform: none !important;
   }

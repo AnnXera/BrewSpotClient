@@ -60,7 +60,6 @@ export class ReservationService extends BaseService {
     party_size: number
     reservation_date: string
     reservation_end: string
-    status: 'pending' | 'confirmed'
     notes?: string
   }) {
     return this.post<{ success: boolean; message: string; reservation: ReservationRecord }>(

@@ -10,11 +10,9 @@ defineProps<{
 function roleBadgeClass(role: string) {
   switch (role.toLowerCase()) {
     case 'manager':
-      return 'bg-[#7D5A50] text-[#FFF0D1]'
-    case 'cashier':
-      return 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+      return 'bg-[#3B1F0E] text-[#FFF0D1] border-[#3B1F0E]'
     default:
-      return 'bg-amber-100 text-amber-800 border border-amber-200'
+      return 'bg-[#F6ECDD] text-[#6E4F42] border-[#EADFD3]'
   }
 }
 
@@ -31,12 +29,12 @@ function getInitials(name: string) {
 </script>
 
 <template>
-  <section class="flex flex-col gap-4 rounded-[22px] border border-[#EEDFC4] bg-white p-6 shadow-[0_1px_2px_rgba(59,31,14,0.04)]" aria-labelledby="employees-heading">
+  <section class="flex flex-col gap-4 rounded-[22px] border border-[#EEDFC4] bg-white p-5 shadow-[0_1px_2px_rgba(59,31,14,0.04)] sm:p-6" aria-labelledby="employees-heading">
     <!-- Header -->
     <header class="flex items-start justify-between gap-4">
       <div>
         <div class="flex items-center gap-2">
-          <h2 id="employees-heading" class="font-display text-[18px] font-bold text-[#3D2B24]">
+          <h2 id="employees-heading" class="font-display text-[18px] font-bold text-[#3B1F0E]">
             Branch Team & Shifts
           </h2>
           <span v-if="employees?.summary?.working_today" class="rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[11px] font-bold text-emerald-800 tabular-nums">
@@ -54,7 +52,7 @@ function getInitials(name: string) {
           {{ employees.summary.active }} Active
         </span>
         <span>&middot;</span>
-        <span>{{ employees.summary.cashiers }} Cashiers</span>
+        <span>{{ employees.summary.cashiers }} {{ employees.summary.cashiers === 1 ? 'Cashier' : 'Cashiers' }}</span>
       </div>
     </header>
 
@@ -76,29 +74,31 @@ function getInitials(name: string) {
       <div
         v-for="(emp, idx) in employees.list"
         :key="emp.uuid"
-        class="animate-row-enter py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors hover:bg-[#FDF8F3]/60 rounded-xl px-2 -mx-2"
+        class="animate-row-enter flex flex-col justify-between gap-3 py-3 sm:flex-row sm:items-center"
         :style="{ '--row-delay': `${idx * 60}ms` }"
       >
         <!-- Identity -->
         <div class="flex items-center gap-3 min-w-0 flex-1">
-          <div class="h-9 w-9 rounded-full bg-[#3B1F0E] text-[#FFF0D1] flex items-center justify-center font-display font-bold text-xs shrink-0">
-            {{ getInitials(emp.name) }}
+          <div class="relative h-9 w-9 shrink-0" aria-hidden="true">
+            <div class="flex h-9 w-9 items-center justify-center rounded-full bg-[#F6ECDD] font-display text-xs font-bold text-[#5A3828]">
+              {{ getInitials(emp.name) }}
+            </div>
+            <span
+              v-if="emp.is_active"
+              class="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500"
+            />
           </div>
           <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
-              <p class="font-display text-[14px] font-bold text-[#3D2B24] truncate">
+            <div class="flex min-w-0 items-center gap-2">
+              <p class="truncate font-display text-[14px] font-bold text-[#3B1F0E]">
                 {{ emp.name }}
+                <span v-if="emp.is_active" class="sr-only">(active)</span>
               </p>
               <span
-                :class="['px-2 py-0.2 rounded text-[11px] font-semibold tracking-wide uppercase', roleBadgeClass(emp.role)]"
+                :class="['shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide', roleBadgeClass(emp.role)]"
               >
                 {{ emp.role }}
               </span>
-              <span
-                v-if="emp.is_active"
-                class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"
-                title="Active"
-              />
             </div>
             <p class="text-xs text-[#8B6656] truncate mt-0.5">
               {{ emp.email }}
@@ -111,9 +111,9 @@ function getInitials(name: string) {
           <!-- Today's shift badge -->
           <div
             class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs"
-            :class="emp.today_shift === 'Day Off' ? 'bg-gray-50 border-gray-200 text-gray-500' : 'bg-[#FFF8EA] border-[#EADFD3] text-[#7D5A50] font-medium'"
+            :class="emp.today_shift === 'Day Off' ? 'border-dashed border-[#E3CFB4] bg-transparent text-[#8B6656]' : 'border-[#EADFD3] bg-[#FFF8EA] font-medium text-[#5A3828]'"
           >
-            <Icon name="heroicons:clock" class="h-3.5 w-3.5 shrink-0" />
+            <Icon :name="emp.today_shift === 'Day Off' ? 'heroicons:moon' : 'heroicons:clock'" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>{{ emp.today_shift }}</span>
           </div>
 

@@ -61,7 +61,7 @@ defineProps<{
             </span>
             <NuxtLink
               to="/manager/floor-plan"
-              class="inline-flex items-center gap-1 text-[#FFF0D1] underline decoration-[#FFF0D1]/30 underline-offset-4 hover:decoration-[#FFF0D1] active:scale-[0.97] transition-transform duration-160 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFF0D1]/70"
+              class="inline-flex items-center gap-1 text-[#FFF0D1] underline decoration-[#FFF0D1]/30 underline-offset-4 hover:decoration-[#FFF0D1] active:scale-[0.97] transition-transform duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFF0D1]/70"
             >
               Floor Plan
               <Icon name="heroicons:arrow-up-right-20-solid" class="h-3.5 w-3.5" />

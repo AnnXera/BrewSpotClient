@@ -13,7 +13,7 @@ const lead = () => Math.max(1, ...props.categories.map(c => c.orders))
 </script>
 
 <template>
-  <section class="rounded-[22px] border border-[#EEDFC4] bg-white p-5 sm:p-7 shadow-[0_1px_2px_rgba(59,31,14,0.04)]" aria-labelledby="categories-heading">
+  <section class="rounded-[22px] border border-[#EEDFC4] bg-white p-5 shadow-[0_1px_2px_rgba(59,31,14,0.04)] sm:p-6" aria-labelledby="categories-heading">
     <header>
       <h2 id="categories-heading" class="font-display text-[18px] font-bold text-[#3B1F0E]">Top Categories</h2>
       <p class="mt-0.5 text-[13px] text-[#8B6656]">Ranked by order frequency in this branch &middot; {{ span }}</p>
@@ -35,7 +35,7 @@ const lead = () => Math.max(1, ...props.categories.map(c => c.orders))
       >
         <div class="flex items-baseline justify-between gap-3">
           <p class="min-w-0 truncate text-[14px] font-semibold text-[#3D2B24]">
-            <span class="mr-1.5 font-display tabular-nums text-[#C2A592]">{{ i + 1 }}</span>{{ c.name }}
+            <span class="mr-1.5 font-display tabular-nums text-[#8B6656]">{{ i + 1 }}</span>{{ c.name }}
           </p>
           <p class="shrink-0 text-[14px] font-semibold text-[#3D2B24] tabular-nums">
             {{ formatCount(c.orders) }} <span class="font-normal text-[#9E7060]">{{ c.orders === 1 ? 'order' : 'orders' }}</span>

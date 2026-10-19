@@ -183,9 +183,12 @@ export class DevicePosService extends BaseService {
         return this.patch<{ success: boolean; message: string; table: any }>('/pos/device/tables/' + tableUuid + '/status', { status })
     }
 
-    getReservations(date?: string) {
-        const query = date ? `?date=${encodeURIComponent(date)}` : ''
-        return this.get<{ success: boolean; reservations: { data: any[]; current_page: number; last_page: number; total: number } }>('/pos/device/reservations' + query)
+    // A full service day fits one page (the server caps per_page at 100).
+    getReservations(date?: string, perPage = 100) {
+        return this.get<{ success: boolean; reservations: { data: any[]; current_page: number; last_page: number; total: number } }>(
+            '/pos/device/reservations',
+            { per_page: perPage, ...(date ? { date } : {}) },
+        )
     }
 
     updateReservationStatus(reservationUuid: string, status: string) {

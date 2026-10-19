@@ -11,13 +11,14 @@ export type TableVisual =
 
 // fill/stroke paint the table and chairs; badge/badgeText paint the number circle on the table top.
 export const TABLE_STYLE: Record<TableVisual, { fill: string; stroke: string; badge: string; badgeText: string }> = {
-  available: { fill: '#F0FDF4', stroke: '#16A34A', badge: '#16A34A', badgeText: '#FFFFFF' },
-  reserved: { fill: '#FFFBEB', stroke: '#D97706', badge: '#D97706', badgeText: '#FFFFFF' },
-  occupied: { fill: '#EFF6FF', stroke: '#2563EB', badge: '#2563EB', badgeText: '#FFFFFF' },
-  cleaning: { fill: '#F3F4F6', stroke: '#6B7280', badge: '#6B7280', badgeText: '#FFFFFF' },
-  unavailable: { fill: '#F3F4F6', stroke: '#9CA3AF', badge: '#6B7280', badgeText: '#FFFFFF' },
+  available: { fill: '#FFFFFF', stroke: '#7D5A50', badge: '#7D5A50', badgeText: '#FFF0D1' },
+  // Brand palette only: held tables read as latte, seated as taken gray, cleaning as pale gray.
+  reserved: { fill: '#F4E7DA', stroke: '#B4846C', badge: '#B4846C', badgeText: '#FFFFFF' },
+  occupied: { fill: '#D9D9D9', stroke: '#BDBDBD', badge: '#8A8A8A', badgeText: '#FFFFFF' },
+  cleaning: { fill: '#EFEDEB', stroke: '#CFCAC6', badge: '#A8A19C', badgeText: '#FFFFFF' },
+  unavailable: { fill: '#D9D9D9', stroke: '#BDBDBD', badge: '#8A8A8A', badgeText: '#FFFFFF' },
   neutral: { fill: '#FFFFFF', stroke: '#7D5A50', badge: '#7D5A50', badgeText: '#FFF0D1' },
-  selected: { fill: '#3D2B24', stroke: '#A96746', badge: '#FFF0D1', badgeText: '#3D2B24' },
+  selected: { fill: '#7D5A50', stroke: '#7D5A50', badge: '#FFF0D1', badgeText: '#7D5A50' },
 }
 
 export function tableVisual(status: string | null | undefined, selected = false): TableVisual {
@@ -35,35 +36,35 @@ export function tableVisual(status: string | null | undefined, selected = false)
 export const TABLE_STATUS_CONFIG = {
   available: {
     label: 'Available',
-    color: '#16A34A',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    dotClass: 'bg-emerald-500',
-    btnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+    color: '#7D5A50',
+    badgeClass: 'bg-white text-[#2D1E17] border-[#7D5A50]',
+    dotClass: 'bg-white ring-1 ring-[#7D5A50]',
+    btnClass: 'bg-[#7D5A50] hover:bg-[#65463D] text-[#FFF0D1]',
     icon: 'heroicons:check-circle',
   },
   reserved: {
     label: 'Reserved',
-    color: '#D97706',
-    badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
-    dotClass: 'bg-amber-500',
-    btnClass: 'bg-amber-600 hover:bg-amber-700 text-white',
+    color: '#B4846C',
+    badgeClass: 'bg-[#F4E7DA] text-[#5B3F33] border-[#B4846C]',
+    dotClass: 'bg-[#B4846C]',
+    btnClass: 'bg-[#B4846C] hover:bg-[#9C6F58] text-white',
     icon: 'heroicons:calendar-days',
   },
   occupied: {
     label: 'Occupied',
-    color: '#2563EB',
-    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
-    dotClass: 'bg-blue-500',
-    btnClass: 'bg-blue-600 hover:bg-blue-700 text-white',
+    color: '#8A8A8A',
+    badgeClass: 'bg-[#D9D9D9] text-[#3D3D3D] border-[#BDBDBD]',
+    dotClass: 'bg-[#8A8A8A]',
+    btnClass: 'bg-[#8A8A8A] hover:bg-[#757575] text-white',
     icon: 'heroicons:user-group',
   },
   cleaning: {
     label: 'Not Available',
     sublabel: 'Cleaning / Reset',
-    color: '#6B7280',
-    badgeClass: 'bg-gray-100 text-gray-700 border-gray-300',
-    dotClass: 'bg-gray-500',
-    btnClass: 'bg-gray-600 hover:bg-gray-700 text-white',
+    color: '#A8A19C',
+    badgeClass: 'bg-[#EFEDEB] text-[#5C5550] border-[#CFCAC6]',
+    dotClass: 'bg-[#A8A19C]',
+    btnClass: 'bg-[#A8A19C] hover:bg-[#8F8883] text-white',
     icon: 'heroicons:no-symbol',
   },
 } as const

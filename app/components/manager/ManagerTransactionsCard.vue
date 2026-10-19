@@ -15,6 +15,7 @@ const emit = defineEmits<{
 const service = useManagerDashboardService()
 
 const loading = ref(true)
+const loadError = ref(false)
 const transactions = ref<ManagerTransactionItem[]>([])
 const currentPage = ref(1)
 const lastPage = ref(1)
@@ -30,9 +31,14 @@ const statusTabs = [
   { label: 'Voided', value: 'void' },
 ]
 
+// Ignore responses from superseded requests (fast typing, quick tab switches)
+let requestId = 0
+
 async function fetchTransactions() {
   if (!props.branchUuid) return
+  const id = ++requestId
   loading.value = true
+  loadError.value = false
   try {
     const res = await service.getTransactions(props.branchUuid, {
       page: currentPage.value,
@@ -40,27 +46,39 @@ async function fetchTransactions() {
       status: statusFilter.value,
       search: searchQuery.value.trim(),
     })
+    if (id !== requestId) return
     if (res.success) {
       transactions.value = res.transactions.data
       currentPage.value = res.transactions.current_page
       lastPage.value = res.transactions.last_page
       totalItems.value = res.transactions.total
       todayStats.value = res.today_stats
+    } else {
+      loadError.value = true
     }
   } catch (err) {
+    if (id !== requestId) return
     console.warn('Failed to load branch transactions:', err)
+    loadError.value = true
   } finally {
-    loading.value = false
+    if (id === requestId) loading.value = false
   }
 }
 
-let searchTimer: any
+let searchTimer: ReturnType<typeof setTimeout> | undefined
 function onSearchInput() {
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     currentPage.value = 1
     fetchTransactions()
   }, 350)
+}
+
+function clearSearch() {
+  clearTimeout(searchTimer)
+  searchQuery.value = ''
+  currentPage.value = 1
+  fetchTransactions()
 }
 
 function setFilter(status: string) {
@@ -87,6 +105,8 @@ onMounted(() => {
     fetchTransactions()
   }
 })
+
+defineExpose({ refresh: fetchTransactions })
 
 function formatDateTime(iso: string) {
   if (!iso) return ''
@@ -128,12 +148,12 @@ function paymentIcon(method: string) {
 </script>
 
 <template>
-  <section class="flex flex-col gap-4 rounded-[22px] border border-[#EEDFC4] bg-white p-6 shadow-[0_1px_2px_rgba(59,31,14,0.04)]" aria-labelledby="transactions-heading">
+  <section class="flex flex-col gap-4 rounded-[22px] border border-[#EEDFC4] bg-white p-5 shadow-[0_1px_2px_rgba(59,31,14,0.04)] sm:p-6" aria-labelledby="transactions-heading">
     <!-- Header -->
     <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <div class="flex items-center gap-2">
-          <h2 id="transactions-heading" class="font-display text-[18px] font-bold text-[#3D2B24]">
+          <h2 id="transactions-heading" class="font-display text-[18px] font-bold text-[#3B1F0E]">
             Transaction History
           </h2>
           <span v-if="todayStats?.total_count" class="rounded-full bg-[#7D5A50]/10 text-[#7D5A50] font-semibold text-xs px-2.5 py-0.5 tabular-nums">
@@ -161,13 +181,18 @@ function paymentIcon(method: string) {
     <!-- Filters + Search -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
       <!-- Tabs -->
-      <div class="inline-flex rounded-xl bg-[#F6ECDD] p-1 text-xs font-semibold text-[#8B6656]">
+      <div
+        role="group"
+        aria-label="Filter by status"
+        class="inline-flex self-start overflow-x-auto rounded-xl bg-[#F6ECDD] p-1 text-xs font-semibold text-[#8B6656]"
+      >
         <button
           v-for="tab in statusTabs"
           :key="tab.value"
           type="button"
-          class="rounded-lg px-3 py-1.5 transition-all"
-          :class="statusFilter === tab.value ? 'bg-white text-[#3B1F0E] shadow-xs' : 'hover:text-[#3B1F0E]'"
+          :aria-pressed="statusFilter === tab.value"
+          class="whitespace-nowrap rounded-lg px-3 py-1.5 transition-all duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+          :class="statusFilter === tab.value ? 'bg-white text-[#3B1F0E] shadow-[0_1px_3px_rgba(59,31,14,0.08)]' : 'hover:text-[#3B1F0E]'"
           @click="setFilter(tab.value)"
         >
           {{ tab.label }}
@@ -176,29 +201,36 @@ function paymentIcon(method: string) {
 
       <!-- Search Input -->
       <div class="relative sm:w-64">
-        <Icon name="heroicons:magnifying-glass" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8B6656]" />
+        <Icon name="heroicons:magnifying-glass" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8B6656]" aria-hidden="true" />
         <input
           v-model="searchQuery"
-          type="text"
-          placeholder="Receipt # or cashier..."
-          class="w-full h-9 pl-9 pr-3 rounded-xl border border-[#EADFD3] bg-[#FBF7F2] text-xs text-[#2D201B] placeholder:text-[#8B6656] focus:outline-none focus:border-[#7D5A50] focus:bg-white focus:ring-1 focus:ring-[#7D5A50] transition-colors"
+          type="search"
+          aria-label="Search transactions by receipt number or cashier"
+          placeholder="Receipt # or cashier…"
+          class="tx-search h-9 w-full rounded-xl border border-[#EADFD3] bg-[#FBF7F2] pl-9 pr-8 text-xs text-[#2D201B] transition-colors placeholder:text-[#8B6656] focus:border-[#7D5A50] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#7D5A50]"
           @input="onSearchInput"
+          @keydown.esc="searchQuery && clearSearch()"
         />
         <button
           v-if="searchQuery"
           type="button"
-          class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-          @click="searchQuery = ''; fetchTransactions()"
+          aria-label="Clear search"
+          class="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-[#A88879] hover:bg-[#F6ECDD] hover:text-[#5A3828] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+          @click="clearSearch"
         >
-          <Icon name="heroicons:x-mark" class="w-3.5 h-3.5" />
+          <Icon name="heroicons:x-mark" class="h-3.5 w-3.5" />
         </button>
       </div>
     </div>
 
     <!-- Transactions Table -->
-    <div class="overflow-x-auto rounded-xl border border-[#EADFD3] mt-1">
+    <div
+      class="relative mt-1 overflow-x-auto rounded-xl border border-[#EADFD3] transition-opacity duration-200"
+      :class="{ 'opacity-60': loading && transactions.length }"
+      :aria-busy="loading"
+    >
       <table class="w-full text-left text-xs border-collapse">
-        <thead class="bg-[#FBF7F2] border-b border-[#EADFD3] text-[#8B6656] uppercase font-bold text-[11px] tracking-wider">
+        <thead v-if="transactions.length && !(loadError && !loading)" class="whitespace-nowrap bg-[#FBF7F2] border-b border-[#EADFD3] text-[#8B6656] uppercase font-bold text-[11px] tracking-wider">
           <tr>
             <th class="py-3 px-4">Receipt #</th>
             <th class="py-3 px-4">Date & Time</th>
@@ -211,18 +243,39 @@ function paymentIcon(method: string) {
           </tr>
         </thead>
         <tbody class="divide-y divide-[#EADFD3]">
-          <tr v-if="loading">
+          <tr v-if="loading && !transactions.length">
             <td colspan="8" class="py-10 text-center">
               <Icon name="heroicons:arrow-path" class="w-6 h-6 mx-auto text-[#7D5A50] animate-spin" />
-              <p class="text-xs text-[#8B6656] mt-2">Loading transactions...</p>
+              <p class="text-xs text-[#8B6656] mt-2">Loading transactions…</p>
+            </td>
+          </tr>
+
+          <tr v-else-if="loadError && !loading">
+            <td colspan="8" class="py-10 text-center">
+              <Icon name="heroicons:exclamation-triangle" class="mx-auto h-7 w-7 text-[#B4554A]" />
+              <p class="mt-2 font-display font-semibold text-[#3B1F0E]">Transactions could not be loaded</p>
+              <p class="mt-0.5 text-xs text-[#8B6656]">Check your connection, then try again.</p>
+              <button
+                type="button"
+                class="mt-3 rounded-lg border border-[#D9C3A5] bg-white px-3 py-1.5 text-xs font-semibold text-[#3B1F0E] hover:border-[#3B1F0E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+                @click="fetchTransactions"
+              >
+                Try again
+              </button>
             </td>
           </tr>
 
           <tr v-else-if="!transactions.length">
             <td colspan="8" class="py-10 text-center">
               <Icon name="heroicons:receipt-percent" class="w-7 h-7 mx-auto text-[#C2A592]" />
-              <p class="font-display font-semibold text-[#3B1F0E] mt-2">No transactions match your criteria</p>
-              <p class="text-xs text-[#8B6656] mt-0.5">Try clearing your filters or changing the search term.</p>
+              <template v-if="searchQuery || statusFilter">
+                <p class="font-display font-semibold text-[#3B1F0E] mt-2">No transactions match these filters</p>
+                <p class="text-xs text-[#8B6656] mt-0.5">Clear the search or pick a different status.</p>
+              </template>
+              <template v-else>
+                <p class="font-display font-semibold text-[#3B1F0E] mt-2">No transactions yet</p>
+                <p class="text-xs text-[#8B6656] mt-0.5">Receipts rung up at this branch will appear here.</p>
+              </template>
             </td>
           </tr>
 
@@ -291,7 +344,7 @@ function paymentIcon(method: string) {
     </div>
 
     <!-- Pagination -->
-    <div v-if="lastPage > 1" class="flex items-center justify-between pt-2 text-xs text-[#8B6656]">
+    <div v-if="lastPage > 1" class="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs text-[#8B6656]">
       <div>
         Showing page <strong class="text-[#3B1F0E]">{{ currentPage }}</strong> of <strong class="text-[#3B1F0E]">{{ lastPage }}</strong>
         <span class="text-[#A88879]">({{ totalItems }} total)</span>
@@ -301,7 +354,7 @@ function paymentIcon(method: string) {
         <button
           type="button"
           :disabled="currentPage <= 1 || loading"
-          class="h-8 px-3 rounded-lg border border-[#EADFD3] bg-white text-[#2D201B] font-medium hover:bg-[#FBF7F2] active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-160 ease-out"
+          class="h-8 px-3 rounded-lg border border-[#EADFD3] bg-white text-[#2D201B] font-medium hover:bg-[#FBF7F2] active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
           @click="changePage(currentPage - 1)"
         >
           Previous
@@ -310,7 +363,7 @@ function paymentIcon(method: string) {
         <button
           type="button"
           :disabled="currentPage >= lastPage || loading"
-          class="h-8 px-3 rounded-lg border border-[#EADFD3] bg-white text-[#2D201B] font-medium hover:bg-[#FBF7F2] active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-160 ease-out"
+          class="h-8 px-3 rounded-lg border border-[#EADFD3] bg-white text-[#2D201B] font-medium hover:bg-[#FBF7F2] active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
           @click="changePage(currentPage + 1)"
         >
           Next
@@ -321,6 +374,12 @@ function paymentIcon(method: string) {
 </template>
 
 <style scoped>
+/* Custom clear button replaces the native one */
+.tx-search::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 @keyframes rowEnter {
   0% {
     opacity: 0;

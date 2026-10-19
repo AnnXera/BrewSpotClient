@@ -10,15 +10,15 @@ defineProps<{
 </script>
 
 <template>
-  <section class="flex flex-col gap-4 rounded-[22px] border border-[#EEDFC4] bg-white p-6 shadow-[0_1px_2px_rgba(59,31,14,0.04)]" aria-labelledby="top-selling-heading">
+  <section class="flex flex-col gap-4 rounded-[22px] border border-[#EEDFC4] bg-white p-5 shadow-[0_1px_2px_rgba(59,31,14,0.04)] sm:p-6" aria-labelledby="top-selling-heading">
     <header class="flex items-start justify-between gap-4">
       <div class="flex flex-col gap-0.5">
-        <h2 id="top-selling-heading" class="font-display text-[18px] font-bold text-[#3D2B24]">Top-Selling Menu Items</h2>
+        <h2 id="top-selling-heading" class="font-display text-[18px] font-bold text-[#3B1F0E]">Top-Selling Menu Items</h2>
         <p class="text-[13px] text-[#8B6656]">Top branch performers sorted by order volume and contribution</p>
       </div>
       <NuxtLink
         to="/manager/servings"
-        class="inline-flex shrink-0 items-center gap-1 rounded font-display text-[13px] font-semibold text-[#7D5A50] underline decoration-[#7D5A50]/30 underline-offset-4 hover:decoration-[#7D5A50] active:scale-[0.97] transition-transform duration-160 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+        class="inline-flex shrink-0 items-center gap-1 rounded font-display text-[13px] font-semibold text-[#7D5A50] underline decoration-[#7D5A50]/30 underline-offset-4 hover:decoration-[#7D5A50] active:scale-[0.97] transition-transform duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
       >
         View Servings
         <Icon name="heroicons:arrow-up-right-20-solid" class="h-3.5 w-3.5" />
@@ -40,7 +40,7 @@ defineProps<{
         class="animate-row-enter grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 py-3.5 font-display sm:grid-cols-[32px_minmax(0,1fr)_180px_120px]"
         :style="{ '--row-delay': `${(item.rank - 1) * 60}ms` }"
       >
-        <span class="text-[14px] font-bold text-[#9E7060] tabular-nums">#{{ item.rank }}</span>
+        <span class="text-[14px] font-bold tabular-nums" :class="item.rank === 1 ? 'text-[#3B1F0E]' : 'text-[#8B6656]'">{{ item.rank }}</span>
 
         <div class="flex min-w-0 flex-col gap-0.5">
           <p class="truncate text-[14px] font-bold text-[#3D2B24]">{{ item.name }}</p>
@@ -52,9 +52,10 @@ defineProps<{
             <span class="font-semibold text-[#3D2B24] tabular-nums">{{ formatCount(item.orders) }} {{ item.orders === 1 ? 'order' : 'orders' }}</span>
             <span class="text-[#8B6656] tabular-nums">{{ Math.round(item.share) }}%</span>
           </div>
-          <div class="h-1.5 w-full overflow-hidden rounded-[3px] bg-[#FFF8EA]">
+          <div class="h-1.5 w-full overflow-hidden rounded-full bg-[#F3E7D2]">
             <div
-              class="bar-grow-x h-full bg-[#7D5A50]"
+              class="bar-grow-x h-full rounded-full"
+              :class="item.rank === 1 ? 'bg-[#5A3828]' : 'bg-[#7D5A50]'"
               :style="{ width: `${Math.min(100, item.share)}%`, '--bar-delay': `${(item.rank - 1) * 65}ms` }"
             />
           </div>

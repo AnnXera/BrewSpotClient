@@ -18,6 +18,16 @@ function formatReservationTime(startIso: string, endIso: string) {
   return `${datePrefix}, ${startTime}${endTime ? ` – ${endTime}` : ''}`
 }
 
+function formatBookedAt(iso: string | null) {
+  if (!iso) return ''
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
+  if (mins < 1) return 'Booked just now'
+  if (mins < 60) return `Booked ${mins}m ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `Booked ${hours}h ago`
+  return `Booked ${new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+}
+
 function statusBadgeClass(status: string) {
   switch (status.toLowerCase()) {
     case 'confirmed':
@@ -37,12 +47,12 @@ function statusBadgeClass(status: string) {
 </script>
 
 <template>
-  <section class="flex flex-col gap-4 rounded-[22px] border border-[#EEDFC4] bg-white p-6 shadow-[0_1px_2px_rgba(59,31,14,0.04)]" aria-labelledby="reservations-heading">
+  <section class="flex flex-col gap-4 rounded-[22px] border border-[#EEDFC4] bg-white p-5 shadow-[0_1px_2px_rgba(59,31,14,0.04)] sm:p-6" aria-labelledby="reservations-heading">
     <!-- Header -->
     <header class="flex items-start justify-between gap-4">
       <div>
         <div class="flex items-center gap-2">
-          <h2 id="reservations-heading" class="font-display text-[18px] font-bold text-[#3D2B24]">
+          <h2 id="reservations-heading" class="font-display text-[18px] font-bold text-[#3B1F0E]">
             Table Reservations
           </h2>
           <span v-if="reservations?.summary?.today_count" class="rounded-full bg-[#3B1F0E] px-2 py-0.5 text-[11px] font-bold text-[#FFF0D1] tabular-nums">
@@ -50,13 +60,13 @@ function statusBadgeClass(status: string) {
           </span>
         </div>
         <p class="mt-0.5 text-[13px] text-[#8B6656]">
-          Upcoming bookings and table seating management
+          Latest bookings for today onward, newest first
         </p>
       </div>
 
       <NuxtLink
         to="/manager/floor-plan"
-        class="inline-flex shrink-0 items-center gap-1 rounded font-display text-[13px] font-semibold text-[#7D5A50] underline decoration-[#7D5A50]/30 underline-offset-4 hover:decoration-[#7D5A50] active:scale-[0.97] transition-transform duration-160 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+        class="inline-flex shrink-0 items-center gap-1 rounded font-display text-[13px] font-semibold text-[#7D5A50] underline decoration-[#7D5A50]/30 underline-offset-4 hover:decoration-[#7D5A50] active:scale-[0.97] transition-transform duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
       >
         Floor Plan
         <Icon name="heroicons:arrow-up-right-20-solid" class="h-3.5 w-3.5" />
@@ -98,21 +108,21 @@ function statusBadgeClass(status: string) {
       <div
         v-for="(res, idx) in reservations.upcoming"
         :key="res.uuid"
-        class="animate-row-enter py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors hover:bg-[#FDF8F3]/60 rounded-xl px-2 -mx-2"
+        class="animate-row-enter flex flex-col justify-between gap-3 py-3.5 sm:flex-row sm:items-center"
         :style="{ '--row-delay': `${idx * 60}ms` }"
       >
         <!-- Guest Details -->
         <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2">
-            <span class="font-display text-[14px] font-bold text-[#3D2B24] truncate">
+          <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <span class="min-w-0 max-w-full truncate font-display text-[14px] font-bold text-[#3B1F0E]">
               {{ res.customer_name }}
             </span>
-            <span class="inline-flex items-center gap-1 rounded bg-[#F6ECDD] px-1.5 py-0.5 text-[11px] font-semibold text-[#7D5A50]">
-              <Icon name="heroicons:users" class="h-3 w-3" />
+            <span class="inline-flex shrink-0 items-center gap-1 rounded bg-[#F6ECDD] px-1.5 py-0.5 text-[11px] font-semibold text-[#7D5A50]">
+              <Icon name="heroicons:users" class="h-3 w-3" aria-hidden="true" />
               {{ res.party_size }} {{ res.party_size === 1 ? 'guest' : 'guests' }}
             </span>
-            <span class="text-xs text-[#8B6656] font-medium">
-              &middot; {{ res.table_name }}
+            <span v-if="res.table_name" class="shrink-0 text-xs font-medium text-[#8B6656]">
+              {{ res.table_name }}
             </span>
           </div>
 
@@ -125,14 +135,17 @@ function statusBadgeClass(status: string) {
               <Icon name="heroicons:phone" class="h-3 w-3 text-[#A88879]" />
               {{ res.customer_phone }}
             </span>
-            <span v-if="res.notes" class="italic text-[#9E7A6B] truncate max-w-[240px]">
+            <span v-if="res.notes" class="max-w-[240px] truncate italic text-[#8B6656]" :title="res.notes">
               "{{ res.notes }}"
             </span>
           </div>
         </div>
 
-        <!-- Status Badge -->
-        <div class="flex items-center gap-2 shrink-0 self-start sm:self-center">
+        <!-- Booked time + Status Badge -->
+        <div class="flex shrink-0 items-center gap-2.5 self-start sm:self-center">
+          <span v-if="res.created_at" class="text-[11px] text-[#8B6656] tabular-nums" :title="new Date(res.created_at).toLocaleString('en-US')">
+            {{ formatBookedAt(res.created_at) }}
+          </span>
           <span
             :class="['px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize border', statusBadgeClass(res.status)]"
           >

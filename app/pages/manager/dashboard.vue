@@ -58,6 +58,13 @@ function closeTransactionModal() {
   selectedTxUuid.value = null
 }
 
+const transactionsCard = ref<InstanceType<typeof ManagerTransactionsCard> | null>(null)
+
+function refreshAll() {
+  loadStats()
+  transactionsCard.value?.refresh()
+}
+
 let requestId = 0
 
 async function loadStats() {
@@ -195,7 +202,7 @@ const todayDateFormatted = computed(() => {
 
               <span
                 v-if="branchDisplay.badge"
-                class="inline-block rounded-md border border-[#E3CFB4] bg-white px-2.5 py-0.5 font-mono text-[11px] font-medium tracking-wide uppercase text-[#7D5A50]"
+                class="inline-block rounded-md border border-[#E3CFB4] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#7D5A50]"
               >
                 {{ branchDisplay.badge }}
               </span>
@@ -235,12 +242,12 @@ const todayDateFormatted = computed(() => {
             <!-- Sharp Rectangular Refresh Button -->
             <button
               type="button"
-              class="inline-flex items-center gap-2 rounded-lg border border-[#D9C3A5] bg-white px-4 py-2 text-[13px] font-semibold text-[#3B1F0E] shadow-2xs transition-all duration-160 ease-out hover:border-[#3B1F0E] hover:bg-[#FFFDF9] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
+              class="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D9C3A5] bg-white px-4 text-[13px] font-semibold text-[#3B1F0E] shadow-[0_1px_2px_rgba(59,31,14,0.06)] transition-all duration-150 ease-out hover:border-[#3B1F0E] hover:bg-[#FFFDF9] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FDF3E7] disabled:cursor-wait disabled:opacity-60"
               :disabled="loading || refreshing"
-              @click="loadStats"
+              @click="refreshAll"
             >
-              <Icon name="heroicons:arrow-path-20-solid" class="h-4 w-4 text-[#7D5A50]" :class="{ 'animate-spin': loading || refreshing }" />
-              <span>Refresh</span>
+              <Icon name="heroicons:arrow-path-20-solid" class="h-4 w-4 text-[#7D5A50]" :class="{ 'animate-spin': loading || refreshing }" aria-hidden="true" />
+              <span>{{ refreshing ? 'Refreshing…' : 'Refresh' }}</span>
             </button>
           </div>
         </header>
@@ -324,6 +331,7 @@ const todayDateFormatted = computed(() => {
             <div class="scroll-reveal">
               <ManagerTransactionsCard
                 v-if="branchUuid"
+                ref="transactionsCard"
                 :branch-uuid="branchUuid"
                 @view-receipt="openTransactionModal"
               />
