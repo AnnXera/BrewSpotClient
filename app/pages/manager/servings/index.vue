@@ -347,24 +347,25 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
-          <ServingsIngredientsUsedPanel
-            v-model:search="ingredientSearch"
-            v-model:sort="ingredientSort"
-            :ingredients="ingredients"
-            :loading="loading"
-          />
-          <ServingsServingLogPanel :entries="log" :loading="loading" />
-        </div>
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+            <ServingsIngredientsUsedPanel
+              v-model:search="ingredientSearch"
+              v-model:sort="ingredientSort"
+              :ingredients="ingredients"
+              :loading="loading"
+            />
+            <ServingsServingLogPanel :entries="log" :loading="loading" />
+          </div>
 
-        <ServingsSpoilagePanel
-          :entries="spoilage"
-          :total="spoilageTotal"
-          :loading="loading"
-          :voiding-uuid="voidingUuid"
-          @void="voidTarget = $event"
-        />
-      </template>
+          <ServingsSpoilagePanel
+            :entries="spoilage"
+            :total="spoilageTotal"
+            :loading="loading"
+            :voiding-uuid="voidingUuid"
+            @void="voidTarget = $event"
+          />
+        </template>
+      </div>
 
       <CommonConfirmModal
         :show="!!voidTarget"

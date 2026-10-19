@@ -174,4 +174,21 @@ export class DevicePosService extends BaseService {
             reason
         })
     }
+
+    getFloorPlan() {
+        return this.get<{ success: boolean; floor_plan: any; floor_plans: any[] }>('/pos/device/floor-plan')
+    }
+
+    updateTableStatus(tableUuid: string, status: string) {
+        return this.patch<{ success: boolean; message: string; table: any }>('/pos/device/tables/' + tableUuid + '/status', { status })
+    }
+
+    getReservations(date?: string) {
+        const query = date ? `?date=${encodeURIComponent(date)}` : ''
+        return this.get<{ success: boolean; reservations: { data: any[]; current_page: number; last_page: number; total: number } }>('/pos/device/reservations' + query)
+    }
+
+    updateReservationStatus(reservationUuid: string, status: string) {
+        return this.patch<{ success: boolean; message: string; reservation: any }>('/pos/device/reservations/' + reservationUuid + '/status', { status })
+    }
 }

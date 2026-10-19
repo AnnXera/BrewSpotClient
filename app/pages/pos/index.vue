@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import logoIcon from '~/assets/images/logo-icon.svg'
+import FloorPlanModal from '~/components/pos/FloorPlanModal.vue'
 
 // POS Register uses its own auth via pos_device_token cookie
 // It does not use the standard user auth, so we don't define a 'role' requirement here.
@@ -286,6 +287,7 @@ function onEscape(e: KeyboardEvent) {
   else if (isPaymentModalOpen.value) closePayment()
   else if (isTransactionsModalOpen.value) isTransactionsModalOpen.value = false
   else if (isSpoilageOpen.value) isSpoilageOpen.value = false
+  else if (isFloorPlanOpen.value) isFloorPlanOpen.value = false
 }
 onMounted(() => {
   window.addEventListener('keydown', onEscape)
@@ -672,6 +674,7 @@ async function completeOrder() {
       isPaymentModalOpen.value = false
       isReceiptModalOpen.value = true
       cart.value = []
+      selectedTableForOrder.value = null
       amountTendered.value = ''
       referenceNumber.value = ''
       selectedDiscountType.value = 'none'
@@ -723,6 +726,20 @@ async function openTransactions() {
 
 // Spoilage: logged entries come out of the item's servings, so the menu's stock is reloaded.
 const isSpoilageOpen = ref(false)
+
+// Floor plan & table reservations modal
+const isFloorPlanOpen = ref(false)
+const selectedTableForOrder = ref<any>(null)
+
+function openFloorPlan() {
+  isFloorPlanOpen.value = true
+}
+
+function onTableSelectedFromFloorPlan(table: any) {
+  selectedTableForOrder.value = table
+  isFloorPlanOpen.value = false
+  showNotice(`Assigned ${table.table_name} to current order.`)
+}
 
 async function onSpoilageLogged() {
   try {
@@ -840,6 +857,9 @@ function formatCurrency(amount: number) {
               <span class="font-semibold text-base text-gray-700">{{ device.active_staff.firstname }}</span>
             </div>
             
+            <button type="button" @click="openFloorPlan" title="View floor plan and table reservations" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 min-h-11 rounded-md text-base font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
+              <Icon name="heroicons:map" class="w-4 h-4 text-[#7B5A50]" /> Tables
+            </button>
             <button @click="openTransactions" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 min-h-11 rounded-md text-base font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
               <Icon name="heroicons:document-text" class="w-4 h-4" /> Transactions
             </button>
@@ -1028,6 +1048,20 @@ function formatCurrency(amount: number) {
             </button>
           </div>
 
+          <!-- Table Assigned to Order Indicator -->
+          <div v-if="selectedTableForOrder" class="px-4 py-2 bg-[#FDF3E7] border-b border-[#E3CFB4] flex items-center justify-between text-xs font-semibold text-[#3B1F0E]">
+            <span class="flex items-center gap-1.5 truncate">
+              <Icon name="heroicons:map-pin" class="w-4 h-4 text-[#7D5A50] shrink-0" />
+              <span>Table: {{ selectedTableForOrder.table_name }} ({{ selectedTableForOrder.capacity }} seats)</span>
+              <span v-if="selectedTableForOrder.range_label || selectedTableForOrder.upcoming_reservation?.range_label" class="ml-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-mono font-bold">
+                🕒 {{ selectedTableForOrder.range_label || selectedTableForOrder.upcoming_reservation?.range_label }}
+              </span>
+            </span>
+            <button @click="selectedTableForOrder = null" title="Remove table from order" class="text-[#8B6656] hover:text-red-700 ml-2">
+              <Icon name="heroicons:x-mark" class="w-4 h-4" />
+            </button>
+          </div>
+
           <div v-if="orderNotice" role="status" class="px-4 py-2 bg-gray-800 text-white text-sm flex items-center justify-between gap-3 shrink-0">
             <span>{{ orderNotice.text }}</span>
             <button v-if="orderNotice.restore" @click="undoClear" class="min-h-11 px-3 -mr-3 font-semibold underline">Undo</button>
@@ -1197,6 +1231,15 @@ function formatCurrency(amount: number) {
         :items="menuItems"
         @close="isSpoilageOpen = false"
         @logged="onSpoilageLogged"
+      />
+
+      <!-- ── FLOOR PLAN & TABLE RESERVATIONS ───────────────────────────── -->
+      <FloorPlanModal
+        v-if="isFloorPlanOpen"
+        :show="isFloorPlanOpen"
+        :branch-name="device?.branch_name"
+        @close="isFloorPlanOpen = false"
+        @select-table="onTableSelectedFromFloorPlan"
       />
 
       <!-- ── SIZE AND ADD-ON PICKER ───────────────────────────────────────── -->
