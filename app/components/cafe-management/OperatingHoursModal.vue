@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import { useOperatingHours, sanitizeSchedule, DEFAULT_SCHEDULE, type DaySchedule } from '~/composables/useOperatingHours'
 
 const props = defineProps<{
@@ -13,53 +13,73 @@ const emit = defineEmits<{
   (e: 'save', schedule: DaySchedule[]): void
 }>()
 
-const { operatingHours, formatTime12h } = useOperatingHours()
+const { operatingHours } = useOperatingHours()
 
 const weekSchedule = ref<DaySchedule[]>([])
 const localError = ref('')
+const errorDay = ref<string | null>(null)
+const copyMenuDay = ref<string | null>(null)
 
-const customOpenTime = ref('08:00')
-const customCloseTime = ref('22:00')
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 
-watch(() => props.show, (newVal) => {
-  if (newVal) {
+function onKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return
+  if (copyMenuDay.value) copyMenuDay.value = null
+  else emit('close')
+}
+
+watch(() => props.show, (open) => {
+  if (open) {
     weekSchedule.value = sanitizeSchedule(operatingHours.value)
     localError.value = ''
+    errorDay.value = null
+    copyMenuDay.value = null
+  }
+  if (import.meta.client) {
+    if (open) window.addEventListener('keydown', onKeydown)
+    else window.removeEventListener('keydown', onKeydown)
   }
 }, { immediate: true })
 
-function applyCustomTime() {
-  weekSchedule.value.forEach(item => {
-    item.isOpen = true
-    item.openTime = customOpenTime.value
-    item.closeTime = customCloseTime.value
-    item.is24Hours = false
-  })
-}
-
-function toggleAllDays(isOpen: boolean) {
-  weekSchedule.value.forEach(item => {
-    item.isOpen = isOpen
-  })
-}
-
-function handleResetDefaults() {
-  weekSchedule.value = sanitizeSchedule(DEFAULT_SCHEDULE)
-}
+onBeforeUnmount(() => {
+  if (import.meta.client) window.removeEventListener('keydown', onKeydown)
+})
 
 function closesAfterMidnight(item: DaySchedule) {
   return item.isOpen && !item.is24Hours && !!item.openTime && !!item.closeTime && item.closeTime < item.openTime
 }
 
-const activeDay = ref<string | null>(null)
+function copyFrom(source: DaySchedule, target: 'weekdays' | 'all') {
+  weekSchedule.value.forEach(d => {
+    if (d.day === source.day) return
+    if (target === 'weekdays' && !WEEKDAYS.includes(d.day)) return
+    d.isOpen = source.isOpen
+    d.is24Hours = source.is24Hours
+    d.openTime = source.openTime
+    d.closeTime = source.closeTime
+  })
+  copyMenuDay.value = null
+}
+
+function onCopyMenuBlur(e: FocusEvent) {
+  const wrapper = e.currentTarget as HTMLElement
+  if (!wrapper.contains(e.relatedTarget as Node | null)) copyMenuDay.value = null
+}
+
+function handleResetDefaults() {
+  weekSchedule.value = sanitizeSchedule(DEFAULT_SCHEDULE)
+  errorDay.value = null
+  localError.value = ''
+}
 
 function handleSave() {
   localError.value = ''
+  errorDay.value = null
 
   const sameTimes = weekSchedule.value.find(d => d.isOpen && !d.is24Hours && d.openTime === d.closeTime)
   if (sameTimes) {
-    localError.value = `${sameTimes.day}: opening and closing time can't be the same. Use 24 Hours instead.`
-    activeDay.value = sameTimes.day
+    localError.value = `${sameTimes.day}: opening and closing time can't be the same. Turn on 24h instead.`
+    errorDay.value = sameTimes.day
     return
   }
 
@@ -70,154 +90,179 @@ function handleSave() {
 <template>
   <div v-if="show" class="fixed inset-0 z-[999] flex items-center justify-center p-4 overflow-y-auto">
     <!-- Overlay -->
-    <div 
-      class="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
-      @click="emit('close')"
-    ></div>
+    <div class="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" @click="emit('close')"></div>
 
-    <!-- Modal Content -->
-    <div class="relative bg-white rounded-3xl w-full max-w-[806px] my-auto flex flex-col shadow-2xl">
-      
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="hours-dialog-title"
+      class="relative bg-white rounded-3xl w-full max-w-[720px] my-auto flex flex-col shadow-2xl"
+    >
       <!-- Header -->
-      <div class="flex items-center justify-between px-6 md:px-8 py-5 border-b border-[#EEDFC4] shrink-0">
-        <h2 class="text-xl md:text-2xl font-display font-bold text-[#3B1F0E]">
-          Operating Hours
-        </h2>
-        <button 
+      <div class="flex items-start justify-between gap-4 px-6 md:px-8 py-5 border-b border-[#EEDFC4]">
+        <div>
+          <h2 id="hours-dialog-title" class="text-xl md:text-2xl font-display font-bold text-[#3B1F0E]">Opening hours</h2>
+          <p class="text-sm text-[#9E7060] mt-0.5">One schedule, shared by every branch. Times are Philippine time.</p>
+        </div>
+        <button
+          type="button"
           @click="emit('close')"
-          class="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F5] text-[#7D5A50] hover:bg-[#EEDFC4] transition-colors focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/40"
-          title="Close Modal"
+          aria-label="Close"
+          class="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg bg-[#F5F5F5] text-[#7D5A50] hover:bg-[#EEDFC4] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
         >
           <Icon name="heroicons:x-mark" class="w-5 h-5" />
         </button>
       </div>
 
-      <!-- Body -->
-      <div class="p-6 md:p-8 flex flex-col gap-6 md:gap-8">
-        
-        <!-- Quick Fill -->
-        <div class="flex flex-col md:flex-row gap-6">
-          <div class="flex-1">
-            <div class="flex items-center justify-between mb-2">
-              <label class="block text-xs font-bold text-[#B4846C] uppercase tracking-wider">Quick Custom Setter</label>
-              <div class="flex items-center gap-2 text-xs text-[#7D5A50]">
-                <button @click="toggleAllDays(true)" class="hover:underline font-bold">Select All</button>
-                <span class="text-[#EEDFC4]">|</span>
-                <button @click="toggleAllDays(false)" class="hover:underline font-bold">Deselect All</button>
-              </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-3 bg-[#fef8f0] p-4 rounded-xl border border-[#EEDFC4]">
-              <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-[#EEDFC4]">
-                <span class="text-xs font-bold text-[#B4846C]">Open:</span>
-                <input type="time" v-model="customOpenTime" class="text-sm font-bold text-[#3B1F0E] focus:outline-none" />
-              </div>
-              <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-[#EEDFC4]">
-                <span class="text-xs font-bold text-[#B4846C]">Close:</span>
-                <input type="time" v-model="customCloseTime" class="text-sm font-bold text-[#3B1F0E] focus:outline-none" />
-              </div>
-              <button @click="applyCustomTime" class="px-4 py-2 rounded-lg bg-[#7D5A50] text-white text-sm font-bold hover:bg-[#5C413A] transition">
-                Apply to All
-              </button>
-            </div>
-          </div>
-        </div>
+      <!-- Week -->
+      <ul class="px-3 md:px-5 py-3 divide-y divide-[#F3E7D2]">
+        <li
+          v-for="item in weekSchedule"
+          :key="item.day"
+          class="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[6.5rem_auto_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-2.5 px-3 py-3 rounded-xl"
+          :class="errorDay === item.day ? 'bg-red-50 ring-1 ring-red-200' : ''"
+        >
+          <!-- Day + open switch -->
+          <div class="flex items-center gap-3 md:contents">
+          <span class="font-bold text-[15px]" :class="item.isOpen ? 'text-[#3B1F0E]' : 'text-[#9E7060]'">{{ item.day }}</span>
 
-        <hr class="border-[#EEDFC4]" />
-
-        <!-- Weekly Schedule Accordion -->
-        <div>
-          <label class="block text-xs font-bold text-[#B4846C] uppercase tracking-wider mb-4">Weekly Schedule</label>
-          <div class="flex flex-col gap-3">
-            <div 
-              v-for="item in weekSchedule" 
-              :key="item.day"
-              class="border border-[#EEDFC4] rounded-xl overflow-hidden bg-[#fef8f0]"
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="item.isOpen"
+            :aria-label="`${item.day} open`"
+            @click="item.isOpen = !item.isOpen"
+            class="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 focus-visible:ring-offset-2"
+          >
+            <span
+              aria-hidden="true"
+              class="relative inline-flex h-5 w-9 items-center rounded-full border transition-colors"
+              :class="item.isOpen ? 'border-[#7D5A50] bg-[#7D5A50]' : 'border-[#B4846C] bg-white'"
             >
-              <!-- Accordion Header -->
-              <div 
-                @click="activeDay = activeDay === item.day ? null : item.day"
-                class="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-[#FBF2E1] transition-colors"
-              >
-                <div class="flex items-center gap-4">
-                  <input 
-                    type="checkbox" 
-                    v-model="item.isOpen" 
-                    @click.stop 
-                    class="w-4 h-4 rounded border-[#EEDFC4] text-[#7D5A50] focus:ring-[#7D5A50]"
-                  />
-                  <span class="font-bold text-[#3B1F0E] text-[15px]">{{ item.day }}</span>
-                </div>
-                <div class="flex items-center gap-4">
-                  <span v-if="!item.isOpen" class="text-xs font-bold text-red-500 bg-red-50 px-3 py-1 rounded-lg">Closed</span>
-                  <span v-else-if="item.is24Hours" class="text-xs font-bold text-[#B4846C] bg-white px-3 py-1 rounded-lg border border-[#EEDFC4]">24 Hours</span>
-                  <span v-else class="text-xs font-bold text-[#B4846C] bg-white px-3 py-1 rounded-lg border border-[#EEDFC4]">
-                    {{ formatTime12h(item.openTime) }} - {{ formatTime12h(item.closeTime) }}<template v-if="closesAfterMidnight(item)"> (next day)</template>
-                  </span>
-                  <Icon 
-                    name="heroicons:chevron-down" 
-                    class="w-6 h-6 text-[#B4846C] transition-transform" 
-                    :class="{'rotate-180': activeDay === item.day}" 
-                  />
-                </div>
-              </div>
+              <span
+                class="rounded-full transition-[transform,width,height,background-color]"
+                :class="item.isOpen ? 'h-4 w-4 translate-x-[17px] bg-white shadow-sm' : 'h-3.5 w-3.5 translate-x-[2px] bg-[#B4846C]'"
+              ></span>
+            </span>
+          </button>
+          </div>
 
-              <!-- Accordion Content -->
-              <div 
-                v-show="activeDay === item.day"
-                class="p-5 border-t border-[#EEDFC4] bg-white flex flex-col sm:flex-row sm:items-center gap-6"
+          <!-- Times -->
+          <div class="col-span-2 order-last md:col-span-1 md:order-none flex flex-wrap items-center gap-2 min-w-0 tabular-nums">
+            <template v-if="!item.isOpen">
+              <span class="text-sm font-semibold text-[#9E7060]">Closed</span>
+            </template>
+            <template v-else-if="item.is24Hours">
+              <span class="text-sm font-semibold text-[#3B1F0E]">Open 24 hours</span>
+            </template>
+            <template v-else>
+              <input
+                type="time"
+                v-model="item.openTime"
+                :aria-label="`${item.day} opening time`"
+                class="w-[8.25rem] bg-[#FEF8F0] border border-[#EEDFC4] text-[#3B1F0E] rounded-lg px-2.5 py-1.5 text-sm font-bold outline-none focus:ring-2 focus:ring-[#7D5A50]/40"
+              />
+              <span class="text-[#B4846C] font-bold" aria-hidden="true">to</span>
+              <input
+                type="time"
+                v-model="item.closeTime"
+                :aria-label="`${item.day} closing time`"
+                class="w-[8.25rem] bg-[#FEF8F0] border border-[#EEDFC4] text-[#3B1F0E] rounded-lg px-2.5 py-1.5 text-sm font-bold outline-none focus:ring-2 focus:ring-[#7D5A50]/40"
+              />
+              <span
+                v-if="closesAfterMidnight(item)"
+                class="text-[11px] font-bold text-[#7D5A50] bg-[#FBF2E1] px-1.5 py-0.5 rounded-md whitespace-nowrap"
+                title="Closes the next day"
+              >+1 day</span>
+            </template>
+          </div>
+
+          <!-- 24h + copy -->
+          <div class="flex items-center justify-end gap-3 md:contents">
+            <label
+              class="inline-flex items-center gap-2 text-sm font-semibold text-[#5C4037] cursor-pointer"
+              :class="{ 'opacity-40 pointer-events-none': !item.isOpen }"
+            >
+              <input
+                type="checkbox"
+                v-model="item.is24Hours"
+                :disabled="!item.isOpen"
+                class="w-4 h-4 rounded border-[#D9C4A8] text-[#7D5A50] focus:ring-[#7D5A50]"
+              />
+              24h
+            </label>
+
+            <div class="relative" @focusout="onCopyMenuBlur">
+              <button
+                type="button"
+                @click="copyMenuDay = copyMenuDay === item.day ? null : item.day"
+                :aria-expanded="copyMenuDay === item.day"
+                aria-haspopup="menu"
+                :aria-label="`Copy ${item.day}'s hours to other days`"
+                class="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-bold text-[#7D5A50] hover:bg-[#FBF2E1] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
               >
-                <div class="flex-1 flex items-center gap-4" :class="{'opacity-40 pointer-events-none': !item.isOpen || item.is24Hours}">
-                  <div class="flex flex-col gap-1">
-                    <span class="text-xs font-bold text-[#B4846C] uppercase">Opening Time</span>
-                    <input type="time" v-model="item.openTime" class="bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl px-4 py-2 font-bold focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/40" />
-                  </div>
-                  <span class="text-[#B4846C] font-bold mt-5">-</span>
-                  <div class="flex flex-col gap-1">
-                    <span class="text-xs font-bold text-[#B4846C] uppercase">Closing Time</span>
-                    <input type="time" v-model="item.closeTime" class="bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl px-4 py-2 font-bold focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/40" />
-                  </div>
-                </div>
-                <label class="flex items-center gap-3 cursor-pointer mt-5 sm:mt-0" :class="{'opacity-40 pointer-events-none': !item.isOpen}">
-                  <input type="checkbox" v-model="item.is24Hours" class="w-5 h-5 rounded border-[#EEDFC4] text-[#7D5A50] focus:ring-[#7D5A50]" />
-                  <span class="text-base font-bold text-[#3B1F0E]">24 Hours</span>
-                </label>
+                <Icon name="heroicons:document-duplicate" class="w-4 h-4 text-[#B4846C]" />
+                Copy
+              </button>
+              <div
+                v-if="copyMenuDay === item.day"
+                role="menu"
+                class="absolute right-0 top-full mt-1 z-10 w-44 bg-white border border-[#EEDFC4] rounded-xl shadow-lg py-1"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  @click="copyFrom(item, 'weekdays')"
+                  class="w-full text-left px-3 py-2 text-sm font-semibold text-[#3B1F0E] hover:bg-[#FBF2E1] focus:bg-[#FBF2E1] outline-none"
+                >
+                  Copy to weekdays
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  @click="copyFrom(item, 'all')"
+                  class="w-full text-left px-3 py-2 text-sm font-semibold text-[#3B1F0E] hover:bg-[#FBF2E1] focus:bg-[#FBF2E1] outline-none"
+                >
+                  Copy to all days
+                </button>
               </div>
             </div>
           </div>
-        </div>
+        </li>
+      </ul>
 
-      </div>
-
-      <p v-if="localError || error" class="px-6 md:px-8 pb-4 text-sm font-bold text-red-600 whitespace-pre-line">
+      <p v-if="localError || error" role="alert" class="px-6 md:px-8 pb-4 text-sm font-bold text-red-700 whitespace-pre-line">
         {{ localError || error }}
       </p>
 
       <!-- Footer -->
-      <div class="flex items-center justify-between px-6 md:px-8 py-5 border-t border-[#EEDFC4] shrink-0 bg-[#FAFAF8] rounded-b-3xl">
-        <button 
-          @click="handleResetDefaults" 
-          class="text-sm font-bold text-[#B4846C] hover:text-[#7D5A50] underline focus:outline-none"
+      <div class="flex items-center justify-between px-6 md:px-8 py-5 border-t border-[#EEDFC4] bg-[#FAFAF8] rounded-b-3xl">
+        <button
+          type="button"
+          @click="handleResetDefaults"
+          class="text-sm font-bold text-[#9E7060] hover:text-[#7D5A50] underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 rounded"
         >
-          Reset Defaults
+          Reset to defaults
         </button>
         <div class="flex items-center gap-3">
-          <button 
-            @click="emit('close')" 
-            class="px-6 py-2.5 rounded-xl border border-[#EEDFC4] text-[#7D5A50] font-bold hover:bg-[#FDF3E7] transition focus:outline-none"
+          <button
+            type="button"
+            @click="emit('close')"
+            class="px-6 py-2.5 rounded-xl border border-[#EEDFC4] text-[#7D5A50] font-bold hover:bg-[#FDF3E7] transition outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
           >
             Cancel
           </button>
-          <button 
-            @click="handleSave" 
+          <button
+            type="button"
+            @click="handleSave"
             :disabled="saving"
-            class="px-6 py-2.5 rounded-xl bg-[#7D5A50] text-white font-bold hover:bg-[#5C413A] transition shadow-md flex items-center gap-2 disabled:opacity-50 focus:outline-none"
+            class="px-6 py-2.5 rounded-xl bg-[#7D5A50] text-white font-bold hover:bg-[#5C413A] transition shadow-md flex items-center gap-2 disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 focus-visible:ring-offset-2"
           >
             <Icon v-if="saving" name="heroicons:arrow-path" class="w-5 h-5 animate-spin" />
-            <span>Save Schedule</span>
+            <span>Save hours</span>
           </button>
         </div>
       </div>
-      
     </div>
   </div>
 </template>
