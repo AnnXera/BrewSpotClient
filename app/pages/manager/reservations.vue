@@ -16,12 +16,12 @@ const links = [
   { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
 ]
 
-// Statuses that hold a table for their window (mirrors floor_plan.blocking_reservation_statuses).
+// Statuses that hold a table (mirrors floor_plan.blocking_reservation_statuses).
+// A booking holds its table for the whole day: guests may stay as long as they like.
 const BLOCKING = ['pending', 'confirmed', 'seated']
 const SLOT_MINUTES = 30
 const FIRST_SLOT = 6 * 60
 const LAST_SLOT_END = 22 * 60
-const DURATIONS = [60, 90, 120]
 const DATE_STRIP_DAYS = 14
 const PLAN_MAX_SCALE = 1.5
 const PLAN_MIN_SCALE = 0.6
@@ -84,7 +84,6 @@ function nextSlotMinutes(from: Date) {
 const todayDate = computed(() => localDateKey(now.value))
 const selectedDate = ref(todayDate.value)
 const selectedTime = ref(minutesToTime(nextSlotMinutes(now.value)))
-const duration = ref(90)
 
 const reservation = reactive({
   customerName: '',
@@ -111,12 +110,23 @@ const filteredReservations = computed(() => {
 
 // ── Date and time window ────────────────────────────────────────────
 
+// Minutes may reach 24:00, which lands on the next day's midnight.
 function dateAt(date: string, minutes: number) {
-  return new Date(`${date}T${minutesToTime(minutes)}:00`)
+  const day = new Date(`${date}T00:00:00`)
+  day.setMinutes(minutes)
+  return day
 }
 
+// The closing time of the open window that contains the given arrival minute.
+function closingMinutes(dateKey: string, minutes: number) {
+  const range = openWindows(dateKey).find(([open, close]) => minutes >= open && minutes < close)
+  return range ? range[1] : minutes + SLOT_MINUTES
+}
+
+// The booking runs from arrival to closing, so the guests' stay is never cut short.
 const windowStart = computed(() => dateAt(selectedDate.value, timeToMinutes(selectedTime.value)))
-const windowEnd = computed(() => new Date(windowStart.value.getTime() + duration.value * 60_000))
+const windowEnd = computed(() =>
+  dateAt(selectedDate.value, closingMinutes(selectedDate.value, timeToMinutes(selectedTime.value))))
 const windowIsPast = computed(() => windowStart.value.getTime() < now.value.getTime() - 5 * 60_000)
 const windowIncludesNow = computed(() =>
   windowStart.value.getTime() <= now.value.getTime() && now.value.getTime() < windowEnd.value.getTime())
@@ -168,13 +178,6 @@ function formatSlot(minutes: number) {
   return formatClock(dateAt(todayDate.value, minutes))
 }
 
-function formatDuration(minutes: number) {
-  const hours = Math.floor(minutes / 60)
-  const rest = minutes % 60
-  if (!hours) return `${rest} min`
-  return rest ? `${hours}h ${rest}m` : `${hours}h`
-}
-
 // ── Availability ────────────────────────────────────────────────────
 
 function reservationDateValue(value: string) {
@@ -200,23 +203,19 @@ const activeDayReservations = computed(() =>
     }))
     .filter((entry): entry is { item: ReservationRecord; start: Date; end: Date } => Boolean(entry.start && entry.end)))
 
-function overlapping(start: Date, end: Date) {
-  return activeDayReservations.value.filter((entry) =>
-    entry.start.getTime() < end.getTime() && start.getTime() < entry.end.getTime())
-}
-
 // Counter seating is booked by seats, so it only fills up once every seat is taken.
 function isShared(table: FloorPlanTable) {
   return /^table_bar_\d+$/.test(table.asset_key ?? '')
 }
 
-function tableHolds(table: FloorPlanTable, start: Date, end: Date) {
-  return overlapping(start, end).filter((entry) => entry.item.table?.uuid === table.uuid)
+// Any active booking on the selected date holds its table for the whole day.
+function tableHolds(table: FloorPlanTable) {
+  return activeDayReservations.value.filter((entry) => entry.item.table?.uuid === table.uuid)
 }
 
-function tableIsTaken(table: FloorPlanTable, start: Date, end: Date, includesNow: boolean) {
+function tableIsTaken(table: FloorPlanTable, includesNow: boolean) {
   if (includesNow && table.status !== 'available') return true
-  const holds = tableHolds(table, start, end)
+  const holds = tableHolds(table)
   if (!holds.length) return false
   if (!isShared(table)) return true
   const seats = holds.reduce((sum, entry) => sum + entry.item.party_size, 0)
@@ -225,7 +224,7 @@ function tableIsTaken(table: FloorPlanTable, start: Date, end: Date, includesNow
 
 const takenTables = computed(() => new Set(
   planTables.value
-    .filter((table) => tableIsTaken(table, windowStart.value, windowEnd.value, windowIncludesNow.value))
+    .filter((table) => tableIsTaken(table, windowIncludesNow.value))
     .map((table) => table.uuid),
 ))
 
@@ -266,11 +265,11 @@ const dayIsClosed = computed(() => !openWindows(selectedDate.value).length)
 const slots = computed(() => {
   const list = []
   for (const [open, close] of openWindows(selectedDate.value)) {
-    for (let minutes = Math.ceil(open / SLOT_MINUTES) * SLOT_MINUTES; minutes + duration.value <= close; minutes += SLOT_MINUTES) {
+    const end = dateAt(selectedDate.value, close)
+    for (let minutes = Math.ceil(open / SLOT_MINUTES) * SLOT_MINUTES; minutes + SLOT_MINUTES <= close; minutes += SLOT_MINUTES) {
       const start = dateAt(selectedDate.value, minutes)
-      const end = new Date(start.getTime() + duration.value * 60_000)
       const includesNow = start.getTime() <= now.value.getTime() && now.value.getTime() < end.getTime()
-      const free = planTables.value.filter((table) => !tableIsTaken(table, start, end, includesNow)).length
+      const free = planTables.value.filter((table) => !tableIsTaken(table, includesNow)).length
       list.push({
         time: minutesToTime(minutes),
         label: formatSlot(minutes),
@@ -286,8 +285,7 @@ const noSlotsLeft = computed(() => !slots.value.some((slot) => !slot.past))
 const selectedSlotValid = computed(() => slots.value.some((slot) => slot.time === selectedTime.value && !slot.past))
 
 function seatIsOccupied(chair: FloorPlanElement) {
-  return overlapping(windowStart.value, windowEnd.value)
-    .some((entry) => entry.item.seat_element_uuid === chair.uuid)
+  return activeDayReservations.value.some((entry) => entry.item.seat_element_uuid === chair.uuid)
 }
 
 function tableVisualStatus(table: FloorPlanTable) {
@@ -295,7 +293,7 @@ function tableVisualStatus(table: FloorPlanTable) {
 }
 
 const inspectedHolds = computed(() =>
-  inspectedTable.value ? tableHolds(inspectedTable.value, windowStart.value, windowEnd.value) : [])
+  inspectedTable.value ? tableHolds(inspectedTable.value) : [])
 
 const inspectedReason = computed(() => {
   const table = inspectedTable.value
@@ -362,13 +360,13 @@ function selectChair(chair: FloorPlanElement) {
 }
 
 // A selection made for one window must not survive into a window where it is taken.
-watch([selectedDate, selectedTime, duration, dayReservations], () => {
+watch([selectedDate, selectedTime, dayReservations], () => {
   if (selectedTable.value && takenTables.value.has(selectedTable.value.uuid)) {
-    reservationError.value = `${selectedTable.value.table_name} is reserved at this time. Choose another table.`
+    reservationError.value = `${selectedTable.value.table_name} is reserved on this date. Choose another table.`
     selectedTable.value = null
     selectedChair.value = null
   } else if (selectedChair.value && seatIsOccupied(selectedChair.value)) {
-    reservationError.value = 'That seat is reserved at this time. Choose another seat.'
+    reservationError.value = 'That seat is reserved on this date. Choose another seat.'
     selectedTable.value = null
     selectedChair.value = null
   }
@@ -574,8 +572,10 @@ function tableNumber(item: ReservationRecord) {
 const agenda = computed(() =>
   [...activeDayReservations.value].sort((a, b) => a.start.getTime() - b.start.getTime()))
 
-function agendaOverlapsWindow(entry: { start: Date; end: Date }) {
-  return entry.start.getTime() < windowEnd.value.getTime() && windowStart.value.getTime() < entry.end.getTime()
+// Bookings that arrive in the selected time slot.
+function agendaInSelectedSlot(entry: { start: Date }) {
+  const offset = entry.start.getTime() - windowStart.value.getTime()
+  return offset >= 0 && offset < SLOT_MINUTES * 60_000
 }
 
 function jumpTo(entry: { start: Date }) {
@@ -636,7 +636,7 @@ async function confirmReservation() {
 function openOnBookableDay() {
   if (!noSlotsLeft.value) return
   const day = dateStrip.value.find((item) => item.key > selectedDate.value && openWindows(item.key)
-    .some(([open, close]) => close - Math.ceil(open / SLOT_MINUTES) * SLOT_MINUTES >= duration.value))
+    .some(([open, close]) => close - Math.ceil(open / SLOT_MINUTES) * SLOT_MINUTES >= SLOT_MINUTES))
   if (day) selectedDate.value = day.key
 }
 
@@ -703,7 +703,7 @@ onBeforeUnmount(() => {
         </div>
       </header>
 
-      <!-- When: date strip, time slots, duration -->
+      <!-- When: date strip, arrival time -->
       <section class="mt-6 rounded-2xl border border-[#E8D7C7] bg-[#FFFDF9] p-4 md:p-5" aria-label="Reservation date and time">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h2 class="font-display text-lg font-semibold text-[#3B2A24]">{{ selectedDateLabel }}</h2>
@@ -771,24 +771,9 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#F0E3D6] pt-4">
+        <div class="mt-3 flex flex-wrap items-baseline justify-between gap-3 border-t border-[#F0E3D6] pt-4">
           <h3 class="text-sm font-medium text-[#3B2A24]">Arrival time</h3>
-          <div class="flex items-center gap-2 text-sm text-[#76605A]">
-            <span id="duration-label">Stay</span>
-            <div class="flex rounded-lg border border-[#DCC8B8] bg-white p-0.5" role="group" aria-labelledby="duration-label">
-              <button
-                v-for="option in DURATIONS"
-                :key="option"
-                type="button"
-                :aria-pressed="duration === option"
-                class="rounded-md px-3 py-1 text-xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
-                :class="duration === option ? 'bg-[#7D5A50] text-white' : 'text-[#5B463C] hover:bg-[#F8EFE7]'"
-                @click="duration = option"
-              >
-                {{ formatDuration(option) }}
-              </button>
-            </div>
-          </div>
+          <p class="text-xs text-[#76605A]">A booked table is held for the whole day.</p>
         </div>
 
         <p v-if="dayIsClosed || noSlotsLeft" class="mt-3 rounded-xl border border-dashed border-[#DCC8B8] px-4 py-3 text-sm text-[#5B463C]">
@@ -851,7 +836,7 @@ onBeforeUnmount(() => {
                 <template v-else-if="planTables.length">
                   <strong class="font-display text-base font-semibold tabular-nums text-[#3B2A24]">{{ freeTableCount }} of {{ planTables.length }}</strong>
                   tables free
-                  <span class="text-[#76605A]">· {{ formatClock(windowStart) }} to {{ formatClock(windowEnd) }}</span>
+                  <span class="text-[#76605A]">for the day</span>
                   <span v-if="dayLoading" class="ml-1 text-[#76605A]">· updating</span>
                 </template>
               </p>
@@ -930,7 +915,7 @@ onBeforeUnmount(() => {
                     ]"
                     :style="{ left: `${table.x_location}px`, top: `${table.y_location}px`, width: `${tableSize(table).w}px`, height: `${tableSize(table).h}px`, transform: `rotate(${table.rotation}deg)`, zIndex: 50 }"
                     :aria-label="takenTables.has(table.uuid)
-                      ? `${table.table_name}, reserved at this time`
+                      ? `${table.table_name}, reserved on this date`
                       : `${table.table_name}, ${table.capacity} seats, available`"
                     :aria-pressed="selectedTable?.uuid === table.uuid"
                     @click="selectTable(table)"
@@ -961,13 +946,13 @@ onBeforeUnmount(() => {
                 <button
                   type="button"
                   class="grid w-full grid-cols-[96px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm transition-colors hover:bg-[#F8EFE7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/30"
-                  :class="agendaOverlapsWindow(entry) ? 'bg-[#F8EFE7]' : ''"
+                  :class="agendaInSelectedSlot(entry) ? 'bg-[#F8EFE7]' : ''"
                   :title="`Show the floor at ${formatClock(entry.start)}`"
                   @click="jumpTo(entry)"
                 >
                   <span class="tabular-nums text-[#3B2A24]">
                     {{ formatClock(entry.start) }}
-                    <span class="block text-[11px] text-[#76605A]">to {{ formatClock(entry.end) }}</span>
+                    <span class="block text-[11px] text-[#76605A]">arrival</span>
                   </span>
                   <span class="min-w-0">
                     <span class="block truncate font-medium text-[#3B2A24]">{{ entry.item.customer_name }}</span>
@@ -991,24 +976,24 @@ onBeforeUnmount(() => {
               <dd class="font-medium text-[#3B2A24]">{{ new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(windowStart) }}</dd>
             </div>
             <div class="bg-[#FFFDF9] px-3 py-2">
-              <dt class="text-[11px] text-[#76605A]">Time</dt>
-              <dd class="font-medium tabular-nums text-[#3B2A24]">{{ selectedSlotValid ? `${formatClock(windowStart)} · ${formatDuration(duration)}` : 'Pick a time' }}</dd>
+              <dt class="text-[11px] text-[#76605A]">Arrival</dt>
+              <dd class="font-medium tabular-nums text-[#3B2A24]">{{ selectedSlotValid ? formatClock(windowStart) : 'Pick a time' }}</dd>
             </div>
           </dl>
 
           <div v-if="inspectedTable" class="mt-4 rounded-xl border border-[#BDBDBD] bg-[#F4F4F4] p-3 text-sm text-[#3B2A24]">
             <div class="flex items-center justify-between gap-2">
-              <p class="font-medium">{{ inspectedTable.table_name }} is reserved</p>
+              <p class="font-medium">{{ inspectedTable.table_name }} is {{ inspectedHolds.length ? 'reserved for the day' : 'unavailable' }}</p>
               <button type="button" class="text-xs text-[#5B463C] underline underline-offset-2" @click="inspectedTable = null">Dismiss</button>
             </div>
             <ul v-if="inspectedHolds.length" class="mt-2 space-y-1.5">
               <li v-for="entry in inspectedHolds" :key="entry.item.uuid" class="text-xs text-[#5B463C]">
-                <span class="tabular-nums">{{ formatClock(entry.start) }} to {{ formatClock(entry.end) }}</span>
+                <span class="tabular-nums">Arrives {{ formatClock(entry.start) }}</span>
                 · {{ entry.item.customer_name }} · {{ entry.item.party_size }} guest{{ entry.item.party_size === 1 ? '' : 's' }}
               </li>
             </ul>
             <p v-else class="mt-1 text-xs text-[#5B463C]">{{ inspectedReason }}</p>
-            <p class="mt-2 text-xs text-[#76605A]">Choose a white table, or try another time.</p>
+            <p class="mt-2 text-xs text-[#76605A]">Choose a white table, or try another date.</p>
           </div>
 
           <div v-else-if="selectedTable" class="mt-4 flex items-center justify-between gap-3 rounded-xl bg-[#7D5A50] px-3 py-3 text-[#FFF0D1]">
