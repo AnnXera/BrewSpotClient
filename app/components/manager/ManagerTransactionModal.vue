@@ -1,12 +1,18 @@
 <!-- app/components/manager/ManagerTransactionModal.vue -->
 <script setup lang="ts">
 import type { ManagerTransactionDetail } from '~/services/ManagerDashboardService'
+import type { OwnerTransactionDetail } from '~/services/OwnerAnalyticsService'
 import { formatCount, formatMethod, formatPeso, formatPesoCents } from '~/utils/dashboardFormat'
+
+// The owner's transaction log passes its own loader (no branch needed) and gets the
+// branch and refund details on top of the manager receipt.
+type Detail = ManagerTransactionDetail & Partial<Pick<OwnerTransactionDetail, 'branch_name' | 'changed_at' | 'refund'>>
 
 const props = defineProps<{
   show: boolean
   transactionUuid: string | null
-  branchUuid: string
+  branchUuid?: string
+  loader?: (uuid: string) => Promise<{ success: boolean; transaction: Detail }>
 }>()
 
 const emit = defineEmits<{
@@ -14,18 +20,20 @@ const emit = defineEmits<{
 }>()
 
 const service = useManagerDashboardService()
-const detail = ref<ManagerTransactionDetail | null>(null)
+const detail = ref<Detail | null>(null)
 const loading = ref(false)
 const error = ref('')
 const copied = ref(false)
 let copyTimer: any
 
 async function loadDetail() {
-  if (!props.transactionUuid || !props.branchUuid) return
+  if (!props.transactionUuid || (!props.loader && !props.branchUuid)) return
   loading.value = true
   error.value = ''
   try {
-    const res = await service.getTransaction(props.branchUuid, props.transactionUuid)
+    const res = props.loader
+      ? await props.loader(props.transactionUuid)
+      : await service.getTransaction(props.branchUuid!, props.transactionUuid)
     if (res.success) {
       detail.value = res.transaction
     } else {
@@ -79,6 +87,7 @@ function statusBadgeClass(status: string) {
     case 'refunded':
       return 'bg-amber-100 text-amber-800 border-amber-300'
     case 'void':
+    case 'voided':
       return 'bg-rose-100 text-rose-800 border-rose-300'
     default:
       return 'bg-gray-100 text-gray-800 border-gray-300'
@@ -152,7 +161,17 @@ function statusBadgeClass(status: string) {
             <!-- Timestamp -->
             <p class="text-xs text-[#8A6E64]">
               Recorded on <span class="font-medium text-[#2D201B]">{{ formatDate(detail.created_at) }}</span>
+              <template v-if="detail.branch_name"> at <span class="font-medium text-[#2D201B]">{{ detail.branch_name }}</span></template>
             </p>
+
+            <!-- Refund / void trail (owner transaction log) -->
+            <div v-if="detail.changed_at" class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs space-y-1 text-amber-900">
+              <p>
+                <span class="font-semibold capitalize">{{ detail.status }}</span> on {{ formatDate(detail.changed_at) }}
+                <template v-if="detail.refund"> · approved by <span class="font-semibold">{{ detail.refund.by }}</span><template v-if="detail.refund.role"> ({{ detail.refund.role }})</template></template>
+              </p>
+              <p v-if="detail.refund?.reason">Reason: {{ detail.refund.reason }}</p>
+            </div>
 
             <!-- Line Items -->
             <div>

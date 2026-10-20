@@ -5,6 +5,7 @@ import AnalyticsChange from './AnalyticsChange.vue'
 import AnalyticsBarChart, { type BarPoint } from './AnalyticsBarChart.vue'
 import AnalyticsHeatmap from './AnalyticsHeatmap.vue'
 import AnalyticsStatus from './AnalyticsStatus.vue'
+import TransactionLog from './TransactionLog.vue'
 import type { AnalyticsFilters, AnalyticsSales } from '~/services/OwnerAnalyticsService'
 import type { ExcelColumn, ExcelFormat, ExcelReport, ExcelSheet } from '~/composables/useExcelExport'
 import { WEEKDAYS_LONG, formatCount, formatDay, formatHour, formatMethod, formatPeso, formatPesoCents, formatPesoCompact, formatSpan } from '~/utils/dashboardFormat'
@@ -250,6 +251,8 @@ defineExpose({ excelReport, exportReady: computed(() => !!data.value) })
       <div v-if="loading" class="skeleton h-[220px] rounded-xl" />
       <AnalyticsHeatmap v-else-if="data" :grid="data.heatmap" />
     </AnalyticsPanel>
+
+    <TransactionLog :filters="filters" />
   </div>
 </template>
 

@@ -1,6 +1,7 @@
 //app/services/OwnerAnalyticsService.ts
 import { BaseService } from './BaseService'
 import type { SpoilageReason } from './PosService'
+import type { ManagerTransactionDetail } from './ManagerDashboardService'
 
 // Owner Analytics page: one call per tab. Dates are Y-m-d and inclusive;
 // no branch means every branch combined.
@@ -39,6 +40,52 @@ export interface AnalyticsSales {
     heatmap: { orders: number; revenue: number }[][] // [weekday 0 = Sunday][hour]
     payments: { method: string; orders: number; amount: number; share: number }[]
     discounts: { type: string; orders: number; amount: number }[]
+}
+
+export type TransactionLogStatus = 'settled' | 'refunded' | 'void'
+
+export interface TransactionLogQuery {
+    status?: TransactionLogStatus | null
+    search?: string
+    page?: number
+    per_page?: number
+}
+
+// Refund approver and reason, as the POS wrote them into the sale's note.
+export interface TransactionRefund {
+    by: string
+    role: string | null
+    reason: string | null
+}
+
+export interface TransactionLogRow {
+    uuid: string
+    receipt_number: string
+    created_at: string
+    changed_at: string | null // when it was refunded or voided; null while settled
+    branch: string | null
+    cashier: string | null // null: rung up without a signed-in staff member
+    items: number
+    payment_method: string | null
+    discount_type: string | null
+    discount_amount: number
+    total_amount: number
+    status: string
+    refund: TransactionRefund | null
+}
+
+export interface TransactionLog {
+    success: boolean
+    filters: AnalyticsFiltersOut
+    counts: Record<'all' | TransactionLogStatus, number>
+    transactions: TransactionLogRow[]
+    pagination: { page: number; per_page: number; total: number; last_page: number }
+}
+
+export interface OwnerTransactionDetail extends ManagerTransactionDetail {
+    branch_name: string | null
+    changed_at: string | null
+    refund: TransactionRefund | null
 }
 
 export interface AnalyticsMenuItem {
@@ -127,6 +174,19 @@ export interface AnalyticsOperations {
 export class OwnerAnalyticsService extends BaseService {
     getSales(filters: AnalyticsFilters) {
         return this.get<AnalyticsSales>('/owner/analytics/sales', params(filters))
+    }
+
+    getTransactions(filters: AnalyticsFilters, query: TransactionLogQuery = {}) {
+        const p: Record<string, string | number> = params(filters)
+        if (query.status) p.status = query.status
+        if (query.search?.trim()) p.search = query.search.trim()
+        if (query.page) p.page = query.page
+        if (query.per_page) p.per_page = query.per_page
+        return this.get<TransactionLog>('/owner/analytics/transactions', p)
+    }
+
+    getTransaction(uuid: string) {
+        return this.get<{ success: boolean; transaction: OwnerTransactionDetail }>(`/owner/analytics/transactions/${uuid}`)
     }
 
     getMenu(filters: AnalyticsFilters) {
