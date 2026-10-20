@@ -87,7 +87,25 @@ export function spoilageItemLabel(log: SpoilageLog) {
     return [log.size_name, log.menu_item?.menu_name ?? 'Removed item'].filter(Boolean).join(' ')
 }
 
+// A register as listed on a branch's details page (revoked registers are left out).
+export interface BranchPosDevice {
+    uuid: string
+    name: string
+    branch_uuid: string | null
+    registered_by: string | null
+    active_staff: { uuid: string; firstname: string; name: string } | null // signed in on it now
+    active_since: string | null
+    last_used_at: string | null
+    created_at: string | null
+}
+
 export class PosService extends BaseService {
+    // ── Branch registers (Owner/Manager auth_token, `pos_system` plan feature) ───
+
+    listBranchDevices(scope: 'owner' | 'manager', branchUuid: string) {
+        return this.get<{ success: boolean; devices: BranchPosDevice[] }>(`/${scope}/branches/${branchUuid}/pos-devices`)
+    }
+
     // ── Setup API (Uses Owner/Manager auth_token) ────────────────────────────────
 
     getSetupBranches() {

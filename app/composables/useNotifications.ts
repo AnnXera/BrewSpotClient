@@ -1,4 +1,4 @@
-import type { ApiNotification } from '~/services/NotificationService'
+import type { ApiNotification, NotificationKind } from '~/services/NotificationService'
 import { useNotificationService } from './useNotificationService'
 
 export interface AppNotification {
@@ -9,15 +9,38 @@ export interface AppNotification {
     read: boolean
     to?: string // route to open when the notification is clicked
     icon?: string // heroicons name, without the "heroicons:" prefix
+    tone?: NotificationTone
 }
 
-// Where each kind of server notification links to, and the icon it shows.
+export type NotificationTone = 'neutral' | 'good' | 'warning' | 'bad'
+
+// The icon and tone each kind of server notification shows.
+const KIND_STYLE: Record<NotificationKind, { icon: string; tone: NotificationTone }> = {
+    owner_application: { icon: 'user-plus', tone: 'neutral' },
+    branch_submission: { icon: 'building-storefront', tone: 'neutral' },
+
+    account_approved: { icon: 'check-badge', tone: 'good' },
+    account_rejected: { icon: 'x-circle', tone: 'bad' },
+    account_suspended: { icon: 'no-symbol', tone: 'bad' },
+    account_reactivated: { icon: 'arrow-path', tone: 'good' },
+    branch_approved: { icon: 'building-storefront', tone: 'good' },
+    branch_rejected: { icon: 'building-storefront', tone: 'bad' },
+
+    payment_received: { icon: 'banknotes', tone: 'good' },
+    payment_failed: { icon: 'exclamation-triangle', tone: 'bad' },
+    plan_change_scheduled: { icon: 'arrows-right-left', tone: 'neutral' },
+    subscription_cancelled: { icon: 'x-circle', tone: 'warning' },
+    subscription_expiring: { icon: 'clock', tone: 'warning' },
+    renewal_open: { icon: 'calendar-days', tone: 'neutral' },
+    subscription_expired: { icon: 'exclamation-circle', tone: 'bad' },
+}
+
 function fromApi(n: ApiNotification): AppNotification {
-    const approvalLink = n.approval_uuid ? `/admin/approvals?uuid=${n.approval_uuid}` : '/admin/approvals'
-    const byKind: Record<string, Pick<AppNotification, 'to' | 'icon'>> = {
-        owner_application: { to: approvalLink, icon: 'user-plus' },
-        branch_submission: { to: approvalLink, icon: 'building-storefront' },
-    }
+    // Admin approval notices carry the approval; owner notices carry their own link.
+    const to = n.link
+        ?? (n.kind === 'owner_application' || n.kind === 'branch_submission'
+            ? (n.approval_uuid ? `/admin/approvals?uuid=${n.approval_uuid}` : '/admin/approvals')
+            : undefined)
 
     return {
         id: n.id,
@@ -25,7 +48,8 @@ function fromApi(n: ApiNotification): AppNotification {
         body: n.body ?? undefined,
         createdAt: n.created_at,
         read: n.read,
-        ...(n.kind ? byKind[n.kind] : {}),
+        to,
+        ...(n.kind && KIND_STYLE[n.kind] ? KIND_STYLE[n.kind] : {}),
     }
 }
 

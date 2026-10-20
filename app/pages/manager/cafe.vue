@@ -291,6 +291,9 @@ onMounted(init)
 
             <p v-else class="text-sm text-[#9E7060]">No BIR document uploaded for this branch.</p>
           </section>
+
+          <!-- POS Registers (full width, under both cards) -->
+          <PosDevicesCard class="lg:col-span-2" :branch-uuid="branch.uuid" scope="manager" />
         </div>
 
         <!-- Employees Tab: the list, or one employee's details. Managers can only add / edit cashiers and staff. -->

@@ -1,6 +1,14 @@
 <!--app/components/NotificationBell.vue-->
 <script setup lang="ts">
-import { useNotifications, type AppNotification } from '~/composables/useNotifications'
+import { useNotifications, type AppNotification, type NotificationTone } from '~/composables/useNotifications'
+
+// Icon chip per tone; same green/amber/rose families as the dashboards' status pills.
+const TONE_CLASS: Record<NotificationTone, string> = {
+  neutral: 'bg-[#F3E3C9] text-[#7D5A50]',
+  good: 'bg-emerald-50 text-emerald-700',
+  warning: 'bg-amber-50 text-amber-700',
+  bad: 'bg-rose-50 text-rose-700',
+}
 
 // 'sidebar': panel opens to the right, over the page content.
 // 'topbar': panel spans the screen width under the mobile top bar.
@@ -131,8 +139,11 @@ function timeAgo(iso: string) {
               :class="item.read ? '' : 'bg-[#FFF7E8]'"
               @click="openNotification(item)"
             >
-              <span class="w-8 h-8 rounded-full bg-[#F3E3C9] flex items-center justify-center shrink-0 mt-0.5">
-                <Icon :name="`heroicons:${item.icon || 'bell'}`" class="w-4 h-4 text-[#7D5A50]" />
+              <span
+                class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                :class="TONE_CLASS[item.tone ?? 'neutral']"
+              >
+                <Icon :name="`heroicons:${item.icon || 'bell'}`" class="w-4 h-4" />
               </span>
               <span class="flex-1 min-w-0">
                 <span
