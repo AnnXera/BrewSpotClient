@@ -10,6 +10,8 @@ export type NotificationKind =
     // Owner: subscription and billing
     | 'payment_received' | 'payment_failed' | 'plan_change_scheduled' | 'subscription_cancelled'
     | 'subscription_expiring' | 'renewal_open' | 'subscription_expired'
+    // Manager (owner for a locked manager PIN): what's happening at the branch
+    | 'servings_low' | 'sold_out' | 'pin_locked' | 'refund_approved' | 'spoilage_logged'
 
 export interface ApiNotification {
     id: string

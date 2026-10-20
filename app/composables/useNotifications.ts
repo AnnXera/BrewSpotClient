@@ -33,6 +33,12 @@ const KIND_STYLE: Record<NotificationKind, { icon: string; tone: NotificationTon
     subscription_expiring: { icon: 'clock', tone: 'warning' },
     renewal_open: { icon: 'calendar-days', tone: 'neutral' },
     subscription_expired: { icon: 'exclamation-circle', tone: 'bad' },
+
+    servings_low: { icon: 'arrow-trending-down', tone: 'warning' },
+    sold_out: { icon: 'no-symbol', tone: 'bad' },
+    pin_locked: { icon: 'lock-closed', tone: 'bad' },
+    refund_approved: { icon: 'receipt-refund', tone: 'neutral' },
+    spoilage_logged: { icon: 'trash', tone: 'warning' },
 }
 
 function fromApi(n: ApiNotification): AppNotification {
