@@ -28,6 +28,13 @@ const route = useRoute()
 const authStore = useAuthStore()
 const logout = useLogout()
 const { categories: navCategories, refresh: refreshNavCategories } = useNavCategories()
+const { refresh: refreshNotifications } = useNotifications()
+
+// Loaded here (not in the bell) so the desktop and mobile bells share one poll.
+useAutoRefresh(refreshNotifications)
+onMounted(() => {
+  refreshNotifications().catch(e => console.warn('Failed to load notifications', e))
+})
 
 const mobileOpen = ref(false)   // mobile drawer
 const profileDropdownOpen = ref(false)
@@ -154,11 +161,12 @@ function toggleDropdown(link: NavLink) {
   <!-- ============ DESKTOP SIDEBAR (md and up) ============ -->
   <!-- Removed hover expansion, permanently expanded width: 289px -->
   <aside
-    class="hidden md:flex h-screen sticky top-0 bg-[#7D5A50] flex-col p-6 w-[289px] shrink-0"
+    class="hidden md:flex h-screen sticky top-0 z-30 bg-[#7D5A50] flex-col p-6 w-[289px] shrink-0"
   >
-    <!-- Logo (stays put; only the nav below scrolls) -->
-    <div class="h-12 flex items-center justify-start shrink-0">
-      <img :src="logoFull" alt="Brewspot" class="h-auto w-full max-w-[195px]" />
+    <!-- Logo + notifications (stay put; only the nav below scrolls) -->
+    <div class="h-12 flex items-center justify-between gap-3 shrink-0">
+      <img :src="logoFull" alt="Brewspot" class="h-auto min-w-0 w-full max-w-[175px]" />
+      <NotificationBell placement="sidebar" />
     </div>
 
     <!-- Divider (logo → nav) -->
@@ -302,6 +310,8 @@ function toggleDropdown(link: NavLink) {
 
     <img :src="logoFull" alt="Brewspot" class="h-6 w-auto shrink-0" />
 
+    <div class="flex items-center gap-2">
+    <NotificationBell placement="topbar" />
     <div ref="mobileProfileRef" class="relative">
       <button type="button" class="flex items-center justify-center" @click="profileDropdownOpen = !profileDropdownOpen">
         <div class="w-8 h-8 rounded-full bg-[#3B1F0E] flex items-center justify-center shrink-0">
@@ -327,6 +337,7 @@ function toggleDropdown(link: NavLink) {
           <span class="font-sans text-sm font-medium text-[#D9534F]">Logout</span>
         </button>
       </div>
+    </div>
     </div>
   </div>
 

@@ -184,33 +184,43 @@ async function confirmReject() {
 
 useAutoRefresh(() => Promise.all([fetchStats(), fetchApprovals(true)]))
 
+// Opens the approval named in ?uuid= (links from emails and the notification bell)
+async function openFromQuery(uuid: string) {
+  const target = approvals.value.find((a) => a.uuid === uuid)
+  if (target) {
+    openDetails(target)
+    return
+  }
+  try {
+    const res = await ownerService.approvalSnapshot(uuid)
+    if (res.success) {
+      modalApproval.value = {
+        uuid,
+        status: 'pending_approval',
+        user: res.owner,
+        cafe: res.cafe,
+        branch: res.branch,
+      } as any
+      modalOwnerDetails.value = res
+      modalOpen.value = true
+    }
+  } catch (err) {
+    console.warn('Could not auto-open approval from query param:', err)
+  }
+}
+
 onMounted(async () => {
   fetchStats()
   await fetchApprovals()
 
-  if (route.query.uuid) {
-    const target = approvals.value.find((a) => a.uuid === route.query.uuid)
-    if (target) {
-      openDetails(target)
-    } else {
-      try {
-        const res = await ownerService.approvalSnapshot(route.query.uuid as string)
-        if (res.success) {
-          modalApproval.value = {
-            uuid: route.query.uuid as string,
-            status: 'pending_approval',
-            user: res.owner,
-            cafe: res.cafe,
-            branch: res.branch,
-          } as any
-          modalOwnerDetails.value = res
-          modalOpen.value = true
-        }
-      } catch (err) {
-        console.warn('Could not auto-open approval from query param:', err)
-      }
-    }
-  }
+  if (route.query.uuid) await openFromQuery(route.query.uuid as string)
+})
+
+// A notification clicked while already on this page only changes the query, so the page doesn't remount.
+watch(() => route.query.uuid, async (uuid) => {
+  if (!uuid) return
+  await Promise.all([fetchStats(), fetchApprovals(true)])
+  await openFromQuery(uuid as string)
 })
 </script>
 
