@@ -171,6 +171,9 @@ function statusBadgeClass(status: string) {
                 <template v-if="detail.refund"> · approved by <span class="font-semibold">{{ detail.refund.by }}</span><template v-if="detail.refund.role"> ({{ detail.refund.role }})</template></template>
               </p>
               <p v-if="detail.refund?.reason">Reason: {{ detail.refund.reason }}</p>
+              <p v-if="detail.refund && detail.refund.restocked !== null">
+                {{ detail.refund.restocked ? 'Order was not made; servings went back on sale.' : 'Order was already made; servings stay used up.' }}
+              </p>
             </div>
 
             <!-- Line Items -->

@@ -185,11 +185,13 @@ export class DevicePosService extends BaseService {
         return this.get<{ success: boolean; managers: { uuid: string; name: string; role: string; has_pin: boolean; is_locked: boolean }[] }>('/pos/device/approving-managers')
     }
 
-    refundTransaction(transactionUuid: string, managerUuid: string, pin: string, reason?: string) {
+    // restock: the order was never made, so its servings go back on sale; otherwise they count as refunded (still used up).
+    refundTransaction(transactionUuid: string, managerUuid: string, pin: string, reason?: string, restock = false) {
         return this.post<{ success: boolean; message: string; transaction?: PosTransactionDetail }>('/pos/device/transactions/' + transactionUuid + '/refund', {
             manager_uuid: managerUuid,
             pin,
-            reason
+            reason,
+            restock,
         })
     }
 

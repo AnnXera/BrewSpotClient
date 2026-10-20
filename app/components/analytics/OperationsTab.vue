@@ -21,7 +21,7 @@ const wasteStats = computed(() => {
   if (!w) return []
   return [
     { label: 'Planned', value: formatCount(w.expected) },
-    { label: 'Sold', value: formatCount(w.sold) },
+    { label: 'Sold', value: formatCount(w.sold), sub: w.refunded ? `${formatCount(w.refunded)} more refunded after serving` : undefined },
     { label: 'Sell-through', value: w.sell_through === null ? '—' : `${w.sell_through}%` },
     {
       label: 'Spoiled',
@@ -89,6 +89,7 @@ function excelReport(): Omit<ExcelReport, 'cafe'> | null {
     rows: [
       { area: 'Servings', metric: 'Planned', value: w.expected, format: 'count' },
       { area: 'Servings', metric: 'Sold', value: w.sold, format: 'count' },
+      { area: 'Servings', metric: 'Refunded after serving', value: w.refunded, format: 'count' },
       { area: 'Servings', metric: 'Sell-through', value: w.sell_through, format: 'percent' },
       { area: 'Servings', metric: 'Spoiled', value: w.spoilage, format: 'count' },
       { area: 'Servings', metric: 'Spoiled, % of planned', value: w.spoilage_rate, format: 'percent' },
@@ -136,6 +137,7 @@ function excelReport(): Omit<ExcelReport, 'cafe'> | null {
       { header: 'Item', value: i => i.total ? 'Total' : (i.removed ? `${i.name} (removed)` : i.name) },
       { header: 'Planned', value: i => i.expected, format: 'count' },
       { header: 'Sold', value: i => i.sold, format: 'count' },
+      { header: 'Refunded after serving', value: i => i.refunded, format: 'count' },
       { header: 'Sell-through', value: i => i.sell_through, format: 'percent' },
       { header: 'Spoiled', value: i => i.spoilage, format: 'count' },
       { header: 'Spoilage cost', value: i => i.spoilage_value, format: 'peso' },
@@ -145,7 +147,7 @@ function excelReport(): Omit<ExcelReport, 'cafe'> | null {
     rows: wasteItems,
     totals: {
       total: true, uuid: '', name: '', removed: false, days: 0,
-      expected: w.expected, sold: w.sold, sell_through: w.sell_through,
+      expected: w.expected, sold: w.sold, refunded: w.refunded, sell_through: w.sell_through,
       spoilage: w.spoilage, spoilage_value: w.spoilage_value, sold_out_days: w.sold_out_days,
     },
   }
@@ -360,6 +362,7 @@ defineExpose({ excelReport, exportReady: computed(() => !!data.value) })
                 <td class="px-2 py-2.5 text-right tabular-nums text-[#3D2B24]">
                   {{ formatCount(w.sold) }} / {{ formatCount(w.expected) }}
                   <span v-if="w.sell_through !== null" class="block text-[11px] text-[#9E7060]">{{ w.sell_through }}%</span>
+                  <span v-if="w.refunded" class="block text-[11px] text-[#9E7060]">+{{ formatCount(w.refunded) }} refunded</span>
                 </td>
                 <td class="px-2 py-2.5 text-right tabular-nums" :class="w.spoilage ? 'font-semibold text-[#A2352A]' : 'text-[#9E7060]'">
                   {{ formatCount(w.spoilage) }}

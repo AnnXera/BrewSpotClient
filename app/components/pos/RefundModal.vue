@@ -23,6 +23,8 @@ const managers = ref<ApprovingManager[]>([])
 const selectedManagerUuid = ref<string>('')
 const pin = ref('')
 const reason = ref('')
+// Made orders can't be sold again: their servings count as refunded. Not made: back on sale.
+const wasMade = ref(true)
 const selectedReasonChip = ref('')
 const loading = ref(false)
 const loadingManagers = ref(false)
@@ -82,6 +84,7 @@ watch(() => props.show, (val) => {
     pin.value = ''
     reason.value = ''
     selectedReasonChip.value = ''
+    wasMade.value = true
     errorMessage.value = ''
     attemptsLeft.value = null
     successMessage.value = ''
@@ -177,7 +180,8 @@ async function submitRefund() {
       props.transaction.uuid,
       selectedManagerUuid.value,
       pin.value,
-      effectiveReason.value
+      effectiveReason.value,
+      !wasMade.value
     )
 
     if (res.success) {
@@ -318,10 +322,45 @@ async function submitRefund() {
           </div>
         </div>
 
-        <!-- Step 2: Reason -->
+        <!-- Step 2: Was the order made? -->
+        <fieldset>
+          <legend class="block text-xs font-bold text-[#8A6E64] uppercase tracking-wide mb-1.5">
+            2. Was the order already made?
+          </legend>
+          <div class="grid grid-cols-2 gap-2">
+            <label
+              v-for="opt in [
+                { value: true, title: 'Yes, it was made', hint: 'Servings stay used up' },
+                { value: false, title: 'No, not made yet', hint: 'Servings go back on sale' },
+              ]"
+              :key="String(opt.value)"
+              :class="[
+                'flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-all',
+                wasMade === opt.value
+                  ? 'border-[#7B5A50] bg-[#7B5A50]/5 ring-1 ring-[#7B5A50]'
+                  : 'border-[#EADFD3] bg-white hover:bg-[#FBF7F2]'
+              ]"
+            >
+              <input
+                type="radio"
+                name="was-made"
+                :value="opt.value"
+                v-model="wasMade"
+                :disabled="loading || !!successMessage"
+                class="mt-0.5 w-4 h-4 text-[#7B5A50] focus:ring-[#7B5A50]"
+              />
+              <span class="min-w-0">
+                <span class="block text-sm font-semibold text-[#2d201b]">{{ opt.title }}</span>
+                <span class="block text-xs text-[#8A6E64]">{{ opt.hint }}</span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <!-- Step 3: Reason -->
         <div>
           <label class="block text-xs font-bold text-[#8A6E64] uppercase tracking-wide mb-1.5">
-            2. Reason for Refund (Optional)
+            3. Reason for Refund (Optional)
           </label>
           <div class="flex flex-wrap gap-1.5 mb-2">
             <button
@@ -348,10 +387,10 @@ async function submitRefund() {
           />
         </div>
 
-        <!-- Step 3: Enter Manager PIN -->
+        <!-- Step 4: Enter Manager PIN -->
         <div>
           <label class="block text-xs font-bold text-[#8A6E64] uppercase tracking-wide mb-2 text-center">
-            3. Enter Manager's 6-Digit PIN
+            4. Enter Manager's 6-Digit PIN
           </label>
           
           <!-- PIN Dots Indicator -->

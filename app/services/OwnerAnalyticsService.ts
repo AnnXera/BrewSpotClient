@@ -56,6 +56,7 @@ export interface TransactionRefund {
     by: string
     role: string | null
     reason: string | null
+    restocked: boolean | null // servings went back on sale; false: logged as spoilage
 }
 
 export interface TransactionLogRow {
@@ -140,6 +141,7 @@ export interface AnalyticsOperations {
             expected: number
             sold: number
             spoilage: number
+            refunded: number // made and served, then refunded; not in sold, but used up
             spoilage_value: number // pesos at each entry's size price when logged; base price for older spoilage
             spoilage_change: number | null // % vs the previous period, null when it had none
             sell_through: number | null
@@ -149,7 +151,7 @@ export interface AnalyticsOperations {
         // Adds up to summary.spoilage; 'unspecified' covers entries without a reason.
         reasons: { reason: SpoilageReason | 'unspecified'; quantity: number; share: number }[]
         voided: { entries: number; quantity: number } // logged by mistake and voided, not counted
-        items: { uuid: string; name: string; removed: boolean; expected: number; sold: number; spoilage: number; spoilage_value: number; sold_out_days: number; days: number; sell_through: number | null }[]
+        items: { uuid: string; name: string; removed: boolean; expected: number; sold: number; refunded: number; spoilage: number; spoilage_value: number; sold_out_days: number; days: number; sell_through: number | null }[]
     }
     ingredients: { name: string; unit: string; quantity: number; items: number }[]
     reservations: {
