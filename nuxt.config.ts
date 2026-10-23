@@ -2,6 +2,9 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-07-01',
   devtools: { enabled: true },
 
+  // SPA build: the Hostinger Single plan serves static files only (no Node.js runtime).
+  ssr: false,
+
   modules: ['@pinia/nuxt', '@nuxtjs/tailwindcss', '@nuxt/fonts', '@nuxt/icon'],
 
   icon: {
