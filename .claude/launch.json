@@ -6,6 +6,13 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "server-api",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["../server/artisan", "serve", "--port=8000"],
+      "port": 8000,
+      "autoPort": false
     }
   ]
 }

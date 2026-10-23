@@ -1,0 +1,23 @@
+# Hostinger public_html: Nuxt SPA + Laravel API on one domain.
+# Laravel's entry point lives in public_html/backend/index.php (see server/deploy/hostinger).
+
+Options -MultiViews -Indexes
+RewriteEngine On
+
+# Hide the FTP deploy state file (GitHub Actions)
+RewriteRule ^\.ftp-deploy-sync-state\.json$ - [F,L]
+
+# Pass the Authorization header (Sanctum bearer tokens) through to PHP
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# API, Sanctum, health check and uploaded files (storage) go to Laravel
+RewriteRule ^(api|sanctum|up|storage)(/.*)?$ backend/index.php [L]
+
+# Real files and folders (assets, storage symlink) are served as-is
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Everything else is a client-side route
+RewriteRule ^ index.html [L]

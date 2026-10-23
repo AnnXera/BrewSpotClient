@@ -1,97 +1,126 @@
 <script setup lang="ts">
 import type { PaymentTransaction } from '~/components/common/PaymentHistoryTable.vue'
+import { formatPesoCents } from '~/utils/dashboardFormat'
 
+// Latest subscription payments across every cafe owner.
 defineProps<{
   transactions: PaymentTransaction[]
   loading?: boolean
 }>()
 
-function formatAmount(amt?: string | number): string {
-  if (amt === undefined || amt === null) return '₱0.00'
-  const numeric = typeof amt === 'string' ? parseFloat(amt.replace(/[^0-9.]/g, '')) : amt
-  if (isNaN(numeric)) return String(amt)
-  return `₱${numeric.toFixed(2)}`
+function amount(val?: string | number): number {
+  if (val === undefined || val === null) return 0
+  const n = typeof val === 'number' ? val : parseFloat(String(val).replace(/[^0-9.]/g, ''))
+  return isNaN(n) ? 0 : n
+}
+
+// Same pill colors as the manager's transaction history.
+function statusClass(status: string) {
+  switch (status.toLowerCase()) {
+    case 'active':
+    case 'success':
+    case 'paid':
+    case 'completed':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    case 'failed':
+    case 'cancelled':
+      return 'bg-rose-50 text-rose-700 border-rose-200'
+    default:
+      return 'bg-amber-50 text-amber-700 border-amber-200'
+  }
+}
+
+function statusLabel(status: string) {
+  return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
 }
 </script>
 
 <template>
-  <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden shadow-sm flex flex-col h-full">
-    <!-- Card Header -->
-    <div class="p-6 border-b border-[#F3E7D2] flex items-center justify-between bg-[#FFFDF9]">
+  <section class="flex flex-col gap-4 rounded-[22px] border border-[#EEDFC4] bg-white p-5 sm:p-7 shadow-[0_1px_2px_rgba(59,31,14,0.04)]" aria-labelledby="recent-payments-heading">
+    <header class="flex items-start justify-between gap-4">
       <div>
-        <h3 class="font-display text-lg font-bold text-[#3B1F0E] flex items-center gap-2">
-          <span>Recent Transactions</span>
-        </h3>
-        <p class="font-sans text-xs text-[#8B6656] mt-0.5">Latest subscription payments processed across registered cafes</p>
+        <h2 id="recent-payments-heading" class="font-display text-[18px] font-bold text-[#3B1F0E]">Recent payments</h2>
+        <p class="mt-1 text-[13px] text-[#8B6656]">Latest subscription billing across all cafes</p>
       </div>
-
       <NuxtLink
         to="/admin/payments"
-        class="text-xs font-semibold text-[#7D5A50] hover:text-[#684940] flex items-center gap-1 transition-colors"
+        class="inline-flex shrink-0 items-center gap-1 rounded font-display text-[13px] font-semibold text-[#7D5A50] underline decoration-[#7D5A50]/30 underline-offset-4 hover:decoration-[#7D5A50] active:scale-[0.97] transition-transform duration-160 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
       >
-        View All
-        <Icon name="heroicons:chevron-right" class="w-4 h-4" />
+        View all
+        <Icon name="heroicons:arrow-up-right-20-solid" class="h-3.5 w-3.5" />
       </NuxtLink>
+    </header>
+
+    <ul v-if="loading" class="space-y-4 py-1" aria-hidden="true">
+      <li v-for="i in 4" :key="i" class="flex items-center gap-3">
+        <span class="flex-1 space-y-2"><span class="skeleton block h-3.5 w-1/2 rounded" /><span class="skeleton block h-3 w-1/3 rounded" /></span>
+        <span class="skeleton h-4 w-16 rounded" />
+      </li>
+    </ul>
+
+    <ul v-else-if="transactions.length" class="flex flex-col divide-y divide-[#F3E7D2]">
+      <li
+        v-for="(item, i) in transactions.slice(0, 5)"
+        :key="item.transaction_id"
+        class="animate-row-enter flex items-center gap-3 py-3"
+        :style="{ '--row-delay': `${i * 60}ms` }"
+      >
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-[14px] font-semibold text-[#3B1F0E]">{{ item.owner_name || item.description }}</p>
+          <p class="truncate text-[13px] text-[#8B6656]">
+            {{ item.owner_name ? item.description : '' }}<template v-if="item.owner_name"> · </template><span class="font-mono text-[12px] text-[#9E7060]">{{ item.transaction_id }}</span>
+          </p>
+        </div>
+        <div class="flex shrink-0 flex-col items-end gap-1">
+          <span class="text-[14px] font-semibold text-[#3B1F0E] tabular-nums">{{ formatPesoCents(amount(item.amount)) }}</span>
+          <span class="rounded-full border px-2 py-px text-[11px] font-semibold" :class="statusClass(item.status)">
+            {{ statusLabel(item.status) }}
+          </span>
+        </div>
+      </li>
+    </ul>
+
+    <div v-else class="animate-row-enter flex-1 rounded-2xl bg-[#FDF8F3] px-5 py-8 text-center">
+      <Icon name="heroicons:receipt-percent" class="mx-auto h-7 w-7 text-[#C2A592]" />
+      <p class="mt-2 font-display font-semibold text-[#3B1F0E]">No payments yet</p>
+      <p class="mt-1 text-[13px] text-[#8B6656]">Subscription payments will appear here as owners subscribe.</p>
     </div>
-
-    <!-- Table content -->
-    <div class="overflow-x-auto flex-1">
-      <table class="w-full text-left border-collapse">
-        <thead>
-          <tr class="bg-[#FFF0D1]/60 border-b border-[#F3E7D2]">
-            <th class="font-sans text-[11px] font-semibold text-[#9E7060] uppercase px-6 py-3">Transaction ID</th>
-            <th class="font-sans text-[11px] font-semibold text-[#9E7060] uppercase px-6 py-3">Plan / Description</th>
-            <th class="font-sans text-[11px] font-semibold text-[#9E7060] uppercase px-6 py-3">Amount</th>
-            <th class="font-sans text-[11px] font-semibold text-[#9E7060] uppercase px-6 py-3 text-right">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loading">
-            <td colspan="4" class="px-6 py-8 text-center text-xs text-[#8B6656]">
-              <div class="flex items-center justify-center gap-2">
-                <Icon name="heroicons:arrow-path" class="w-4 h-4 animate-spin text-[#7D5A50]" />
-                <span>Loading recent transactions...</span>
-              </div>
-            </td>
-          </tr>
-
-          <tr v-else-if="!transactions.length">
-            <td colspan="4" class="px-6 py-8 text-center text-xs text-[#8B6656]/70">
-              No recent payment transactions recorded.
-            </td>
-          </tr>
-
-          <tr
-            v-for="item in transactions.slice(0, 5)"
-            :key="item.transaction_id"
-            class="border-b border-[#F3E7D2] last:border-b-0 hover:bg-[#FFFDF9] transition-colors"
-          >
-            <td class="px-6 py-4 font-sans text-xs font-bold text-[#3B1F0E] whitespace-nowrap">
-              {{ item.transaction_id }}
-            </td>
-
-            <td class="px-6 py-4 font-sans text-xs text-[#3B1F0E]">
-              <p class="font-semibold text-[#7D5A50]">{{ item.description }}</p>
-              <p v-if="item.owner_name" class="text-[11px] text-[#8B6656]">{{ item.owner_name }}</p>
-            </td>
-
-            <td class="px-6 py-4 font-sans text-xs font-bold text-[#28A745] whitespace-nowrap">
-              {{ formatAmount(item.amount) }}
-            </td>
-
-            <td class="px-6 py-4 text-right whitespace-nowrap">
-              <span 
-                class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-bold"
-                :class="item.status.toLowerCase() === 'active' || item.status.toLowerCase() === 'success' ? 'bg-[#D4EDDA] text-[#28A745]' : 
-                        item.status.toLowerCase() === 'failed' || item.status.toLowerCase() === 'cancelled' ? 'bg-[#F8D7DA] text-[#DC3545]' : 
-                        'bg-[#FFF3CD] text-[#856404]'"
-              >
-                {{ item.status.charAt(0).toUpperCase() + item.status.slice(1).toLowerCase() }}
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+  </section>
 </template>
+
+<style scoped>
+.skeleton {
+  background: linear-gradient(90deg, #F6ECDD, #FBF4EA, #F6ECDD);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@keyframes rowEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-row-enter {
+  animation: rowEnter 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton, .animate-row-enter {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+</style>

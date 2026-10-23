@@ -318,8 +318,8 @@ onUnmounted(() => {
       </transition>
     </header>
 
-    <!-- SECTION 1: HERO SECTION (PERFECTLY CENTERED) -->
-    <section id="hero" class="min-h-screen relative flex flex-col justify-between items-center overflow-hidden bg-[#FFF8EA] text-[#2D201B] pt-28 pb-10 border-b border-[#E5B299]/40 reveal-on-scroll">
+    <!-- SECTION 1: HERO SECTION (PERFECTLY CENTERED, FITS SCREEN) -->
+    <section id="hero" class="min-h-screen min-h-[100dvh] relative flex flex-col justify-center items-center overflow-hidden bg-[#2D201B] text-[#FFF8EA] pt-20 pb-12">
       <!-- Background Image with Rich Palette Dark Overlay -->
       <div
         class="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-1000 scale-105"
@@ -327,10 +327,10 @@ onUnmounted(() => {
       ></div>
       <!-- Multi-layer Brand Overlay using #000000 and #7D5A50 for contrast -->
       <div class="absolute inset-0 bg-gradient-to-r from-[#000000]/90 via-[#7D5A50]/85 to-[#000000]/90 backdrop-blur-[1px]"></div>
-      <div class="absolute inset-0 bg-gradient-to-b from-[#000000]/60 via-transparent to-[#7D5A50]/95"></div>
+      <div class="absolute inset-0 bg-gradient-to-b from-[#000000]/60 via-transparent to-[#7D5A50]"></div>
 
       <!-- Hero Main Content Box (Centered Layout) -->
-      <div class="max-w-4xl mx-auto px-6 sm:px-8 lg:px-10 relative z-10 my-auto w-full py-12 flex flex-col items-center justify-center text-center">
+      <div class="max-w-4xl mx-auto px-6 sm:px-8 lg:px-10 relative z-10 w-full flex flex-col items-center justify-center text-center">
         <div class="space-y-8 flex flex-col items-center text-center">
           <!-- Top Badge Pill -->
           <div class="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-[#FCDEC0]/20 border border-[#FCDEC0]/40 text-[#FCDEC0] text-xs sm:text-sm font-semibold tracking-wide backdrop-blur-md shadow-xl text-center">
@@ -377,10 +377,12 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
+    </section>
 
-      <!-- Hero Bottom Key Metrics Strip (Centered Grid) -->
-      <div class="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 w-full">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 p-6 sm:p-8 rounded-2xl bg-[#7D5A50]/90 border border-[#B4846C]/40 text-[#FFF8EA] backdrop-blur-md shadow-2xl text-center">
+    <!-- KEY METRICS STRIP (SEAMLESS RICH COFFEE BAR LOWERED BELOW HERO) -->
+    <section class="relative z-10 bg-[#7D5A50] text-[#FFF8EA] py-8 sm:py-10 border-b border-[#65463D] shadow-md reveal-on-scroll">
+      <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 w-full">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 text-center">
           <div class="text-center space-y-1">
             <p class="text-3xl sm:text-4xl font-extrabold text-[#FCDEC0]">500+</p>
             <p class="text-xs sm:text-sm text-[#FFF8EA]/85 font-medium">Active Cafes & Roasteries</p>

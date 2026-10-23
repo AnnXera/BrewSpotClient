@@ -140,32 +140,47 @@ export function useOperatingHours() {
     return `${displayHour}:${m < 10 ? '0' + m : m} ${period}`
   }
 
-  // Returns formatted string e.g. "Mon - Sun: 7:00 AM - 10:00 PM"
+  // One day's hours as text: "8:00 AM - 5:00 PM", "24 hours" or "Closed".
+  function dayHoursText(d: DaySchedule) {
+    if (!d.isOpen) return 'Closed'
+    if (d.is24Hours) return '24 hours'
+    return `${formatTime12h(d.openTime)} - ${formatTime12h(d.closeTime)}`
+  }
+
+  // Consecutive open days with identical hours, grouped:
+  // "Mon - Fri: 8:00 AM - 5:00 PM · Sat: 10:00 AM - 2:00 PM". Closed days are left out.
   const formattedSummary = computed(() => {
     if (!isLoaded.value) return 'Loading hours…'
 
     const list = sanitizeSchedule(operatingHoursState.value)
-    const activeDays = list.filter(d => d.isOpen)
-    if (activeDays.length === 0) return 'Closed All Week'
+    const openDays = list.filter(d => d.isOpen)
+    if (openDays.length === 0) return 'Closed all week'
+    if (openDays.length === 7 && openDays.every(d => d.is24Hours)) return 'Open 24/7'
 
-    // Check if all active days are 24 hours
-    if (activeDays.every(d => d.is24Hours)) return 'Open 24/7'
-
-    const firstOpen = activeDays[0]?.openTime || '07:00'
-    const firstClose = activeDays[0]?.closeTime || '22:00'
-    const allSame = activeDays.every(d => (d?.openTime || '07:00') === firstOpen && (d?.closeTime || '22:00') === firstClose && !d.is24Hours)
-
-    if (allSame && activeDays.length === 7) {
-      return `Mon - Sun: ${formatTime12h(firstOpen)} - ${formatTime12h(firstClose)}`
-    }
-    if (allSame && activeDays.length === 5 && !list.find(d => (d.day === 'Saturday' || d.day === 'Sunday') && d.isOpen)) {
-      return `Mon - Fri: ${formatTime12h(firstOpen)} - ${formatTime12h(firstClose)}`
+    const groups: { from: string; to: string; text: string }[] = []
+    for (const d of list) {
+      const last = groups[groups.length - 1]
+      const text = dayHoursText(d)
+      const prev = list[DAYS.indexOf(d.day) - 1]
+      if (last && prev?.isOpen && last.text === text) last.to = d.day
+      else if (d.isOpen) groups.push({ from: d.day, to: d.day, text })
     }
 
-    const first = activeDays[0]
-    const last = activeDays[activeDays.length - 1]
-    if (!first || !last) return 'Closed All Week'
-    return `${first.day.slice(0, 3)} - ${last.day.slice(0, 3)}: ${formatTime12h(first.openTime)} - ${formatTime12h(first.closeTime)}`
+    return groups
+      .map(g => `${g.from.slice(0, 3)}${g.to !== g.from ? ` - ${g.to.slice(0, 3)}` : ''}: ${g.text}`)
+      .join(' · ')
+  })
+
+  // The week for display, with today flagged (cafe time).
+  const weekView = computed(() => {
+    const { day } = cafeNow(clock.value)
+    return sanitizeSchedule(operatingHoursState.value).map(d => ({
+      ...d,
+      short: d.day.slice(0, 3),
+      isToday: d.day === day,
+      text: dayHoursText(d),
+      overnight: d.isOpen && !d.is24Hours && d.closeTime < d.openTime,
+    }))
   })
 
   // Open right now (cafe time)? Covers 24-hour days and hours that run past
@@ -195,6 +210,45 @@ export function useOperatingHours() {
     return false
   })
 
+  // What happens next: "Closes 10:00 PM", "Opens 9:00 AM tomorrow", "Opens 9:00 AM Mon".
+  const nextChangeText = computed(() => {
+    if (!isLoaded.value) return ''
+
+    const { day, minutes } = cafeNow(clock.value)
+    const list = sanitizeSchedule(operatingHoursState.value)
+    const todayIndex = DAYS.indexOf(day)
+    const today = list[todayIndex]
+    const yesterday = list[(todayIndex + 6) % 7]
+
+    if (isOpenNow.value) {
+      // Still inside yesterday's past-midnight hours.
+      if (yesterday?.isOpen && !yesterday.is24Hours && yesterday.closeTime < yesterday.openTime
+        && minutes < toMinutes(yesterday.closeTime)) {
+        return `Closes ${formatTime12h(yesterday.closeTime)}`
+      }
+      if (today?.is24Hours) {
+        // Walk forward through back-to-back 24-hour days.
+        for (let i = 1; i <= 7; i++) {
+          const d = list[(todayIndex + i) % 7]!
+          if (!d.isOpen) return `Closes midnight ${i === 1 ? 'tonight' : DAYS[(todayIndex + i - 1) % 7]!.slice(0, 3)}`
+          if (!d.is24Hours) return 'Open 24 hours today'
+        }
+        return 'Open 24/7'
+      }
+      return today ? `Closes ${formatTime12h(today.closeTime)}` : ''
+    }
+
+    for (let i = 0; i < 7; i++) {
+      const d = list[(todayIndex + i) % 7]!
+      if (!d.isOpen) continue
+      const opensAt = d.is24Hours ? '00:00' : d.openTime
+      if (i === 0 && toMinutes(opensAt) <= minutes) continue
+      const when = i === 0 ? '' : i === 1 ? ' tomorrow' : ` ${d.day.slice(0, 3)}`
+      return `Opens ${formatTime12h(opensAt)}${when}`
+    }
+    return 'Closed all week'
+  })
+
   const todayHoursText = computed(() => {
     const { day } = cafeNow(clock.value)
     const todaySched = sanitizeSchedule(operatingHoursState.value).find(d => d.day === day)
@@ -210,7 +264,9 @@ export function useOperatingHours() {
     loadOperatingHours,
     saveOperatingHours,
     formattedSummary,
+    weekView,
     isOpenNow,
+    nextChangeText,
     todayHoursText,
     formatTime12h,
     sanitizeSchedule

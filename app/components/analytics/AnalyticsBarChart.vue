@@ -80,7 +80,10 @@ function onKey(e: KeyboardEvent, i: number) {
           <div
             class="bar h-full w-full max-w-[34px]"
             :class="{ 'bar--active': active === i }"
-            :style="{ clipPath: clip(p.value) }"
+            :style="{
+              clipPath: clip(p.value),
+              '--bar-delay': `${i * 45}ms`,
+            }"
           />
           <span class="pointer-events-none absolute inset-x-0 inset-y-0 rounded-md ring-2 ring-[#7D5A50] opacity-0 group-focus-visible:opacity-100" aria-hidden="true" />
           <div
@@ -121,9 +124,24 @@ function onKey(e: KeyboardEvent, i: number) {
 </template>
 
 <style scoped>
+@keyframes barGrow {
+  0% {
+    transform: scaleY(0);
+    opacity: 0.15;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
 .bar {
   background: #B4846C;
-  transition: clip-path 520ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease;
+  transform-origin: bottom;
+  animation: barGrow 850ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--bar-delay, 0ms);
+  transition: clip-path 600ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease;
+  will-change: transform;
 }
 
 .group:hover .bar,
@@ -140,6 +158,6 @@ function onKey(e: KeyboardEvent, i: number) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bar, .tooltip { transition: none; animation: none; }
+  .bar, .tooltip { transition: none; animation: none; transform: none; }
 }
 </style>

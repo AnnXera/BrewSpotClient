@@ -17,7 +17,7 @@ const { hasFeature, fetchCurrentSubscription } = usePlanFeature()
 const branches = ref<BranchSummary[]>([])
 const loading = ref(false)
 const errorMessage = ref('')
-const { formattedSummary, isOpenNow, saveOperatingHours } = useOperatingHours()
+const { saveOperatingHours } = useOperatingHours()
 
 const currentPage = ref(1)
 const lastPage = ref(1)
@@ -188,8 +188,8 @@ function viewDetails(uuid: string) {
 <template>
   <div class="flex flex-col md:flex-row min-h-screen bg-[#FFF8EA]">
     <NavBar :links="links" />
-    <main class="flex-1 p-6 sm:p-8 lg:p-10 space-y-8">
-      <!-- Toast Notification -->
+    <!-- Toast: teleported to body so it floats over the page instead of taking a slot in main's spacing -->
+    <Teleport to="body">
       <transition
         enter-active-class="transition duration-300 ease-out"
         enter-from-class="opacity-0 -translate-y-2"
@@ -198,53 +198,21 @@ function viewDetails(uuid: string) {
         leave-from-class="opacity-100 translate-y-0"
         leave-to-class="opacity-0 -translate-y-2"
       >
-        <div v-if="toastMessage" class="fixed top-6 right-6 z-50 bg-[#7D5A50] text-[#FFF8EA] px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-[#B4846C]">
+        <div v-if="toastMessage" role="status" aria-live="polite" class="fixed top-6 right-6 z-[1000] bg-[#7D5A50] text-[#FFF8EA] px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-[#B4846C]">
           <Icon name="heroicons:check-circle" class="w-5 h-5 text-emerald-400 shrink-0" />
           <span class="text-sm font-bold">{{ toastMessage }}</span>
         </div>
       </transition>
-
-      <!-- Header Row: Cafe Title + Chosen Opening Hours Badge + Operating Hours Action Button -->
-      <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    </Teleport>
+    <main class="flex-1 p-6 sm:p-8 lg:p-10 space-y-8">
+      <!-- Header: cafe title + cafe-wide opening hours (click to edit) -->
+      <header class="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
           <h1 class="font-display text-3xl sm:text-4xl font-extrabold text-[#3D2B24] tracking-tight">{{ cafeName || 'Cafe Management' }}</h1>
-          <p class="text-xs sm:text-sm text-[#9E7060] mt-1 font-medium">Manage your cafe branches, store details, and general operating hours.</p>
+          <p class="text-xs sm:text-sm text-[#9E7060] mt-1 font-medium">Manage your branches and the opening hours they share.</p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-3 shrink-0">
-          <!-- Active Operating Hours Display Badge (Static Design) -->
-          <div 
-            class="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white border border-[#EEDFC4] shadow-xs"
-          >
-            <div class="w-8 h-8 rounded-lg bg-[#7D5A50]/10 flex items-center justify-center text-[#7D5A50]">
-              <Icon name="heroicons:clock" class="w-5 h-5" />
-            </div>
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="text-[10px] font-bold text-[#9E7060] uppercase tracking-wider">General Store Hours</span>
-                <span 
-                  class="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.2 rounded-full border"
-                  :class="isOpenNow ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'"
-                >
-                  <span class="w-1.5 h-1.5 rounded-full" :class="isOpenNow ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
-                  {{ isOpenNow ? 'Open Now' : 'Closed' }}
-                </span>
-              </div>
-              <p class="text-xs font-extrabold text-[#3D2B24] mt-0.5">
-                {{ formattedSummary }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Opening Hours Action Button -->
-          <button
-            @click="isOperatingHoursOpen = true"
-            class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#7D5A50] text-white font-bold text-sm hover:bg-[#65463D] transition-all shadow-md shrink-0 border border-[#B4846C]"
-          >
-            <Icon name="heroicons:cog-6-tooth" class="w-5 h-5" />
-            <span>Opening Hours</span>
-          </button>
-        </div>
+        <CafeManagementOperatingHoursPanel class="shrink-0" @edit="isOperatingHoursOpen = true" />
       </header>
 
       <!-- 4 Metric Summary Cards -->
@@ -289,8 +257,8 @@ function viewDetails(uuid: string) {
         />
 
         <!-- List Content -->
-        <div class="p-6 flex flex-col gap-4">
-          <div v-if="errorMessage" class="bg-red-50 text-red-800 border border-red-200 rounded-xl p-4 flex items-center gap-3">
+        <div>
+          <div v-if="errorMessage" class="m-6 bg-red-50 text-red-800 border border-red-200 rounded-xl p-4 flex items-center gap-3">
             <Icon name="heroicons:exclamation-triangle" class="w-5 h-5 shrink-0" />
             <span class="text-sm font-medium">{{ errorMessage }}</span>
             <button @click="fetchBranches" class="ml-auto text-sm font-bold underline hover:text-red-900 focus:outline-none">Retry</button>
@@ -300,15 +268,53 @@ function viewDetails(uuid: string) {
             <Icon name="heroicons:arrow-path" class="w-8 h-8 animate-spin text-[#7D5A50]" />
           </div>
 
-          <template v-else>
-            <CafeManagementBranchCard 
-              v-for="branch in branches" 
-              :key="branch.uuid" 
-              :branch="branch"
-              :selected="selectedBranches.includes(branch.uuid)"
-              @update:selected="$event ? selectedBranches.push(branch.uuid) : selectedBranches = selectedBranches.filter(id => id !== branch.uuid)"
-              @view="viewDetails"
-            />
+          <div v-else-if="branches.length === 0 && !errorMessage" class="px-6 py-14 text-center">
+            <p class="font-display font-extrabold text-lg text-[#3D2B24]">
+              {{ search || status ? 'No branches match these filters' : 'No branches yet' }}
+            </p>
+            <p class="text-sm text-[#9E7060] mt-1">
+              {{ search || status ? 'Try a different search or status.' : 'Add your first branch to start managing it here.' }}
+            </p>
+            <button
+              v-if="search || status"
+              type="button"
+              @click="search = ''; status = ''"
+              class="mt-4 text-sm font-bold text-[#7D5A50] underline underline-offset-4 hover:text-[#3D2B24]"
+            >
+              Clear filters
+            </button>
+          </div>
+
+          <template v-else-if="branches.length">
+            <!-- Column labels (wide screens only; rows stack on small screens) -->
+            <div
+              class="hidden lg:grid grid-cols-[auto_minmax(0,2.2fr)_minmax(0,2fr)_minmax(0,1.3fr)_8.5rem_auto] items-center gap-x-4 px-6 py-2.5 bg-[#FDF8F3] border-b border-[#F3E7D2] text-[11px] font-bold text-[#9E7060]"
+            >
+              <input
+                type="checkbox"
+                :checked="selectedBranches.length === branches.length"
+                :indeterminate="selectedBranches.length > 0 && selectedBranches.length < branches.length"
+                @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
+                aria-label="Select all branches on this page"
+                class="w-5 h-5 rounded border-[#D9C4A8] text-[#7D5A50] focus:ring-[#7D5A50] cursor-pointer"
+              />
+              <span>Branch</span>
+              <span>Address</span>
+              <span>Manager</span>
+              <span>Status</span>
+              <span class="w-9" aria-hidden="true"></span>
+            </div>
+
+            <ul class="divide-y divide-[#F3E7D2]">
+              <li v-for="branch in branches" :key="branch.uuid">
+                <CafeManagementBranchCard
+                  :branch="branch"
+                  :selected="selectedBranches.includes(branch.uuid)"
+                  @update:selected="$event ? selectedBranches.push(branch.uuid) : selectedBranches = selectedBranches.filter(id => id !== branch.uuid)"
+                  @view="viewDetails"
+                />
+              </li>
+            </ul>
           </template>
         </div>
       </div>

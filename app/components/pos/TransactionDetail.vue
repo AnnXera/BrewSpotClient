@@ -8,7 +8,21 @@ const props = defineProps<{
   preview: { created_at: string; staff_name: string; total_amount: number; status: string }
 }>()
 
-const emit = defineEmits<{ back: [] }>()
+const emit = defineEmits<{
+  back: []
+  refunded: [transaction: any]
+}>()
+
+const showRefundModal = ref(false)
+
+function onRefundSuccess(updated: any) {
+  if (updated) {
+    detail.value = updated
+  } else if (detail.value) {
+    detail.value.status = 'refunded'
+  }
+  emit('refunded', detail.value)
+}
 
 const devicePosService = useDevicePosService()
 const detail = ref<PosTransactionDetail | null>(null)
@@ -95,7 +109,8 @@ onUnmounted(() => clearTimeout(copiedTimer))
           </p>
         </div>
         <div class="text-right shrink-0">
-          <span v-if="!isSettled" class="inline-block mb-1 text-[11px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-50 text-red-800 border border-red-200">{{ status }}</span>
+          <span v-if="status?.toLowerCase() === 'refunded'" class="inline-block mb-1 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300">REFUNDED</span>
+          <span v-else-if="!isSettled" class="inline-block mb-1 text-[11px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-50 text-red-800 border border-red-200">{{ status }}</span>
           <p class="font-display text-[1.75rem] leading-none font-semibold tabular-nums tracking-tight" :class="isSettled ? 'text-[#7B5A50]' : 'text-[#8A6E64] line-through'">
             {{ formatCurrency(detail?.total_amount ?? preview.total_amount) }}
           </p>
@@ -217,7 +232,39 @@ onUnmounted(() => clearTimeout(copiedTimer))
           </div>
         </dl>
       </section>
+
+      <!-- Actions: Refund Button -->
+      <section v-if="detail && isSettled" class="mx-5 mt-2 mb-6 pt-3 border-t border-[#EADFD3]">
+        <button
+          type="button"
+          @click="showRefundModal = true"
+          class="w-full h-12 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-sm transition-colors flex items-center justify-center gap-2 focus:ring-2 focus:ring-red-600/30 active:scale-[0.99]"
+        >
+          <Icon name="heroicons:arrow-uturn-left" class="w-4 h-4" />
+          Refund Sale (Requires Manager PIN)
+        </button>
+      </section>
+
+      <section v-else-if="detail && status?.toLowerCase() === 'refunded'" class="mx-5 mt-2 mb-6 p-3.5 rounded-lg bg-amber-50 border border-amber-200">
+        <div class="flex items-start gap-2.5">
+          <Icon name="heroicons:information-circle" class="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+          <div>
+            <p class="text-xs font-bold text-amber-900 uppercase tracking-wide">Sale Refunded</p>
+            <p v-if="detail.walk_in_note" class="text-xs text-amber-800 mt-0.5 break-words">{{ detail.walk_in_note }}</p>
+            <p v-else class="text-xs text-amber-800 mt-0.5">This transaction has been refunded by a manager. Serving quantities were restored to inventory.</p>
+          </div>
+        </div>
+      </section>
     </div>
+
+    <!-- Refund Authorization Modal -->
+    <PosRefundModal
+      v-if="showRefundModal && detail"
+      :show="showRefundModal"
+      :transaction="detail"
+      @close="showRefundModal = false"
+      @refunded="onRefundSuccess"
+    />
   </div>
 </template>
 

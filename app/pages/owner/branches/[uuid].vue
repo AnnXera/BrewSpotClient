@@ -282,6 +282,9 @@ onMounted(fetchBranch)
 
             <p v-else class="text-sm text-[#9E7060]">No BIR document uploaded for this branch.</p>
           </section>
+
+          <!-- POS Registers (full width, under both cards) -->
+          <PosDevicesCard class="lg:col-span-2" :branch-uuid="branch.uuid" scope="owner" />
         </div>
 
         <!-- Employees Tab: the list, or one employee's details -->

@@ -33,10 +33,10 @@ const status = computed<ServingItemStatus>(() => {
 })
 
 const badge = computed(() => ({
-  available: { label: 'Available', cls: 'bg-[#D4EDDA] text-[#28A745]' },
-  sold_out: { label: 'Sold Out', cls: 'bg-[#FFE0E0] text-[#B31E1E]' },
-  unavailable: { label: 'Unavailable', cls: 'bg-[#F0E8E5]/70 border border-[#B4846C] text-[#B4846C]' },
-  branch_unavailable: { label: 'Unavailable for this branch', cls: 'bg-[#AAAAAA]/70 text-[#5A5A5A]' },
+  available: { label: 'Available', cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80' },
+  sold_out: { label: 'Sold Out', cls: 'bg-rose-50 text-rose-700 border border-rose-200/80' },
+  unavailable: { label: 'Unavailable', cls: 'bg-amber-50 text-amber-700 border border-amber-200/80' },
+  branch_unavailable: { label: 'Not at branch', cls: 'bg-stone-100 text-stone-600 border border-stone-200' },
 }[status.value]))
 
 const editing = ref(false)
@@ -54,7 +54,6 @@ async function startEdit() {
 function commit() {
   if (!editing.value) return
   editing.value = false
-  // A number input's v-model gives a number, or '' when empty.
   const raw = String(text.value).trim()
   const n = Math.floor(Number(raw))
   if (raw !== '' && Number.isFinite(n)) {
@@ -68,39 +67,66 @@ function onEye() {
 </script>
 
 <template>
-  <div class="relative">
+  <div class="relative group">
     <div
-      class="bg-white border rounded-2xl p-[22px] flex flex-col gap-3"
-      :class="error ? 'border-[#B31E1E]' : 'border-[#EDD8CC]'"
+      class="item-card bg-white border rounded-2xl p-4 sm:p-5 flex flex-col gap-3.5 shadow-2xs transition-card"
+      :class="error ? 'border-rose-400 ring-1 ring-rose-300' : 'border-[#E3CFB4] hover:border-[#B4846C]'"
     >
+      <!-- Item Header: Name, Image, Eye Toggle -->
       <div class="flex items-center justify-between gap-3">
         <div class="flex items-center gap-3 min-w-0">
-          <img v-if="item.picture" :src="item.picture" :alt="item.menu_name" class="size-9 rounded-full object-cover shrink-0">
-          <div v-else class="size-9 rounded-full bg-[#FFF8EA] flex items-center justify-center shrink-0">
+          <img
+            v-if="item.picture"
+            :src="item.picture"
+            :alt="item.menu_name"
+            class="size-10 rounded-xl object-cover shrink-0 border border-[#E3CFB4]/60"
+          >
+          <div
+            v-else
+            class="size-10 rounded-xl bg-[#FDF3E7] border border-[#E3CFB4]/60 flex items-center justify-center shrink-0"
+          >
             <Icon name="heroicons:cake" class="w-5 h-5 text-[#9E7060]" />
           </div>
-          <p class="font-display font-semibold text-[20px] text-[#3D2B24] truncate">{{ item.menu_name }}</p>
+          <div class="min-w-0">
+            <p class="font-display font-bold text-[17px] text-[#3B1F0E] truncate leading-tight">
+              {{ item.menu_name }}
+            </p>
+            <p v-if="!item.editable" class="text-[11px] font-medium text-stone-500">
+              Not assigned to this branch
+            </p>
+          </div>
         </div>
+
+        <!-- Eye toggle button -->
         <button
           type="button"
-          class="shrink-0 text-[#3D2B24] disabled:cursor-not-allowed"
+          class="eye-btn shrink-0 p-2 rounded-xl border border-transparent transition-all duration-160 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+          :class="[
+            item.editable ? 'hover:bg-[#FDF3E7] hover:border-[#E3CFB4] active:scale-[0.92] cursor-pointer' : 'cursor-not-allowed opacity-40',
+            enabled ? 'text-[#7D5A50]' : 'text-stone-400'
+          ]"
           :disabled="!item.editable"
           :aria-label="enabled ? 'Mark unavailable for today' : 'Mark available for today'"
           :aria-pressed="enabled"
           @click="onEye"
         >
-          <Icon :name="enabled ? 'heroicons:eye' : 'heroicons:eye-slash'" class="w-6 h-6" />
+          <Icon :name="enabled ? 'heroicons:eye' : 'heroicons:eye-slash'" class="w-5 h-5" />
         </button>
       </div>
 
-      <div class="bg-[#F2ECE5] rounded-2xl p-4 flex flex-col">
-        <div class="flex items-center justify-between h-[38px] pb-2.5">
-          <span class="font-display font-medium text-[16px] text-[#3D2B24]">Status</span>
-          <span class="font-display font-semibold text-[12px] rounded-full px-2.5 py-[5px]" :class="badge.cls">{{ badge.label }}</span>
+      <!-- Properties Box -->
+      <div class="bg-[#FAF4ED] border border-[#EBE0D2] rounded-xl p-3 flex flex-col gap-2.5">
+        <!-- Status Row -->
+        <div class="flex items-center justify-between">
+          <span class="font-display font-medium text-[13px] text-[#7D5A50]">Status</span>
+          <span class="font-display font-semibold text-[11px] rounded-full px-2.5 py-0.5" :class="badge.cls">
+            {{ badge.label }}
+          </span>
         </div>
 
-        <div class="flex items-center justify-between pb-2.5">
-          <span class="font-display font-medium text-[16px] text-[#3D2B24]">Daily Limit</span>
+        <!-- Daily Limit Row -->
+        <div class="flex items-center justify-between">
+          <span class="font-display font-medium text-[13px] text-[#7D5A50]">Daily Limit</span>
           <input
             v-if="editing"
             ref="input"
@@ -111,7 +137,7 @@ function onEye() {
             step="1"
             inputmode="numeric"
             aria-label="Daily limit"
-            class="w-[84px] bg-white rounded-md px-3 py-1 font-display font-semibold text-[16px] text-[#7D5A50] outline-none ring-2 ring-[#7D5A50]"
+            class="w-[84px] bg-white rounded-lg border border-[#7D5A50] px-2.5 py-1 text-center font-display font-semibold text-[14px] text-[#3B1F0E] outline-none ring-2 ring-[#7D5A50]/20 shadow-2xs"
             @blur="commit"
             @keydown.enter.prevent="commit"
             @keydown.esc.prevent="editing = false"
@@ -119,26 +145,55 @@ function onEye() {
           <button
             v-else
             type="button"
-            class="bg-white rounded-md px-3 py-1 flex items-center gap-3 font-display font-semibold text-[16px] text-[#7D5A50] disabled:cursor-not-allowed"
+            class="edit-limit-btn bg-white rounded-lg border border-[#E3CFB4] hover:border-[#7D5A50] hover:bg-[#FFFDF9] px-2.5 py-1 flex items-center gap-2 font-display font-semibold text-[14px] text-[#7D5A50] shadow-2xs transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+            :class="item.editable ? 'active:scale-[0.96] cursor-pointer' : 'cursor-not-allowed opacity-50'"
             :disabled="!item.editable"
             aria-label="Edit daily limit"
             @click="startEdit"
           >
-            {{ limit }}
-            <Icon name="heroicons:pencil-square" class="w-4 h-4" />
+            <span class="tabular-nums">{{ limit }}</span>
+            <Icon name="heroicons:pencil-square" class="w-3.5 h-3.5 text-[#B4846C]" />
           </button>
         </div>
 
-        <div class="flex items-center justify-between">
-          <span class="font-display font-medium text-[16px] text-[#3D2B24]">Available Stock</span>
-          <span class="w-[72px] text-center font-display font-semibold text-[16px] text-[#7D5A50]">{{ stock }}</span>
+        <!-- Available Stock Row -->
+        <div class="flex items-center justify-between pt-1 border-t border-[#EBE0D2]/60">
+          <span class="font-display font-medium text-[13px] text-[#7D5A50]">Available Stock</span>
+          <span class="font-display font-bold text-[16px] tabular-nums text-[#3B1F0E] text-right min-w-[60px]">
+            {{ stock }}
+          </span>
         </div>
       </div>
 
-      <p v-if="error" role="alert" class="text-[12px] text-[#B31E1E]">{{ error }}</p>
+      <!-- Row Error -->
+      <div v-if="error" role="alert" class="flex items-center gap-1.5 text-[12px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5">
+        <Icon name="heroicons:exclamation-circle" class="w-4 h-4 shrink-0 text-rose-600" />
+        <span class="truncate">{{ error }}</span>
+      </div>
     </div>
-
-    <!-- Switched off for this branch: greyed out and not editable -->
-    <div v-if="!item.editable" class="absolute inset-0 rounded-2xl bg-[#D9D9D9]/50" aria-hidden="true" />
   </div>
 </template>
+
+<style scoped>
+.item-card {
+  transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1),
+              box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1),
+              border-color 180ms ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .item-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px -2px rgba(61, 43, 36, 0.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item-card,
+  .eye-btn,
+  .edit-limit-btn {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+</style>

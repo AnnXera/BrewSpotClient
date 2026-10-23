@@ -3,7 +3,8 @@ import { computed, toRef } from 'vue'
 import AnalyticsPanel from './AnalyticsPanel.vue'
 import AnalyticsChange from './AnalyticsChange.vue'
 import AnalyticsStatus from './AnalyticsStatus.vue'
-import type { AnalyticsFilters } from '~/services/OwnerAnalyticsService'
+import type { AnalyticsBranch, AnalyticsFilters } from '~/services/OwnerAnalyticsService'
+import type { ExcelReport, ExcelSheet } from '~/composables/useExcelExport'
 import { formatCount, formatPeso, formatPesoCents, formatSpan } from '~/utils/dashboardFormat'
 
 // Every branch side by side for the date range (the branch filter does not apply here).
@@ -26,6 +27,46 @@ const statusLabel: Record<string, string> = {
   suspended: 'Suspended',
   rejected: 'Rejected',
 }
+
+// ── Excel export, called from the page's Export button ──
+function excelReport(): Omit<ExcelReport, 'cafe'> | null {
+  const d = data.value
+  if (!d) return null
+  const t = totals.value
+  const previous = d.branches.reduce((a, b) => a + b.previous_revenue, 0)
+
+  type Row = AnalyticsBranch & { total?: boolean }
+  const branches: ExcelSheet<Row> = {
+    name: 'Branch comparison',
+    columns: [
+      { header: 'Branch', value: b => b.total ? 'All branches' : b.name },
+      { header: 'Type', value: b => b.total ? null : (b.branch_type === 'main' ? 'Main' : 'Branch') },
+      { header: 'Status', value: b => b.total ? null : (statusLabel[b.status] ?? 'Active') },
+      { header: 'Income', value: b => b.revenue, format: 'peso' },
+      { header: 'Orders', value: b => b.orders, format: 'count' },
+      { header: 'Average order', value: b => b.avg_order_value, format: 'peso' },
+      { header: 'Share of income', value: b => b.total ? null : b.share, format: 'percent' },
+      { header: 'Income before', value: b => b.previous_revenue, format: 'peso' },
+      { header: 'Income vs before', value: b => b.change, format: 'percent', signed: true },
+    ],
+    rows: [...d.branches].sort((a, b) => b.revenue - a.revenue),
+    totals: {
+      total: true, uuid: '', name: '', branch_type: '', status: '', share: 0,
+      revenue: t.revenue, orders: t.orders, avg_order_value: t.aov, previous_revenue: previous,
+      change: previous ? ((t.revenue - previous) / previous) * 100 : null,
+    },
+  }
+
+  return {
+    title: 'Branches report',
+    from: d.filters.from,
+    to: d.filters.to,
+    scope: 'All branches',
+    sheets: [branches],
+  }
+}
+
+defineExpose({ excelReport, exportReady: computed(() => !!data.value) })
 </script>
 
 <template>

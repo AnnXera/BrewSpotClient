@@ -13,6 +13,7 @@ const links = [
   { label: 'Dashboard', to: '/manager/dashboard', icon: 'squares-2x2' },
   { label: 'Cafe Management', to: '/manager/cafe', icon: 'building-storefront' },
   { label: 'Servings', to: '/manager/servings', icon: 'cake' },
+  { label: 'Reservations', to: '/manager/reservations', icon: 'calendar-days' },
   { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
 ]
 
@@ -290,6 +291,9 @@ onMounted(init)
 
             <p v-else class="text-sm text-[#9E7060]">No BIR document uploaded for this branch.</p>
           </section>
+
+          <!-- POS Registers (full width, under both cards) -->
+          <PosDevicesCard class="lg:col-span-2" :branch-uuid="branch.uuid" scope="manager" />
         </div>
 
         <!-- Employees Tab: the list, or one employee's details. Managers can only add / edit cashiers and staff. -->

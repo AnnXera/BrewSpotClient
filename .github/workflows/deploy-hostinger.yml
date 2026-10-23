@@ -1,0 +1,51 @@
+# Builds the Nuxt SPA and deploys it to the Hostinger site's public_html over FTP.
+# Setup (secrets and variables): deploy/hostinger/README.md in the server repo.
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: hostinger-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FTP_SERVER: ${{ secrets.FTP_SERVER }}
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_DIR: ${{ vars.FTP_PUBLIC_DIR }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run generate:hostinger
+
+      # Refuse to upload unless FTP_PUBLIC_DIR points at the site's public_html (it must contain backend/).
+      - name: Check FTP target folder
+        run: |
+          listing=$(curl --silent --show-error --ssl --list-only --user "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER/$FTP_DIR") || exit 1
+          if ! printf '%s\n' "$listing" | grep -qx backend; then
+            echo "::error::No 'backend' folder in '$FTP_DIR' on the FTP server. Set the FTP_PUBLIC_DIR variable to the site's public_html as seen from the FTP root."
+            exit 1
+          fi
+
+      # Only files from earlier runs are ever deleted, so backend/ (uploaded by hand) is left alone.
+      - uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ${{ vars.FTP_PROTOCOL || 'ftps' }}
+          local-dir: ./.output/public/
+          server-dir: ${{ vars.FTP_PUBLIC_DIR }}

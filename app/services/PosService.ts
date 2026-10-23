@@ -30,6 +30,7 @@ export interface PosTransactionDetail {
     created_at: string
     staff_name: string
     status: string
+    walk_in_note?: string | null
     subtotal: number
     discount_type: string | null
     discount_amount: number
@@ -86,7 +87,25 @@ export function spoilageItemLabel(log: SpoilageLog) {
     return [log.size_name, log.menu_item?.menu_name ?? 'Removed item'].filter(Boolean).join(' ')
 }
 
+// A register as listed on a branch's details page (revoked registers are left out).
+export interface BranchPosDevice {
+    uuid: string
+    name: string
+    branch_uuid: string | null
+    registered_by: string | null
+    active_staff: { uuid: string; firstname: string; name: string } | null // signed in on it now
+    active_since: string | null
+    last_used_at: string | null
+    created_at: string | null
+}
+
 export class PosService extends BaseService {
+    // ── Branch registers (Owner/Manager auth_token, `pos_system` plan feature) ───
+
+    listBranchDevices(scope: 'owner' | 'manager', branchUuid: string) {
+        return this.get<{ success: boolean; devices: BranchPosDevice[] }>(`/${scope}/branches/${branchUuid}/pos-devices`)
+    }
+
     // ── Setup API (Uses Owner/Manager auth_token) ────────────────────────────────
 
     getSetupBranches() {
@@ -160,5 +179,39 @@ export class DevicePosService extends BaseService {
             discount_type: discountType,
             discount_amount: discountAmount
         })
+    }
+
+    getApprovingManagers() {
+        return this.get<{ success: boolean; managers: { uuid: string; name: string; role: string; has_pin: boolean; is_locked: boolean }[] }>('/pos/device/approving-managers')
+    }
+
+    // restock: the order was never made, so its servings go back on sale; otherwise they count as refunded (still used up).
+    refundTransaction(transactionUuid: string, managerUuid: string, pin: string, reason?: string, restock = false) {
+        return this.post<{ success: boolean; message: string; transaction?: PosTransactionDetail }>('/pos/device/transactions/' + transactionUuid + '/refund', {
+            manager_uuid: managerUuid,
+            pin,
+            reason,
+            restock,
+        })
+    }
+
+    getFloorPlan() {
+        return this.get<{ success: boolean; floor_plan: any; floor_plans: any[] }>('/pos/device/floor-plan')
+    }
+
+    updateTableStatus(tableUuid: string, status: string) {
+        return this.patch<{ success: boolean; message: string; table: any }>('/pos/device/tables/' + tableUuid + '/status', { status })
+    }
+
+    // A full service day fits one page (the server caps per_page at 100).
+    getReservations(date?: string, perPage = 100) {
+        return this.get<{ success: boolean; reservations: { data: any[]; current_page: number; last_page: number; total: number } }>(
+            '/pos/device/reservations',
+            { per_page: perPage, ...(date ? { date } : {}) },
+        )
+    }
+
+    updateReservationStatus(reservationUuid: string, status: string) {
+        return this.patch<{ success: boolean; message: string; reservation: any }>('/pos/device/reservations/' + reservationUuid + '/status', { status })
     }
 }
