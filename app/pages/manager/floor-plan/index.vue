@@ -1195,6 +1195,17 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
                     aria-label="Rotate"
                     @pointerdown.stop.prevent="startRotate($event, 'element', el)"
                   />
+                  <button
+                    type="button"
+                    class="absolute -right-[12px] -top-[24px] flex size-[20px] items-center justify-center rounded-full border border-[#E7C3BD] bg-white text-[#A85F57] shadow-sm hover:bg-[#F3DFDC] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A85F57]"
+                    :style="{ transform: el.rotation ? `rotate(${-el.rotation}deg)` : undefined }"
+                    aria-label="Delete fixture"
+                    title="Delete"
+                    @pointerdown.stop.prevent
+                    @click.stop="removeSelected"
+                  >
+                    <Icon name="heroicons:trash-20-solid" class="size-[12px]" />
+                  </button>
                 </template>
 
                 <!-- Drag either end to lengthen or shorten -->
@@ -1238,6 +1249,17 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
                     aria-label="Rotate"
                     @pointerdown.stop.prevent="startRotate($event, 'table', t)"
                   />
+                  <button
+                    type="button"
+                    class="absolute -right-[12px] -top-[24px] flex size-[20px] items-center justify-center rounded-full border border-[#E7C3BD] bg-white text-[#A85F57] shadow-sm hover:bg-[#F3DFDC] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A85F57]"
+                    :style="{ transform: t.rotation ? `rotate(${-t.rotation}deg)` : undefined }"
+                    aria-label="Delete table"
+                    title="Delete"
+                    @pointerdown.stop.prevent
+                    @click.stop="removeSelected"
+                  >
+                    <Icon name="heroicons:trash-20-solid" class="size-[12px]" />
+                  </button>
                 </template>
               </div>
 
