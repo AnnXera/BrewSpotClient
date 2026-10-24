@@ -11,6 +11,8 @@ interface Props {
   danger?: boolean
   /** Disables both actions while the confirmed work is in flight. */
   loading?: boolean
+  /** Holds back only the confirm action, e.g. until terms are accepted. */
+  confirmDisabled?: boolean
 }
 
 withDefaults(defineProps<Props>(), {
@@ -18,6 +20,7 @@ withDefaults(defineProps<Props>(), {
   cancelLabel: 'Cancel',
   danger: false,
   loading: false,
+  confirmDisabled: false,
 })
 
 const emit = defineEmits<{
@@ -51,7 +54,7 @@ const emit = defineEmits<{
       </button>
       <button
         type="button"
-        :disabled="loading"
+        :disabled="loading || confirmDisabled"
         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFFDF9] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         :class="danger
           ? 'bg-[#9E4F47] hover:bg-[#8A423B] focus-visible:ring-[#9E4F47]'

@@ -423,13 +423,13 @@ const isRenewalOpen = computed(() => {
 function planButtonLabel(plan: SubscriptionPlanItem): string {
   if (!currentPlan.value) return 'Subscribe Now'
   // Paid days are used up: every plan is now something the owner can pay for today.
-  if (isRenewalOpen.value) return isCurrentPlan(plan) ? 'Renew Now' : 'Switch & Pay Now'
+  if (isRenewalOpen.value) return isCurrentPlan(plan) ? 'Renew Now' : 'Subscribe Plan'
 
   // A date says when the change happens; "at renewal" leaves the owner to work it out.
   const endDate = currentPlan.value.end_date ? formatDate(currentPlan.value.end_date) : null
   if (isScheduledPlan(plan)) return endDate ? `Scheduled for ${endDate}` : 'Scheduled'
   if (isCurrentPlan(plan)) return hasScheduledChange.value ? 'Stay on This Plan' : 'Current Plan'
-  return endDate ? `Switch on ${endDate}` : 'Switch at Renewal'
+  return 'Subscribe Plan'
 }
 
 function planButtonDisabled(plan: SubscriptionPlanItem): boolean {
@@ -441,15 +441,75 @@ function planButtonDisabled(plan: SubscriptionPlanItem): boolean {
   return isCurrentPlan(plan) && !hasScheduledChange.value
 }
 
+// A free trial has no paid days to finish, so upgrading from it skips the switch terms.
+const isOnTrial = computed(() => {
+  const sub = currentPlan.value
+  return !!sub && (sub.billing_cycle === 'trial' || Number(sub.plan?.price ?? 0) <= 0)
+})
+
+// The plan the owner is agreeing to switch to, while the terms dialog is open.
+const pendingSwitch = ref<SubscriptionPlanItem | null>(null)
+const switchTermsAccepted = ref(false)
+
+/**
+ * A switch away from a paid plan only takes effect once its term is finished. Picking the
+ * current plan again (dropping a scheduled change) and paying once renewal has opened are
+ * not switches the owner has to wait out.
+ */
+function needsSwitchTerms(plan: SubscriptionPlanItem): boolean {
+  return !!currentPlan.value && !isOnTrial.value && !isRenewalOpen.value && !isCurrentPlan(plan)
+}
+
+const switchTerms = computed(() => {
+  const plan = pendingSwitch.value
+  const current = currentPlan.value?.plan?.sub_name ?? 'current plan'
+  const next = plan?.sub_name ?? 'new plan'
+  const endsOn = currentPlan.value?.end_date ? formatDate(currentPlan.value.end_date) : 'the end of your current term'
+  const cycle = browseBillingCycle.value === 'yearly' ? 'yearly' : 'monthly'
+
+  return {
+    title: `Switch to ${next}?`,
+    message: `You need to finish your ${current} before you can use ${next}.`,
+    terms: [
+      `Your ${current} stays active, with all of its features, until ${endsOn}.`,
+      `${next} (${cycle}) takes effect only after your current term ends on ${endsOn}. Its features are not available before then.`,
+      `Nothing is charged today. Payment for ${next} opens when your current term ends.`,
+      `You can remove this scheduled switch any time before ${endsOn}.`,
+    ],
+  }
+})
+
+function cancelSwitch() {
+  if (scheduling.value) return
+  pendingSwitch.value = null
+}
+
+async function confirmSwitch() {
+  const plan = pendingSwitch.value
+  if (!plan || !switchTermsAccepted.value) return
+  await applyPlanChange(plan)
+  pendingSwitch.value = null
+}
+
 /**
  * Choosing a plan means one of two things.
  *
  * With no active subscription — or while still on a free trial — there are no paid days to
  * protect, so checkout opens straight away. Otherwise the change is booked for the end of
- * the current term and nothing is charged. The backend replies with `requires_checkout`
- * when it decides the switch should happen immediately after all.
+ * the current term and nothing is charged, once the owner accepts the switch terms. The
+ * backend replies with `requires_checkout` when it decides the switch should happen
+ * immediately after all.
  */
-async function selectPlan(plan: SubscriptionPlanItem) {
+function selectPlan(plan: SubscriptionPlanItem) {
+  if (needsSwitchTerms(plan)) {
+    switchTermsAccepted.value = false
+    pendingSwitch.value = plan
+    return
+  }
+  applyPlanChange(plan)
+}
+
+async function applyPlanChange(plan: SubscriptionPlanItem) {
   if (!currentPlan.value) {
     openCheckout(plan)
     return
@@ -1161,6 +1221,35 @@ onMounted(async () => {
           <span>{{ line }}</span>
         </li>
       </ul>
+    </ConfirmDialog>
+
+    <!-- Terms for switching away from a paid plan before its term is finished -->
+    <ConfirmDialog
+      :open="pendingSwitch !== null"
+      :title="switchTerms.title"
+      :message="switchTerms.message"
+      confirm-label="Agree & Subscribe Plan"
+      cancel-label="Keep current plan"
+      :loading="scheduling"
+      :confirm-disabled="!switchTermsAccepted"
+      @confirm="confirmSwitch"
+      @cancel="cancelSwitch"
+    >
+      <div class="rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] p-4">
+        <p class="mb-2 font-display text-[13px] font-semibold text-[#3B1F0E]">Terms and conditions</p>
+        <ol class="list-decimal space-y-1.5 pl-5 font-sans text-[13px] leading-relaxed text-[#3B1F0E]/80">
+          <li v-for="line in switchTerms.terms" :key="line">{{ line }}</li>
+        </ol>
+      </div>
+      <label class="mt-4 flex cursor-pointer items-start gap-2.5 font-sans text-sm text-[#3B1F0E]">
+        <input
+          v-model="switchTermsAccepted"
+          type="checkbox"
+          :disabled="scheduling"
+          class="mt-0.5 size-4 shrink-0 cursor-pointer rounded border-[#D9C3A5] accent-[#3A2923]"
+        >
+        <span>I understand that I need to finish my current plan before my new plan takes effect.</span>
+      </label>
     </ConfirmDialog>
 
     <!-- Outcome messages. The live region is always mounted so screen readers pick up the text. -->
