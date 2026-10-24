@@ -364,7 +364,6 @@ const OVERRIDES = [
   { status: 'available', label: 'Free' },
   { status: 'reserved', label: 'Held' },
   { status: 'occupied', label: 'Seated' },
-  { status: 'cleaning', label: 'Cleaning' },
 ]
 
 async function setTableStatus(table: TableData, status: string) {
@@ -823,7 +822,7 @@ onUnmounted(() => {
 
                 <div>
                   <h4 class="text-[13px] font-semibold text-[#2D1E17]">Set table by hand</h4>
-                  <div class="mt-2 grid grid-cols-4 gap-1 rounded-xl bg-[#F6ECE0] p-1 lg:w-[320px]" role="radiogroup" aria-label="Table status">
+                  <div class="mt-2 grid grid-cols-3 gap-1 rounded-xl bg-[#F6ECE0] p-1 lg:w-[320px]" role="radiogroup" aria-label="Table status">
                     <button
                       v-for="o in OVERRIDES"
                       :key="o.status"
