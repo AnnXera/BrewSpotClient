@@ -5,6 +5,7 @@ import OwnerIncomeChart from '~/components/dashboard/OwnerIncomeChart.vue'
 import OwnerBranchBreakdown from '~/components/dashboard/OwnerBranchBreakdown.vue'
 import OwnerTrendingItems from '~/components/dashboard/OwnerTrendingItems.vue'
 import OwnerTopCategories from '~/components/dashboard/OwnerTopCategories.vue'
+import TransactionLog from '~/components/analytics/TransactionLog.vue'
 import type { DashboardRange, OwnerDashboardStats } from '~/services/OwnerProfileService'
 import { formatSpan } from '~/utils/dashboardFormat'
 
@@ -65,6 +66,25 @@ watch(range, (value) => {
 
 onMounted(load)
 useAutoRefresh(load)
+
+// ── Transaction log: the chart's period, with its own branch picker ──
+const logBranches = ref<{ value: string | null; label: string }[]>([{ value: null, label: 'All branches' }])
+
+onMounted(async () => {
+  try {
+    const res = await ownerProfileService.getBranches(100, 1)
+    if (res?.success) {
+      logBranches.value = [
+        { value: null, label: 'All branches' },
+        ...res.branches.data.map(b => ({ value: b.uuid, label: b.branch_name })),
+      ]
+    }
+  } catch (err) {
+    console.warn('Dashboard branch list error:', err)
+  }
+})
+
+const logFilters = computed(() => (stats.value ? { from: stats.value.period.from, to: stats.value.period.to } : null))
 
 const span = computed(() => (stats.value ? formatSpan(stats.value.period.from, stats.value.period.to) : ''))
 const updatedAt = computed(() =>
@@ -196,6 +216,15 @@ const todayDateFormatted = computed(() => {
                 :categories="stats?.top_categories ?? []"
                 :span="span"
                 :loading="loading"
+              />
+            </div>
+
+            <!-- 4. Transaction Log -->
+            <div v-if="logFilters" class="scroll-reveal">
+              <TransactionLog
+                :filters="logFilters"
+                :branches="logBranches"
+                :note="`Every sale for ${span}, with who handled it. Refunds and voids stay listed with who approved them.`"
               />
             </div>
           </div>

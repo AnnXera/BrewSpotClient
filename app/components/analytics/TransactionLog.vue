@@ -1,18 +1,29 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import AnalyticsPanel from './AnalyticsPanel.vue'
+import DropdownList from '~/components/common/DropdownList.vue'
 import ManagerTransactionModal from '~/components/manager/ManagerTransactionModal.vue'
 import type { AnalyticsFilters, TransactionLog, TransactionLogRow, TransactionLogStatus } from '~/services/OwnerAnalyticsService'
 import { formatCount, formatMethod, formatPesoCents } from '~/utils/dashboardFormat'
 
 // Every sale in the Sales tab's period, refunds and voids included, newest first.
 // Pages, status and search are local to this panel; the period and branch come
-// from the page filters.
-const props = defineProps<{ filters: AnalyticsFilters }>()
+// from the page filters. Given `branches`, the panel shows its own branch picker
+// instead (the dashboard has no page-wide branch filter).
+const props = defineProps<{
+  filters: AnalyticsFilters
+  branches?: { value: string | null; label: string }[]
+  note?: string
+}>()
 
 const PER_PAGE = 20
 
 const service = useOwnerAnalyticsService()
+
+const branch = ref<string | null>(null)
+const effectiveFilters = computed<AnalyticsFilters>(() =>
+  props.branches ? { ...props.filters, branch: branch.value } : { ...props.filters },
+)
 
 const status = ref<TransactionLogStatus | null>(null)
 const search = ref('')
@@ -37,7 +48,7 @@ async function load() {
   if (data.value) refreshing.value = true
   failed.value = false
   try {
-    const res = await service.getTransactions({ ...props.filters }, {
+    const res = await service.getTransactions(effectiveFilters.value, {
       status: status.value,
       search: query.value,
       page: page.value,
@@ -58,7 +69,7 @@ async function load() {
 }
 
 // A new period, branch, status or search starts again from the first page.
-watch([() => JSON.stringify(props.filters), status, query], () => {
+watch([() => JSON.stringify(effectiveFilters.value), status, query], () => {
   if (page.value !== 1) page.value = 1 // the page watcher loads
   else load()
 }, { immediate: true })
@@ -111,19 +122,31 @@ const loadReceipt = (uuid: string) => service.getTransaction(uuid)
 <template>
   <AnalyticsPanel
     title="Transaction log"
-    note="Every sale rung up in this period, with who handled it. Refunds and voids stay listed with who approved them."
+    :note="note ?? 'Every sale rung up in this period, with who handled it. Refunds and voids stay listed with who approved them.'"
   >
     <template #actions>
-      <label class="relative block w-full sm:w-[260px]">
-        <span class="sr-only">Search transactions</span>
-        <Icon name="heroicons:magnifying-glass" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9E7060]" />
-        <input
-          v-model="search"
-          type="search"
-          placeholder="Receipt #, cashier, or note"
-          class="h-9 w-full rounded-[10px] border border-[#E9D7BF] bg-white pl-9 pr-3 text-[13px] text-[#3B1F0E] placeholder:text-[#B09080] focus:border-[#7D5A50] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
-        >
-      </label>
+      <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        <div v-if="branches" class="w-full sm:w-56">
+          <DropdownList
+            v-model="branch"
+            :options="branches"
+            size="xs"
+            icon="heroicons:building-storefront"
+            aria-label="Branch"
+            align="right"
+          />
+        </div>
+        <label class="relative block w-full sm:w-[260px]">
+          <span class="sr-only">Search transactions</span>
+          <Icon name="heroicons:magnifying-glass" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9E7060]" />
+          <input
+            v-model="search"
+            type="search"
+            placeholder="Receipt #, cashier, or note"
+            class="h-9 w-full rounded-[10px] border border-[#E9D7BF] bg-white pl-9 pr-3 text-[13px] text-[#3B1F0E] placeholder:text-[#B09080] focus:border-[#7D5A50] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
+          >
+        </label>
+      </div>
     </template>
 
     <div role="radiogroup" aria-label="Transaction status" class="-mt-1 mb-4 flex flex-wrap gap-1.5">
