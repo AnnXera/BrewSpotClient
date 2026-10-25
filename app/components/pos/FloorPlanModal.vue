@@ -269,9 +269,24 @@ function activeBooking(table: TableData): Booking | null {
 
 function tableState(table: TableData): string {
   const b = activeBooking(table)
-  if (b?.status === 'seated') return 'occupied'
-  if (b && OPEN.includes(b.status) && new Date(b.reservation_date) <= now.value) return 'reserved'
-  return table.status || 'available'
+  // If reservation is seated or table was explicitly marked occupied
+  if (b?.status === 'seated' || table.status === 'occupied') return 'occupied'
+
+  // If table is held by an active or upcoming reservation during service
+  if (b && OPEN.includes(b.status)) {
+    const start = new Date(b.reservation_date)
+    const end = new Date(b.reservation_end)
+    const isOngoing = now.value >= start && now.value <= end
+    const isArrivingSoon = start > now.value && minutesBetween(now.value, start) <= 20
+    const isLate = laneOf(b) === 'late'
+    if (isOngoing || isArrivingSoon || isLate) {
+      return 'reserved'
+    }
+  }
+
+  if (table.status === 'reserved') return 'reserved'
+  if (table.status === 'cleaning' || table.status === 'unavailable') return table.status
+  return 'available'
 }
 
 function tableMark(table: TableData) {
@@ -366,7 +381,36 @@ const OVERRIDES = [
   { status: 'occupied', label: 'Seated' },
 ]
 
+async function markTableAvailable(table: TableData) {
+  if (updatingTable.value) return
+  updatingTable.value = true
+  try {
+    // If there is an active seated reservation on this table, mark it as completed first
+    const b = activeBooking(table)
+    if (b && b.status === 'seated') {
+      try {
+        await devicePosService.updateReservationStatus(b.uuid, 'completed')
+      } catch (err) {
+        console.warn('Could not complete reservation:', err)
+      }
+    }
+    const res = await devicePosService.updateTableStatus(table.uuid, 'available')
+    if (res.success) {
+      table.status = 'available'
+    }
+    await refreshAll(false)
+    showToast(`${table.table_name} is now Available (Free)`)
+  } catch (e: any) {
+    showToast(e?.data?.message || 'Could not update table status', 'error')
+  } finally {
+    updatingTable.value = false
+  }
+}
+
 async function setTableStatus(table: TableData, status: string) {
+  if (status === 'available') {
+    return markTableAvailable(table)
+  }
   if (updatingTable.value || table.status === status) return
   updatingTable.value = true
   const previous = table.status
@@ -374,6 +418,8 @@ async function setTableStatus(table: TableData, status: string) {
   try {
     const res = await devicePosService.updateTableStatus(table.uuid, status)
     if (res.success && res.table) table.status = res.table.status
+    await refreshAll(false)
+    showToast(`${table.table_name} set to ${status}`)
   } catch (e: any) {
     table.status = previous
     showToast(e?.data?.message || 'The table status did not change. Try again.', 'error')
@@ -382,9 +428,35 @@ async function setTableStatus(table: TableData, status: string) {
   }
 }
 
-function assignToOrder(table: TableData) {
-  emit('selectTable', table)
-  emit('close')
+async function assignToOrder(table: TableData) {
+  updatingTable.value = true
+  try {
+    const res = await devicePosService.updateTableStatus(table.uuid, 'occupied')
+    if (res.success && res.table) {
+      table.status = res.table.status
+    } else {
+      table.status = 'occupied'
+    }
+
+    // If there is an active reservation on this table, mark it seated
+    const b = activeBooking(table)
+    if (b && (b.status === 'confirmed' || b.status === 'pending')) {
+      try {
+        await devicePosService.updateReservationStatus(b.uuid, 'seated')
+      } catch (err) {
+        console.warn('Could not mark reservation seated:', err)
+      }
+    }
+
+    await refreshAll(false)
+    showToast(`Assigned ${table.table_name} to order (Occupied)`)
+    emit('selectTable', { ...table, status: 'occupied' })
+    emit('close')
+  } catch (e: any) {
+    showToast(e?.data?.message || 'Could not update table to occupied', 'error')
+  } finally {
+    updatingTable.value = false
+  }
 }
 
 // ── Canvas: fit the floor to its pane, then let staff zoom from there ──────
@@ -783,17 +855,80 @@ onUnmounted(() => {
             >
               <div class="flex items-start gap-3">
                 <div class="min-w-0 flex-1">
-                  <h3 class="font-display text-[22px] font-bold leading-tight text-[#2D1E17]">{{ selectedTable.table_name }}</h3>
-                  <p class="text-[13px] text-[#7D5A50]">
+                  <div class="flex items-center gap-2.5">
+                    <h3 class="font-display text-[22px] font-bold leading-tight text-[#2D1E17]">{{ selectedTable.table_name }}</h3>
+                    <span
+                      class="px-2.5 py-0.5 rounded-full text-xs font-bold border"
+                      :class="{
+                        'bg-emerald-50 text-emerald-800 border-emerald-200': tableState(selectedTable) === 'available',
+                        'bg-[#F4E7DA] text-[#5B3F33] border-[#B4846C]': tableState(selectedTable) === 'reserved',
+                        'bg-gray-100 text-gray-700 border-gray-300': tableState(selectedTable) === 'occupied',
+                      }"
+                    >
+                      {{ tableState(selectedTable) === 'available' ? 'Available (Free)' : (tableState(selectedTable) === 'reserved' ? 'Reserved (Held)' : 'Occupied (Seated)') }}
+                    </span>
+                  </div>
+                  <p class="text-[13px] text-[#7D5A50] mt-0.5">
                     {{ selectedTable.capacity }} seats<template v-if="selectedTable.shared"> · counter seating, booked by seat</template>
                   </p>
                 </div>
-                <button type="button" class="rsv-press h-11 shrink-0 rounded-xl bg-[#7D5A50] px-4 text-[14px] font-semibold text-[#FFF0D1] hover:bg-[#65463D]" @click="assignToOrder(selectedTable)">
-                  Assign to order
-                </button>
-                <button type="button" class="rsv-icon grid shrink-0 place-items-center" aria-label="Close table details" @click="closeSheet">
-                  <Icon name="heroicons:x-mark" class="size-5" />
-                </button>
+
+                <!-- Primary Action based on Table State -->
+                <div class="flex items-center gap-2 shrink-0">
+                  <!-- When Occupied: Customer Left — Mark Table Available -->
+                  <button
+                    v-if="tableState(selectedTable) === 'occupied'"
+                    type="button"
+                    :disabled="updatingTable"
+                    class="rsv-press h-11 shrink-0 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 text-[14px] font-bold disabled:opacity-50 flex items-center gap-2 shadow-xs transition-all active:scale-95"
+                    @click="markTableAvailable(selectedTable)"
+                  >
+                    <Icon name="heroicons:arrow-path" v-if="updatingTable" class="size-4 animate-spin" />
+                    <Icon name="heroicons:check-circle" v-else class="size-5" />
+                    <span>Customer Left — Mark Available</span>
+                  </button>
+
+                  <!-- When Available: Assign to walk-in order -->
+                  <button
+                    v-else-if="tableState(selectedTable) === 'available'"
+                    type="button"
+                    :disabled="updatingTable"
+                    class="rsv-press h-11 shrink-0 rounded-xl bg-[#7D5A50] px-4 text-[14px] font-bold text-[#FFF0D1] hover:bg-[#65463D] disabled:opacity-50 flex items-center gap-2 shadow-xs transition-all active:scale-95"
+                    @click="assignToOrder(selectedTable)"
+                  >
+                    <Icon name="heroicons:arrow-path" v-if="updatingTable" class="size-4 animate-spin" />
+                    <Icon name="heroicons:user-plus" v-else class="size-4" />
+                    <span>Assign to order</span>
+                  </button>
+
+                  <!-- When Reserved: Actionable Seat or Clear buttons -->
+                  <template v-else-if="tableState(selectedTable) === 'reserved'">
+                    <button
+                      type="button"
+                      :disabled="updatingTable"
+                      class="rsv-press h-11 shrink-0 rounded-xl bg-[#7D5A50] hover:bg-[#65463D] text-[#FFF0D1] px-4 text-[13px] font-bold disabled:opacity-50 flex items-center gap-2 shadow-xs transition-all active:scale-95 cursor-pointer"
+                      @click="assignToOrder(selectedTable)"
+                    >
+                      <Icon name="heroicons:arrow-path" v-if="updatingTable" class="size-4 animate-spin" />
+                      <Icon name="heroicons:arrow-right-end-on-rectangle" v-else class="size-4" />
+                      <span>Seat & Assign to order</span>
+                    </button>
+                    <button
+                      type="button"
+                      :disabled="updatingTable"
+                      class="rsv-press h-11 shrink-0 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 text-[13px] font-bold disabled:opacity-50 flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+                      @click="markTableAvailable(selectedTable)"
+                      title="Mark table free/available"
+                    >
+                      <Icon name="heroicons:check" class="size-4" />
+                      <span>Mark Available</span>
+                    </button>
+                  </template>
+
+                  <button type="button" class="rsv-icon grid shrink-0 place-items-center" aria-label="Close table details" @click="closeSheet">
+                    <Icon name="heroicons:x-mark" class="size-5" />
+                  </button>
+                </div>
               </div>
 
               <div class="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto]">
@@ -821,17 +956,17 @@ onUnmounted(() => {
                 </div>
 
                 <div>
-                  <h4 class="text-[13px] font-semibold text-[#2D1E17]">Set table by hand</h4>
+                  <h4 class="text-[13px] font-semibold text-[#2D1E17]">Update table status</h4>
                   <div class="mt-2 grid grid-cols-3 gap-1 rounded-xl bg-[#F6ECE0] p-1 lg:w-[320px]" role="radiogroup" aria-label="Table status">
                     <button
                       v-for="o in OVERRIDES"
                       :key="o.status"
                       type="button"
                       role="radio"
-                      :aria-checked="selectedTable.status === o.status"
+                      :aria-checked="tableState(selectedTable) === o.status"
                       :disabled="updatingTable"
                       class="h-11 rounded-lg text-[13px] font-semibold transition-colors disabled:opacity-50"
-                      :class="selectedTable.status === o.status ? 'bg-[#7D5A50] text-[#FFF0D1]' : 'text-[#7D5A50] hover:bg-white/70'"
+                      :class="tableState(selectedTable) === o.status ? 'bg-[#7D5A50] text-[#FFF0D1] shadow-xs' : 'text-[#7D5A50] hover:bg-white/70'"
                       @click="setTableStatus(selectedTable, o.status)"
                     >
                       {{ o.label }}

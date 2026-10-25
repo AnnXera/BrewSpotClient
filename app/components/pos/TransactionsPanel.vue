@@ -367,6 +367,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown, true))
           :key="openSale.uuid"
           :transaction-uuid="openSale.uuid"
           :preview="openSale"
+          :branch-name="branchName"
           @back="closeSale"
           @refunded="handleRefunded"
         />

@@ -6,6 +6,7 @@ const props = defineProps<{
   transactionUuid: string
   // The row that was tapped, so the header reads right while the details load.
   preview: { created_at: string; staff_name: string; total_amount: number; status: string }
+  branchName?: string
 }>()
 
 const emit = defineEmits<{
@@ -14,6 +15,7 @@ const emit = defineEmits<{
 }>()
 
 const showRefundModal = ref(false)
+const showReceiptModal = ref(false)
 
 function onRefundSuccess(updated: any) {
   if (updated) {
@@ -233,19 +235,29 @@ onUnmounted(() => clearTimeout(copiedTimer))
         </dl>
       </section>
 
-      <!-- Actions: Refund Button -->
-      <section v-if="detail && isSettled" class="mx-5 mt-2 mb-6 pt-3 border-t border-[#EADFD3]">
+      <!-- Actions: View Receipt & Refund Buttons -->
+      <section v-if="detail" class="mx-5 mt-2 mb-6 pt-3 border-t border-[#EADFD3] space-y-2.5">
         <button
           type="button"
+          @click="showReceiptModal = true"
+          class="w-full h-12 rounded-lg bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold text-sm transition-colors shadow-sm flex items-center justify-center gap-2 focus:ring-2 focus:ring-[#7B5A50]/30 active:scale-[0.99]"
+        >
+          <Icon name="heroicons:receipt-percent" class="w-5 h-5" />
+          View Receipt
+        </button>
+
+        <button
+          v-if="isSettled"
+          type="button"
           @click="showRefundModal = true"
-          class="w-full h-12 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-sm transition-colors flex items-center justify-center gap-2 focus:ring-2 focus:ring-red-600/30 active:scale-[0.99]"
+          class="w-full h-11 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-sm transition-colors flex items-center justify-center gap-2 focus:ring-2 focus:ring-red-600/30 active:scale-[0.99]"
         >
           <Icon name="heroicons:arrow-uturn-left" class="w-4 h-4" />
           Refund Sale (Requires Manager PIN)
         </button>
       </section>
 
-      <section v-else-if="detail && status?.toLowerCase() === 'refunded'" class="mx-5 mt-2 mb-6 p-3.5 rounded-lg bg-amber-50 border border-amber-200">
+      <section v-if="detail && status?.toLowerCase() === 'refunded'" class="mx-5 mt-0 mb-6 p-3.5 rounded-lg bg-amber-50 border border-amber-200">
         <div class="flex items-start gap-2.5">
           <Icon name="heroicons:information-circle" class="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
           <div>
@@ -256,6 +268,15 @@ onUnmounted(() => clearTimeout(copiedTimer))
         </div>
       </section>
     </div>
+
+    <!-- Receipt View Modal -->
+    <PosReceiptModal
+      v-if="showReceiptModal && detail"
+      :show="showReceiptModal"
+      :transaction="detail"
+      :branch-name="props.branchName"
+      @close="showReceiptModal = false"
+    />
 
     <!-- Refund Authorization Modal -->
     <PosRefundModal

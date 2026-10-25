@@ -69,11 +69,21 @@ useAutoRefresh(load)
 
 // ── Transaction log: the chart's period, with its own branch picker ──
 const logBranches = ref<{ value: string | null; label: string }[]>([{ value: null, label: 'All branches' }])
+const cafeName = ref('')
+const branchList = ref<{ uuid: string; branch_name: string; branch_type?: string }[]>([])
+const selectedBranchUuid = ref('')
+
+const { isOpenNow } = useOperatingHours()
 
 onMounted(async () => {
   try {
     const res = await ownerProfileService.getBranches(100, 1)
     if (res?.success) {
+      cafeName.value = res.cafe_name || 'Brew Haven'
+      branchList.value = [
+        { uuid: '', branch_name: 'All Branches', branch_type: 'Overview' },
+        ...res.branches.data.map(b => ({ uuid: b.uuid, branch_name: b.branch_name, branch_type: b.branch_type })),
+      ]
       logBranches.value = [
         { value: null, label: 'All branches' },
         ...res.branches.data.map(b => ({ value: b.uuid, label: b.branch_name })),
@@ -88,17 +98,9 @@ const logFilters = computed(() => (stats.value ? { from: stats.value.period.from
 
 const span = computed(() => (stats.value ? formatSpan(stats.value.period.from, stats.value.period.to) : ''))
 const updatedAt = computed(() =>
-  stats.value ? new Date(stats.value.generated_at).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : '',
+  stats.value ? new Date(stats.value.generated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '',
 )
 const branchCount = computed(() => stats.value?.totals.branches ?? 0)
-
-const todayDateFormatted = computed(() => {
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  }).format(new Date())
-})
 </script>
 
 <template>
@@ -107,55 +109,18 @@ const todayDateFormatted = computed(() => {
 
     <main class="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10 xl:px-12">
       <div class="mx-auto max-w-[1360px] space-y-6">
-        <!-- Header: Clean Editorial & Sharp (Matching Manager Dashboard) -->
-        <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between pb-2">
-          <div class="min-w-0">
-            <!-- Title + Sharp Tag -->
-            <div class="flex flex-wrap items-baseline gap-3">
-              <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">
-                <span v-if="loading && !stats" class="skeleton inline-block h-9 w-56 rounded align-middle" />
-                <template v-else>Owner Dashboard</template>
-              </h1>
-
-              <span
-                class="inline-block rounded-md border border-[#E3CFB4] bg-white px-2.5 py-0.5 font-mono text-[11px] font-medium tracking-wide uppercase text-[#7D5A50]"
-              >
-                {{ branchCount ? `${branchCount} Branches` : 'All Branches' }}
-              </span>
-            </div>
-
-            <!-- Address & Metadata line -->
-            <p class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[#8B6656]">
-              <span class="flex items-center gap-1.5">
-                <Icon name="heroicons:building-storefront-20-solid" class="h-3.5 w-3.5 shrink-0 text-[#B4846C]" />
-                <span>Every branch combined</span>
-              </span>
-              <span class="text-[#D9C3A5]">/</span>
-              <span class="flex items-center gap-1.5 text-[#8B6656]">
-                <Icon name="heroicons:calendar-days-20-solid" class="h-3.5 w-3.5 shrink-0 text-[#B4846C]" />
-                <span>{{ todayDateFormatted }}</span>
-              </span>
-              <span v-if="updatedAt" class="text-[#D9C3A5]">/</span>
-              <span v-if="updatedAt" class="text-[13px] text-[#9E7060] tabular-nums" aria-live="polite">
-                Updated {{ updatedAt }}
-              </span>
-            </p>
-          </div>
-
-          <!-- Controls: Clean Sharp Actions -->
-          <div class="flex flex-wrap items-center gap-3 shrink-0">
-            <!-- Sharp Rectangular Refresh Button -->
-            <button
-              type="button"
-              class="inline-flex items-center gap-2 rounded-lg border border-[#D9C3A5] bg-white px-4 py-2 text-[13px] font-semibold text-[#3B1F0E] shadow-2xs transition-all duration-160 ease-out hover:border-[#3B1F0E] hover:bg-[#FFFDF9] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
-              :disabled="loading || refreshing"
-              @click="load"
-            >
-              <Icon name="heroicons:arrow-path-20-solid" class="h-4 w-4 text-[#7D5A50]" :class="{ 'animate-spin': loading || refreshing }" />
-              <span>Refresh</span>
-            </button>
-          </div>
-        </header>
+        <!-- Header: Clean layout (Greeting/Animated Date & Status, Title/Branch dropdown, Refresh) -->
+        <DashboardHeader
+          :title="cafeName || 'Brew Haven'"
+          :branches="branchList"
+          v-model:current-branch-uuid="selectedBranchUuid"
+          :branch-badge="branchList.find(b => b.uuid === selectedBranchUuid)?.branch_name || (branchCount ? `${branchCount} Branches` : 'All Branches')"
+          :is-open="isOpenNow"
+          :updated-at="updatedAt"
+          :loading="loading"
+          :refreshing="refreshing"
+          @refresh="load"
+        />
 
         <div
           v-if="error"

@@ -27,6 +27,9 @@ export interface LockScreenStaff {
 export interface PosTransactionDetail {
     uuid: string
     receipt_number: string
+    cafe_name?: string | null
+    branch_name?: string | null
+    branch_address?: string | null
     created_at: string
     staff_name: string
     status: string
