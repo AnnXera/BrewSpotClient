@@ -70,8 +70,6 @@ useAutoRefresh(load)
 // ── Transaction log: the chart's period, with its own branch picker ──
 const logBranches = ref<{ value: string | null; label: string }[]>([{ value: null, label: 'All branches' }])
 const cafeName = ref('')
-const branchList = ref<{ uuid: string; branch_name: string; branch_type?: string }[]>([])
-const selectedBranchUuid = ref('')
 
 const { isOpenNow } = useOperatingHours()
 
@@ -80,10 +78,6 @@ onMounted(async () => {
     const res = await ownerProfileService.getBranches(100, 1)
     if (res?.success) {
       cafeName.value = res.cafe_name || 'Brew Haven'
-      branchList.value = [
-        { uuid: '', branch_name: 'All Branches', branch_type: 'Overview' },
-        ...res.branches.data.map(b => ({ uuid: b.uuid, branch_name: b.branch_name, branch_type: b.branch_type })),
-      ]
       logBranches.value = [
         { value: null, label: 'All branches' },
         ...res.branches.data.map(b => ({ value: b.uuid, label: b.branch_name })),
@@ -108,7 +102,6 @@ const span = computed(() => (stats.value ? formatSpan(stats.value.period.from, s
 const updatedAt = computed(() =>
   stats.value ? new Date(stats.value.generated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '',
 )
-const branchCount = computed(() => stats.value?.totals.branches ?? 0)
 </script>
 
 <template>
@@ -117,12 +110,9 @@ const branchCount = computed(() => stats.value?.totals.branches ?? 0)
 
     <main class="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10 xl:px-12">
       <div class="mx-auto max-w-[1360px] space-y-6">
-        <!-- Header: Clean layout (Greeting/Animated Date & Status, Title/Branch dropdown, Refresh) -->
+        <!-- Header: Clean layout (Greeting/Animated Date & Status, Title, Refresh) -->
         <DashboardHeader
           :title="cafeName || 'Brew Haven'"
-          :branches="branchList"
-          v-model:current-branch-uuid="selectedBranchUuid"
-          :branch-badge="branchList.find(b => b.uuid === selectedBranchUuid)?.branch_name || (branchCount ? `${branchCount} Branches` : 'All Branches')"
           :is-open="isOpenNow"
           :updated-at="updatedAt"
           :loading="loading"
