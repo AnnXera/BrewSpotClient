@@ -1,7 +1,6 @@
 <!-- app/pages/manager/cafe.vue -->
 <!-- Cafe Management (manager side): the assigned branch's details, same layout as the owner's Branch Details. -->
 <script setup lang="ts">
-import DropdownList from '~/components/common/DropdownList.vue'
 import type { ManagedBranch } from '~/services/ServingService'
 import type { BranchDetail } from '~/services/OwnerProfileService'
 
@@ -22,9 +21,7 @@ const router = useRouter()
 const service = useServingService('manager')
 
 const branches = ref<ManagedBranch[]>([])
-// ?branch=<uuid> keeps the open branch across a refresh when the manager has several.
-const branchUuid = ref('')
-const branchOptions = computed(() => branches.value.map(b => ({ value: b.uuid, label: b.branch_name })))
+const branchUuid = ref('') // a manager runs exactly one branch
 
 const branch = ref<BranchDetail | null>(null)
 const loading = ref(true)
@@ -117,8 +114,7 @@ async function init() {
       loading.value = false
       return
     }
-    const wanted = typeof route.query.branch === 'string' ? route.query.branch : ''
-    branchUuid.value = res.branches.find(b => b.uuid === wanted)?.uuid ?? res.branches[0]!.uuid
+    branchUuid.value = res.branches[0]!.uuid
   } catch (e: any) {
     errorMessage.value = e?.data?.message || 'Could not load your branches.'
     loading.value = false
@@ -130,14 +126,7 @@ function retry() {
   else init()
 }
 
-watch(branchUuid, (uuid, oldUuid) => {
-  if (branches.value.length > 1 && route.query.branch !== uuid) {
-    // An open employee belongs to the previous branch, so switching drops back to the list.
-    const { employee, ...restQuery } = route.query
-    router.replace({ query: { ...(oldUuid ? restQuery : route.query), branch: uuid } })
-  }
-  fetchBranch()
-})
+watch(branchUuid, fetchBranch)
 
 onMounted(init)
 </script>
@@ -150,9 +139,6 @@ onMounted(init)
         <div class="min-w-0">
           <p class="text-sm font-medium text-[#9E7060]">Cafe Management</p>
           <h1 class="mt-1 text-2xl sm:text-[32px] font-bold text-[#3D2B24] break-words">{{ pageTitle }}</h1>
-        </div>
-        <div v-if="branches.length > 1" class="w-full sm:w-64">
-          <DropdownList v-model="branchUuid" :options="branchOptions" icon="heroicons:building-storefront" aria-label="Branch" />
         </div>
       </div>
 

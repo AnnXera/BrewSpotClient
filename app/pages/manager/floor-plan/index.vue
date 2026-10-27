@@ -1,6 +1,5 @@
 <!-- app/pages/manager/floor-plan/index.vue -->
 <script setup lang="ts">
-import DropdownList from '~/components/common/DropdownList.vue'
 import type {
   FloorPlan,
   FloorPlanAssets,
@@ -67,8 +66,7 @@ function flashSaved() {
 
 // ── State ────────────────────────────────────────────────────────────────
 const branches = ref<{ uuid: string; branch_name: string }[]>([])
-const branchUuid = ref('')
-const branchOptions = computed(() => branches.value.map(b => ({ value: b.uuid, label: b.branch_name })))
+const branchUuid = ref('') // a manager runs exactly one branch
 const catalog = ref<FloorPlanAssets | null>(null)
 const plans = ref<FloorPlan[]>([])
 const plan = ref<FloorPlan | null>(null)
@@ -922,10 +920,7 @@ async function loadBranch() {
   }
 }
 
-watch(branchUuid, (_, old) => {
-  if (!old) return void loadBranch()
-  guard(loadBranch)
-})
+watch(branchUuid, loadBranch)
 
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
@@ -996,9 +991,6 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
           <p class="font-display text-[12px] text-[#7D5A50]">Arrange your cafe, set capacities, and prepare tables for reservations.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
-          <div v-if="branches.length > 1" class="w-52">
-            <DropdownList v-model="branchUuid" :options="branchOptions" icon="heroicons:building-storefront" size="sm" aria-label="Branch" />
-          </div>
           <button type="button" :class="iconBtn" :disabled="!undoStack.length || preview" @click="undo">
             <Icon name="heroicons:arrow-uturn-left" class="size-4" />
             Undo

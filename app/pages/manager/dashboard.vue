@@ -13,7 +13,6 @@ import ManagerTrendingItems from '~/components/manager/ManagerTrendingItems.vue'
 import ManagerTopCategories from '~/components/manager/ManagerTopCategories.vue'
 import ManagerPeakHours from '~/components/manager/ManagerPeakHours.vue'
 import ManagerTransactionModal from '~/components/manager/ManagerTransactionModal.vue'
-import DropdownList from '~/components/common/DropdownList.vue'
 
 definePageMeta({
   role: 'Manager',
@@ -108,14 +107,8 @@ async function init() {
       return
     }
 
-    const queryBranch = typeof route.query.branch === 'string' ? route.query.branch : ''
-    const match = branches.value.find(b => b.uuid === queryBranch)
-    const firstBranch = branches.value[0]
-    if (match) {
-      branchUuid.value = match.uuid
-    } else if (firstBranch) {
-      branchUuid.value = firstBranch.uuid
-    }
+    // A manager runs exactly one branch.
+    branchUuid.value = branches.value[0]!.uuid
 
     await loadStats()
   } catch (err: any) {
@@ -130,26 +123,12 @@ watch(range, (val) => {
   loadStats()
 })
 
-watch(branchUuid, (val) => {
-  if (val) {
-    router.replace({ query: { ...route.query, branch: val } })
-    loadStats()
-  }
-})
-
 onMounted(init)
 useAutoRefresh(refreshAll)
 
 const span = computed(() => (stats.value ? formatSpan(stats.value.period.from, stats.value.period.to) : ''))
 const updatedAt = computed(() =>
   stats.value ? new Date(stats.value.generated_at).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : ''
-)
-
-const branchOptions = computed(() =>
-  branches.value.map(b => ({
-    label: b.branch_name,
-    value: b.uuid,
-  }))
 )
 
 const currentBranchName = computed(() => {
@@ -160,20 +139,11 @@ const currentBranchAddress = computed(() => {
   return stats.value?.branch?.address || branches.value.find(b => b.uuid === branchUuid.value)?.address || ''
 })
 
-const branchDisplay = computed(() => {
+// Title is the branch name; "Cafe — Branch" style names keep only the first part.
+const headerTitle = computed(() => {
   const raw = currentBranchName.value || 'Assigned Branch'
-  const type = stats.value?.branch?.branch_type
-  const defaultBadge = type ? (type === 'main' ? 'Main Branch' : type.charAt(0).toUpperCase() + type.slice(1)) : ''
-
   const delimiter = raw.includes(' — ') ? ' — ' : raw.includes(' - ') ? ' - ' : null
-  if (delimiter) {
-    const parts = raw.split(delimiter)
-    const name = parts[0]?.trim() || raw
-    const badge = parts.slice(1).join(delimiter).trim()
-    return { name, badge: badge || defaultBadge }
-  }
-
-  return { name: raw, badge: defaultBadge }
+  return (delimiter && raw.split(delimiter)[0]?.trim()) || raw
 })
 
 const { isOpenNow } = useOperatingHours()
@@ -186,12 +156,9 @@ const { isOpenNow } = useOperatingHours()
     <main class="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10 xl:px-12">
       <div class="mx-auto max-w-[1360px] space-y-6">
         
-        <!-- Header: Clean layout (Greeting/Animated Date & Status, Title/Branch dropdown, Refresh) -->
+        <!-- Header: Clean layout (Greeting/Animated Date & Status, Title, Refresh) -->
         <DashboardHeader
-          :title="branchDisplay.name"
-          :branches="branches"
-          v-model:current-branch-uuid="branchUuid"
-          :branch-badge="branchDisplay.badge"
+          :title="headerTitle"
           :is-open="isOpenNow"
           :updated-at="updatedAt"
           :loading="loading"

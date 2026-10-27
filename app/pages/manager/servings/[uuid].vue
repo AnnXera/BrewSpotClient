@@ -30,7 +30,7 @@ const service = useServingService('manager')
 const { timeLabel, dateLabel } = useNowClock()
 
 const categoryUuid = computed(() => route.params.uuid as string)
-const branchUuid = ref(typeof route.query.branch === 'string' ? route.query.branch : '')
+const branchUuid = ref('') // a manager runs exactly one branch
 
 const categoryName = ref('')
 const items = ref<CategoryServingItem[]>([])
@@ -165,14 +165,12 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 onMounted(async () => {
   window.addEventListener('beforeunload', onBeforeUnload)
   try {
-    if (!branchUuid.value) {
-      const res = await service.managedBranches()
-      if (!res.branches.length) {
-        errorMessage.value = 'You are not assigned to a branch yet.'
-        return
-      }
-      branchUuid.value = res.branches[0]!.uuid
+    const res = await service.managedBranches()
+    if (!res.branches.length) {
+      errorMessage.value = 'You are not assigned to a branch yet.'
+      return
     }
+    branchUuid.value = res.branches[0]!.uuid
     await load()
   } catch (e: any) {
     failure(e, 'Could not load your branches.')
@@ -200,7 +198,7 @@ onBeforeUnmount(() => {
             <!-- Breadcrumb Navigation -->
             <nav aria-label="Breadcrumb" class="flex items-center gap-2 text-[13px] font-medium mb-1.5">
               <NuxtLink
-                :to="{ path: '/manager/servings', query: { branch: branchUuid } }"
+                to="/manager/servings"
                 class="inline-flex items-center gap-1.5 text-[#8B6656] hover:text-[#3B1F0E] transition-colors duration-160"
               >
                 <Icon name="heroicons:arrow-left" class="w-3.5 h-3.5 text-[#B4846C]" />

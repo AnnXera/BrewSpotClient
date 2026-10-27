@@ -2,19 +2,12 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 
-export interface BranchOption {
-  uuid: string
-  branch_name: string
-  branch_type?: string
-  address?: string | null
-}
-
 const props = withDefaults(
   defineProps<{
     title?: string
-    branches?: BranchOption[]
-    currentBranchUuid?: string
-    branchBadge?: string
+    // Plain label beside the title (e.g. "Platform" on the admin dashboard). There is no
+    // branch switcher: owners see every branch, and a manager runs exactly one.
+    badge?: string
     isOpen?: boolean
     statusMainText?: string
     statusSubText?: string
@@ -24,9 +17,7 @@ const props = withDefaults(
   }>(),
   {
     title: 'Brew Haven',
-    branches: () => [],
-    currentBranchUuid: '',
-    branchBadge: '',
+    badge: '',
     isOpen: true,
     statusMainText: '',
     statusSubText: '',
@@ -37,7 +28,6 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  'update:currentBranchUuid': [uuid: string]
   'refresh': []
 }>()
 
@@ -63,61 +53,24 @@ const formattedDate = computed(() => {
   }).format(new Date())
 })
 
-// 2. Branch Dropdown state
-const isDropdownOpen = ref(false)
-const dropdownRef = ref<HTMLElement | null>(null)
-
-const activeBranch = computed(() => {
-  if (props.currentBranchUuid && props.branches?.length) {
-    return props.branches.find(b => b.uuid === props.currentBranchUuid) || null
-  }
-  return null
-})
-
-const currentBranchLabel = computed(() => {
-  if (props.branchBadge) return props.branchBadge
-  if (activeBranch.value) return activeBranch.value.branch_name
-  if (props.branches?.length) return props.branches[0]?.branch_name || 'Main Branch'
-  return 'Main Branch'
-})
-
-function selectBranch(uuid: string) {
-  emit('update:currentBranchUuid', uuid)
-  isDropdownOpen.value = false
-}
-
-function handleDropdownClick() {
-  if (props.branches && props.branches.length > 1) {
-    isDropdownOpen.value = !isDropdownOpen.value
-  }
-}
-
-function onDocumentClick(e: MouseEvent) {
-  if (dropdownRef.value && !dropdownRef.value.contains(e.target as Node)) {
-    isDropdownOpen.value = false
-  }
-}
-
-// 3. Optional custom status (e.g. for Admin Platform Operational, excluding any "10 PM" or "Open until")
+// 2. Optional custom status (e.g. for Admin Platform Operational, excluding any "10 PM" or "Open until")
 const hasCustomStatus = computed(() => {
   if (!props.statusMainText) return false
   const lower = props.statusMainText.toLowerCase()
   return !lower.includes('10 pm') && !lower.includes('open until')
 })
 
-// 4. Emil Kowalski Ticker: alternates between Date and "Open now" / "Closed now" every 5 seconds
+// 3. Emil Kowalski Ticker: alternates between Date and "Open now" / "Closed now" every 5 seconds
 const tickerState = ref<'date' | 'status'>('date')
 let tickerTimer: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
-  document.addEventListener('click', onDocumentClick)
   tickerTimer = setInterval(() => {
     tickerState.value = tickerState.value === 'date' ? 'status' : 'date'
   }, 5000)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('click', onDocumentClick)
   if (tickerTimer) {
     clearInterval(tickerTimer)
   }
@@ -194,80 +147,17 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- Row 2: Title / Cafe Name + Branch Selector (side by side, tight leading) -->
+    <!-- Row 2: Title / Cafe Name + optional plain badge (tight leading) -->
     <div class="flex flex-wrap items-baseline gap-2.5 sm:gap-3.5 my-0.5">
       <h1 class="font-display text-[28px] sm:text-[34px] md:text-[40px] font-extrabold leading-none tracking-[-0.03em] text-[#3B1F0E]">
         <span v-if="loading && !title" class="skeleton inline-block h-9 w-52 rounded-md align-middle" />
         <template v-else>{{ title }}</template>
       </h1>
 
-      <!-- Branch Dropdown right next to the title with Emil Kowalski press & spring interaction -->
-      <div v-if="branches.length > 1" ref="dropdownRef" class="relative inline-block self-center sm:self-auto">
-        <button
-          type="button"
-          @click="handleDropdownClick"
-          class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-sm sm:text-base font-normal text-[#7D5A50] hover:text-[#3B1F0E] hover:bg-[#3B1F0E]/5 transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer select-none active:scale-[0.96]"
-          aria-haspopup="listbox"
-          :aria-expanded="isDropdownOpen"
-        >
-          <span class="max-w-[200px] sm:max-w-[280px] truncate">{{ currentBranchLabel }}</span>
-          <Icon
-            name="heroicons:chevron-down"
-            class="w-4 h-4 text-[#8B6656] transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]"
-            :class="{ 'rotate-180': isDropdownOpen }"
-          />
-        </button>
-
-        <Transition
-          enter-active-class="transition duration-160 ease-[cubic-bezier(0.23,1,0.32,1)] origin-top-left"
-          enter-from-class="transform scale-[0.95] opacity-0 -translate-y-1"
-          enter-to-class="transform scale-100 opacity-100 translate-y-0"
-          leave-active-class="transition duration-120 ease-in origin-top-left"
-          leave-from-class="transform scale-100 opacity-100 translate-y-0"
-          leave-to-class="transform scale-[0.95] opacity-0 -translate-y-1"
-        >
-          <div
-            v-if="isDropdownOpen"
-            class="absolute left-0 mt-1.5 w-56 sm:w-64 rounded-2xl bg-white border border-[#E8E2D8] shadow-xl py-1.5 z-50 overflow-hidden"
-            role="listbox"
-          >
-            <div class="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-[#A98B7C] border-b border-[#F0EBE3]">
-              Select Branch
-            </div>
-            <div class="max-h-60 overflow-y-auto py-1">
-              <button
-                v-for="b in branches"
-                :key="b.uuid"
-                type="button"
-                @click="selectBranch(b.uuid)"
-                class="w-full text-left px-3.5 py-2 text-xs sm:text-sm font-medium flex items-center justify-between hover:bg-[#FDF8F3] transition-colors duration-150 cursor-pointer active:bg-[#FAF4ED]"
-                :class="b.uuid === currentBranchUuid ? 'text-[#3B1F0E] font-bold bg-[#FAF4ED]' : 'text-[#7D5A50]'"
-                role="option"
-                :aria-selected="b.uuid === currentBranchUuid"
-              >
-                <div class="min-w-0 pr-2">
-                  <p class="truncate">{{ b.branch_name }}</p>
-                  <p v-if="b.branch_type" class="text-[10px] text-[#A98B7C] uppercase font-mono">{{ b.branch_type }}</p>
-                </div>
-                <Icon
-                  v-if="b.uuid === currentBranchUuid"
-                  name="heroicons:check"
-                  class="w-4 h-4 text-[#7B5A50] shrink-0 transition-transform duration-150 scale-100"
-                />
-              </button>
-            </div>
-          </div>
-        </Transition>
-      </div>
-
-      <!-- Static badge with chevron appearance if single/fixed branch -->
-      <div
-        v-else-if="currentBranchLabel"
-        class="inline-flex items-center gap-1.5 px-2 py-0.5 text-sm sm:text-base font-normal text-[#7D5A50] select-none self-center sm:self-auto"
-      >
-        <span class="max-w-[200px] sm:max-w-[280px] truncate">{{ currentBranchLabel }}</span>
-        <Icon name="heroicons:chevron-down" class="w-4 h-4 text-[#8B6656]/70" />
-      </div>
+      <span
+        v-if="badge"
+        class="max-w-[200px] sm:max-w-[280px] truncate px-2 py-0.5 text-sm sm:text-base font-normal text-[#7D5A50] select-none self-center sm:self-auto"
+      >{{ badge }}</span>
     </div>
 
     <!-- Optional subtext row only if statusSubText or hasCustomStatus exists (e.g. Admin platform) -->

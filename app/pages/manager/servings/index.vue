@@ -28,9 +28,9 @@ const links = [
   { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
 ]
 
-// Opens the category's items; the branch rides along since a manager can have several.
+// Opens the category's items (for the manager's one branch).
 function openCategory(c: ServingCategorySummary) {
-  navigateTo({ path: `/manager/servings/${c.uuid ?? 'uncategorized'}`, query: { branch: branchUuid.value } })
+  navigateTo({ path: `/manager/servings/${c.uuid ?? 'uncategorized'}` })
 }
 
 const CATEGORIES_PER_PAGE = 6
@@ -39,8 +39,7 @@ const REFRESH_MS = 30_000
 const service = useServingService('manager')
 
 const branches = ref<ManagedBranch[]>([])
-const branchUuid = ref('')
-const branchOptions = computed(() => branches.value.map(b => ({ value: b.uuid, label: b.branch_name })))
+const branchUuid = ref('') // a manager runs exactly one branch
 
 // Live clock in the header
 const { timeLabel, dateLabel } = useNowClock()
@@ -182,11 +181,7 @@ onMounted(async () => {
     const res = await service.managedBranches()
     branches.value = res.branches
     if (!res.branches.length) errorMessage.value = 'You are not assigned to a branch yet.'
-    else {
-      // Coming back from a category page keeps the branch that was open.
-      const wanted = typeof useRoute().query.branch === 'string' ? useRoute().query.branch : ''
-      branchUuid.value = res.branches.find((b) => b.uuid === wanted)?.uuid ?? res.branches[0]!.uuid
-    }
+    else branchUuid.value = res.branches[0]!.uuid
   } catch (e: any) {
     failure(e, 'Could not load your branches.')
   }
@@ -229,19 +224,8 @@ onBeforeUnmount(() => {
             </p>
           </div>
 
-          <!-- Controls: Branch Selector, Live Time, Refresh Button -->
+          <!-- Controls: Live Time, Refresh Button -->
           <div class="flex flex-wrap items-center gap-3 shrink-0">
-            <!-- Branch Selector -->
-            <div v-if="branches.length > 1" class="w-52 sm:w-60">
-              <DropdownList
-                v-model="branchUuid"
-                :options="branchOptions"
-                size="sm"
-                icon="heroicons:building-storefront"
-                aria-label="Select branch"
-              />
-            </div>
-
             <!-- Live Time Pill with Pulsing Indicator -->
             <div class="inline-flex items-center gap-2 rounded-xl border border-[#E3CFB4] bg-white px-3.5 py-2 text-[13px] font-medium text-[#7D5A50] shadow-2xs">
               <span class="relative flex h-2 w-2">

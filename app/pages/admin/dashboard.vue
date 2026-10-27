@@ -160,7 +160,7 @@ useAutoRefresh(loadDashboardData)
         <!-- Header: Clean 3-row layout (Greeting/Date, Title/Badge, Status/Refresh) -->
         <DashboardHeader
           title="Admin Dashboard"
-          branch-badge="Platform"
+          badge="Platform"
           :is-open="true"
           status-main-text="Platform Operational"
           :status-sub-text="activeSubscribersCount ? `${activeSubscribersCount} Active Subscribers` : 'Every cafe on Brewspot'"

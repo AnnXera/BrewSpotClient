@@ -507,11 +507,6 @@ async function loadOpeningHours() {
   }
 }
 
-async function changeBranch() {
-  await Promise.all([loadPlan(), loadOpeningHours()])
-  await Promise.all([loadReservations(), loadDayReservations()])
-}
-
 async function updateReservationStatus(item: ReservationRecord, status: ReservationStatus) {
   if (updatingReservation.value) return
   updatingReservation.value = item.uuid
@@ -681,15 +676,6 @@ onBeforeUnmount(() => {
           <p class="mt-1 text-sm text-[#76605A]">Pick a date and time to see which tables are free.</p>
         </div>
         <div class="flex items-center gap-2">
-          <select
-            v-if="branches.length > 1"
-            v-model="branchUuid"
-            aria-label="Branch"
-            class="h-10 rounded-lg border border-[#DCC8B8] bg-white px-3 text-sm text-[#5B463C] outline-none focus-visible:border-[#7D5A50] focus-visible:ring-2 focus-visible:ring-[#7D5A50]/25"
-            @change="changeBranch"
-          >
-            <option v-for="branch in branches" :key="branch.uuid" :value="branch.uuid">{{ branch.branch_name }}</option>
-          </select>
           <button
             type="button"
             class="inline-flex h-10 items-center gap-2 rounded-lg border border-[#C79679] px-4 text-sm text-[#5B463C] transition-colors hover:bg-[#F8EFE7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/30"
