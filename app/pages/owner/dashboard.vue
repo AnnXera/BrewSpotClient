@@ -94,7 +94,15 @@ onMounted(async () => {
   }
 })
 
-const logFilters = computed(() => (stats.value ? { from: stats.value.period.from, to: stats.value.period.to } : null))
+// The dashboard period runs to the end of the week/month, but the analytics API rejects
+// future dates (to <= today), so the log stops at today.
+const logFilters = computed(() => {
+  if (!stats.value) return null
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const { from, to } = stats.value.period
+  return { from, to: to > today ? today : to }
+})
 
 const span = computed(() => (stats.value ? formatSpan(stats.value.period.from, stats.value.period.to) : ''))
 const updatedAt = computed(() =>
