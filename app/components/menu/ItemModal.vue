@@ -324,6 +324,26 @@ const sizeOptions = computed(() => [
   ...form.value.sizes.map((size, i) => ({ value: size.key as string | null, label: sizeLabel(size, i) }))
 ])
 
+// Inputs share one look; the error state swaps the border and focus ring.
+function fieldClass(invalid: boolean) {
+  return [
+    'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl px-4 py-3 placeholder:text-[#B4846C]/70 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow',
+    invalid ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
+  ]
+}
+
+// On phones a row wraps over two lines, so a rule marks where the next one starts.
+const rowDivider = 'max-sm:pb-4 max-sm:border-b max-sm:border-[#EEDFC4] max-sm:last:border-b-0 max-sm:last:pb-0'
+
+// Columns of the size and recipe rows. On phones the name takes its own line.
+const sizeGridClass = computed(() => form.value.is_hot_and_iced
+  ? 'grid-cols-[1fr_1fr_auto] sm:grid-cols-[2fr_1fr_1fr_auto]'
+  : 'grid-cols-[1fr_auto] sm:grid-cols-[2fr_1fr_auto]')
+
+const recipeGridClass = computed(() => form.value.has_sizes
+  ? 'grid-cols-[1fr_1fr_auto] sm:grid-cols-[2fr_1.2fr_1fr_1fr_auto]'
+  : 'grid-cols-[1fr_1fr_auto] sm:grid-cols-[2fr_1fr_1fr_auto]')
+
 const isDirty = ref(false)
 const errors = ref({
   menu_name: '',
@@ -596,348 +616,334 @@ const saveItem = async () => {
 <template>
   <div v-if="show" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
     <!-- Overlay -->
-    <div 
+    <div
       class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
       @click="handleClose"
     ></div>
 
-    <!-- Modal Content -->
-    <div class="relative bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-      
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="item-modal-title"
+      class="relative bg-white rounded-3xl w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col shadow-2xl"
+    >
+
       <!-- Header -->
-      <div class="flex items-center justify-between px-8 py-5 border-b border-[#EEDFC4]">
-        <h2 class="text-3xl font-display font-bold text-[#3B1F0E]">
+      <div class="flex items-center justify-between gap-4 px-6 md:px-8 py-5 border-b border-[#EEDFC4]">
+        <h2 id="item-modal-title" class="text-2xl md:text-3xl font-display font-bold text-[#3B1F0E] truncate">
           {{ isEditMode ? 'Edit Item' : 'Add Item' }}
         </h2>
-        <button 
+        <button
+          type="button"
           @click="handleClose"
-          class="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F5] text-[#7D5A50] hover:bg-[#EEDFC4] transition-colors focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/40"
-          title="Close Modal"
+          class="w-10 h-10 shrink-0 flex items-center justify-center rounded-xl text-[#7D5A50] hover:bg-[#FBF2E1] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B4846C]"
+          aria-label="Close"
         >
           <Icon name="heroicons:x-mark" class="w-5 h-5" />
         </button>
       </div>
 
-      <!-- Body (Scrollable) -->
-      <div ref="bodyEl" class="flex-1 overflow-y-auto p-8 space-y-8">
-        
-        <!-- Top Section: Image & Basic Info -->
-        <div class="flex flex-col md:flex-row gap-8">
-          
-          <!-- Image Upload -->
-          <div class="w-full md:w-1/3 flex flex-col gap-2">
-            <button 
-              type="button"
-              class="relative w-full aspect-[4/3] rounded-2xl bg-[#FBF2E1] border-2 border-dashed border-[#EEDFC4] overflow-hidden group cursor-pointer focus:outline-none focus-visible:ring-4 focus-visible:ring-[#B4846C]/40"
-              @click="triggerFileInput"
-            >
-              <img 
-                v-if="picturePreview" 
-                :src="picturePreview" 
-                class="w-full h-full object-cover"
-                alt="Item preview"
-              />
-              <div v-else class="w-full h-full flex flex-col items-center justify-center text-[#B4846C]/60">
-                <Icon name="heroicons:photo" class="w-12 h-12 mb-2" />
-                <span class="text-sm font-bold">Upload Image</span>
-              </div>
-              
-              <!-- Edit icon floating -->
-              <div class="absolute top-2 right-2 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow group-hover:bg-gray-50 transition-colors">
-                <Icon name="heroicons:pencil" class="w-4 h-4 text-[#7D5A50]" />
-              </div>
+      <!-- Body: one section per job, each titled above its fields -->
+      <div ref="bodyEl" class="flex-1 overflow-y-auto px-6 md:px-8 divide-y divide-[#EEDFC4]">
 
-              <!-- Hover overlay -->
-              <div class="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <span class="bg-white/90 text-[#3B1F0E] px-3 py-1 rounded-lg text-sm font-bold shadow-sm">Change Image</span>
-              </div>
-            </button>
-            <input 
-              type="file" 
-              ref="fileInput" 
-              class="hidden" 
-              accept="image/*"
-              @change="onFileChange"
-            />
+        <!-- ── Details ─────────────────────────────────────────── -->
+        <section class="py-7" aria-labelledby="item-details-title">
+          <div class="mb-5">
+            <h3 id="item-details-title" class="text-base font-bold text-[#3B1F0E]">Details</h3>
+            <p class="text-sm text-[#9E7060] mt-1">How the item shows on the menu and at the register.</p>
           </div>
 
-          <!-- Basic Info Fields -->
-          <div class="w-full md:w-2/3 flex flex-col gap-5">
-            <div>
-              <label class="block text-sm font-bold text-[#B4846C] uppercase tracking-wider mb-2">Item Name</label>
-              <div class="relative">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Icon name="heroicons:pencil" class="w-5 h-5 text-[#B4846C]/60" />
-                </div>
-                <input 
-                  v-model="form.menu_name"
-                  type="text" 
-                  placeholder="e.g. Caramel Macchiato"
-                  :class="[
-                    'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow',
-                    errors.menu_name ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
-                  ]"
+          <!-- From lg the photo sits beside the fields as a square exactly as tall as them -->
+          <div class="flex flex-col lg:flex-row gap-5">
+            <!-- Photo -->
+            <div class="w-36 lg:w-60 shrink-0">
+              <button
+                type="button"
+                class="relative w-full aspect-square rounded-2xl bg-[#FBF2E1] border-2 border-dashed border-[#EEDFC4] overflow-hidden group cursor-pointer focus:outline-none focus-visible:ring-4 focus-visible:ring-[#B4846C]/40"
+                :aria-label="picturePreview ? 'Change photo' : 'Upload photo'"
+                @click="triggerFileInput"
+              >
+                <img
+                  v-if="picturePreview"
+                  :src="picturePreview"
+                  class="w-full h-full object-cover"
+                  alt=""
                 />
-              </div>
-              <p v-if="errors.menu_name" class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.menu_name }}</p>
+                <span v-else class="w-full h-full flex flex-col items-center justify-center gap-1 text-[#B4846C]">
+                  <Icon name="heroicons:photo" class="w-9 h-9 opacity-60" />
+                  <span class="text-sm font-bold">Upload photo</span>
+                </span>
+                <span
+                  v-if="picturePreview"
+                  class="absolute inset-x-2 bottom-2 rounded-lg bg-white/90 text-[#3B1F0E] text-xs font-bold py-1.5 text-center shadow-sm opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity"
+                >
+                  Change photo
+                </span>
+              </button>
+              <input
+                type="file"
+                ref="fileInput"
+                class="hidden"
+                accept="image/*"
+                @change="onFileChange"
+              />
             </div>
 
-            <div class="flex flex-col sm:flex-row gap-5">
-              <div class="flex-1">
-                <label class="block text-sm font-bold text-[#B4846C] uppercase tracking-wider mb-2">Category</label>
-                <DropdownList v-model="form.category_uuid" :options="categoryOptions" />
+            <!-- Name, category, description -->
+            <div class="flex-1 min-w-0 flex flex-col gap-4 lg:h-60">
+              <div class="grid grid-cols-1 sm:grid-cols-[3fr_2fr] gap-4">
+                <div>
+                  <label for="item-name" class="block text-sm font-semibold text-[#3B1F0E] mb-1.5">Name</label>
+                  <input
+                    id="item-name"
+                    v-model="form.menu_name"
+                    type="text"
+                    maxlength="150"
+                    placeholder="e.g. Caramel Macchiato"
+                    :class="fieldClass(!!errors.menu_name)"
+                  />
+                  <p v-if="errors.menu_name" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.menu_name }}</p>
+                </div>
+                <div>
+                  <span class="block text-sm font-semibold text-[#3B1F0E] mb-1.5">Category</span>
+                  <DropdownList v-model="form.category_uuid" :options="categoryOptions" aria-label="Category" />
+                </div>
               </div>
 
-              <div class="flex-1">
-                <label class="block text-sm font-bold text-[#B4846C] uppercase tracking-wider mb-2">Price</label>
-                <p v-if="form.has_sizes" class="py-3 text-sm text-[#7D5A50]">Set for each size below.</p>
-                <div v-else :class="form.is_hot_and_iced ? 'grid grid-cols-2 gap-3' : ''">
-                  <div>
-                    <div class="relative">
-                      <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Icon name="heroicons:banknotes" class="w-5 h-5 text-[#B4846C]/60" />
-                      </div>
-                      <input
-                        v-model="form.base_price"
-                        type="number"
-                        step="0.01"
-                        :placeholder="form.is_hot_and_iced ? 'Hot' : '0.00'"
-                        :aria-label="form.is_hot_and_iced ? 'Hot price' : 'Price'"
-                        :class="[
-                          'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow',
-                          errors.base_price ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
-                        ]"
-                      />
-                    </div>
-                    <p v-if="form.is_hot_and_iced" class="text-xs text-[#9E7060] mt-1 ml-1">Hot</p>
-                    <p v-if="errors.base_price" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.base_price }}</p>
+              <div class="lg:flex-1 lg:min-h-0 flex flex-col">
+                <label for="item-description" class="block text-sm font-semibold text-[#3B1F0E] mb-1.5">
+                  Description <span class="font-normal text-[#9E7060]">(optional)</span>
+                </label>
+                <textarea
+                  id="item-description"
+                  v-model="form.description"
+                  rows="3"
+                  placeholder="What makes this item worth ordering?"
+                  :class="[fieldClass(false), 'resize-none lg:flex-1 lg:min-h-0']"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Pricing ─────────────────────────────────────────── -->
+        <section class="py-7" aria-labelledby="item-pricing-title">
+          <div class="mb-5">
+            <h3 id="item-pricing-title" class="text-base font-bold text-[#3B1F0E]">Pricing</h3>
+            <p class="text-sm text-[#9E7060] mt-1">What the cashier charges for one serving.</p>
+          </div>
+
+          <div class="min-w-0">
+            <!-- Options that change the price grid below -->
+            <div class="flex flex-wrap gap-2" role="group" aria-label="Price options">
+              <label
+                :class="[
+                  'inline-flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-bold cursor-pointer select-none transition-colors focus-within:ring-2 focus-within:ring-[#B4846C]',
+                  form.has_sizes ? 'border-[#3B1F0E] bg-[#3B1F0E] text-white' : 'border-[#EEDFC4] bg-[#fef8f0] text-[#7D5A50] hover:bg-[#FBF2E1]'
+                ]"
+              >
+                <input
+                  type="checkbox"
+                  :checked="form.has_sizes"
+                  @change="onSizesToggle"
+                  class="sr-only"
+                />
+                <Icon :name="form.has_sizes ? 'heroicons:check' : 'heroicons:plus'" class="w-4 h-4" />
+                Comes in sizes
+              </label>
+              <label
+                :class="[
+                  'inline-flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-bold cursor-pointer select-none transition-colors focus-within:ring-2 focus-within:ring-[#B4846C]',
+                  form.is_hot_and_iced ? 'border-[#3B1F0E] bg-[#3B1F0E] text-white' : 'border-[#EEDFC4] bg-[#fef8f0] text-[#7D5A50] hover:bg-[#FBF2E1]'
+                ]"
+              >
+                <input
+                  v-model="form.is_hot_and_iced"
+                  type="checkbox"
+                  class="sr-only"
+                />
+                <Icon :name="form.is_hot_and_iced ? 'heroicons:check' : 'heroicons:plus'" class="w-4 h-4" />
+                Hot and iced
+              </label>
+            </div>
+            <p v-if="form.is_hot_and_iced" class="text-sm text-[#9E7060] mt-2">
+              Hot and iced use the same recipe. Only the price changes.
+            </p>
+
+            <!-- One price, or hot and iced prices -->
+            <div v-if="!form.has_sizes" class="mt-5 grid grid-cols-2 sm:grid-cols-[repeat(2,minmax(0,11rem))] gap-4">
+              <div>
+                <label for="item-price" class="block text-sm font-semibold text-[#3B1F0E] mb-1.5">{{ form.is_hot_and_iced ? 'Hot price' : 'Price' }}</label>
+                <div class="relative">
+                  <span class="pointer-events-none absolute inset-y-0 left-0 pl-4 flex items-center text-[#B4846C] font-semibold">₱</span>
+                  <input
+                    id="item-price"
+                    v-model="form.base_price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    :class="[fieldClass(!!errors.base_price), 'pl-9 tabular-nums']"
+                  />
+                </div>
+                <p v-if="errors.base_price" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.base_price }}</p>
+              </div>
+              <div v-if="form.is_hot_and_iced">
+                <label for="item-iced-price" class="block text-sm font-semibold text-[#3B1F0E] mb-1.5">Iced price</label>
+                <div class="relative">
+                  <span class="pointer-events-none absolute inset-y-0 left-0 pl-4 flex items-center text-[#B4846C] font-semibold">₱</span>
+                  <input
+                    id="item-iced-price"
+                    v-model="form.iced_price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    :class="[fieldClass(!!errors.iced_price), 'pl-9 tabular-nums']"
+                  />
+                </div>
+                <p v-if="errors.iced_price" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.iced_price }}</p>
+              </div>
+            </div>
+
+            <!-- Price per size (and per temperature) -->
+            <div v-else class="mt-5">
+              <div :class="['hidden sm:grid gap-3 mb-2 px-1', sizeGridClass]">
+                <span class="text-xs font-bold text-[#B4846C] uppercase tracking-wider">Size</span>
+                <span class="text-xs font-bold text-[#B4846C] uppercase tracking-wider">{{ form.is_hot_and_iced ? 'Hot price' : 'Price' }}</span>
+                <span v-if="form.is_hot_and_iced" class="text-xs font-bold text-[#B4846C] uppercase tracking-wider">Iced price</span>
+                <span class="w-10"></span>
+              </div>
+
+              <div class="space-y-3">
+                <div
+                  v-for="(size, index) in form.sizes"
+                  :key="size.key"
+                  :class="['grid gap-3 items-start', rowDivider, sizeGridClass]"
+                >
+                  <div class="col-span-full sm:col-span-1">
+                    <label :for="`size-name-${size.key}`" class="block sm:hidden text-xs font-bold text-[#B4846C] uppercase tracking-wider mb-1">Size</label>
+                    <input
+                      :id="`size-name-${size.key}`"
+                      v-model="size.name"
+                      type="text"
+                      maxlength="50"
+                      placeholder="e.g. Small (12oz)"
+                      :class="fieldClass(!!sizeErrors[index]?.name)"
+                    />
+                    <p v-if="sizeErrors[index]?.name" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ sizeErrors[index].name }}</p>
                   </div>
-                  <div v-if="form.is_hot_and_iced">
+
+                  <div>
+                    <label :for="`size-price-${size.key}`" class="block sm:hidden text-xs font-bold text-[#B4846C] uppercase tracking-wider mb-1">{{ form.is_hot_and_iced ? 'Hot price' : 'Price' }}</label>
                     <div class="relative">
-                      <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Icon name="heroicons:banknotes" class="w-5 h-5 text-[#B4846C]/60" />
-                      </div>
+                      <span class="pointer-events-none absolute inset-y-0 left-0 pl-4 flex items-center text-[#B4846C] font-semibold">₱</span>
                       <input
-                        v-model="form.iced_price"
+                        :id="`size-price-${size.key}`"
+                        v-model="size.price"
                         type="number"
                         step="0.01"
                         min="0"
-                        placeholder="Iced"
-                        aria-label="Iced price"
-                        :class="[
-                          'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow',
-                          errors.iced_price ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
-                        ]"
+                        placeholder="0.00"
+                        :aria-label="sizeLabel(size, index) + (form.is_hot_and_iced ? ' hot price' : ' price')"
+                        :class="[fieldClass(!!sizeErrors[index]?.price), 'pl-9 tabular-nums']"
                       />
                     </div>
-                    <p class="text-xs text-[#9E7060] mt-1 ml-1">Iced</p>
-                    <p v-if="errors.iced_price" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.iced_price }}</p>
+                    <p v-if="sizeErrors[index]?.price" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ sizeErrors[index].price }}</p>
                   </div>
-                </div>
-                <div class="mt-2 flex flex-wrap gap-x-5 gap-y-1">
-                  <label class="inline-flex items-center gap-2 text-sm font-bold text-[#7D5A50] cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      :checked="form.has_sizes"
-                      @change="onSizesToggle"
-                      class="w-4 h-4 rounded accent-[#3B1F0E]"
-                    />
-                    Comes in sizes
-                  </label>
-                  <!-- Only the price changes; hot and iced use the same recipe. -->
-                  <label class="inline-flex items-center gap-2 text-sm font-bold text-[#7D5A50] cursor-pointer select-none">
-                    <input
-                      v-model="form.is_hot_and_iced"
-                      type="checkbox"
-                      class="w-4 h-4 rounded accent-[#3B1F0E]"
-                    />
-                    Hot and iced
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Description -->
-        <div>
-          <label class="block text-sm font-bold text-[#B4846C] uppercase tracking-wider mb-2">Item Description</label>
-          <textarea 
-            v-model="form.description"
-            rows="3"
-            placeholder="Describe your delicious item..."
-            class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent transition-shadow resize-none"
-          ></textarea>
-        </div>
-
-        <!-- Sizes Section -->
-        <template v-if="form.has_sizes">
-          <hr class="border-[#EEDFC4]" />
-
-          <div>
-            <div class="mb-4">
-              <h3 class="text-2xl font-display font-bold text-[#3B1F0E]">Sizes</h3>
-              <p class="text-sm text-[#9E7060] mt-1">
-                Each size has its own price<template v-if="form.is_hot_and_iced">, hot and iced</template>. Set how much of each ingredient a size uses in the recipe below.
-              </p>
-            </div>
-
-            <div :class="['hidden md:grid gap-4 mb-2 px-1', form.is_hot_and_iced ? 'grid-cols-[2fr_1fr_1fr_auto]' : 'grid-cols-[2fr_1fr_auto]']">
-              <span class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">Size</span>
-              <span class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">{{ form.is_hot_and_iced ? 'Hot price' : 'Price' }}</span>
-              <span v-if="form.is_hot_and_iced" class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">Iced price</span>
-              <span class="w-8"></span>
-            </div>
-
-            <div class="space-y-4">
-              <div
-                v-for="(size, index) in form.sizes"
-                :key="size.key"
-                :class="[
-                  'flex flex-col md:grid gap-4 items-start md:items-center bg-white md:bg-transparent p-4 md:p-0 rounded-xl border border-[#EEDFC4] md:border-none',
-                  form.is_hot_and_iced ? 'md:grid-cols-[2fr_1fr_1fr_auto]' : 'md:grid-cols-[2fr_1fr_auto]'
-                ]"
-              >
-                <div class="w-full">
-                  <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Size</label>
-                  <input
-                    v-model="size.name"
-                    type="text"
-                    maxlength="50"
-                    placeholder="e.g. Small (12oz)"
-                    :class="[
-                      'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent',
-                      sizeErrors[index]?.name ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
-                    ]"
-                  />
-                  <p v-if="sizeErrors[index]?.name" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ sizeErrors[index].name }}</p>
-                </div>
-
-                <div class="w-full">
-                  <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">{{ form.is_hot_and_iced ? 'Hot price' : 'Price' }}</label>
-                  <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Icon name="heroicons:banknotes" class="w-5 h-5 text-[#B4846C]/60" />
+                  <div v-if="form.is_hot_and_iced">
+                    <label :for="`size-iced-${size.key}`" class="block sm:hidden text-xs font-bold text-[#B4846C] uppercase tracking-wider mb-1">Iced price</label>
+                    <div class="relative">
+                      <span class="pointer-events-none absolute inset-y-0 left-0 pl-4 flex items-center text-[#B4846C] font-semibold">₱</span>
+                      <input
+                        :id="`size-iced-${size.key}`"
+                        v-model="size.iced_price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        :aria-label="`${sizeLabel(size, index)} iced price`"
+                        :class="[fieldClass(!!sizeErrors[index]?.iced_price), 'pl-9 tabular-nums']"
+                      />
                     </div>
-                    <input
-                      v-model="size.price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      :class="[
-                        'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent',
-                        sizeErrors[index]?.price ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
-                      ]"
-                    />
+                    <p v-if="sizeErrors[index]?.iced_price" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ sizeErrors[index].iced_price }}</p>
                   </div>
-                  <p v-if="sizeErrors[index]?.price" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ sizeErrors[index].price }}</p>
-                </div>
 
-                <div v-if="form.is_hot_and_iced" class="w-full">
-                  <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Iced price</label>
-                  <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Icon name="heroicons:banknotes" class="w-5 h-5 text-[#B4846C]/60" />
-                    </div>
-                    <input
-                      v-model="size.iced_price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      :aria-label="`${sizeLabel(size, index)} iced price`"
-                      :class="[
-                        'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent',
-                        sizeErrors[index]?.iced_price ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
-                      ]"
-                    />
-                  </div>
-                  <p v-if="sizeErrors[index]?.iced_price" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ sizeErrors[index].iced_price }}</p>
-                </div>
-
-                <div class="w-full md:w-auto flex justify-end md:justify-center mt-2 md:mt-0">
                   <button
                     type="button"
                     @click="removeSize(index)"
-                    class="w-8 h-8 flex items-center justify-center rounded-lg text-[#D9534F] bg-[#fef8f0] hover:bg-[#FDE8E8] transition-colors focus:outline-none focus:ring-2 focus:ring-[#D9534F]/40"
-                    :title="`Remove ${sizeLabel(size, index)}`"
+                    class="self-end sm:self-start w-10 h-12 flex items-center justify-center rounded-xl text-[#D9534F] hover:bg-[#FDE8E8] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D9534F]/40"
+                    :aria-label="`Remove ${sizeLabel(size, index)}`"
                   >
                     <Icon name="heroicons:trash" class="w-4 h-4" />
                   </button>
                 </div>
               </div>
+
+              <p v-if="sizesError" data-row-error class="text-red-500 text-xs font-bold mt-2 ml-1">{{ sizesError }}</p>
+
+              <button
+                v-if="form.sizes.length < MAX_SIZES"
+                type="button"
+                @click="addSize"
+                class="mt-3 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 -ml-2 text-sm font-bold text-[#7D5A50] hover:bg-[#FBF2E1] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B4846C]"
+              >
+                <Icon name="heroicons:plus" class="w-4 h-4" />
+                Add size
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Recipe ──────────────────────────────────────────── -->
+        <section class="py-7" aria-labelledby="item-recipe-title">
+          <div class="mb-5">
+            <h3 id="item-recipe-title" class="text-base font-bold text-[#3B1F0E]">Recipe</h3>
+            <p class="text-sm text-[#9E7060] mt-1">The ingredients in one serving.</p>
+          </div>
+
+          <div class="min-w-0">
+            <p v-if="form.has_sizes" class="text-sm text-[#9E7060] mb-4">
+              Use "All sizes" for what every size gets the same of. Add a row per size for amounts that change, like milk.
+            </p>
+
+            <!-- Column headers (sm and up) -->
+            <div :class="['hidden sm:grid gap-3 mb-2 px-1', recipeGridClass]">
+              <span class="text-xs font-bold text-[#B4846C] uppercase tracking-wider">Ingredient</span>
+              <span v-if="form.has_sizes" class="text-xs font-bold text-[#B4846C] uppercase tracking-wider">For</span>
+              <span class="text-xs font-bold text-[#B4846C] uppercase tracking-wider">Amount</span>
+              <span class="text-xs font-bold text-[#B4846C] uppercase tracking-wider">Unit</span>
+              <span class="w-10"></span>
             </div>
 
-            <p v-if="sizesError" data-row-error class="text-red-500 text-xs font-bold mt-2 ml-1">{{ sizesError }}</p>
+            <div class="space-y-3">
+              <div
+                v-for="(recipe, index) in form.recipes"
+                :key="index"
+                :class="['grid gap-3 items-center', rowDivider, recipeGridClass]"
+              >
+                <div class="col-span-full sm:col-span-1">
+                  <IngredientPicker
+                    :ref="(el) => setIngredientInputRef(el, index)"
+                    v-model:name="recipe.ingredient_name"
+                    :ingredients="ingredients"
+                    :used-names="usedNamesExcept(index)"
+                    :invalid="!!rowErrors[index] || (triedSave && !!missingSizes[index])"
+                    @pick="onPick(recipe, index, $event)"
+                    @enter="handleEnterOnIngredient(index)"
+                  />
+                </div>
 
-            <button
-              v-if="form.sizes.length < MAX_SIZES"
-              type="button"
-              @click="addSize"
-              class="w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-xl border border-[#EEDFC4] bg-[#fef8f0]/30 hover:bg-[#EEDFC4]/30 text-[#B4846C] text-sm font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-[#B4846C]"
-            >
-              <Icon name="heroicons:plus" class="w-5 h-5" />
-              Add size
-            </button>
-          </div>
-        </template>
+                <div v-if="form.has_sizes" class="col-span-full sm:col-span-1">
+                  <DropdownList
+                    v-model="recipe.size_key"
+                    :options="sizeOptions"
+                    aria-label="Size this amount is for"
+                    @change="serverRowErrors = {}"
+                  />
+                </div>
 
-        <hr class="border-[#EEDFC4]" />
-
-        <!-- Recipe Section -->
-        <div>
-          <div class="mb-4">
-            <h3 class="text-2xl font-display font-bold text-[#3B1F0E]">Recipe</h3>
-            <p v-if="form.has_sizes" class="text-sm text-[#9E7060] mt-1">Use "All sizes" for what every size gets the same of. Add a row per size for amounts that change, like milk.</p>
-          </div>
-
-          <!-- Recipe Table Headers (visible on md+) -->
-          <div :class="['hidden md:grid gap-4 mb-2 px-1', form.has_sizes ? 'grid-cols-[2fr_1fr_1fr_1fr_auto]' : 'grid-cols-[2fr_1fr_1fr_auto]']">
-            <span class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">Ingredient</span>
-            <span v-if="form.has_sizes" class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">For</span>
-            <span class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">Amount</span>
-            <span class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">Unit</span>
-            <span class="w-8"></span> <!-- Spacer for subtle delete button -->
-          </div>
-
-          <!-- Recipe Rows -->
-          <div class="space-y-4">
-            <div 
-              v-for="(recipe, index) in form.recipes" 
-              :key="index"
-              :class="[
-                'flex flex-col md:grid gap-4 items-start md:items-center bg-white md:bg-transparent p-4 md:p-0 rounded-xl border border-[#EEDFC4] md:border-none',
-                form.has_sizes ? 'md:grid-cols-[2fr_1fr_1fr_1fr_auto]' : 'md:grid-cols-[2fr_1fr_1fr_auto]'
-              ]"
-            >
-              <!-- Ingredient Name -->
-              <div class="w-full">
-                <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Ingredient</label>
-                <IngredientPicker
-                  :ref="(el) => setIngredientInputRef(el, index)"
-                  v-model:name="recipe.ingredient_name"
-                  :ingredients="ingredients"
-                  :used-names="usedNamesExcept(index)"
-                  :invalid="!!rowErrors[index] || (triedSave && !!missingSizes[index])"
-                  @pick="onPick(recipe, index, $event)"
-                  @enter="handleEnterOnIngredient(index)"
-                />
-              </div>
-
-              <!-- Size the amount is for -->
-              <div v-if="form.has_sizes" class="w-full">
-                <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">For</label>
-                <DropdownList
-                  v-model="recipe.size_key"
-                  :options="sizeOptions"
-                  @change="serverRowErrors = {}"
-                />
-              </div>
-
-              <!-- Amount -->
-              <div class="w-full">
-                <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Amount</label>
                 <input
                   :value="recipe.quantity_display"
                   @input="onQuantityInput(recipe, $event)"
@@ -945,114 +951,120 @@ const saveItem = async () => {
                   type="text"
                   inputmode="decimal"
                   placeholder="e.g. 1/4 or 2.5"
+                  aria-label="Amount"
                   @keydown.enter.prevent="handleEnterOnIngredient(index)"
-                  class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent"
+                  :class="[fieldClass(false), 'tabular-nums']"
                 />
-              </div>
 
-              <!-- Unit -->
-              <div class="w-full relative">
-                <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Unit</label>
                 <!-- An existing ingredient is always measured in its own unit. -->
                 <DropdownList
                   v-model="recipe.unit"
                   :options="INGREDIENT_UNIT_OPTIONS"
                   :disabled="!!recipe.ingredient_uuid"
+                  aria-label="Unit"
                   :title="recipe.ingredient_uuid ? `${recipe.ingredient_name} is measured in ${recipe.unit}` : undefined"
                 />
-              </div>
 
-              <!-- Delete Button -->
-              <div class="w-full md:w-auto flex justify-end md:justify-center mt-2 md:mt-0">
-                <button 
+                <button
+                  type="button"
                   @click="removeIngredient(index)"
-                  class="w-8 h-8 flex items-center justify-center rounded-lg text-[#D9534F] bg-[#fef8f0] hover:bg-[#FDE8E8] transition-colors focus:outline-none focus:ring-2 focus:ring-[#D9534F]/40"
-                  title="Remove Ingredient"
+                  class="w-10 h-12 flex items-center justify-center rounded-xl text-[#D9534F] hover:bg-[#FDE8E8] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D9534F]/40"
+                  :aria-label="`Remove ${recipe.ingredient_name.trim() || 'ingredient'}`"
                 >
                   <Icon name="heroicons:trash" class="w-4 h-4" />
                 </button>
-              </div>
 
-              <!-- Messages get their own line under the row, so the inputs above stay aligned -->
-              <div v-if="rowErrors[index] || missingSizes[index]" class="w-full md:col-span-full -mt-2 md:-mt-3">
-                <p v-if="rowErrors[index]" data-row-error class="text-red-500 text-xs font-bold ml-1">{{ rowErrors[index] }}</p>
-                <!-- Set for some sizes only: offer the missing ones -->
-                <p
-                  v-else-if="missingSizes[index]"
-                  :data-row-error="triedSave ? '' : undefined"
-                  :class="['text-xs font-bold ml-1 flex flex-wrap items-center gap-x-2 gap-y-1', triedSave ? 'text-red-500' : 'text-[#9E7060]']"
-                >
-                  <span>Also needs an amount for</span>
-                  <button
-                    v-for="sizeKey in missingSizes[index]"
-                    :key="sizeKey"
-                    type="button"
-                    @click="addMissingSize(index, sizeKey)"
-                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-current hover:bg-[#FBF2E1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B4846C]"
+                <!-- Messages get their own line under the row, so the inputs above stay aligned -->
+                <div v-if="rowErrors[index] || missingSizes[index]" class="col-span-full -mt-1">
+                  <p v-if="rowErrors[index]" data-row-error class="text-red-500 text-xs font-bold ml-1">{{ rowErrors[index] }}</p>
+                  <!-- Set for some sizes only: offer the missing ones -->
+                  <p
+                    v-else-if="missingSizes[index]"
+                    :data-row-error="triedSave ? '' : undefined"
+                    :class="['text-xs font-bold ml-1 flex flex-wrap items-center gap-x-2 gap-y-1', triedSave ? 'text-red-500' : 'text-[#9E7060]']"
                   >
-                    <Icon name="heroicons:plus" class="w-3 h-3" />
-                    {{ sizeLabel(form.sizes.find(s => s.key === sizeKey)!, form.sizes.findIndex(s => s.key === sizeKey)) }}
-                  </button>
-                </p>
+                    <span>Also needs an amount for</span>
+                    <button
+                      v-for="sizeKey in missingSizes[index]"
+                      :key="sizeKey"
+                      type="button"
+                      @click="addMissingSize(index, sizeKey)"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-current hover:bg-[#FBF2E1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B4846C]"
+                    >
+                      <Icon name="heroicons:plus" class="w-3 h-3" />
+                      {{ sizeLabel(form.sizes.find(s => s.key === sizeKey)!, form.sizes.findIndex(s => s.key === sizeKey)) }}
+                    </button>
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Add Row Button -->
-          <button 
-            @click="addIngredient"
-            class="w-full mt-4 flex items-center justify-center py-3 rounded-xl border border-[#EEDFC4] bg-[#fef8f0]/30 hover:bg-[#EEDFC4]/30 text-[#B4846C] transition-colors focus:outline-none focus:ring-2 focus:ring-[#B4846C]"
-          >
-            <Icon name="heroicons:plus" class="w-5 h-5" />
-          </button>
-        </div>
-
-        <hr class="border-[#EEDFC4]" />
-
-        <!-- Add-ons Section -->
-        <div>
-          <div class="mb-4">
-            <h3 class="text-2xl font-display font-bold text-[#3B1F0E]">Add-ons</h3>
-            <p class="text-sm text-[#9E7060] mt-1">Extras the cashier can add to this item. Their prices and ingredients are set on the Add-ons page.</p>
-          </div>
-
-          <p v-if="addons.length === 0" class="text-sm text-[#7D5A50] bg-[#fef8f0] border border-dashed border-[#EEDFC4] rounded-xl px-4 py-3">
-            No add-ons yet. Create them on the Add-ons page, then pick them here.
-          </p>
-          <div v-else class="flex flex-wrap gap-2">
             <button
-              v-for="addon in addons"
-              :key="addon.uuid"
               type="button"
-              role="checkbox"
-              :aria-checked="form.addon_uuids.includes(addon.uuid)"
-              @click="toggleAddon(addon.uuid)"
-              :class="[
-                'flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-bold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B4846C]',
-                form.addon_uuids.includes(addon.uuid)
-                  ? 'bg-[#3B1F0E] border-[#3B1F0E] text-white'
-                  : 'bg-[#fef8f0] border-[#EEDFC4] text-[#7D5A50] hover:bg-[#EEDFC4]/40'
-              ]"
+              @click="addIngredient"
+              class="mt-3 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 -ml-2 text-sm font-bold text-[#7D5A50] hover:bg-[#FBF2E1] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B4846C]"
             >
-              <Icon :name="form.addon_uuids.includes(addon.uuid) ? 'heroicons:check' : 'heroicons:plus'" class="w-4 h-4" />
-              {{ addon.name }}
-              <span :class="form.addon_uuids.includes(addon.uuid) ? 'text-white/70' : 'text-[#B4846C]'">+₱{{ Number(addon.price).toFixed(2) }}</span>
-              <span v-if="!addon.is_available" class="text-xs font-normal opacity-70">(off)</span>
+              <Icon name="heroicons:plus" class="w-4 h-4" />
+              Add ingredient
             </button>
           </div>
-        </div>
+        </section>
+
+        <!-- ── Add-ons ─────────────────────────────────────────── -->
+        <section class="py-7" aria-labelledby="item-addons-title">
+          <div class="mb-5">
+            <h3 id="item-addons-title" class="text-base font-bold text-[#3B1F0E]">Add-ons</h3>
+            <p class="text-sm text-[#9E7060] mt-1">Extras the cashier can add. Prices and ingredients are set on the Add-ons page.</p>
+          </div>
+
+          <div class="min-w-0">
+            <p v-if="addons.length === 0" class="text-sm text-[#7D5A50] bg-[#fef8f0] border border-dashed border-[#EEDFC4] rounded-xl px-4 py-3">
+              No add-ons yet. Create them on the Add-ons page, then pick them here.
+            </p>
+            <div v-else class="flex flex-wrap gap-2">
+              <button
+                v-for="addon in addons"
+                :key="addon.uuid"
+                type="button"
+                role="checkbox"
+                :aria-checked="form.addon_uuids.includes(addon.uuid)"
+                @click="toggleAddon(addon.uuid)"
+                :class="[
+                  'flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-sm font-bold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B4846C]',
+                  form.addon_uuids.includes(addon.uuid)
+                    ? 'bg-[#3B1F0E] border-[#3B1F0E] text-white'
+                    : 'bg-[#fef8f0] border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FBF2E1]'
+                ]"
+              >
+                <Icon :name="form.addon_uuids.includes(addon.uuid) ? 'heroicons:check' : 'heroicons:plus'" class="w-4 h-4" />
+                {{ addon.name }}
+                <span :class="['tabular-nums', form.addon_uuids.includes(addon.uuid) ? 'text-white/70' : 'text-[#B4846C]']">+₱{{ Number(addon.price).toFixed(2) }}</span>
+                <span v-if="!addon.is_available" class="text-xs font-normal opacity-70">(off)</span>
+              </button>
+            </div>
+          </div>
+        </section>
 
       </div>
 
       <!-- Footer -->
-      <div class="px-8 py-5 border-t border-[#EEDFC4] flex justify-end bg-white">
-        <button 
+      <div class="px-6 md:px-8 py-4 border-t border-[#EEDFC4] flex items-center justify-end gap-3 bg-white">
+        <button
+          type="button"
+          @click="handleClose"
+          :disabled="isSubmitting"
+          class="px-5 py-3 rounded-xl font-bold text-[#7D5A50] hover:bg-[#FBF2E1] transition-colors disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B4846C]"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
           @click="saveItem"
           :disabled="isSubmitting"
-          class="bg-[#3B1F0E] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#2A160A] transition-colors shadow-md disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#3B1F0E]/40 focus-visible:ring-offset-2"
+          class="bg-[#3B1F0E] text-white px-7 py-3 rounded-xl font-bold hover:bg-[#2A160A] transition-colors shadow-md disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#3B1F0E]/40 focus-visible:ring-offset-2"
         >
           <Icon v-if="isSubmitting" name="heroicons:arrow-path" class="w-5 h-5 animate-spin" />
-          {{ isSubmitting ? 'Saving...' : 'Confirm' }}
+          {{ isSubmitting ? 'Saving...' : (isEditMode ? 'Save changes' : 'Add item') }}
         </button>
       </div>
 
