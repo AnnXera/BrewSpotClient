@@ -35,10 +35,12 @@ export interface IngredientPayload {
 type IngredientResponse = { success: boolean; message: string; ingredient?: Ingredient; errors?: Record<string, string[]> }
 
 // One size of a menu item (Small, Large). An item with no sizes sells at base_price.
+// On an item sold hot and iced, price is the hot price and iced_price the iced one.
 export interface MenuItemSize {
     uuid: string
     name: string
     price: string
+    iced_price: string | null
 }
 
 export interface AddonRecipe {

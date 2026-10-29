@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // One sale opened from Today's sales: what was ordered, how it was paid, and who rang it up.
 import type { PosTransactionDetail } from '~/services/PosService'
+import { variantLabel } from '~/utils/variant'
 
 const props = defineProps<{
   transactionUuid: string
@@ -72,7 +73,8 @@ const paymentLabel = computed(() => {
 })
 
 function lineDetails(item: PosTransactionDetail['items'][number]) {
-  const parts = item.size_name ? [item.size_name] : []
+  const variant = variantLabel(item.temperature, item.size_name)
+  const parts = variant ? [variant] : []
   for (const a of item.addons) parts.push(a.quantity > 1 ? `${a.quantity}x ${a.name}` : a.name)
   return parts.join(' · ')
 }

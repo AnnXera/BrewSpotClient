@@ -88,6 +88,7 @@ const snapOn = ref(true)
 const panMode = ref(false) // Pan button: dragging scrolls the canvas instead of moving items
 const panning = ref(false)
 const scrollEl = ref<HTMLElement | null>(null)
+const zoom = ref(1) // canvas scale; item coordinates stay in unscaled canvas px
 const loading = ref(true)
 const saving = ref(false)
 const statusBusy = ref(false)
@@ -392,8 +393,8 @@ function onDragMove(e: PointerEvent) {
   if (!drag) return
   const item = (drag.type === 'table' ? tables.value : elements.value).find((i) => i.uid === drag!.uid)
   if (!item) return
-  const dx = e.clientX - drag.sx
-  const dy = e.clientY - drag.sy
+  const dx = (e.clientX - drag.sx) / zoom.value
+  const dy = (e.clientY - drag.sy) / zoom.value
   if (!drag.moved) {
     if (Math.abs(dx) + Math.abs(dy) < 3) return
     pushUndo()
@@ -457,6 +458,33 @@ function endPan() {
   pan = null
   panning.value = false
   window.removeEventListener('pointermove', onPanMove)
+}
+
+// ── Zoom (toolbar slider and buttons) ────────────────────────────────────
+const ZOOM_MIN = 0.25
+const ZOOM_MAX = 3
+const ZOOM_STEP = 1.2
+
+// Keeps the canvas point under (clientX, clientY) in place while the scale changes.
+async function setZoom(next: number, at?: { x: number; y: number }) {
+  const z = Math.min(Math.max(Math.round(next * 100) / 100, ZOOM_MIN), ZOOM_MAX)
+  const el = scrollEl.value
+  const canvas = canvasEl.value
+  if (z === zoom.value || !el || !canvas) {
+    zoom.value = z
+    return
+  }
+  const before = canvas.getBoundingClientRect()
+  const sr = el.getBoundingClientRect()
+  const cx = at?.x ?? sr.left + el.clientWidth / 2
+  const cy = at?.y ?? sr.top + el.clientHeight / 2
+  const px = (cx - before.left) / zoom.value
+  const py = (cy - before.top) / zoom.value
+  zoom.value = z
+  await nextTick()
+  const after = canvas.getBoundingClientRect()
+  el.scrollLeft += after.left + px * z - cx
+  el.scrollTop += after.top + py * z - cy
 }
 
 // ── Joining walls ────────────────────────────────────────────────────────
@@ -524,8 +552,8 @@ function onRotateMove(e: PointerEvent) {
   // The knob sits straight above the centre at 0 degrees, so the pointer angle + 90 is the rotation.
   const { w, h } = itemSize(rotating.type, item)
   const rect = canvasEl.value.getBoundingClientRect()
-  const cx = rect.left + canvasEl.value.clientLeft + item.x + w / 2
-  const cy = rect.top + canvasEl.value.clientTop + item.y + h / 2
+  const cx = rect.left + (canvasEl.value.clientLeft + item.x + w / 2) * zoom.value
+  const cy = rect.top + (canvasEl.value.clientTop + item.y + h / 2) * zoom.value
   const deg = (Math.atan2(e.clientY - cy, e.clientX - cx) * 180) / Math.PI + 90
   const step = snapOn.value ? ROTATE_STEP : 1
   const next = (((Math.round(deg / step) * step) % 360) + 360) % 360
@@ -575,7 +603,7 @@ function onResizeMove(e: PointerEvent) {
   const el = elements.value.find((i) => i.uid === resize!.uid)
   if (!el) return
   const r = resize
-  const p = (e.clientX - r.sx) * r.ux + (e.clientY - r.sy) * r.uy
+  const p = ((e.clientX - r.sx) * r.ux + (e.clientY - r.sy) * r.uy) / zoom.value
   if (!r.moved) {
     if (Math.abs(p) < 3) return
     pushUndo()
@@ -614,7 +642,7 @@ function onDrop(e: DragEvent) {
   e.preventDefault()
   const rect = canvasEl.value.getBoundingClientRect()
   try {
-    addItem(JSON.parse(raw) as PlaceSpec, { x: e.clientX - rect.left, y: e.clientY - rect.top })
+    addItem(JSON.parse(raw) as PlaceSpec, { x: (e.clientX - rect.left) / zoom.value, y: (e.clientY - rect.top) / zoom.value })
   } catch {
     /* not ours */
   }
@@ -1137,18 +1165,20 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
           </form>
 
           <!-- Canvas -->
+          <div v-if="plan" class="relative">
           <div
-            v-if="plan"
             ref="scrollEl"
             class="overflow-auto p-[18px] max-h-[78vh] bg-white"
             :class="panning ? 'cursor-grabbing' : panMode ? 'cursor-grab touch-none' : ''"
             @pointerdown="startPan"
           >
+            <!-- Takes up the scaled size so the scroll area matches the zoomed canvas -->
+            <div class="mx-auto" :style="{ width: `${canvasW * zoom}px`, height: `${canvasH * zoom}px` }">
             <div
               ref="canvasEl"
-              class="relative isolate mx-auto rounded-[10px] border border-[#F4E6DE] select-none touch-none"
+              class="relative isolate origin-top-left rounded-[10px] border border-[#F4E6DE] select-none touch-none"
               :class="preview ? 'bg-white' : 'bg-[#FFFDF9] [background-image:radial-gradient(#EADFD0_1px,transparent_1px)]'"
-              :style="{ width: `${canvasW}px`, height: `${canvasH}px`, ...(preview ? {} : { backgroundSize: `${GRID}px ${GRID}px` }) }"
+              :style="{ width: `${canvasW}px`, height: `${canvasH}px`, transform: zoom === 1 ? undefined : `scale(${zoom})`, ...(preview ? {} : { backgroundSize: `${GRID}px ${GRID}px` }) }"
               @dragover.prevent
               @drop="onDrop"
               @pointerdown.self="selected = null"
@@ -1262,6 +1292,52 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
                 Drag an object from the library to start your layout.
               </p>
             </div>
+            </div>
+          </div>
+
+          <!-- Zoom, pinned to the corner of the visible canvas area -->
+          <div
+            class="absolute bottom-6 right-6 z-10 h-[35px] rounded-[8px] border border-[#DED4CA] bg-[#FFFDF9]/95 shadow-[0_2px_8px_rgba(58,41,35,0.12)] flex items-center text-[12px] text-[#2D2521]"
+            role="group"
+            aria-label="Zoom"
+          >
+            <button
+              type="button"
+              class="h-full px-2 flex items-center rounded-l-[8px] hover:bg-[#F1E9DE] disabled:opacity-40 transition-colors"
+              aria-label="Zoom out"
+              :disabled="zoom <= ZOOM_MIN"
+              @click="setZoom(zoom / ZOOM_STEP)"
+            >
+              <Icon name="heroicons:minus" class="size-4" />
+            </button>
+            <input
+              type="range"
+              class="w-[110px] mx-1 accent-[#3A2923] cursor-pointer"
+              :min="ZOOM_MIN"
+              :max="ZOOM_MAX"
+              step="0.05"
+              :value="zoom"
+              aria-label="Zoom level"
+              @input="setZoom(Number(($event.target as HTMLInputElement).value))"
+            >
+            <button
+              type="button"
+              class="h-full w-[48px] tabular-nums hover:bg-[#F1E9DE] transition-colors"
+              title="Reset to 100%"
+              @click="setZoom(1)"
+            >
+              {{ Math.round(zoom * 100) }}%
+            </button>
+            <button
+              type="button"
+              class="h-full px-2 flex items-center rounded-r-[8px] hover:bg-[#F1E9DE] disabled:opacity-40 transition-colors"
+              aria-label="Zoom in"
+              :disabled="zoom >= ZOOM_MAX"
+              @click="setZoom(zoom * ZOOM_STEP)"
+            >
+              <Icon name="heroicons:plus" class="size-4" />
+            </button>
+          </div>
           </div>
           <p v-else class="p-10 text-center text-[14px] text-[#9E7060]">
             Create your first floor plan to start arranging tables.

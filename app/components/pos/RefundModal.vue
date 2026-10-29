@@ -2,6 +2,7 @@
 // Refund a whole sale. Left side is the cashier's part (what, made or not, why);
 // right side is handed to the manager, who approves with their PIN.
 import type { PosTransactionDetail } from '~/services/PosService'
+import { variantLabel } from '~/utils/variant'
 
 interface ApprovingManager {
   uuid: string
@@ -72,7 +73,8 @@ const paymentLabel = computed(() => {
 })
 
 function lineDetails(item: PosTransactionDetail['items'][number]) {
-  const parts = item.size_name ? [item.size_name] : []
+  const variant = variantLabel(item.temperature, item.size_name)
+  const parts = variant ? [variant] : []
   for (const a of item.addons ?? []) parts.push(a.quantity > 1 ? `${a.quantity}x ${a.name}` : a.name)
   return parts.join(' · ')
 }

@@ -11,6 +11,8 @@ const props = defineProps<{
     base_price?: string | number | null
     price?: number
     sizes?: { uuid: string, name: string, price: string | number }[]
+    is_hot_and_iced?: boolean
+    iced_price?: string | number | null
     tags?: string[]
     recipes_preview?: string | null
     recipes_remaining_count?: number
@@ -21,6 +23,14 @@ defineEmits<{
   (e: 'view', id: string | number): void
   (e: 'delete', id: string | number): void
 }>()
+
+// Sold hot and iced without sizes: the lower of the two is the starting price.
+const startingPrice = computed(() => {
+  const prices = [props.item.base_price, props.item.is_hot_and_iced ? props.item.iced_price : null]
+    .filter(p => p !== null && p !== undefined && p !== '')
+    .map(Number)
+  return prices.length ? Math.min(...prices) : null
+})
 
 const getImageUrl = () => {
   if (props.item.picture) {
@@ -65,8 +75,8 @@ const getImageUrl = () => {
           {{ item.menu_name }}
         </h3>
         <span v-if="item.base_price" class="font-display font-bold text-[16px] text-[#3B1F0E] whitespace-nowrap">
-          <span v-if="item.sizes?.length" class="text-xs font-sans font-normal text-[#B4846C]">from</span>
-          ₱{{ Number(item.base_price).toFixed(2) }}
+          <span v-if="item.sizes?.length || item.is_hot_and_iced" class="text-xs font-sans font-normal text-[#B4846C]">from</span>
+          ₱{{ Number(startingPrice).toFixed(2) }}
         </span>
       </div>
       
