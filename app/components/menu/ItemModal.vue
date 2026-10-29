@@ -24,7 +24,8 @@ interface SizeRow {
   key: string // the size's uuid, or a temporary key until it is saved
   uuid: string | null
   name: string
-  price: string
+  price: string // the hot price when the item is sold hot and iced
+  iced_price: string
 }
 
 // Mirrors MenuItemRequest::MAX_SIZES on the server.
@@ -51,6 +52,9 @@ const form = ref({
   menu_name: '',
   category_uuid: '',
   base_price: '',
+  // Sold hot or iced at different prices; the recipe stays the same.
+  is_hot_and_iced: false,
+  iced_price: '',
   description: '',
   recipes: [] as RecipeRow[],
   has_sizes: false,
@@ -195,7 +199,7 @@ async function addMissingSize(index: number, sizeKey: string) {
 
 // --- Sizes ---
 
-const sizeErrors = ref<Record<number, { name?: string; price?: string }>>({})
+const sizeErrors = ref<Record<number, { name?: string; price?: string; iced_price?: string }>>({})
 const sizesError = ref('')
 
 function sizeLabel(size: SizeRow, index: number) {
@@ -204,7 +208,7 @@ function sizeLabel(size: SizeRow, index: number) {
 
 function addSize() {
   if (form.value.sizes.length >= MAX_SIZES) return
-  form.value.sizes.push({ key: newSizeKey(), uuid: null, name: '', price: '' })
+  form.value.sizes.push({ key: newSizeKey(), uuid: null, name: '', price: '', iced_price: '' })
 }
 
 // The size's own ingredient amounts go with it.
@@ -220,8 +224,8 @@ function removeSize(index: number) {
 function turnSizesOn() {
   if (form.value.sizes.length === 0) {
     form.value.sizes = [
-      { key: newSizeKey(), uuid: null, name: 'Small', price: String(form.value.base_price ?? '') },
-      { key: newSizeKey(), uuid: null, name: 'Large', price: '' }
+      { key: newSizeKey(), uuid: null, name: 'Small', price: String(form.value.base_price ?? ''), iced_price: String(form.value.iced_price ?? '') },
+      { key: newSizeKey(), uuid: null, name: 'Large', price: '', iced_price: '' }
     ]
   }
   form.value.has_sizes = true
@@ -231,6 +235,8 @@ function turnSizesOff() {
   // One price again: start from the lowest size price.
   const prices = form.value.sizes.map(s => parseFloat(s.price)).filter(p => !Number.isNaN(p))
   if (!form.value.base_price && prices.length) form.value.base_price = String(Math.min(...prices))
+  const icedPrices = form.value.sizes.map(s => parseFloat(s.iced_price)).filter(p => !Number.isNaN(p))
+  if (!form.value.iced_price && icedPrices.length) form.value.iced_price = String(Math.min(...icedPrices))
   form.value.recipes = form.value.recipes.filter(r => !r.size_key)
   if (form.value.recipes.length === 0) form.value.recipes.push(emptyRow())
   form.value.sizes = []
@@ -272,13 +278,14 @@ function validateSizes(): boolean {
 
   const seen = new Set<string>()
   form.value.sizes.forEach((size, i) => {
-    const errs: { name?: string; price?: string } = {}
+    const errs: { name?: string; price?: string; iced_price?: string } = {}
     const key = normalizeName(size.name)
     if (!key) errs.name = 'Size name is required.'
     else if (seen.has(key)) errs.name = 'Two sizes have the same name.'
     seen.add(key)
     if (size.price === '' || size.price == null || Number(size.price) < 0) errs.price = 'Price is required.'
-    if (errs.name || errs.price) sizeErrors.value[i] = errs
+    if (form.value.is_hot_and_iced && (size.iced_price === '' || size.iced_price == null || Number(size.iced_price) < 0)) errs.iced_price = 'Iced price is required.'
+    if (errs.name || errs.price || errs.iced_price) sizeErrors.value[i] = errs
   })
 
   return Object.keys(sizeErrors.value).length === 0
@@ -320,12 +327,13 @@ const sizeOptions = computed(() => [
 const isDirty = ref(false)
 const errors = ref({
   menu_name: '',
-  base_price: ''
+  base_price: '',
+  iced_price: ''
 })
 
 watch(() => props.show, (newVal) => {
   if (newVal) {
-    errors.value = { menu_name: '', base_price: '' }
+    errors.value = { menu_name: '', base_price: '', iced_price: '' }
     serverRowErrors.value = {}
     sizeErrors.value = {}
     sizesError.value = ''
@@ -333,11 +341,13 @@ watch(() => props.show, (newVal) => {
     loadIngredients()
     loadAddons()
     if (props.item) {
-      const sizes: SizeRow[] = (props.item.sizes ?? []).map((s: any) => ({ key: s.uuid, uuid: s.uuid, name: s.name, price: String(s.price) }))
+      const sizes: SizeRow[] = (props.item.sizes ?? []).map((s: any) => ({ key: s.uuid, uuid: s.uuid, name: s.name, price: String(s.price), iced_price: s.iced_price != null ? String(s.iced_price) : '' }))
       form.value = {
         menu_name: props.item.menu_name || '',
         category_uuid: props.item.category_uuid || 'uncategorized',
         base_price: props.item.base_price || '',
+        is_hot_and_iced: !!props.item.is_hot_and_iced,
+        iced_price: props.item.iced_price ?? '',
         description: props.item.description || '',
         recipes: props.item.recipes?.length 
           ? props.item.recipes.map((r: any): RecipeRow => ({
@@ -358,6 +368,8 @@ watch(() => props.show, (newVal) => {
         menu_name: '',
         category_uuid: props.defaultCategoryUuid || 'uncategorized',
         base_price: '',
+        is_hot_and_iced: false,
+        iced_price: '',
         description: '',
         recipes: [emptyRow()],
         has_sizes: false,
@@ -445,7 +457,7 @@ const scrollToFirstError = async () => {
 }
 
 const saveItem = async () => {
-  errors.value = { menu_name: '', base_price: '' }
+  errors.value = { menu_name: '', base_price: '', iced_price: '' }
   let hasError = false
 
   if (!form.value.menu_name) {
@@ -454,6 +466,10 @@ const saveItem = async () => {
   }
   if (!form.value.has_sizes && !form.value.base_price) {
     errors.value.base_price = 'Price is required.'
+    hasError = true
+  }
+  if (!form.value.has_sizes && form.value.is_hot_and_iced && form.value.iced_price === '') {
+    errors.value.iced_price = 'Iced price is required.'
     hasError = true
   }
   if (!validateSizes()) hasError = true
@@ -475,6 +491,10 @@ const saveItem = async () => {
     // With sizes, the server takes the lowest size price as the item's price.
     if (!form.value.has_sizes) {
       formData.append('base_price', form.value.base_price.toString())
+    }
+    formData.append('is_hot_and_iced', form.value.is_hot_and_iced ? '1' : '0')
+    if (form.value.is_hot_and_iced && !form.value.has_sizes) {
+      formData.append('iced_price', form.value.iced_price.toString())
     }
     
     if (form.value.category_uuid && form.value.category_uuid !== 'uncategorized') {
@@ -512,7 +532,8 @@ const saveItem = async () => {
     formData.append('sizes', JSON.stringify(sizes.map(s => ({
       ...(s.uuid ? { uuid: s.uuid } : {}),
       name: s.name.trim(),
-      price: Number(s.price)
+      price: Number(s.price),
+      ...(form.value.is_hot_and_iced ? { iced_price: Number(s.iced_price) } : {})
     }))))
     formData.append('addon_uuids', JSON.stringify(form.value.addon_uuids))
 
@@ -534,18 +555,21 @@ const saveItem = async () => {
       const message = messages[0]
       if (message === undefined) continue
       const recipe = field.match(/^recipes\.(\d+)\./)
-      const size = field.match(/^sizes\.(\d+)\.(name|price)$/)
+      const size = field.match(/^sizes\.(\d+)\.(name|price|iced_price)$/)
       if (recipe) {
         rowMessages[Number(recipe[1])] ??= message
       } else if (size) {
         const i = Number(size[1])
-        sizeErrors.value[i] = { ...sizeErrors.value[i], [size[2] as 'name' | 'price']: message }
+        sizeErrors.value[i] = { ...sizeErrors.value[i], [size[2] as 'name' | 'price' | 'iced_price']: message }
         shownInForm = true
       } else if (field === 'sizes') {
         sizesError.value = message
         shownInForm = true
       } else if (field === 'base_price') {
         errors.value.base_price = message
+        shownInForm = true
+      } else if (field === 'iced_price') {
+        errors.value.iced_price = message
         shownInForm = true
       } else if (field === 'addon_uuids') {
         showAlert('Save Failed', message)
@@ -667,31 +691,69 @@ const saveItem = async () => {
               <div class="flex-1">
                 <label class="block text-sm font-bold text-[#B4846C] uppercase tracking-wider mb-2">Price</label>
                 <p v-if="form.has_sizes" class="py-3 text-sm text-[#7D5A50]">Set for each size below.</p>
-                <div v-else class="relative">
-                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Icon name="heroicons:banknotes" class="w-5 h-5 text-[#B4846C]/60" />
+                <div v-else :class="form.is_hot_and_iced ? 'grid grid-cols-2 gap-3' : ''">
+                  <div>
+                    <div class="relative">
+                      <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Icon name="heroicons:banknotes" class="w-5 h-5 text-[#B4846C]/60" />
+                      </div>
+                      <input
+                        v-model="form.base_price"
+                        type="number"
+                        step="0.01"
+                        :placeholder="form.is_hot_and_iced ? 'Hot' : '0.00'"
+                        :aria-label="form.is_hot_and_iced ? 'Hot price' : 'Price'"
+                        :class="[
+                          'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow',
+                          errors.base_price ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
+                        ]"
+                      />
+                    </div>
+                    <p v-if="form.is_hot_and_iced" class="text-xs text-[#9E7060] mt-1 ml-1">Hot</p>
+                    <p v-if="errors.base_price" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.base_price }}</p>
                   </div>
-                  <input 
-                    v-model="form.base_price"
-                    type="number" 
-                    step="0.01"
-                    placeholder="0.00"
-                    :class="[
-                      'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow',
-                      errors.base_price ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
-                    ]"
-                  />
+                  <div v-if="form.is_hot_and_iced">
+                    <div class="relative">
+                      <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Icon name="heroicons:banknotes" class="w-5 h-5 text-[#B4846C]/60" />
+                      </div>
+                      <input
+                        v-model="form.iced_price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Iced"
+                        aria-label="Iced price"
+                        :class="[
+                          'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow',
+                          errors.iced_price ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
+                        ]"
+                      />
+                    </div>
+                    <p class="text-xs text-[#9E7060] mt-1 ml-1">Iced</p>
+                    <p v-if="errors.iced_price" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.iced_price }}</p>
+                  </div>
                 </div>
-                <p v-if="errors.base_price && !form.has_sizes" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.base_price }}</p>
-                <label class="mt-2 inline-flex items-center gap-2 text-sm font-bold text-[#7D5A50] cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    :checked="form.has_sizes"
-                    @change="onSizesToggle"
-                    class="w-4 h-4 rounded accent-[#3B1F0E]"
-                  />
-                  Comes in sizes
-                </label>
+                <div class="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+                  <label class="inline-flex items-center gap-2 text-sm font-bold text-[#7D5A50] cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      :checked="form.has_sizes"
+                      @change="onSizesToggle"
+                      class="w-4 h-4 rounded accent-[#3B1F0E]"
+                    />
+                    Comes in sizes
+                  </label>
+                  <!-- Only the price changes; hot and iced use the same recipe. -->
+                  <label class="inline-flex items-center gap-2 text-sm font-bold text-[#7D5A50] cursor-pointer select-none">
+                    <input
+                      v-model="form.is_hot_and_iced"
+                      type="checkbox"
+                      class="w-4 h-4 rounded accent-[#3B1F0E]"
+                    />
+                    Hot and iced
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -715,12 +777,15 @@ const saveItem = async () => {
           <div>
             <div class="mb-4">
               <h3 class="text-2xl font-display font-bold text-[#3B1F0E]">Sizes</h3>
-              <p class="text-sm text-[#9E7060] mt-1">Each size has its own price. Set how much of each ingredient a size uses in the recipe below.</p>
+              <p class="text-sm text-[#9E7060] mt-1">
+                Each size has its own price<template v-if="form.is_hot_and_iced">, hot and iced</template>. Set how much of each ingredient a size uses in the recipe below.
+              </p>
             </div>
 
-            <div class="hidden md:grid grid-cols-[2fr_1fr_auto] gap-4 mb-2 px-1">
+            <div :class="['hidden md:grid gap-4 mb-2 px-1', form.is_hot_and_iced ? 'grid-cols-[2fr_1fr_1fr_auto]' : 'grid-cols-[2fr_1fr_auto]']">
               <span class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">Size</span>
-              <span class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">Price</span>
+              <span class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">{{ form.is_hot_and_iced ? 'Hot price' : 'Price' }}</span>
+              <span v-if="form.is_hot_and_iced" class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">Iced price</span>
               <span class="w-8"></span>
             </div>
 
@@ -728,7 +793,10 @@ const saveItem = async () => {
               <div
                 v-for="(size, index) in form.sizes"
                 :key="size.key"
-                class="flex flex-col md:grid md:grid-cols-[2fr_1fr_auto] gap-4 items-start md:items-center bg-white md:bg-transparent p-4 md:p-0 rounded-xl border border-[#EEDFC4] md:border-none"
+                :class="[
+                  'flex flex-col md:grid gap-4 items-start md:items-center bg-white md:bg-transparent p-4 md:p-0 rounded-xl border border-[#EEDFC4] md:border-none',
+                  form.is_hot_and_iced ? 'md:grid-cols-[2fr_1fr_1fr_auto]' : 'md:grid-cols-[2fr_1fr_auto]'
+                ]"
               >
                 <div class="w-full">
                   <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Size</label>
@@ -746,7 +814,7 @@ const saveItem = async () => {
                 </div>
 
                 <div class="w-full">
-                  <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Price</label>
+                  <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">{{ form.is_hot_and_iced ? 'Hot price' : 'Price' }}</label>
                   <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Icon name="heroicons:banknotes" class="w-5 h-5 text-[#B4846C]/60" />
@@ -764,6 +832,28 @@ const saveItem = async () => {
                     />
                   </div>
                   <p v-if="sizeErrors[index]?.price" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ sizeErrors[index].price }}</p>
+                </div>
+
+                <div v-if="form.is_hot_and_iced" class="w-full">
+                  <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Iced price</label>
+                  <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Icon name="heroicons:banknotes" class="w-5 h-5 text-[#B4846C]/60" />
+                    </div>
+                    <input
+                      v-model="size.iced_price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      :aria-label="`${sizeLabel(size, index)} iced price`"
+                      :class="[
+                        'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent',
+                        sizeErrors[index]?.iced_price ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
+                      ]"
+                    />
+                  </div>
+                  <p v-if="sizeErrors[index]?.iced_price" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ sizeErrors[index].iced_price }}</p>
                 </div>
 
                 <div class="w-full md:w-auto flex justify-end md:justify-center mt-2 md:mt-0">

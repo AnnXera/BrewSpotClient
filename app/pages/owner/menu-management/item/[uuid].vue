@@ -153,9 +153,16 @@ onMounted(fetchItem)
                     </div>
                     <div class="flex flex-col gap-1">
                       <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">Price</p>
-                      <p v-if="!item.sizes?.length" class="text-base font-medium text-[#3D2B24]">{{ formatPrice(item.base_price) }}</p>
+                      <template v-if="!item.sizes?.length">
+                        <p v-if="!item.is_hot_and_iced" class="text-base font-medium text-[#3D2B24]">{{ formatPrice(item.base_price) }}</p>
+                        <p v-else class="text-base font-medium text-[#3D2B24]">Hot {{ formatPrice(item.base_price) }} · Iced {{ formatPrice(item.iced_price) }}</p>
+                      </template>
                       <ul v-else class="text-base font-medium text-[#3D2B24]">
-                        <li v-for="size in item.sizes" :key="size.uuid">{{ size.name }}: {{ formatPrice(size.price) }}</li>
+                        <li v-for="size in item.sizes" :key="size.uuid">
+                          {{ size.name }}:
+                          <template v-if="item.is_hot_and_iced">Hot {{ formatPrice(size.price) }} · Iced {{ formatPrice(size.iced_price) }}</template>
+                          <template v-else>{{ formatPrice(size.price) }}</template>
+                        </li>
                       </ul>
                     </div>
                   </div>

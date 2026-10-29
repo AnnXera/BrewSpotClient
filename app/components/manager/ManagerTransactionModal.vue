@@ -3,6 +3,7 @@
 import type { ManagerTransactionDetail } from '~/services/ManagerDashboardService'
 import type { OwnerTransactionDetail } from '~/services/OwnerAnalyticsService'
 import { formatCount, formatMethod, formatPeso, formatPesoCents } from '~/utils/dashboardFormat'
+import { variantLabel } from '~/utils/variant'
 
 // The owner's transaction log passes its own loader (no branch needed) and gets the
 // branch and refund details on top of the manager receipt.
@@ -189,7 +190,7 @@ function statusBadgeClass(status: string) {
                     <div class="flex items-center gap-1.5">
                       <span class="font-bold text-[#2D201B]">{{ item.quantity }}x</span>
                       <span class="font-medium text-[#2D201B]">{{ item.menu_name }}</span>
-                      <span v-if="item.size_name" class="text-xs text-[#8A6E64]">({{ item.size_name }})</span>
+                      <span v-if="item.size_name || item.temperature" class="text-xs text-[#8A6E64]">({{ variantLabel(item.temperature, item.size_name) }})</span>
                     </div>
                     <div v-if="item.addons?.length" class="mt-1 pl-4 text-xs text-[#8A6E64] space-y-0.5">
                       <div v-for="a in item.addons" :key="a.name">

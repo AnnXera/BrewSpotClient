@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import logoIcon from '~/assets/images/logo-icon.svg'
 import FloorPlanModal from '~/components/pos/FloorPlanModal.vue'
+import { variantLabel, TEMPERATURE_LABELS, type Temperature } from '~/utils/variant'
 
 // POS Register uses its own auth via pos_device_token cookie
 // It does not use the standard user auth, so we don't define a 'role' requirement here.
@@ -389,7 +390,7 @@ interface CartAddon {
   quantity: number // per drink
 }
 
-// One line per item + size + add-ons, so a Large with Oreo and a plain Large are separate lines.
+// One line per item + temperature + size + add-ons, so a Large with Oreo and a plain Large are separate lines.
 interface CartItem {
   line_key: string
   uuid: string
@@ -397,8 +398,9 @@ interface CartItem {
   base_price: number
   size_uuid: string | null
   size_name: string | null
+  temperature: Temperature | null // items sold hot and iced only
   addons: CartAddon[]
-  unit_price: number // size (or base) price + add-ons, per drink
+  unit_price: number // size (or base) price, hot or iced, + add-ons, per drink
   quantity: number
   picture?: string
 }
@@ -409,9 +411,10 @@ function getItemUnitPrice(item: CartItem) {
   return item.unit_price
 }
 
-// "Large · 2x Oreo Crumbles" under the item name.
+// "Iced Large · 2x Oreo Crumbles" under the item name.
 function lineDetails(item: CartItem) {
-  const parts = item.size_name ? [item.size_name] : []
+  const variant = variantLabel(item.temperature, item.size_name)
+  const parts = variant ? [variant] : []
   for (const a of item.addons) parts.push(a.quantity > 1 ? `${a.quantity}x ${a.name}` : a.name)
   return parts.join(' · ')
 }
@@ -469,7 +472,13 @@ function inCart(uuid: string) {
   return cart.value.reduce((n, i) => n + (i.uuid === uuid ? i.quantity : 0), 0)
 }
 
-function addLine(item: any, size: { uuid: string; name: string; price: number } | null, addons: CartAddon[]) {
+// Price of one drink before add-ons: the size (or base) price, or its iced price when served iced.
+function variantPrice(item: any, size: { price: number; iced_price?: number | null } | null, temperature: Temperature | null) {
+  if (temperature === 'iced') return Number(size ? size.iced_price : item.iced_price)
+  return size ? Number(size.price) : Number(item.base_price)
+}
+
+function addLine(item: any, size: { uuid: string; name: string; price: number; iced_price?: number | null } | null, temperature: Temperature | null, addons: CartAddon[]) {
   const limit = stockLimit(item.uuid)
   if (inCart(item.uuid) >= limit) {
     showNotice(`Only ${limit} ${item.menu_name} left in stock.`)
@@ -477,13 +486,13 @@ function addLine(item: any, size: { uuid: string; name: string; price: number } 
   }
 
   const sorted = [...addons].sort((a, b) => a.uuid.localeCompare(b.uuid))
-  const lineKey = [item.uuid, size?.uuid ?? '', ...sorted.map(a => `${a.uuid}x${a.quantity}`)].join('|')
+  const lineKey = [item.uuid, temperature ?? '', size?.uuid ?? '', ...sorted.map(a => `${a.uuid}x${a.quantity}`)].join('|')
   const existing = cart.value.find(i => i.line_key === lineKey)
 
   if (existing) {
     existing.quantity++
   } else {
-    const price = size ? Number(size.price) : Number(item.base_price)
+    const price = variantPrice(item, size, temperature)
     cart.value.push({
       line_key: lineKey,
       uuid: item.uuid,
@@ -492,6 +501,7 @@ function addLine(item: any, size: { uuid: string; name: string; price: number } 
       picture: item.picture,
       size_uuid: size?.uuid ?? null,
       size_name: size?.name ?? null,
+      temperature,
       addons: sorted,
       unit_price: price + sorted.reduce((sum, a) => sum + a.price * a.quantity, 0),
       quantity: 1
@@ -502,12 +512,12 @@ function addLine(item: any, size: { uuid: string; name: string; price: number } 
 
 function addToCart(item: any) {
   if (item.sold_out || isProcessingOrder.value) return
-  // Sizes or add-ons to choose: ask first.
-  if (item.sizes?.length || item.addons?.length) {
+  // Hot or iced, sizes or add-ons to choose: ask first.
+  if (item.is_hot_and_iced || item.sizes?.length || item.addons?.length) {
     openOptions(item)
     return
   }
-  addLine(item, null, [])
+  addLine(item, null, null, [])
 }
 
 function updateQuantity(item: CartItem, delta: number) {
@@ -528,11 +538,13 @@ function updateQuantity(item: CartItem, delta: number) {
 // -- SIZE AND ADD-ON PICKER -------------------------------------------------
 const optionsItem = ref<any | null>(null)
 const optionsSizeUuid = ref<string | null>(null)
+const optionsTemperature = ref<Temperature | null>(null)
 const optionsAddonQty = ref<Record<string, number>>({})
 
 function openOptions(item: any) {
   optionsItem.value = item
   optionsSizeUuid.value = item.sizes?.length === 1 ? item.sizes[0].uuid : null
+  optionsTemperature.value = null
   optionsAddonQty.value = {}
 }
 
@@ -553,16 +565,30 @@ const optionsAddons = computed<CartAddon[]>(() =>
 )
 
 const optionsNeedsSize = computed(() => !!optionsItem.value?.sizes?.length && !optionsSize.value)
+const optionsNeedsTemperature = computed(() => !!optionsItem.value?.is_hot_and_iced && !optionsTemperature.value)
+
+// What the Add button asks for while something is still missing.
+const optionsMissing = computed(() => {
+  if (optionsNeedsTemperature.value && optionsNeedsSize.value) return 'Pick hot or iced and a size'
+  if (optionsNeedsTemperature.value) return 'Pick hot or iced'
+  if (optionsNeedsSize.value) return 'Pick a size'
+  return null
+})
+
+// A size's price as shown on its button: the iced price once Iced is picked.
+function sizePriceShown(size: any) {
+  return optionsTemperature.value === 'iced' ? size.iced_price : size.price
+}
 
 const optionsPrice = computed(() => {
   if (!optionsItem.value) return 0
-  const base = optionsSize.value ? Number(optionsSize.value.price) : Number(optionsItem.value.base_price)
+  const base = variantPrice(optionsItem.value, optionsSize.value, optionsTemperature.value)
   return base + optionsAddons.value.reduce((sum, a) => sum + a.price * a.quantity, 0)
 })
 
 function confirmOptions() {
-  if (!optionsItem.value || optionsNeedsSize.value) return
-  if (addLine(optionsItem.value, optionsSize.value, optionsAddons.value)) closeOptions()
+  if (!optionsItem.value || optionsMissing.value) return
+  if (addLine(optionsItem.value, optionsSize.value, optionsTemperature.value, optionsAddons.value)) closeOptions()
 }
 
 function clearCart() {
@@ -755,6 +781,7 @@ async function completeOrder() {
       uuid: i.uuid,
       quantity: i.quantity,
       size_uuid: i.size_uuid,
+      temperature: i.temperature,
       addons: i.addons.map(a => ({ uuid: a.uuid, quantity: a.quantity }))
     }))
     const currentChange = changeAmount.value
@@ -953,7 +980,7 @@ async function downloadCurrentReceipt() {
       quantity: i.quantity,
       unitPrice: getItemUnitPrice(i),
       lineTotal: getItemUnitPrice(i) * (i.quantity || 1),
-      sizeName: i.size_name,
+      sizeName: variantLabel(i.temperature, i.size_name) || null,
       addons: i.addons,
     })),
     subtotal: o.subtotal || o.baseItemsTotal || 0,
@@ -1863,6 +1890,27 @@ function formatCurrency(amount: number) {
           </div>
 
           <div class="p-5 space-y-5 overflow-y-auto">
+            <fieldset v-if="optionsItem.is_hot_and_iced">
+              <legend class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Hot or iced</legend>
+              <div role="radiogroup" aria-label="Hot or iced" class="grid grid-cols-2 gap-2">
+                <button
+                  v-for="temp in (['hot', 'iced'] as const)"
+                  :key="temp"
+                  role="radio"
+                  :aria-checked="optionsTemperature === temp"
+                  @click="optionsTemperature = temp"
+                  class="min-h-14 px-3 py-2 rounded-md border text-left transition-colors"
+                  :class="optionsTemperature === temp ? 'border-[#7B5A50] bg-[#7B5A50]/10 text-[#7B5A50]' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'"
+                >
+                  <span class="block font-semibold text-base leading-tight">{{ TEMPERATURE_LABELS[temp] }}</span>
+                  <!-- Without sizes the price is per temperature; with sizes it shows on each size. -->
+                  <span v-if="!optionsItem.sizes?.length" class="block text-sm tabular-nums">
+                    {{ formatCurrency(temp === 'iced' ? optionsItem.iced_price : optionsItem.base_price) }}
+                  </span>
+                </button>
+              </div>
+            </fieldset>
+
             <fieldset v-if="optionsItem.sizes?.length">
               <legend class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Size</legend>
               <div role="radiogroup" aria-label="Size" class="grid grid-cols-2 gap-2">
@@ -1876,7 +1924,7 @@ function formatCurrency(amount: number) {
                   :class="optionsSizeUuid === size.uuid ? 'border-[#7B5A50] bg-[#7B5A50]/10 text-[#7B5A50]' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'"
                 >
                   <span class="block font-semibold text-base leading-tight">{{ size.name }}</span>
-                  <span class="block text-sm tabular-nums">{{ formatCurrency(size.price) }}</span>
+                  <span class="block text-sm tabular-nums">{{ formatCurrency(sizePriceShown(size)) }}</span>
                 </button>
               </div>
             </fieldset>
@@ -1916,10 +1964,10 @@ function formatCurrency(amount: number) {
           <div class="px-5 pt-3 pb-5 border-t border-gray-200 shrink-0">
             <button
               @click="confirmOptions"
-              :disabled="optionsNeedsSize"
+              :disabled="!!optionsMissing"
               class="w-full h-14 bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold rounded-md text-lg transition-colors shadow-sm flex items-center justify-between px-5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>{{ optionsNeedsSize ? 'Pick a size' : 'Add to order' }}</span>
+              <span>{{ optionsMissing ?? 'Add to order' }}</span>
               <span class="tabular-nums">{{ formatCurrency(optionsPrice) }}</span>
             </button>
           </div>

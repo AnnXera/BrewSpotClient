@@ -119,6 +119,7 @@ export interface ManagerTransactionDetailItem {
     uuid: string
     menu_name: string
     size_name: string | null
+    temperature: string | null // hot or iced, on items sold both ways
     quantity: number
     unit_price: number
     line_total: number

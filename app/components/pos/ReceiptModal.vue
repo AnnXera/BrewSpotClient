@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import type { PosTransactionDetail } from '~/services/PosService'
 import { useReceiptDownload, type ReceiptDownloadData } from '~/composables/useReceiptDownload'
+import { variantLabel } from '~/utils/variant'
 
 const props = defineProps<{
   show: boolean
@@ -35,7 +36,7 @@ const receiptData = computed<ReceiptDownloadData>(() => {
         quantity: i.quantity,
         unitPrice: i.unit_price,
         lineTotal: i.line_total,
-        sizeName: i.size_name,
+        sizeName: variantLabel(i.temperature, i.size_name) || null,
         addons: i.addons,
       })),
       subtotal: t.subtotal,
@@ -64,7 +65,7 @@ const receiptData = computed<ReceiptDownloadData>(() => {
         quantity: i.quantity,
         unitPrice: i.price,
         lineTotal: (i.price || 0) * (i.quantity || 1),
-        sizeName: i.size_name,
+        sizeName: variantLabel(i.temperature, i.size_name) || null,
         addons: i.addons,
       })),
       subtotal: o.subtotal || o.baseItemsTotal || 0,
