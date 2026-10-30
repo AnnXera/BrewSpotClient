@@ -6,6 +6,7 @@ import OwnerBranchBreakdown from '~/components/dashboard/OwnerBranchBreakdown.vu
 import OwnerTrendingItems from '~/components/dashboard/OwnerTrendingItems.vue'
 import OwnerTopCategories from '~/components/dashboard/OwnerTopCategories.vue'
 import TransactionLog from '~/components/analytics/TransactionLog.vue'
+import OwnerWelcomeModal from '~/components/dashboard/OwnerWelcomeModal.vue'
 import type { DashboardRange, OwnerDashboardStats } from '~/services/OwnerProfileService'
 import { formatSpan } from '~/utils/dashboardFormat'
 
@@ -97,6 +98,21 @@ const logFilters = computed(() => {
   const { from, to } = stats.value.period
   return { from, to: to > today ? today : to }
 })
+
+// ── First-login welcome ──
+const authStore = useAuthStore()
+const showWelcome = ref(!!authStore.user?.welcome_pending)
+
+async function closeWelcome(to?: string) {
+  showWelcome.value = false
+  authStore.markWelcomed()
+  try {
+    await ownerProfileService.dismissWelcome()
+  } catch (err) {
+    console.warn('Welcome dismiss error:', err)
+  }
+  if (to) router.push(to)
+}
 
 const span = computed(() => (stats.value ? formatSpan(stats.value.period.from, stats.value.period.to) : ''))
 const updatedAt = computed(() =>
@@ -194,6 +210,8 @@ const updatedAt = computed(() =>
         </template>
       </div>
     </main>
+
+    <OwnerWelcomeModal :open="showWelcome" :firstname="authStore.user?.firstname" @close="closeWelcome" />
   </div>
 </template>
 

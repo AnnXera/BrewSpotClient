@@ -56,6 +56,11 @@ export interface BranchDetail {
 }
 
 export class OwnerProfileService extends BaseService {
+    // Records that the first-login welcome modal was dismissed.
+    dismissWelcome() {
+        return this.post<{ success: boolean }>('/owner/welcome/dismiss', {})
+    }
+
     getBranch(uuid: string) {
         return this.get<{ success: boolean; message?: string; branch?: BranchDetail }>(`/owner/branches/${uuid}`)
     }

@@ -7,6 +7,8 @@ interface User {
     lastname: string
     email: string
     role?: { role_name: string }
+    /** True until the owner dismisses the first-login welcome modal. */
+    welcome_pending?: boolean
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -29,6 +31,10 @@ export const useAuthStore = defineStore('auth', {
             userRole.value = role
             const userData = useCookie<User | null>('user_data', { maxAge: 60 * 60 * 24 * 7 })
             userData.value = user
+        },
+        markWelcomed() {
+            if (!this.user || !this.role) return
+            this.setSession({ ...this.user, welcome_pending: false }, this.role)
         },
         setRegistrationEmail(email: string) {
             this.registrationEmail = email
