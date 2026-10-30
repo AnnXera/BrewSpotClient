@@ -425,16 +425,10 @@ const baseItemsTotal = computed(() => {
 
 const subtotal = computed(() => baseItemsTotal.value)
 
-const selectedDiscountType = ref<'none'|'PWD'|'Senior'|'VIP'>('none')
+const selectedDiscountType = ref<'none'|'PWD'|'Senior'>('none')
 const discountAmount = computed(() => {
   if (selectedDiscountType.value === 'none') return 0
-  if (selectedDiscountType.value === 'PWD' || selectedDiscountType.value === 'Senior') {
-    return subtotal.value * 0.20 // 20% discount
-  }
-  if (selectedDiscountType.value === 'VIP') {
-    return subtotal.value * 0.10 // 10% discount
-  }
-  return 0
+  return subtotal.value * 0.20 // 20% discount
 })
 
 const total = computed(() => subtotal.value - discountAmount.value)
@@ -621,10 +615,6 @@ const isDiscountIdValid = computed(() => {
     // Must follow OSCA-XXXXX (4 to 7 characters, max 12 chars total)
     return /^OSCA-[A-Z0-9]{4,7}$/.test(discountIdNumber.value)
   }
-  if (selectedDiscountType.value === 'VIP') {
-    // Must follow VIP-XXXX (4 to 6 characters, max 10 chars total)
-    return /^VIP-[A-Z0-9]{4,6}$/.test(discountIdNumber.value)
-  }
   return true
 })
 
@@ -661,21 +651,6 @@ function formatDiscountId() {
       val = 'OSCA-' + val.slice(5).replace(/[^A-Z0-9]/g, '')
     }
     discountIdNumber.value = val.slice(0, 12)
-  } else if (selectedDiscountType.value === 'VIP') {
-    // Format: VIP-XXXX (max 10 characters, not exceed)
-    let val = discountIdNumber.value.toUpperCase().replace(/\s+/g, '')
-    if (val.length === 0) {
-      discountIdNumber.value = ''
-      return
-    }
-    if (!val.startsWith('VIP')) {
-      val = 'VIP-' + val.replace(/[^A-Z0-9]/g, '')
-    } else if (val.startsWith('VIP') && !val.startsWith('VIP-') && val.length > 3) {
-      val = 'VIP-' + val.slice(3).replace(/[^A-Z0-9]/g, '')
-    } else if (val.startsWith('VIP-')) {
-      val = 'VIP-' + val.slice(4).replace(/[^A-Z0-9]/g, '')
-    }
-    discountIdNumber.value = val.slice(0, 10)
   }
 }
 
@@ -703,7 +678,6 @@ const discountOptions = [
   { value: 'none', label: 'None' },
   { value: 'PWD', label: 'PWD' },
   { value: 'Senior', label: 'Senior' },
-  { value: 'VIP', label: 'VIP' },
 ] as const
 
 const paymentMethods = [
@@ -725,9 +699,6 @@ const checkoutHint = computed(() => {
   if (selectedDiscountType.value === 'Senior' && !isDiscountIdValid.value) {
     return 'Enter complete Senior (OSCA) ID format (e.g. OSCA-1234567) to continue.'
   }
-  if (selectedDiscountType.value === 'VIP' && !isDiscountIdValid.value) {
-    return 'Enter complete VIP Number format (e.g. VIP-0001) to continue.'
-  }
   if (selectedPaymentMethod.value === 'cash') {
     return Number(amountTendered.value) > 0 ? 'Amount tendered is less than the total.' : 'Enter the cash received to continue.'
   }
@@ -742,7 +713,6 @@ const tenderInput = ref<HTMLInputElement | null>(null)
 const referenceInput = ref<HTMLInputElement | null>(null)
 const pwdIdInputRef = ref<HTMLInputElement | null>(null)
 const seniorIdInputRef = ref<HTMLInputElement | null>(null)
-const vipIdInputRef = ref<HTMLInputElement | null>(null)
 
 function openPayment() {
   if (cart.value.length === 0 || !isOnline.value) return
@@ -762,7 +732,6 @@ watch([isPaymentModalOpen, selectedPaymentMethod], async ([open]) => {
   if (selectedDiscountType.value !== 'none' && !isDiscountIdValid.value) {
     if (selectedDiscountType.value === 'PWD') pwdIdInputRef.value?.focus()
     else if (selectedDiscountType.value === 'Senior') seniorIdInputRef.value?.focus()
-    else if (selectedDiscountType.value === 'VIP') vipIdInputRef.value?.focus()
   } else {
     ;(tenderInput.value ?? referenceInput.value)?.focus()
   }
@@ -1514,15 +1483,13 @@ function formatCurrency(amount: number) {
               <span class="text-2xl font-bold text-[#1E1B18] tabular-nums">{{ formatCurrency(total) }}</span>
             </div>
 
-            <!-- Customer Discount Pills (PWD, Senior, VIP, None) placed directly after the total -->
+            <!-- Customer Discount Pills (PWD, Senior, None) placed directly after the total -->
             <div class="space-y-1 pt-0.5">
               <div class="flex items-center justify-between">
                 <span class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Discount</span>
-                <span v-if="selectedDiscountType !== 'none'" class="text-[11px] font-bold text-red-600">
-                  {{ selectedDiscountType === 'VIP' ? '10% OFF' : '20% OFF' }}
-                </span>
+                <span v-if="selectedDiscountType !== 'none'" class="text-[11px] font-bold text-red-600">20% OFF</span>
               </div>
-              <div role="radiogroup" aria-label="Customer Discount" class="grid grid-cols-4 gap-1.5">
+              <div role="radiogroup" aria-label="Customer Discount" class="grid grid-cols-3 gap-1.5">
                 <button
                   v-for="d in discountOptions"
                   :key="d.value"
@@ -1699,40 +1666,6 @@ function formatCurrency(amount: number) {
                 </span>
                 <span v-else-if="discountIdNumber" class="text-red-600 font-medium">
                   Must follow OSCA-XXXXX
-                </span>
-              </div>
-            </div>
-
-            <!-- VIP Member Number Requirement (Format: VIP-XXXX, max 10 chars) -->
-            <div v-else-if="selectedDiscountType === 'VIP'" class="p-3 bg-[#FAF8F5] border border-[#EAE3D9] rounded-xl space-y-1.5">
-              <div class="flex items-center justify-between">
-                <label for="vip-id-input" class="text-xs font-bold text-[#7B5A50] flex items-center gap-1.5 cursor-pointer">
-                  <Icon name="heroicons:star" class="w-4 h-4 text-[#7B5A50]" />
-                  <span>VIP Member Number</span>
-                  <span class="text-red-500">*</span>
-                </label>
-                <span class="text-[10px] font-bold text-amber-800 bg-amber-100/70 border border-amber-200 px-2 py-0.5 rounded-full">10% Discount</span>
-              </div>
-              <input
-                id="vip-id-input"
-                ref="vipIdInputRef"
-                v-model="discountIdNumber"
-                @input="formatDiscountId"
-                type="text"
-                maxlength="10"
-                placeholder="VIP-0001"
-                class="w-full h-10 bg-white border border-[#D8CEBE] focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] text-[#2D201B] placeholder:text-gray-400 rounded-lg px-3 text-xs sm:text-sm font-semibold tracking-wider font-mono outline-none transition-all uppercase"
-              />
-              <div class="flex items-center justify-between text-[11px]">
-                <p class="text-gray-500 flex items-center gap-1">
-                  <span>Format:</span>
-                  <span class="font-mono font-bold text-[#7B5A50] bg-white px-1.5 py-0.5 rounded border border-[#EAE3D9]">VIP-XXXX</span>
-                </p>
-                <span v-if="isDiscountIdValid" class="text-emerald-700 font-semibold flex items-center gap-1">
-                  <Icon name="heroicons:check-circle" class="w-3.5 h-3.5" /> Valid VIP
-                </span>
-                <span v-else-if="discountIdNumber" class="text-red-600 font-medium">
-                  Must follow VIP-XXXX
                 </span>
               </div>
             </div>
@@ -2027,7 +1960,7 @@ function formatCurrency(amount: number) {
                 <span class="tabular-nums">- {{ formatCurrency(completedOrderDetails.discountAmount) }}</span>
               </div>
               <div v-if="completedOrderDetails.discountIdNumber" class="flex justify-between text-[11px] text-gray-500 mb-1.5">
-                <span>{{ completedOrderDetails.discountType === 'Senior' ? 'OSCA ID' : (completedOrderDetails.discountType === 'VIP' ? 'VIP Number' : 'PWD ID') }}</span>
+                <span>{{ completedOrderDetails.discountType === 'Senior' ? 'OSCA ID' : 'PWD ID' }}</span>
                 <span class="font-mono font-bold text-[#7B5A50]">{{ completedOrderDetails.discountIdNumber }}</span>
               </div>
               <div class="flex justify-between items-center mb-2">
