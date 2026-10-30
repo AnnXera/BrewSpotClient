@@ -2258,7 +2258,7 @@ onBeforeUnmount(() => {
         <div v-else-if="currentStep === 5" key="step5" class="space-y-6">
           <div>
             <span class="text-xs uppercase tracking-wider font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">Registration Submitted ✓</span>
-            <h1 class="text-2xl font-bold text-[#2d201b] mt-2">Application Received! 🎉</h1>
+            <h1 class="text-2xl font-bold text-[#2d201b] mt-2">Application Received!</h1>
             <p class="text-gray-600 text-sm mt-2 leading-relaxed">
               We've sent a confirmation email to <span class="font-semibold text-[#2d201b]">{{ email }}</span> with a direct link to view your submitted details and track review progress.
             </p>
