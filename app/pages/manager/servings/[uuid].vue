@@ -50,9 +50,24 @@ const drafts = ref<Record<string, { daily_limit: number; enabled: boolean }>>({}
 const loading = ref(true)
 const saving = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
 const rowErrors = ref<Record<string, string>>({}) // item uuid -> message from the server
 const planLocked = ref(false)
+
+// Toast Notification State (Save Layout / Floor Plan style)
+const toastShow = ref(false)
+const toastTitle = ref('Servings saved')
+const toastDescription = ref('Daily category limits updated successfully')
+let toastTimer: ReturnType<typeof setTimeout> | undefined
+
+function triggerToast(title: string, desc: string) {
+  toastTitle.value = title
+  toastDescription.value = desc
+  toastShow.value = true
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastShow.value = false
+  }, 2800)
+}
 
 // Activate scroll reveal when items load
 useScrollReveal(items)
@@ -113,7 +128,7 @@ async function save() {
   if (!dirtyCount.value || saving.value) return
   saving.value = true
   errorMessage.value = ''
-  successMessage.value = ''
+  toastShow.value = false
   rowErrors.value = {}
 
   const changes: CategoryServingChange[] = Object.entries(drafts.value).map(([uuid, d]) => ({
@@ -125,7 +140,7 @@ async function save() {
   try {
     const res = await service.saveCategoryItems(branchUuid.value, categoryUuid.value, changes)
     drafts.value = {}
-    successMessage.value = res.message
+    triggerToast(res.message || 'Servings saved', 'Daily category limits updated successfully')
     await load()
   } catch (e: any) {
     const errors = e?.data?.errors as Record<string, string[]> | undefined
@@ -249,16 +264,6 @@ onBeforeUnmount(() => {
           <p class="font-medium">{{ errorMessage }}</p>
         </div>
 
-        <!-- Success Notification -->
-        <div
-          v-else-if="successMessage"
-          role="status"
-          class="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-[14px] text-emerald-800 shadow-2xs"
-        >
-          <Icon name="heroicons:check-circle" class="h-5 w-5 shrink-0 text-emerald-600" />
-          <p class="font-medium">{{ successMessage }}</p>
-        </div>
-
         <!-- Items Card Section with Scroll Reveal -->
         <section v-if="!planLocked && branchUuid" class="scroll-reveal bg-white border border-[#E3CFB4] rounded-2xl shadow-xs overflow-hidden">
           <!-- Toolbar: Search, Sort, Save Button -->
@@ -333,13 +338,21 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <!-- Pagination Footer -->
-          <div class="border-t border-[#E3CFB4] bg-[#FFFDF9]/60 px-5">
+          <!-- Pagination Footer (only if more than 1 page) -->
+          <div v-if="lastPage > 1" class="border-t border-[#E3CFB4] bg-[#FFFDF9]/60 px-5">
             <CommonPagination :page="page" :last-page="lastPage" @change="page = $event" />
           </div>
         </section>
       </div>
     </main>
+
+    <!-- Emil Kowalski Toast (Save Layout style) -->
+    <FloorPlanToast
+      :show="toastShow"
+      :message="toastTitle"
+      :description="toastDescription"
+      @close="toastShow = false"
+    />
   </div>
 </template>
 

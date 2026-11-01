@@ -7,13 +7,19 @@ export default defineNuxtRouteMiddleware((to) => {
     const authStore = useAuthStore()
 
     const userRoleCookie = useCookie<string | null>('user_role')
-    if (!authStore.role && userRoleCookie.value) {
-        authStore.role = userRoleCookie.value
-    }
-
     const userDataCookie = useCookie<any>('user_data')
-    if (!authStore.user && userDataCookie.value) {
-        authStore.user = userDataCookie.value
+
+    if (!token.value) {
+        if (authStore.role || authStore.user || userRoleCookie.value || userDataCookie.value) {
+            authStore.clear()
+        }
+    } else {
+        if (!authStore.role && userRoleCookie.value) {
+            authStore.role = userRoleCookie.value
+        }
+        if (!authStore.user && userDataCookie.value) {
+            authStore.user = userDataCookie.value
+        }
     }
 
     // 1. Obsolete/removed step extensions automatically redirect to /login immediately without rendering

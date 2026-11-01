@@ -115,6 +115,10 @@ export class AuthService extends BaseService {
         return this.post<LoginResponse>('/auth/login', { email, password })
     }
 
+    forgotPassword(email: string) {
+        return this.post<SimpleResponse>('/auth/forgot-password', { email })
+    }
+
     verifyLoginCode(email: string, code: string) {
         return this.post<VerifyLoginCodeResponse>('/auth/verify-login-code', { email, code })
     }

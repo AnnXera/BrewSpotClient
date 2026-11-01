@@ -145,7 +145,7 @@ const updatedAt = computed(() =>
             :class="{ 'opacity-65 pointer-events-none': refreshing }"
           >
             <!-- 1. Owner Totals Banner -->
-            <div class="scroll-reveal">
+            <div class="scroll-reveal" data-walkthrough="feat-totals">
               <OwnerTotals :totals="stats?.totals ?? null" :loading="loading" />
             </div>
 
@@ -153,6 +153,7 @@ const updatedAt = computed(() =>
             <div class="scroll-reveal grid grid-cols-1 gap-6 lg:grid-cols-12">
               <OwnerIncomeChart
                 v-model:range="range"
+                data-walkthrough="feat-chart"
                 class="lg:col-span-12 xl:col-span-8"
                 :period="stats?.period ?? null"
                 :series="stats?.series ?? []"
@@ -183,7 +184,7 @@ const updatedAt = computed(() =>
             </div>
 
             <!-- 4. Transaction Log -->
-            <div v-if="logFilters" class="scroll-reveal">
+            <div v-if="logFilters" class="scroll-reveal" data-walkthrough="feat-transactions">
               <TransactionLog
                 :filters="logFilters"
                 :branches="logBranches"
