@@ -28,39 +28,11 @@ const displayName = computed(() => {
   return bName || cName || 'Branch Details'
 })
 
-async function viewDocument(url: string) {
-  const newTab = window.open('', '_blank')
-  const config = useRuntimeConfig()
-  const token = useCookie<string | null>('auth_token')
-  const origin = config.public.apiBase.replace(/\/api\/?$/, '')
-
-  try {
-    const response = await fetch(`${origin}${url}`, {
-      headers: {
-        Authorization: `Bearer ${token.value}`,
-        Accept: 'application/pdf, image/*',
-      },
-    })
-
-    if (!response.ok) throw new Error(`Request failed: ${response.status}`)
-
-    const blob = await response.blob()
-    const objectUrl = URL.createObjectURL(blob)
-
-    if (newTab) {
-      newTab.location.href = objectUrl
-    } else {
-      window.open(objectUrl, '_blank')
-    }
-  } catch (e) {
-    newTab?.close()
-    console.error('Failed to load document', e)
-  }
-}
+const { openDocument, openImage } = useDocumentViewer()
 
 function viewCafePicture() {
   if (props.branch?.cafe_picture) {
-    window.open(props.branch.cafe_picture, '_blank')
+    openImage(props.branch.cafe_picture, `${displayName.value} photo`)
   }
 }
 </script>
@@ -208,7 +180,7 @@ function viewCafePicture() {
                 <button
                   type="button"
                   class="cursor-pointer font-semibold text-xs sm:text-sm text-[#FFF0D1] rounded-lg px-4 py-1.5 bg-[#7D5A50] hover:bg-[#64463D] transition-colors"
-                  @click="viewDocument(doc.download_url)"
+                  @click="openDocument(doc.download_url, `${doc.doc_type?.replace(/_/g, ' ')} document`)"
                 >
                   View
                 </button>

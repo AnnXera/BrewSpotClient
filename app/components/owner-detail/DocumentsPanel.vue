@@ -34,7 +34,7 @@
               <button
                 type="button"
                 class="cursor-pointer rounded-lg border border-[#EDD8CC] px-2.5 py-1 min-[360px]:px-3 min-[360px]:py-1.5 font-display font-semibold text-xs min-[360px]:text-[13px] text-[#7D5A50] hover:bg-[#7D5A50] hover:text-[#FFF0D1] hover:border-[#7D5A50] transition-colors"
-                @click="emit('view', doc.download_url)"
+                @click="emit('view', doc.download_url, idTitle(doc.id_type, doc.has_back ? 'front' : null))"
               >
                 {{ doc.has_back ? 'Front' : 'View' }}
               </button>
@@ -42,7 +42,7 @@
                 v-if="doc.has_back && doc.download_back_url"
                 type="button"
                 class="cursor-pointer rounded-lg border border-[#7D5A50] px-2.5 py-1 min-[360px]:px-3 min-[360px]:py-1.5 font-display font-semibold text-xs min-[360px]:text-[13px] text-[#7D5A50] hover:bg-[#7D5A50] hover:text-[#FFF0D1] transition-colors"
-                @click="emit('view', doc.download_back_url)"
+                @click="emit('view', doc.download_back_url, idTitle(doc.id_type, 'back'))"
               >
                 Back
               </button>
@@ -76,7 +76,7 @@
             <button
               type="button"
               class="cursor-pointer rounded-lg border border-[#EDD8CC] px-2.5 py-1 min-[360px]:px-3 min-[360px]:py-1.5 font-display font-semibold text-xs min-[360px]:text-[13px] text-[#7D5A50] hover:bg-[#7D5A50] hover:text-[#FFF0D1] hover:border-[#7D5A50] transition-colors shrink-0"
-              @click="emit('view', doc.download_url)"
+              @click="emit('view', doc.download_url, `${doc.doc_type} Certificate`)"
             >
               View
             </button>
@@ -110,8 +110,13 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  view: [url: string]
+  view: [url: string, title: string]
 }>()
+
+function idTitle(idType: string, side: 'front' | 'back' | null) {
+  const name = idType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  return side ? `${name} (${side})` : name
+}
 
 function formatDate(value?: string | null) {
   if (!value) return '—'

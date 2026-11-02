@@ -113,36 +113,7 @@ function closeBranchDetails() {
   selectedBranch.value = null
 }
 
-async function viewDocument(url: string) {
-  const newTab = window.open('', '_blank')
-
-  const config = useRuntimeConfig()
-  const token = useCookie<string | null>('auth_token')
-  const origin = config.public.apiBase.replace(/\/api\/?$/, '')
-
-  try {
-    const response = await fetch(`${origin}${url}`, {
-      headers: {
-        Authorization: `Bearer ${token.value}`,
-        Accept: 'application/pdf, image/*',
-      },
-    })
-
-    if (!response.ok) throw new Error(`Request failed: ${response.status}`)
-
-    const blob = await response.blob()
-    const objectUrl = URL.createObjectURL(blob)
-
-    if (newTab) {
-      newTab.location.href = objectUrl
-    } else {
-      window.open(objectUrl, '_blank')
-    }
-  } catch (e) {
-    newTab?.close()
-    console.error('Failed to load document', e)
-  }
-}
+const { openDocument: viewDocument } = useDocumentViewer()
 
 // Suspend / reactivate — reuses the same status flow as the list page
 const confirmDialog = ref<{ newStatus: 'active' | 'suspended' } | null>(null)

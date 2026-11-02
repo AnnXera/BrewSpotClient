@@ -26,51 +26,11 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value))
 }
 
-const docError = ref('')
+const { openDocument, openImage } = useDocumentViewer()
 
-async function viewDocument(url: string) {
-  docError.value = ''
-
-  const config = useRuntimeConfig()
-  const token = useCookie<string | null>('auth_token')
-  const origin = config.public.apiBase.replace(/\/api\/?$/, '')
-
-  const newTab = window.open('', '_blank')
-
-  try {
-    const response = await fetch(`${origin}${url}`, {
-      headers: {
-        Authorization: `Bearer ${token.value}`,
-        Accept: 'application/pdf, image/*',
-      },
-    })
-
-    if (!response.ok) {
-      newTab?.close()
-      docError.value = `Could not load document (server returned ${response.status}).`
-      return
-    }
-
-    const blob = await response.blob()
-    const objectUrl = URL.createObjectURL(blob)
-
-    if (newTab) {
-      newTab.location.href = objectUrl
-    } else {
-      const a = document.createElement('a')
-      a.href = objectUrl
-      a.download = ''
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-    }
-
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000)
-  } catch (e: any) {
-    newTab?.close()
-    docError.value = 'Failed to load document. Please try again.'
-    console.error('viewDocument error:', e)
-  }
+function idTitle(idType: string, side: 'front' | 'back' | null) {
+  const name = idType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  return side ? `${name} (${side})` : name
 }
 
 function viewCafePicture() {
@@ -79,7 +39,7 @@ function viewCafePicture() {
   const config = useRuntimeConfig()
   const origin = config.public.apiBase.replace(/\/api\/?$/, '')
 
-  window.open(`${origin}/api/branch-picture/${relevantBranch.value.uuid}`, '_blank')
+  openImage(`${origin}/api/branch-picture/${relevantBranch.value.uuid}`, `${relevantBranch.value.branch_name ?? 'Cafe'} photo`)
 }
 </script>
 
@@ -101,19 +61,7 @@ function viewCafePicture() {
                     <span class="font-sans text-sm">Loading application…</span>
                 </div>
 
-                <!-- Document load error banner -->
-                <div
-                    v-if="docError"
-                    class="mx-6 mt-4 flex items-start gap-3 rounded-xl bg-[#FDE8E8] border border-[#F5C6CB] px-4 py-3 font-sans text-[13px] text-[#842029]"
-                >
-                    <Icon name="heroicons:exclamation-triangle" class="w-4 h-4 mt-0.5 shrink-0 text-[#DC3545]" />
-                    <span class="flex-1">{{ docError }}</span>
-                    <button type="button" class="shrink-0 text-[#DC3545] hover:opacity-70 transition-opacity" @click="docError = ''">
-                        <Icon name="heroicons:x-mark" class="w-4 h-4" />
-                    </button>
-                </div>
-
-                <template v-else-if="ownerDetails && approval">
+                <template v-if="ownerDetails && approval">
                     <div class="p-6">
 
                         <!-- Header -->
@@ -313,7 +261,7 @@ function viewCafePicture() {
                                             <button
                                                 type="button"
                                                 class="cursor-pointer font-semibold text-[14px] text-[#FFF0D1] rounded-[10px] border px-[16px] py-[6px] bg-[#7D5A50] hover:bg-[#65463d] transition"
-                                                @click="viewDocument(doc.download_url)"
+                                                @click="openDocument(doc.download_url, idTitle(doc.id_type, doc.has_back ? 'front' : null))"
                                             >
                                                 {{ doc.has_back ? 'View Front' : 'View' }}
                                             </button>
@@ -321,7 +269,7 @@ function viewCafePicture() {
                                                 v-if="doc.has_back && doc.download_back_url"
                                                 type="button"
                                                 class="cursor-pointer font-semibold text-[14px] text-[#7D5A50] rounded-[10px] border border-[#7D5A50] px-[16px] py-[6px] bg-white hover:bg-[#FFF8EA] transition"
-                                                @click="viewDocument(doc.download_back_url)"
+                                                @click="openDocument(doc.download_back_url, idTitle(doc.id_type, 'back'))"
                                             >
                                                 View Back
                                             </button>
@@ -361,7 +309,7 @@ function viewCafePicture() {
                                         <button
                                             type="button"
                                             class="cursor-pointer font-semibold text-[14px] text-[#FFF0D1] rounded-[10px] border px-[20px] py-[6px] bg-[#7D5A50]"
-                                            @click="viewDocument(doc.download_url)"
+                                            @click="openDocument(doc.download_url, `${doc.doc_type} Certificate`)"
                                         >
                                             View
                                         </button>
@@ -431,7 +379,7 @@ function viewCafePicture() {
                                             <button
                                                 type="button"
                                                 class="cursor-pointer font-semibold text-[14px] text-[#FFF0D1] rounded-[10px] border px-[20px] py-[6px] bg-[#7D5A50] hover:opacity-90 transition-opacity"
-                                                @click="viewDocument(doc.download_url)"
+                                                @click="openDocument(doc.download_url, `${doc.doc_type} document`)"
                                             >
                                                 View
                                             </button>
@@ -501,14 +449,14 @@ function viewCafePicture() {
             >
                 <button
                     type="button"
-                    class="flex-1 rounded-xl bg-[#FDE8E8] text-[#DC3545] font-display font-semibold text-[14px] py-3 hover:opacity-80 transition-opacity disabled:opacity-50"
+                    class="flex-1 rounded-xl border border-[#7D5A50] bg-white text-[#7D5A50] font-display font-semibold text-[14px] py-3 hover:bg-[#FFF8EA] transition-colors disabled:opacity-50"
                     :disabled="decisionLoading"
                     @click="emit('reject')"
                 >Reject Application</button>
 
                 <button
                     type="button"
-                    class="flex-1 rounded-xl bg-[#D4EDDA] text-[#28A745] font-display font-semibold text-[14px] py-3 hover:opacity-80 transition-opacity disabled:opacity-50"
+                    class="flex-1 rounded-xl border border-[#7D5A50] bg-[#7D5A50] text-[#FFF0D1] font-display font-semibold text-[14px] py-3 hover:bg-[#65463D] hover:border-[#65463D] transition-colors disabled:opacity-50"
                     :disabled="decisionLoading"
                     @click="emit('approve')"
                 >Approve Application</button>

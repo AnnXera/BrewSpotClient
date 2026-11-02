@@ -33,35 +33,7 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value))
 }
 
-async function viewDocument(url: string) {
-  const newTab = window.open('', '_blank')
-  const config = useRuntimeConfig()
-  const token = useCookie<string | null>('auth_token')
-  const origin = config.public.apiBase.replace(/\/api\/?$/, '')
-
-  try {
-    const response = await fetch(`${origin}${url}`, {
-      headers: {
-        Authorization: `Bearer ${token.value}`,
-        Accept: 'application/pdf, image/*',
-      },
-    })
-
-    if (!response.ok) throw new Error(`Request failed: ${response.status}`)
-
-    const blob = await response.blob()
-    const objectUrl = URL.createObjectURL(blob)
-
-    if (newTab) {
-      newTab.location.href = objectUrl
-    } else {
-      window.open(objectUrl, '_blank')
-    }
-  } catch (e) {
-    newTab?.close()
-    console.error('Failed to load document', e)
-  }
-}
+const { openDocument, openImage } = useDocumentViewer()
 
 function cafePictureUrl(branchUuid?: string | null) {
   if (!branchUuid) return null
@@ -72,7 +44,7 @@ function cafePictureUrl(branchUuid?: string | null) {
 
 function viewCafePicture() {
   const url = cafePictureUrl(relevantBranch.value?.uuid)
-  if (url) window.open(url, '_blank')
+  if (url) openImage(url, `${relevantBranch.value?.branch_name ?? 'Cafe'} photo`)
 }
 </script>
 
@@ -219,7 +191,7 @@ function viewCafePicture() {
                         <button
                           type="button"
                           class="cursor-pointer font-semibold text-[14px] text-[#FFF0D1] rounded-[10px] border px-[20px] py-[6px] bg-[#7D5A50]"
-                          @click="viewDocument(doc.download_url)"
+                          @click="openDocument(doc.download_url, `${doc.doc_type.replace(/_/g, ' ')} document`)"
                         >
                           View
                         </button>
@@ -289,14 +261,14 @@ function viewCafePicture() {
         >
           <button
             type="button"
-            class="flex-1 rounded-xl bg-[#FDE8E8] text-[#DC3545] font-display font-semibold text-[14px] py-3 hover:opacity-80 transition-opacity disabled:opacity-50"
+            class="flex-1 rounded-xl border border-[#7D5A50] bg-white text-[#7D5A50] font-display font-semibold text-[14px] py-3 hover:bg-[#FFF8EA] transition-colors disabled:opacity-50"
             :disabled="decisionLoading"
             @click="emit('reject')"
           >Reject Application</button>
 
           <button
             type="button"
-            class="flex-1 rounded-xl bg-[#D4EDDA] text-[#28A745] font-display font-semibold text-[14px] py-3 hover:opacity-80 transition-opacity disabled:opacity-50"
+            class="flex-1 rounded-xl border border-[#7D5A50] bg-[#7D5A50] text-[#FFF0D1] font-display font-semibold text-[14px] py-3 hover:bg-[#65463D] hover:border-[#65463D] transition-colors disabled:opacity-50"
             :disabled="decisionLoading"
             @click="emit('approve')"
           >Approve Application</button>

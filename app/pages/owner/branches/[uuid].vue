@@ -84,35 +84,7 @@ async function fetchBranch() {
   }
 }
 
-async function viewDocument(url: string) {
-  const newTab = window.open('', '_blank')
-  const config = useRuntimeConfig()
-  const token = useCookie<string | null>('auth_token')
-  const origin = config.public.apiBase.replace(/\/api\/?$/, '')
-
-  try {
-    const response = await fetch(`${origin}${url}`, {
-      headers: {
-        Authorization: `Bearer ${token.value}`,
-        Accept: 'application/pdf, image/*',
-      },
-    })
-
-    if (!response.ok) throw new Error(`Request failed: ${response.status}`)
-
-    const blob = await response.blob()
-    const objectUrl = URL.createObjectURL(blob)
-
-    if (newTab) {
-      newTab.location.href = objectUrl
-    } else {
-      window.open(objectUrl, '_blank')
-    }
-  } catch (e) {
-    newTab?.close()
-    console.error('Failed to load document', e)
-  }
-}
+const { openDocument } = useDocumentViewer()
 
 onMounted(fetchBranch)
 </script>
@@ -298,7 +270,7 @@ onMounted(fetchBranch)
                     <button
                       type="button"
                       class="border border-[#EDD8CC] rounded-[10px] px-4 py-2 text-[13px] font-semibold text-[#7D5A50] hover:bg-[#FFF8EA] transition-colors shrink-0"
-                      @click="viewDocument(birDocument.download_url)"
+                      @click="openDocument(birDocument.download_url, 'BIR Certificate')"
                     >
                       View
                     </button>
