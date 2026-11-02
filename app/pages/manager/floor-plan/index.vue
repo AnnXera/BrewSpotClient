@@ -1172,11 +1172,13 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
           <div v-if="plan" class="relative">
           <div
             ref="scrollEl"
-            class="overflow-auto p-[18px] max-h-[78vh] bg-white"
+            class="overflow-auto p-[18px] bg-white"
             :class="panning ? 'cursor-grabbing' : panMode ? 'cursor-grab touch-none' : ''"
+            :style="{ height: `min(${canvasH + 36}px, 78vh)` }"
             @pointerdown="startPan"
           >
-            <!-- Takes up the scaled size so the scroll area matches the zoomed canvas -->
+            <!-- Takes up the scaled size so the scroll area matches the zoomed canvas.
+                 The scroll area itself is sized for 100%, so the card stays put while zooming. -->
             <div class="mx-auto" :style="{ width: `${canvasW * zoom}px`, height: `${canvasH * zoom}px` }">
             <div
               ref="canvasEl"
