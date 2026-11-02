@@ -201,9 +201,10 @@ const { isOpenNow } = useOperatingHours()
             </div>
 
             <!-- 2. Revenue Chart (full width) -->
-            <div class="scroll-reveal">
+            <div class="scroll-reveal relative z-20">
               <ManagerIncomeChart
                 v-model:range="range"
+                :branch-uuid="branchUuid"
                 :period="stats?.period ?? null"
                 :series="stats?.series ?? []"
                 :loading="loading"

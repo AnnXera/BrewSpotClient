@@ -7,6 +7,28 @@ export default defineNuxtConfig({
 
   modules: ['@pinia/nuxt', '@nuxtjs/tailwindcss', '@nuxt/fonts', '@nuxt/icon'],
 
+  app: {
+    head: {
+      title: 'BrewSpot',
+      link: [
+        { rel: 'manifest', href: '/manifest.webmanifest' },
+        { rel: 'apple-touch-icon', href: '/icons/icon-192x192.png' },
+        { rel: 'icon', type: 'image/svg+xml', href: '/icons/icon.svg' },
+      ],
+      meta: [
+        { name: 'theme-color', content: '#7D5A50' },
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+        { name: 'apple-mobile-web-app-title', content: 'BrewSpot POS' },
+      ],
+      script: [
+        {
+          innerHTML: `(function(){window.__deferredInstallPrompt=null;window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__deferredInstallPrompt=e;if(window.__onDeferredPromptReady){window.__onDeferredPromptReady(e);}});})();`,
+        },
+      ],
+    },
+  },
+
   icon: {
     clientBundle: {
       scan: true,

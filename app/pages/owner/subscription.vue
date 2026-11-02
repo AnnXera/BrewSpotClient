@@ -623,6 +623,7 @@ onMounted(async () => {
           <button
             v-if="viewMode === 'current'"
             @click="viewMode = 'browse'"
+            data-walkthrough="sub-browse-btn"
             class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
           >
             <Icon name="heroicons:sparkles" class="w-5 h-5 text-[#F3E7D2]" />
@@ -644,6 +645,7 @@ onMounted(async () => {
         <!-- Current Subscription Active Plan Card (Strictly Backend Based) -->
         <div
           v-if="currentPlan"
+          data-walkthrough="sub-current-card"
           class="grid grid-cols-1 gap-6 mb-8"
           :class="currentPlan.pending_plan ? 'lg:grid-cols-2 items-start' : ''"
         >
@@ -999,7 +1001,7 @@ onMounted(async () => {
         </div>
 
         <!-- No Active Subscription State -->
-        <div v-else class="bg-[#FFFDF9] border border-[#EEDFC4] rounded-2xl p-8 md:p-12 mb-8 text-center flex flex-col items-center">
+        <div v-else data-walkthrough="sub-current-card" class="bg-[#FFFDF9] border border-[#EEDFC4] rounded-2xl p-8 md:p-12 mb-8 text-center flex flex-col items-center">
           <div class="w-16 h-16 bg-white rounded-xl border border-[#EDD8CC] flex items-center justify-center mb-5">
             <Icon name="heroicons:building-storefront" class="w-8 h-8 text-[#3B1F0E]" aria-hidden="true" />
           </div>
@@ -1025,6 +1027,7 @@ onMounted(async () => {
 
           <button
             @click="viewMode = 'browse'"
+            data-walkthrough="sub-browse-btn"
             class="inline-flex items-center gap-2 min-h-11 px-6 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
           >
             <Icon name="heroicons:sparkles" class="w-5 h-5" aria-hidden="true" />
@@ -1033,7 +1036,7 @@ onMounted(async () => {
         </div>
 
         <!-- Payment History Section Matching Reference Screenshot -->
-        <div>
+        <div data-walkthrough="sub-history-table">
           <div class="flex items-center justify-between mb-4">
             <h2 class="font-display text-xl font-bold text-[#3D2B24]">Payment History</h2>
           </div>

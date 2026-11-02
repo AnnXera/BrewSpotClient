@@ -174,7 +174,10 @@ watch(branchUuid, async () => {
   loading.value = false
 })
 
-useAutoRefresh(loadAll, { interval: REFRESH_MS })
+useAutoRefresh(async () => {
+  refreshKey.value++
+  await loadAll()
+}, { interval: REFRESH_MS })
 
 onMounted(async () => {
   try {
@@ -224,29 +227,15 @@ onBeforeUnmount(() => {
             </p>
           </div>
 
-          <!-- Controls: Live Time, Refresh Button -->
-          <div class="flex flex-wrap items-center gap-3 shrink-0">
-            <!-- Live Time Pill with Pulsing Indicator -->
-            <div class="inline-flex items-center gap-2 rounded-xl border border-[#E3CFB4] bg-white px-3.5 py-2 text-[13px] font-medium text-[#7D5A50] shadow-2xs">
-              <span class="relative flex h-2 w-2">
-                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-              </span>
-              <span class="tabular-nums font-mono">{{ timeLabel }}</span>
-              <span class="text-[#D9C3A5]">/</span>
-              <span>{{ dateLabel }}</span>
-            </div>
-
-            <!-- Refresh Button (triggers slow circle reload) -->
-            <button
-              type="button"
-              class="inline-flex items-center gap-2 rounded-xl border border-[#D9C3A5] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#3B1F0E] shadow-2xs transition-transform duration-160 ease-out hover:border-[#3B1F0E] hover:bg-[#FFFDF9] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:opacity-60 cursor-pointer"
-              :disabled="loading"
-              @click="handleRefresh"
-            >
-              <Icon name="heroicons:arrow-path-20-solid" class="h-4 w-4 text-[#7D5A50]" :class="{ 'animate-spin': loading }" />
-              <span>Refresh</span>
-            </button>
+          <!-- Live Time Pill with Pulsing Indicator (Auto-updates every 30s) -->
+          <div class="inline-flex items-center gap-2 rounded-xl border border-[#E3CFB4] bg-white px-3.5 py-2 text-[13px] font-medium text-[#7D5A50] shadow-2xs shrink-0 self-start sm:self-auto">
+            <span class="relative flex h-2 w-2">
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            <span class="tabular-nums font-mono">{{ timeLabel }}</span>
+            <span class="text-[#D9C3A5]">/</span>
+            <span>{{ dateLabel }}</span>
           </div>
         </header>
 
@@ -262,7 +251,10 @@ onBeforeUnmount(() => {
 
         <template v-if="!planLocked && branchUuid">
           <!-- Categories Card Section with Scroll Reveal -->
-          <section class="scroll-reveal bg-white border border-[#E3CFB4] rounded-2xl shadow-xs overflow-hidden">
+          <section
+            data-walkthrough="servings-categories"
+            class="scroll-reveal bg-white border border-[#E3CFB4] rounded-2xl shadow-xs overflow-hidden"
+          >
             <!-- Toolbar: Search, Sort, Title -->
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 border-b border-[#E3CFB4] bg-[#FFFDF9]/60">
               <div class="flex items-center gap-2">
@@ -322,13 +314,16 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <!-- Pagination Footer -->
-            <div class="border-t border-[#E3CFB4] bg-[#FFFDF9]/60 px-5">
+            <!-- Pagination Footer (only if more than 1 page) -->
+            <div v-if="categoryLastPage > 1" class="border-t border-[#E3CFB4] bg-[#FFFDF9]/60 px-5">
               <CommonPagination :page="categoryPage" :last-page="categoryLastPage" @change="categoryPage = $event" />
             </div>
           </section>
 
-          <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          <div
+            data-walkthrough="servings-usage"
+            class="grid grid-cols-1 xl:grid-cols-2 gap-5"
+          >
             <ServingsIngredientsUsedPanel
               v-model:search="ingredientSearch"
               v-model:sort="ingredientSort"

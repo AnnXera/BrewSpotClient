@@ -3,6 +3,7 @@ import type { FloorPlan, FloorPlanElement, FloorPlanTable } from '~/services/Flo
 import type { ReservationRecord } from '~/services/ReservationService'
 import type { OpeningHour, ReservationStatus } from '~/services/ReservationService'
 import { FLOOR_TAB_LIMIT, doorAsset, tableAsset } from '~/utils/floorPlanCatalog'
+import EmilCalendar from '~/components/common/EmilCalendar.vue'
 
 definePageMeta({
   role: 'Manager',
@@ -39,6 +40,22 @@ const errorMessage = ref('')
 const reservationError = ref('')
 const reservationNotice = ref('')
 const reservations = ref<ReservationRecord[]>([])
+
+// Toast Notification State (matching Save Layout / Floor Plan style)
+const toastShow = ref(false)
+const toastTitle = ref('Reservation confirmed')
+const toastDescription = ref('')
+let toastTimer: ReturnType<typeof setTimeout> | undefined
+
+function triggerToast(title: string, desc: string = '') {
+  toastTitle.value = title
+  toastDescription.value = desc
+  toastShow.value = true
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastShow.value = false
+  }, 3200)
+}
 const dayReservations = ref<ReservationRecord[]>([])
 const openingHours = ref<OpeningHour[]>([])
 const dayLoading = ref(false)
@@ -53,7 +70,6 @@ const waitlistStatusFilter = ref('all')
 const selectedTable = ref<FloorPlanTable | null>(null)
 const selectedChair = ref<FloorPlanElement | null>(null)
 const inspectedTable = ref<FloorPlanTable | null>(null)
-const datePicker = ref<HTMLInputElement | null>(null)
 const slotStrip = ref<HTMLElement | null>(null)
 const planFrame = ref<HTMLElement | null>(null)
 const planFrameWidth = ref(0)
@@ -158,16 +174,6 @@ function shiftDate(days: number) {
   const key = localDateKey(date)
   if (key < todayDate.value) return
   selectedDate.value = key
-}
-
-function openDatePicker() {
-  const input = datePicker.value
-  if (!input) return
-  try {
-    input.showPicker()
-  } catch {
-    input.focus()
-  }
 }
 
 function formatClock(date: Date) {
@@ -516,6 +522,9 @@ async function updateReservationStatus(item: ReservationRecord, status: Reservat
     // Swap in the server's copy so the row shows its new status and actions right away.
     reservations.value = reservations.value.map((reservation) => reservation.uuid === item.uuid ? response.reservation : reservation)
     await loadDayReservations()
+    const statusLabel = status.charAt(0).toUpperCase() + status.slice(1)
+    const tableName = item.table?.table_name ? `Table ${item.table.table_name}` : 'Reservation'
+    triggerToast(`Reservation ${statusLabel}`, `${tableName} for ${item.customer_name} marked as ${status}.`)
   } catch (error: any) {
     // The row stays as it was; the message shows above the list instead of replacing it.
     waitlistActionError.value = error?.data?.message ?? 'Could not update the reservation status.'
@@ -612,7 +621,9 @@ async function confirmReservation() {
       notes: reservation.notes.trim() || undefined,
     })
     // Clear the selection before reloading, or the watcher reports the new booking as a clash.
-    reservationNotice.value = `${tableName} booked for ${reservation.customerName.trim()} at ${formatClock(windowStart.value)}.`
+    const noticeText = `${tableName} booked for ${reservation.customerName.trim()} at ${formatClock(windowStart.value)}.`
+    reservationNotice.value = noticeText
+    triggerToast('Reservation confirmed', noticeText)
     reservation.customerName = ''
     reservation.customerPhone = ''
     reservation.notes = ''
@@ -678,6 +689,7 @@ onBeforeUnmount(() => {
         <div class="flex items-center gap-2">
           <button
             type="button"
+            data-walkthrough="reservations-waitlist-btn"
             class="inline-flex h-10 items-center gap-2 rounded-lg border border-[#C79679] px-4 text-sm text-[#5B463C] transition-colors hover:bg-[#F8EFE7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/30"
             :class="showWaitlist ? 'bg-[#F8EFE7]' : 'bg-white'"
             @click.stop="openWaitlist"
@@ -690,7 +702,7 @@ onBeforeUnmount(() => {
       </header>
 
       <!-- When: date strip, arrival time -->
-      <section class="mt-6 rounded-2xl border border-[#E8D7C7] bg-[#FFFDF9] p-4 md:p-5" aria-label="Reservation date and time">
+      <section data-walkthrough="reservations-date-strip" class="mt-6 rounded-2xl border border-[#E8D7C7] bg-[#FFFDF9] p-4 md:p-5" aria-label="Reservation date and time">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h2 class="font-display text-lg font-semibold text-[#3B2A24]">{{ selectedDateLabel }}</h2>
           <div class="flex items-center gap-1">
@@ -711,25 +723,23 @@ onBeforeUnmount(() => {
             >
               <Icon name="heroicons:chevron-right" class="size-5" />
             </button>
-            <div class="relative">
-              <button
-                type="button"
-                class="inline-flex h-9 items-center gap-2 rounded-lg border border-[#DCC8B8] bg-white px-3 text-sm text-[#5B463C] transition-colors hover:border-[#7D5A50]"
-                @click="openDatePicker"
-              >
-                <Icon name="heroicons:calendar-days" class="size-4" />
-                Other date
-              </button>
-              <input
-                ref="datePicker"
-                v-model="selectedDate"
-                type="date"
-                :min="todayDate"
-                tabindex="-1"
-                aria-hidden="true"
-                class="pointer-events-none absolute inset-0 opacity-0"
-              >
-            </div>
+            <EmilCalendar
+              v-model="selectedDate"
+              :min="todayDate"
+              align="right"
+            >
+              <template #trigger="{ open, toggle }">
+                <button
+                  type="button"
+                  class="inline-flex h-9 items-center gap-2 rounded-lg border border-[#DCC8B8] bg-white px-3 text-sm font-medium text-[#5B463C] shadow-2xs transition-all hover:border-[#7D5A50] hover:bg-[#F8EFE7] active:scale-[0.97] cursor-pointer"
+                  :class="{ 'border-[#7D5A50] bg-[#F8EFE7] ring-2 ring-[#7D5A50]/20': open }"
+                  @click="toggle"
+                >
+                  <Icon name="heroicons:calendar-days" class="size-4 text-[#7D5A50]" />
+                  <span>Other date</span>
+                </button>
+              </template>
+            </EmilCalendar>
           </div>
         </div>
 
@@ -1017,7 +1027,6 @@ onBeforeUnmount(() => {
               <textarea v-model="reservation.notes" rows="2" placeholder="Allergies, occasion, high chair…" class="field resize-none" />
             </label>
             <p v-if="reservationError" class="text-xs text-[#A4472E]" role="alert">{{ reservationError }}</p>
-            <p v-if="reservationNotice" class="text-xs text-[#2F6B45]" role="status">{{ reservationNotice }}</p>
             <button
               type="submit"
               :disabled="!canConfirm"
@@ -1145,6 +1154,14 @@ onBeforeUnmount(() => {
           </div>
         </section>
       </div>
+
+      <!-- Toast Notification (Save Layout / Floor Plan style) -->
+      <FloorPlanToast
+        :show="toastShow"
+        :message="toastTitle"
+        :description="toastDescription"
+        @close="toastShow = false"
+      />
     </main>
   </div>
 </template>

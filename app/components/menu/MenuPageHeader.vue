@@ -29,7 +29,10 @@ const { formattedSummary, isOpenNow } = useOperatingHours()
     </div>
 
     <!-- Chosen Store Operating Hours Badge in Menu Management -->
-    <div class="flex items-center gap-3 bg-white p-3.5 px-4.5 rounded-2xl border border-[#EEDFC4] shadow-xs shrink-0 hover:shadow-sm transition-all">
+    <div
+      data-walkthrough="menu-operating-hours"
+      class="flex items-center gap-3 bg-white p-3.5 px-4.5 rounded-2xl border border-[#EEDFC4] shadow-xs shrink-0 hover:shadow-sm transition-all"
+    >
       <div class="w-10 h-10 rounded-xl bg-[#7D5A50]/10 text-[#7D5A50] flex items-center justify-center shrink-0">
         <Icon name="heroicons:clock" class="w-5.5 h-5.5" />
       </div>

@@ -12,17 +12,17 @@ function time(iso: string) {
 <template>
   <section class="bg-white border border-[#E3CFB4] rounded-2xl flex flex-col h-[520px] shadow-2xs overflow-hidden">
     <!-- Header -->
-    <div class="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[#E3CFB4]/70">
-      <div class="flex items-center gap-2.5">
+    <div class="flex items-center justify-between gap-3 px-5 pt-4 pb-3 border-b border-[#E3CFB4]/70">
+      <div class="flex items-center gap-2.5 min-w-0">
         <div class="size-8 rounded-lg bg-[#FDF3E7] border border-[#E3CFB4] flex items-center justify-center text-[#7D5A50] shrink-0">
           <Icon name="heroicons:clock" class="w-4 h-4" />
         </div>
-        <div>
-          <h2 class="font-display font-bold text-[18px] text-[#3B1F0E] leading-tight">Serving Log</h2>
-          <p class="text-[12px] text-[#8B6656]">Real-time history of today's servings</p>
+        <div class="min-w-0">
+          <h2 class="font-display font-bold text-[17px] sm:text-[18px] text-[#3B1F0E] leading-tight truncate">Serving Log</h2>
+          <p class="text-[12px] text-[#8B6656] truncate">Real-time history of today's servings</p>
         </div>
       </div>
-      <span class="rounded-full bg-[#FDF3E7] border border-[#E3CFB4] px-2.5 py-0.5 text-xs font-semibold text-[#7D5A50] tabular-nums">
+      <span class="rounded-full bg-[#FDF3E7] border border-[#E3CFB4] px-2.5 py-0.5 text-xs font-semibold text-[#7D5A50] tabular-nums shrink-0 whitespace-nowrap">
         {{ entries.length }} recorded
       </span>
     </div>

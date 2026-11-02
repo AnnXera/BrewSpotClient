@@ -60,6 +60,9 @@ async function loadDeviceData() {
       categories.value = [{ uuid: 'all', name: 'All Items' }, ...menuRes.categories]
       menuItems.value = menuRes.items
     }
+
+    // 4. Load initial cashier shift stats
+    refreshShiftStats()
   } catch (e: any) {
     // 401 Unauthorized means the token was revoked or expired
     if (e?.response?.status === 401) {
@@ -383,6 +386,42 @@ const filteredItems = computed(() => {
   return items
 })
 
+// ── CASHIER PROFILE & SHIFT DETAILS ─────────────────────────────────────────
+const currentCashier = computed(() => {
+  if (!device.value?.active_staff) return null
+  const staff = staffList.value.find((s: any) => s.uuid === device.value.active_staff.uuid)
+  const uuid = device.value.active_staff.uuid || ''
+  const employeeNumber = staff?.employee_number || `EMP-${uuid.replace(/-/g, '').slice(0, 6).toUpperCase()}`
+  return {
+    uuid,
+    name: staff ? `${staff.firstname} ${staff.lastname}` : (device.value.active_staff.name || device.value.active_staff.firstname),
+    firstname: device.value.active_staff.firstname,
+    lastname: staff?.lastname || '',
+    role: staff?.role || 'Cashier',
+    employeeNumber,
+    activeSince: device.value.active_since,
+  }
+})
+
+const shiftStats = ref({
+  todayCount: 0,
+  todayTotal: 0,
+})
+
+async function refreshShiftStats() {
+  try {
+    const res = await devicePosService.getTransactions()
+    if (res?.success) {
+      shiftStats.value = {
+        todayCount: res.today_count ?? (res.transactions?.length || 0),
+        todayTotal: res.today_total ?? 0,
+      }
+    }
+  } catch {
+    // silent fallback
+  }
+}
+
 interface CartAddon {
   uuid: string
   name: string
@@ -432,12 +471,6 @@ const discountAmount = computed(() => {
 })
 
 const total = computed(() => subtotal.value - discountAmount.value)
-
-const promoCodeInput = ref('')
-
-function onPromoInput() {
-  // Reserved for custom promotional or voucher codes
-}
 
 // -- ORDER NOTICE (stock limits, undo) --------------------------------------
 const orderNotice = ref<{ text: string, restore?: CartItem[] } | null>(null)
@@ -797,6 +830,7 @@ async function completeOrder() {
       selectedDiscountType.value = 'none'
       // Servings left changed with this sale.
       devicePosService.getMenu().then((m) => { if (m.success) menuItems.value = m.items }).catch(() => {})
+      refreshShiftStats()
     }
   } catch (e: any) {
     const status = e?.response?.status ?? e?.status
@@ -831,6 +865,10 @@ async function openTransactions() {
     const res = await devicePosService.getTransactions()
     if (res.success) {
       transactionsData.value = res
+      shiftStats.value = {
+        todayCount: res.today_count ?? (res.transactions?.length || 0),
+        todayTotal: res.today_total ?? 0,
+      }
     } else {
       transactionsError.value = 'Transactions could not be loaded.'
     }
@@ -1040,10 +1078,6 @@ function formatCurrency(amount: number) {
               <span class="font-bold text-xs text-[#2D201B]">{{ device.active_staff.firstname }}</span>
             </div>
             
-            <button @click="openTransactions" class="h-9 px-3 rounded-xl bg-[#FAF8F5] hover:bg-[#F2ECE4] border border-[#EFECE6] text-[#4A3830] text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95">
-              <Icon name="heroicons:document-text" class="w-4 h-4 text-[#7B5A50]" /> 
-              <span>Transactions</span>
-            </button>
             <button @click="isSpoilageOpen = true" title="Log servings that were thrown away" class="h-9 px-3 rounded-xl bg-[#FAF8F5] hover:bg-[#F2ECE4] border border-[#EFECE6] text-[#4A3830] text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95">
               <Icon name="heroicons:trash" class="w-4 h-4 text-[#7B5A50]" /> 
               <span>Spoilage</span>
@@ -1053,6 +1087,7 @@ function formatCurrency(amount: number) {
             </button>
           </template>
           <template v-else>
+            <CommonA2HSButton variant="badge" label="Install App (A2HS)" />
             <button @click="unregisterDevice" class="h-9 text-xs font-bold text-red-700 hover:text-red-900 transition-colors px-3">
               Unregister device
             </button>
@@ -1199,14 +1234,14 @@ function formatCurrency(amount: number) {
               </span>
             </button>
 
-            <!-- Orders / Transactions -->
+            <!-- Transactions -->
             <button
               @click="openTransactions"
               title="View today's transactions"
               class="h-22 rounded-2xl p-2.5 flex flex-col items-center justify-center gap-1.5 transition-all text-center select-none bg-[#FAF8F5] text-[#4A3830] hover:bg-[#F5EFE6] border border-[#EFECE6] hover:border-[#7B5A50]/40 shadow-xs active:scale-95"
             >
-              <Icon name="heroicons:shopping-bag" class="w-5 h-5 text-[#7B5A50]" />
-              <span class="text-xs font-bold">Orders</span>
+              <Icon name="heroicons:document-text" class="w-5 h-5 text-[#7B5A50]" />
+              <span class="text-xs font-bold">Transactions</span>
             </button>
 
             <!-- Refresh Menu -->
@@ -1220,33 +1255,20 @@ function formatCurrency(amount: number) {
             </button>
           </div>
 
-          <!-- Promo / Voucher Card (Positioned at bottom foot, compact width) -->
-          <div class="mt-auto mb-1 relative overflow-hidden rounded-2xl p-3 bg-[#FAF8F5] border border-[#EAE3D9] shadow-xs w-full max-w-[230px] mx-auto">
-            <!-- Warm yellow gradient glow in bottom corner -->
-            <div class="absolute -bottom-8 -right-8 w-28 h-28 bg-gradient-to-tr from-amber-300/40 via-yellow-200/30 to-transparent rounded-full blur-2xl pointer-events-none"></div>
+          <!-- Perforated Divider -->
+          <div class="border-b border-dashed border-[#E8E2D8] my-0.5 shrink-0"></div>
 
-            <div class="relative z-10 space-y-2">
-              <p class="font-bold text-[11px] text-[#2D201B] leading-snug">
-                Don't forget<br />
-                to enter your promo code<br />
-                for a special discount<br />
-                on your purchase!
-              </p>
-
-              <!-- Pill Input with Gift Box Icon -->
-              <div class="relative">
-                <input 
-                  v-model="promoCodeInput"
-                  @input="onPromoInput"
-                  type="text" 
-                  placeholder="Enter" 
-                  class="w-full bg-white border border-[#E8E2D8] rounded-full pl-3 pr-8 h-8 text-[11px] font-semibold text-[#2D201B] placeholder:text-gray-400 focus:outline-none focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] transition-all"
-                />
-                <div class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-[#7B5A50] pointer-events-none">
-                  <Icon name="heroicons:gift" class="w-3.5 h-3.5" />
-                </div>
-              </div>
-            </div>
+          <!-- Cashier Info & Shift Details Card (Below navbar tiles) -->
+          <div class="mt-auto shrink-0 pt-0.5">
+            <PosCashierInfoCard
+              :cashier="currentCashier"
+              :device-name="device?.name || 'Register 1'"
+              :branch-name="device?.branch_name || ''"
+              :cafe-name="device?.cafe_name || 'BrewSpot'"
+              :today-orders-count="shiftStats.todayCount"
+              :today-total-amount="shiftStats.todayTotal"
+              @open-transactions="openTransactions"
+            />
           </div>
         </aside>
 

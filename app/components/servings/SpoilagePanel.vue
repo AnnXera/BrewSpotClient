@@ -49,7 +49,7 @@ function time(iso: string) {
           v-if="!e.voided_at"
           type="button"
           :disabled="voidingUuid === e.uuid"
-          class="shrink-0 min-h-11 rounded-[10px] px-3 text-[13px] font-semibold text-[#9E4F47] border border-[#DED4CA] hover:bg-[#F1E9DE] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9E4F47] transition-colors"
+          class="shrink-0 min-h-11 rounded-[10px] px-3 text-[13px] font-semibold text-[#9E4F47] border border-[#DED4CA] hover:bg-[#F1E9DE] active:scale-[0.97] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9E4F47] transition-all cursor-pointer"
           :aria-label="`Void ${e.quantity} spoiled ${spoilageItemLabel(e)}`"
           @click="emit('void', e)"
         >

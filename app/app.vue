@@ -1,3 +1,4 @@
 <template>
   <NuxtPage />
+  <CommonFirstTimeWalkthrough />
 </template>

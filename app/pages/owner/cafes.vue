@@ -212,11 +212,18 @@ function viewDetails(uuid: string) {
           <p class="text-xs sm:text-sm text-[#9E7060] mt-1 font-medium">Manage your branches and the opening hours they share.</p>
         </div>
 
-        <CafeManagementOperatingHoursPanel class="shrink-0" @edit="isOperatingHoursOpen = true" />
+        <CafeManagementOperatingHoursPanel
+          data-walkthrough="cafe-hours-btn"
+          class="shrink-0"
+          @edit="isOperatingHoursOpen = true"
+        />
       </header>
 
       <!-- 4 Metric Summary Cards -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div
+        data-walkthrough="cafe-kpis"
+        class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
+      >
         <div class="bg-white border border-[#F3E7D2] rounded-[20px] p-6 shadow-sm space-y-2 hover:border-[#7D5A50] transition-colors">
           <p class="text-[11px] font-bold text-[#9E7060] uppercase tracking-wider">Total Branches</p>
           <p class="text-3xl font-extrabold text-[#3D2B24]">{{ totalBranchesCount }}</p>
@@ -243,6 +250,7 @@ function viewDetails(uuid: string) {
       <div :class="['bg-white border border-[#EEDFC4] shadow-sm flex flex-col', branches.length > 0 ? 'rounded-t-[24px] border-b-0' : 'rounded-[24px]']">
         <!-- Filter Bar -->
         <CafeManagementCafeFilterBar
+          data-walkthrough="cafe-filter-bar"
           class="sticky top-0 z-20 bg-white rounded-t-[24px]"
           v-model:search="search"
           v-model:status="status"

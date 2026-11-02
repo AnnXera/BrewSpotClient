@@ -71,15 +71,17 @@ function formatDate(iso: string | null) {
           {{ devices.length }} {{ devices.length === 1 ? 'register' : 'registers' }}<template v-if="inUseCount"> · {{ inUseCount }} in use</template>
         </span>
       </div>
-      <button
-        v-if="!loading && !planLocked"
-        type="button"
-        class="inline-flex items-center gap-1.5 rounded-lg text-[13px] font-semibold text-[#7D5A50] hover:text-[#3D2B24] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
-        @click="load"
-      >
-        <Icon name="heroicons:arrow-path-20-solid" class="w-4 h-4" aria-hidden="true" />
-        Refresh
-      </button>
+      <div v-if="!loading && !planLocked" class="flex items-center gap-2">
+        <CommonA2HSButton variant="card" label="Install POS App" />
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg text-[13px] font-semibold text-[#7D5A50] hover:text-[#3D2B24] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+          @click="load"
+        >
+          <Icon name="heroicons:arrow-path-20-solid" class="w-4 h-4" aria-hidden="true" />
+          Refresh
+        </button>
+      </div>
     </div>
 
     <!-- Loading -->
