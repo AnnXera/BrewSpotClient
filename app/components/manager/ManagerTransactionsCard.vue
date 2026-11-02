@@ -148,7 +148,11 @@ function paymentIcon(method: string) {
 </script>
 
 <template>
-  <section class="flex flex-col gap-4 rounded-[22px] border border-[#EEDFC4] bg-white p-5 shadow-[0_1px_2px_rgba(59,31,14,0.04)] sm:p-6" aria-labelledby="transactions-heading">
+  <section
+    data-walkthrough="feat-transactions"
+    class="flex flex-col gap-4 rounded-[22px] border border-[#EEDFC4] bg-white p-5 shadow-[0_1px_2px_rgba(59,31,14,0.04)] sm:p-6"
+    aria-labelledby="transactions-heading"
+  >
     <!-- Header -->
     <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>

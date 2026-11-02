@@ -6,7 +6,6 @@ import OwnerBranchBreakdown from '~/components/dashboard/OwnerBranchBreakdown.vu
 import OwnerTrendingItems from '~/components/dashboard/OwnerTrendingItems.vue'
 import OwnerTopCategories from '~/components/dashboard/OwnerTopCategories.vue'
 import TransactionLog from '~/components/analytics/TransactionLog.vue'
-import OwnerWelcomeModal from '~/components/dashboard/OwnerWelcomeModal.vue'
 import type { DashboardRange, OwnerDashboardStats } from '~/services/OwnerProfileService'
 import { formatSpan } from '~/utils/dashboardFormat'
 
@@ -99,21 +98,6 @@ const logFilters = computed(() => {
   return { from, to: to > today ? today : to }
 })
 
-// ── First-login welcome ──
-const authStore = useAuthStore()
-const showWelcome = ref(!!authStore.user?.welcome_pending)
-
-async function closeWelcome(to?: string) {
-  showWelcome.value = false
-  authStore.markWelcomed()
-  try {
-    await ownerProfileService.dismissWelcome()
-  } catch (err) {
-    console.warn('Welcome dismiss error:', err)
-  }
-  if (to) router.push(to)
-}
-
 const span = computed(() => (stats.value ? formatSpan(stats.value.period.from, stats.value.period.to) : ''))
 const updatedAt = computed(() =>
   stats.value ? new Date(stats.value.generated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '',
@@ -161,7 +145,7 @@ const updatedAt = computed(() =>
             :class="{ 'opacity-65 pointer-events-none': refreshing }"
           >
             <!-- 1. Owner Totals Banner -->
-            <div class="scroll-reveal">
+            <div class="scroll-reveal" data-walkthrough="feat-totals">
               <OwnerTotals :totals="stats?.totals ?? null" :loading="loading" />
             </div>
 
@@ -169,6 +153,7 @@ const updatedAt = computed(() =>
             <div class="scroll-reveal grid grid-cols-1 gap-6 lg:grid-cols-12">
               <OwnerIncomeChart
                 v-model:range="range"
+                data-walkthrough="feat-chart"
                 class="lg:col-span-12 xl:col-span-8"
                 :period="stats?.period ?? null"
                 :series="stats?.series ?? []"
@@ -199,7 +184,7 @@ const updatedAt = computed(() =>
             </div>
 
             <!-- 4. Transaction Log -->
-            <div v-if="logFilters" class="scroll-reveal">
+            <div v-if="logFilters" class="scroll-reveal" data-walkthrough="feat-transactions">
               <TransactionLog
                 :filters="logFilters"
                 :branches="logBranches"
@@ -210,8 +195,6 @@ const updatedAt = computed(() =>
         </template>
       </div>
     </main>
-
-    <OwnerWelcomeModal :open="showWelcome" :firstname="authStore.user?.firstname" @close="closeWelcome" />
   </div>
 </template>
 

@@ -8,8 +8,12 @@ import LegalPolicyModal, { type PolicyTab } from '~/components/common/LegalPolic
 
 // Auth state check
 const authStore = useAuthStore()
+const authTokenCookie = useCookie<string | null>('auth_token')
 const userRoleCookie = useCookie<string | null>('user_role')
-const role = computed(() => authStore.role || userRoleCookie.value)
+
+// Only authenticated if a valid auth_token cookie actually exists
+const isAuthenticated = computed(() => !!authTokenCookie.value && !!(authStore.role || userRoleCookie.value))
+const role = computed(() => isAuthenticated.value ? (authStore.role || userRoleCookie.value) : null)
 
 // Legal Policy Modal state
 const isPolicyModalOpen = ref(false)
@@ -22,9 +26,9 @@ function openPolicy(tab: PolicyTab) {
 
 // Enable smooth scrolling for anchor links & set page metadata
 useHead({
-  title: 'BrewSpot - Next-Gen Coffee Shop & Cafe Operating System',
+  title: 'BrewSpot - Modern Coffee Shop OS & Barista POS Platform',
   meta: [
-    { name: 'description', content: 'Streamline your cafe operations with BrewSpot: Barista POS, table management, live analytics, and inventory control built for specialty coffee shops.' },
+    { name: 'description', content: 'All-in-one coffee shop operating system: Touchscreen Barista POS, interactive drag-and-drop floor plan designer, automated recipe inventory, cashier shift balancing, and multi-branch analytics.' },
     { name: 'viewport', content: 'width=device-width, initial-scale=1, maximum-scale=5' },
     { name: 'theme-color', content: '#7D5A50' },
   ],
@@ -50,6 +54,9 @@ function checkHash() {
 }
 
 onMounted(() => {
+  if (!authTokenCookie.value) {
+    authStore.clear()
+  }
   window.addEventListener('scroll', handleScroll, { passive: true })
   window.addEventListener('hashchange', checkHash)
   handleScroll()
@@ -86,7 +93,7 @@ function goRegister() {
 }
 
 function goDashboard() {
-  if (role.value) {
+  if (isAuthenticated.value && role.value) {
     navigateTo(getRedirectForRole(role.value))
   } else {
     navigateTo('/login')
@@ -97,33 +104,33 @@ function goDashboard() {
 const features = [
   {
     icon: 'heroicons:shopping-bag',
-    title: 'Smart Barista POS',
-    description: 'Speed up rush-hour order entry with custom milk alternatives, syrup modifiers, and extra espresso shot presets built for high-volume cafes.'
+    title: 'Touchscreen Barista POS & Shift Audits',
+    description: 'Rapid rush-hour order taking with custom milk alternatives, syrup modifiers, extra espresso shots, multi-channel payments (Cash, E-Wallet, Card), and automated cash drawer shift balancing.'
   },
   {
     icon: 'heroicons:calendar-days',
-    title: 'Interactive Table & Floor Map',
-    description: 'Manage walk-ins and advance table bookings on a real-time digital floor map to maximize seating capacity and eliminate guest wait times.'
+    title: 'Visual Floor Plan & Table Management',
+    description: 'Design custom seating layouts with drag-and-drop tables, chairs, walls, pan/zoom navigation, grid snapping, and live occupancy tracking (Available, Occupied, Reserved, Cleaning).'
   },
   {
     icon: 'heroicons:chart-bar',
-    title: 'Real-Time Revenue Analytics',
-    description: 'Track peak hourly sales, daily espresso cup counts, popular brew blends, and barista efficiency from your centralized owner dashboard.'
+    title: 'Multi-Branch & Centralized Analytics',
+    description: 'Consolidate daily gross revenue, peak hourly sales curves, top-performing brew blends, and employee shift logs across one or multiple cafe branches from your central owner portal.'
   },
   {
     icon: 'heroicons:cube',
-    title: 'Recipe & Inventory Automation',
-    description: 'Automatically track espresso beans, milk, and syrup consumption per transaction, flagging low-stock items before they run out.'
+    title: 'Automated Ingredient & Stock Tracking',
+    description: 'Automatically deduct espresso beans, milk, syrups, and packaging per transaction. Receive instant low-stock threshold alerts before running out of essential barista supplies.'
   },
   {
     icon: 'heroicons:building-storefront',
-    title: 'Multi-Location Management',
-    description: 'Seamlessly scale from a single boutique coffee bar to a multi-city chain of roasteries with centralized multi-branch control.'
+    title: 'Dynamic Menu & Recipe Modifiers',
+    description: 'Easily manage hot and iced coffee categories, cup sizes, pastry stocks, recipe ingredient formulas, and real-time item availability toggles across POS terminals.'
   },
   {
     icon: 'heroicons:user-group',
-    title: 'Role-Based Staff Access',
-    description: 'Assign tailored access permissions for cashiers, baristas, and managers to keep sensitive financial and store data completely secure.'
+    title: 'Role-Based Access & Staff Walkthroughs',
+    description: 'Tailored permissions for Super Admin, Cafe Owners, Store Managers, and Cashiers, complete with interactive onboarding tours and mission checklists.'
   }
 ]
 
@@ -131,20 +138,20 @@ const features = [
 const steps = [
   {
     number: '01',
-    title: 'Create Your Account',
-    description: 'Register your coffee shop details and business credentials in under 3 minutes.',
+    title: 'Register & Verify Your Cafe',
+    description: 'Create your business profile, submit store credentials for quick approval, and access your secure owner dashboard.',
     icon: 'heroicons:user-plus'
   },
   {
     number: '02',
-    title: 'Configure Menu & Tables',
-    description: 'Set up your drink menu, pricing options, table layout, and invite your barista team.',
+    title: 'Design Floor Plan & Configure Menu',
+    description: 'Build your table layout with the visual editor, configure beverage categories, recipe modifiers, and assign store staff.',
     icon: 'heroicons:cog-6-tooth'
   },
   {
     number: '03',
-    title: 'Serve & Multiply Sales',
-    description: 'Start processing orders with ease while monitoring live analytics from anywhere.',
+    title: 'Launch POS & Track Real-Time Sales',
+    description: 'Install the POS app directly to desktop or tablet, process counter orders with ease, balance cash drawers, and monitor live revenues.',
     icon: 'heroicons:sparkles'
   }
 ]
@@ -152,21 +159,21 @@ const steps = [
 // Testimonials data
 const testimonials = [
   {
-    quote: "BrewSpot transformed our morning rush! Orders flow seamlessly from POS to the barista station, cutting order times by half.",
+    quote: "The drag-and-drop floor plan designer and instant POS ticket queue cut our morning table turnover and order fulfillment times in half.",
     author: "Elena Rostova",
     role: "Owner, Velvet Roast Cafe",
     rating: 5,
     avatarBg: "bg-[#7D5A50]"
   },
   {
-    quote: "The table reservation system and real-time inventory alerts saved us hundreds of dollars in wasted milk and beans every month.",
+    quote: "Cashier shift balancing and automated recipe ingredient deduction stopped end-of-day discrepancy headaches completely.",
     author: "Marcus Vance",
     role: "Head Roaster, Artisan Brew Co.",
     rating: 5,
     avatarBg: "bg-[#B4846C]"
   },
   {
-    quote: "Managing 3 cafe locations used to be overwhelming. BrewSpot's centralized dashboard lets me view total sales in real time.",
+    quote: "Overseeing 3 branches with BrewSpot's centralized owner analytics and guided staff walkthrough made multi-location scaling simple.",
     author: "Sophia Lin",
     role: "Operations Director, Daily Grind Labs",
     rating: 5,
@@ -177,36 +184,36 @@ const testimonials = [
 // FAQ Items (Comprehensive including Refund, Cookie, Privacy & Terms)
 const faqs = [
   {
-    question: "How fast can I set up my coffee shop on BrewSpot?",
-    answer: "You can create your account and have your initial menu and tables configured in less than 5 minutes. Our step-by-step registration wizard guides you effortlessly through the process."
+    question: "How does BrewSpot streamline daily coffee shop operations?",
+    answer: "BrewSpot provides an end-to-end operating system combining a dedicated Barista POS, cashier cash drawer shift tracking, an interactive visual floor plan editor with live table occupancy, recipe-level inventory tracking, and centralized multi-branch revenue analytics."
   },
   {
-    question: "What is BrewSpot's refund policy for subscription plans?",
-    answer: "BrewSpot offers an unconditional 14-day 100% money-back guarantee for all new cafe subscriptions. If BrewSpot doesn't fit your cafe's daily operations, simply request a refund within 14 days for a full reversal. Furthermore, subscriptions can be cancelled anytime with zero lock-in contracts or penalty fees."
+    question: "Can the Barista POS be installed as a standalone desktop app?",
+    answer: "Yes! BrewSpot's Barista POS is built as a Progressive Web App (PWA). You can install it directly to your Windows desktop, Mac, or tablet with one click for a dedicated, full-screen touch terminal experience."
   },
   {
-    question: "How does BrewSpot use cookies and local browser storage?",
-    answer: "We use essential cookies strictly to maintain secure POS cashier logins, authenticate station sessions, verify CSRF security tokens, and cache branch selections for offline-resilient operation. BrewSpot contains zero advertising tracker scripts and never sells your operational data."
+    question: "How does the interactive floor plan designer work?",
+    answer: "Store managers can visually design their cafe layout using drag-and-drop tables, chairs, counters, and walls with snap-to-grid alignment. Cashiers can then assign orders to specific tables directly from the POS while monitoring live statuses: Available, Occupied, Reserved, or Cleaning."
   },
   {
-    question: "How do cafe staff process customer refunds or canceled table bookings?",
-    answer: "Store managers and cashiers can issue order voids, process full or partial item refunds, and manage reservation cancellation deposit credits directly through the Barista POS terminal and reservations manager, generating a transparent audit log for the cafe owner."
+    question: "What staff roles does BrewSpot support?",
+    answer: "BrewSpot provides distinct role-based experiences: Super Admin for system oversight and owner verification, Cafe Owners for business financials and branch scaling, Store Managers for floor plans, menu configuration, and inventory, and Cashiers/Baristas for high-speed POS order taking and drawer audits."
   },
   {
-    question: "Is BrewSpot designed specifically for coffee shops and cafes?",
-    answer: "Yes! BrewSpot is custom-engineered for cafes, coffee roasters, espresso bars, and bakeries. It supports customizable coffee modifiers (milk alternatives, extra shots, temperature, sweetness levels) and table management out of the box."
+    question: "How does cashier shift balancing and drawer reconciliation work?",
+    answer: "Cashiers clock in with an opening cash float. Throughout the shift, the system tracks cash, card, and digital wallet transactions. At shift end, the cashier inputs actual cash counted to automatically calculate expected totals, overages, or shortages, storing an audit log for store managers."
   },
   {
-    question: "How is our cafe's sensitive financial and recipe data protected?",
-    answer: "All store records—including custom beverage formulas, ingredient inventory, cashier drawer logs, and gross revenues—are protected with AES-256 database encryption at rest and TLS 1.3 in transit, fully compliant with Republic Act 10173 (Philippine Data Privacy Act)."
+    question: "What happens if a user forgets their password?",
+    answer: "BrewSpot features an automated self-service password recovery flow that sends secure, temporary reset links directly to the user's verified Gmail address, ensuring quick and secure account recovery anytime."
   },
   {
-    question: "Can I manage multiple cafe branches from one account?",
-    answer: "Absolutely. BrewSpot supports multi-branch operations, allowing owners and management teams to view consolidated or branch-specific sales analytics, employee schedules, and inventory levels."
+    question: "How are cafe recipes, inventory, and financial records protected?",
+    answer: "All store records—custom beverage formulas, ingredient stock levels, cashier drawer audits, and revenue reports—are encrypted at rest and transmitted over secure TLS 1.3 channels, adhering to enterprise security standards and the Philippine Data Privacy Act (RA 10173)."
   },
   {
-    question: "Are there long-term contracts or proprietary hardware requirements?",
-    answer: "No long-term contracts. BrewSpot operates on flexible monthly and annual SaaS plans that you can cancel or adjust anytime. The system runs seamlessly on standard web browsers, iPads, Android tablets, and PC touchscreens without requiring proprietary hardware."
+    question: "Can I manage multiple cafe locations from a single account?",
+    answer: "Yes. BrewSpot is built for multi-branch operations. Owners can monitor consolidated gross sales, compare individual branch performance, manage staff assignments, and scale from a single espresso bar to multiple roasteries seamlessly."
   }
 ]
 
@@ -269,7 +276,7 @@ onUnmounted(() => {
 
         <!-- Desktop Action Buttons -->
         <div class="hidden md:flex items-center gap-3 shrink-0">
-          <template v-if="role">
+          <template v-if="isAuthenticated && role">
             <button
               @click="goDashboard"
               class="h-10 px-5 rounded-xl bg-[#FFF8EA] text-[#7D5A50] font-bold text-sm hover:bg-[#FCDEC0] transition flex items-center justify-center gap-2 shadow-md cursor-pointer"
@@ -325,7 +332,7 @@ onUnmounted(() => {
             <a href="#faq" @click="isMobileMenuOpen = false" class="py-2.5 px-3 rounded-lg hover:bg-[#7D5A50] transition">FAQ</a>
           </nav>
           <div class="pt-3 border-t border-[#FFF8EA]/20 flex flex-col gap-2.5 sm:gap-3">
-            <template v-if="role">
+            <template v-if="isAuthenticated && role">
               <button
                 @click="goDashboard(); isMobileMenuOpen = false"
                 class="w-full h-11 px-5 rounded-xl bg-[#FFF8EA] text-[#7D5A50] font-bold text-sm hover:bg-[#FCDEC0] transition flex items-center justify-center gap-2 cursor-pointer shadow-md"
@@ -372,18 +379,18 @@ onUnmounted(() => {
           <!-- Top Badge Pill -->
           <div class="inline-flex items-center gap-2 sm:gap-3 px-3.5 py-1.5 sm:px-5 sm:py-2.5 rounded-full bg-[#FCDEC0]/20 border border-[#FCDEC0]/40 text-[#FCDEC0] text-xs sm:text-sm font-semibold tracking-wide backdrop-blur-md shadow-xl text-center max-w-full">
             <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#E5B299] animate-pulse shrink-0"></span>
-            <span class="truncate sm:whitespace-normal">Next-Gen Coffee Shop & Cafe Operating System</span>
+            <span class="truncate sm:whitespace-normal">Complete Coffee Shop & Cafe Operating System</span>
           </div>
 
           <!-- Main Hero Headline -->
           <h1 class="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.18] sm:leading-[1.15] text-center">
             Every Great Cup Starts With <br class="hidden sm:inline" />
-            <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#FCDEC0] via-[#E5B299] to-[#B4846C]">Smart Management</span>
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#FCDEC0] via-[#E5B299] to-[#B4846C]">Intelligent Management</span>
           </h1>
 
           <!-- Subtitle -->
           <p class="text-sm sm:text-base lg:text-xl text-[#FFF8EA]/95 leading-relaxed font-normal max-w-2xl text-center mx-auto px-2">
-            Unify your barista POS, table reservations, bean inventory, and live revenue analytics into one effortless coffee shop platform.
+            Unify your touchscreen Barista POS, interactive table floor plans, recipe inventory, cashier shift balancing, and multi-branch analytics into one seamless coffee shop platform.
           </p>
 
           <!-- Call to Action Buttons -->
@@ -401,15 +408,15 @@ onUnmounted(() => {
           <div class="pt-4 sm:pt-6 flex flex-wrap items-center justify-center gap-3 sm:gap-6 lg:gap-8 text-xs sm:text-sm text-[#FCDEC0] font-medium text-center">
             <span class="flex items-center gap-1.5 sm:gap-2">
               <Icon name="heroicons:check-circle" class="w-4 h-4 sm:w-5 sm:h-5 text-[#E5B299] shrink-0" />
-              <span>Free Registration</span>
+              <span>Fast Business Verification</span>
             </span>
             <span class="flex items-center gap-1.5 sm:gap-2">
               <Icon name="heroicons:check-circle" class="w-4 h-4 sm:w-5 sm:h-5 text-[#E5B299] shrink-0" />
-              <span>Fast 3-Min Setup</span>
+              <span>PWA Desktop & Tablet Ready</span>
             </span>
             <span class="flex items-center gap-1.5 sm:gap-2">
               <Icon name="heroicons:check-circle" class="w-4 h-4 sm:w-5 sm:h-5 text-[#E5B299] shrink-0" />
-              <span>Multi-Branch Support</span>
+              <span>Multi-Branch & Shift Audits</span>
             </span>
           </div>
         </div>
@@ -426,15 +433,15 @@ onUnmounted(() => {
           </div>
           <div class="text-center space-y-1">
             <p class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#FCDEC0]">1.5M+</p>
-            <p class="text-[11px] sm:text-xs lg:text-sm text-[#FFF8EA]/85 font-medium leading-tight">Espresso Cups Served</p>
+            <p class="text-[11px] sm:text-xs lg:text-sm text-[#FFF8EA]/85 font-medium leading-tight">Orders & Espresso Cups Served</p>
           </div>
           <div class="text-center space-y-1">
-            <p class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#FCDEC0]">99.9%</p>
-            <p class="text-[11px] sm:text-xs lg:text-sm text-[#FFF8EA]/85 font-medium leading-tight">System Uptime Guarantee</p>
+            <p class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#FCDEC0]">100%</p>
+            <p class="text-[11px] sm:text-xs lg:text-sm text-[#FFF8EA]/85 font-medium leading-tight">Cashier Shift & Drawer Balancing</p>
           </div>
           <div class="text-center space-y-1">
             <p class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#FCDEC0]">4.9 / 5</p>
-            <p class="text-[11px] sm:text-xs lg:text-sm text-[#FFF8EA]/85 font-medium leading-tight">Cafe Owner Rating</p>
+            <p class="text-[11px] sm:text-xs lg:text-sm text-[#FFF8EA]/85 font-medium leading-tight">Specialty Cafe Owner Rating</p>
           </div>
         </div>
       </div>
@@ -444,9 +451,9 @@ onUnmounted(() => {
     <section id="demo" class="py-16 sm:py-20 lg:py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden reveal-on-scroll">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full space-y-8 sm:space-y-10">
         <div class="text-center max-w-2xl mx-auto space-y-2.5 sm:space-y-3">
-          <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-[#E5B299]">Interactive Suite</span>
+          <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-[#E5B299]">Live Operations Suite</span>
           <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#2D201B]">Experience BrewSpot Live</h2>
-          <p class="text-xs sm:text-sm md:text-base text-[#7D5A50]">Explore the exact management portal used by top coffee shop owners and administrators.</p>
+          <p class="text-xs sm:text-sm md:text-base text-[#7D5A50]">Explore the real management portals used by coffee shop owners, store managers, and system administrators.</p>
         </div>
 
         <!-- Window Mockup Container -->
@@ -459,7 +466,7 @@ onUnmounted(() => {
                 <span class="w-3 h-3 rounded-full bg-[#FCDEC0] inline-block"></span>
                 <span class="w-3 h-3 rounded-full bg-[#B4846C] inline-block"></span>
               </div>
-              <span class="text-xs font-semibold text-[#FCDEC0] tracking-wide ml-2">BrewSpot Admin Portal</span>
+              <span class="text-xs font-semibold text-[#FCDEC0] tracking-wide ml-2">BrewSpot Operations Portal</span>
             </div>
 
             <!-- Dashboard Navigation Tabs with Smooth Horizontal Scroll -->
@@ -469,7 +476,7 @@ onUnmounted(() => {
                 :class="[activeTab === 'sales' ? 'bg-[#B4846C] text-white font-semibold shadow' : 'text-[#FCDEC0] hover:text-white', 'px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs transition-colors flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink-0 cursor-pointer']"
               >
                 <Icon name="heroicons:squares-2x2" class="w-4 h-4 shrink-0" />
-                <span>POS & Live Sales</span>
+                <span>POS & Shift Register</span>
               </button>
 
               <button
@@ -505,8 +512,8 @@ onUnmounted(() => {
             <div v-if="activeTab === 'sales'" class="space-y-6">
               <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#FCDEC0] pb-4">
                 <div>
-                  <h3 class="text-lg sm:text-xl font-bold text-[#2D201B]">Live Barista Queue & POS Register</h3>
-                  <p class="text-xs text-[#7D5A50] mt-0.5">Real-time order processing, barista station queue, and daily revenue counters.</p>
+                  <h3 class="text-lg sm:text-xl font-bold text-[#2D201B]">Live Barista Queue & POS Shift Register</h3>
+                  <p class="text-xs text-[#7D5A50] mt-0.5">Real-time order ticket queue, table occupancy assignment, coffee modifier options, and shift drawer balance.</p>
                 </div>
                 <span class="self-start sm:self-auto px-3.5 py-1.5 bg-[#E5B299]/30 text-[#7D5A50] text-xs font-semibold rounded-full flex items-center gap-2 border border-[#E5B299] shrink-0">
                   <span class="w-2.5 h-2.5 rounded-full bg-[#7D5A50] animate-pulse"></span> Live Sync Active
@@ -764,9 +771,9 @@ onUnmounted(() => {
     <section id="features" class="py-16 sm:py-20 lg:py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden reveal-on-scroll">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full space-y-10 sm:space-y-12">
         <div class="text-center max-w-2xl mx-auto space-y-2.5 sm:space-y-3">
-          <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-[#E5B299]">Owner Platform Features</span>
-          <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#2D201B]">Everything Your Café Needs to Succeed</h2>
-          <p class="text-xs sm:text-sm md:text-base text-[#7D5A50]">Powerful tools built specifically for coffee shop owners to streamline daily operations, seat guests faster, and scale profitability.</p>
+          <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-[#E5B299]">Owner & Manager Platform Features</span>
+          <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#2D201B]">Everything Your Coffee Business Needs to Scale</h2>
+          <p class="text-xs sm:text-sm md:text-base text-[#7D5A50]">From rush-hour counter sales and custom table layouts to ingredient tracking, cashier shift balancing, and multi-branch control.</p>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
@@ -791,9 +798,9 @@ onUnmounted(() => {
     <section id="how-it-works" class="py-16 sm:py-20 lg:py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden reveal-on-scroll">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full space-y-10 sm:space-y-12">
         <div class="text-center max-w-2xl mx-auto space-y-2.5 sm:space-y-3">
-          <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-[#E5B299]">Streamlined Onboarding</span>
-          <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#2D201B]">Get Started in 3 Simple Steps</h2>
-          <p class="text-xs sm:text-sm md:text-base text-[#7D5A50]">Launch your cafe operations effortlessly without expensive proprietary hardware.</p>
+          <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-[#E5B299]">Streamlined 3-Step Onboarding</span>
+          <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#2D201B]">From Signup to Serving in Minutes</h2>
+          <p class="text-xs sm:text-sm md:text-base text-[#7D5A50]">Launch your cafe operations with ease on your existing tablets, laptops, and touchscreens—no proprietary hardware required.</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
@@ -829,9 +836,9 @@ onUnmounted(() => {
     <section id="testimonials" class="py-16 sm:py-20 lg:py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden reveal-on-scroll">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full space-y-10 sm:space-y-12">
         <div class="text-center max-w-2xl mx-auto space-y-2.5 sm:space-y-3">
-          <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-[#E5B299]">Trusted Leaders</span>
-          <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#2D201B]">What Cafe Owners Say</h2>
-          <p class="text-xs sm:text-sm md:text-base text-[#7D5A50]">Hear directly from specialty roasters and cafe operators using BrewSpot daily.</p>
+          <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-[#E5B299]">Trusted by Specialty Cafes</span>
+          <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#2D201B]">What Cafe Owners & Roasters Say</h2>
+          <p class="text-xs sm:text-sm md:text-base text-[#7D5A50]">Hear directly from specialty coffee founders, head roasters, and managers operating with BrewSpot daily.</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
@@ -865,10 +872,10 @@ onUnmounted(() => {
     <section id="faq" class="py-16 sm:py-20 lg:py-24 flex flex-col justify-center bg-[#FFF8EA] text-[#2D201B] border-b border-[#E5B299]/50 relative overflow-hidden reveal-on-scroll">
       <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 w-full space-y-8 sm:space-y-10">
         <div class="text-center max-w-2xl mx-auto space-y-3">
-          <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-[#E5B299]">Clear Answers & Policies</span>
+          <span class="text-xs font-bold uppercase tracking-wider text-[#7D5A50] bg-[#E5B299]/30 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-[#E5B299]">Platform Knowledge & Policies</span>
           <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#2D201B]">Frequently Asked Questions</h2>
           <p class="text-xs sm:text-sm text-[#7D5A50]">
-            Everything you need to know about our cafe operating system, data security, refunds, and cookies.
+            Everything you need to know about our cafe operating system, touchscreen POS, shift balancing, data privacy, and policies.
           </p>
 
           <!-- Quick Policy Direct Access Pills -->
@@ -950,8 +957,8 @@ onUnmounted(() => {
           <div class="absolute -bottom-12 -left-12 w-64 h-64 bg-[#FCDEC0]/20 rounded-full blur-3xl pointer-events-none"></div>
 
           <div class="max-w-2xl mx-auto space-y-2.5 sm:space-y-3 relative z-10">
-            <h2 class="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight">Ready to Transform Your Coffee Shop?</h2>
-            <p class="text-sm sm:text-base lg:text-lg text-[#FFF8EA]/90 font-normal">Join hundreds of successful cafes using BrewSpot to boost daily orders, seat guests faster, and increase profitability.</p>
+            <h2 class="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight">Ready to Elevate Your Coffee Shop Operations?</h2>
+            <p class="text-sm sm:text-base lg:text-lg text-[#FFF8EA]/90 font-normal">Join top specialty cafes and roasteries using BrewSpot to streamline barista workflows, maximize table turnover, and scale multi-branch revenue.</p>
           </div>
 
           <div class="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 relative z-10">
@@ -1052,8 +1059,8 @@ onUnmounted(() => {
                 <Icon name="heroicons:chat-bubble-left-ellipsis-solid" class="w-6 h-6" />
               </div>
               <div class="min-w-0">
-                <h3 class="font-bold text-sm truncate">BrewSpot Support</h3>
-                <p class="text-xs text-[#FFF8EA]/80 truncate">We typically reply in minutes</p>
+                <h3 class="font-bold text-sm truncate">BrewSpot Operations Support</h3>
+                <p class="text-xs text-[#FFF8EA]/80 truncate">Online to assist cafe owners & managers</p>
               </div>
             </div>
             <button @click="isChatOpen = false" class="text-[#FFF8EA] hover:text-[#FCDEC0] transition cursor-pointer p-1">
@@ -1076,7 +1083,7 @@ onUnmounted(() => {
                 <textarea id="chat-message" rows="3" placeholder="How can we help?" class="w-full px-3 py-2 text-sm rounded-lg border border-[#E5B299] focus:ring-2 focus:ring-[#7D5A50] focus:border-transparent outline-none transition bg-white resize-none"></textarea>
               </div>
               <button type="submit" class="w-full h-10 rounded-lg bg-[#7D5A50] text-[#FFF8EA] font-bold text-sm hover:bg-[#65463D] transition shadow-md flex items-center justify-center gap-2 cursor-pointer">
-                <span>Send Message</span>
+                <span>Send Inquiry</span>
                 <Icon name="heroicons:paper-airplane" class="w-4 h-4 text-[#FCDEC0]" />
               </button>
             </form>

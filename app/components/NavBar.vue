@@ -3,6 +3,7 @@
 import logoFull from '~/assets/images/logo.svg'
 import logoIcon from '~/assets/images/logo-icon.svg'
 import { useNavCategories } from '~/composables/useNavCategories'
+import { useFirstTimeWalkthrough } from '~/composables/useFirstTimeWalkthrough'
 
 interface NavLink {
   label: string
@@ -29,6 +30,7 @@ const authStore = useAuthStore()
 const logout = useLogout()
 const { categories: navCategories, refresh: refreshNavCategories } = useNavCategories()
 const { refresh: refreshNotifications } = useNotifications()
+const { isEligible: isWalkthroughEligible, openGuide } = useFirstTimeWalkthrough()
 
 // Loaded here (not in the bell) so the desktop and mobile bells share one poll.
 useAutoRefresh(refreshNotifications)
@@ -132,6 +134,31 @@ async function handleLogout() {
   mobileOpen.value = false
   await logout()
 }
+
+function handleOpenTour() {
+  profileDropdownOpen.value = false
+  mobileOpen.value = false
+  openGuide('missions')
+}
+
+function handleOpenProfile() {
+  profileDropdownOpen.value = false
+  mobileOpen.value = false
+  navigateTo('/profile')
+}
+
+const userPhotoUrl = computed(() => (authStore.user as any)?.photo_url || null)
+
+onMounted(async () => {
+  if (authStore.isAuthenticated && !authStore.user?.photo_url) {
+    try {
+      const res = await useUserProfileService().getProfile()
+      if (res.success && res.user) {
+        authStore.updateUser(res.user)
+      }
+    } catch {}
+  }
+})
 
 // Close the mobile drawer whenever the route changes (link tap, back button, etc.)
 watch(() => route.path, () => {
@@ -256,26 +283,60 @@ function toggleDropdown(link: NavLink) {
 
     <!-- Profile (stays put at the bottom) -->
     <div ref="profileRef" class="relative shrink-0">
-      <!-- Dropdown -->
-      <div
-        v-if="profileDropdownOpen"
-        class="absolute bottom-[calc(100%+8px)] left-0 w-[200px] bg-[#FFFDF9] rounded-xl shadow-lg border border-[#EEDFC4] overflow-hidden py-1 z-50"
+      <!-- Dropdown (Emil Kowalski espresso & latte palette) -->
+      <Transition
+        enter-active-class="transition duration-200 cubic-bezier(0.16, 1, 0.3, 1)"
+        leave-active-class="transition duration-150 ease-in"
+        enter-from-class="opacity-0 translate-y-2 scale-95"
+        enter-to-class="opacity-100 translate-y-0 scale-100"
+        leave-from-class="opacity-100 translate-y-0 scale-100"
+        leave-to-class="opacity-0 translate-y-2 scale-95"
       >
-        <button
-          class="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FBF2E1] transition-colors text-left"
-          @click="handleLogout"
+        <div
+          v-if="profileDropdownOpen"
+          class="absolute bottom-[calc(100%+10px)] left-0 w-[210px] bg-[#3A2923]/98 backdrop-blur-md rounded-2xl shadow-[0_20px_45px_-10px_rgba(26,14,10,0.65),0_4px_16px_rgba(0,0,0,0.3)] border border-[#7D5A50]/60 ring-1 ring-white/10 p-1.5 space-y-1 z-50 select-none"
         >
-          <Icon name="heroicons:arrow-right-on-rectangle" class="w-5 h-5 text-[#D9534F] shrink-0" />
-          <span class="font-sans text-sm font-medium text-[#D9534F]">Logout</span>
-        </button>
-      </div>
+          <button
+            type="button"
+            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#7D5A50]/40 text-[#FFF8EA] hover:text-white transition-all duration-150 text-left active:scale-[0.98] cursor-pointer"
+            @click="handleOpenProfile"
+          >
+            <Icon name="heroicons:user-circle" class="w-5 h-5 text-[#FFF0D1] shrink-0" />
+            <span class="font-sans text-sm font-medium">Account Profile</span>
+          </button>
+          <button
+            v-if="isWalkthroughEligible"
+            type="button"
+            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#7D5A50]/40 text-[#FFF8EA] hover:text-white transition-all duration-150 text-left active:scale-[0.98] cursor-pointer"
+            @click="handleOpenTour"
+          >
+            <Icon name="heroicons:academic-cap" class="w-5 h-5 text-[#FFF0D1] shrink-0" />
+            <span class="font-sans text-sm font-medium">System Tour</span>
+          </button>
+          <div class="my-1 h-px bg-[#7D5A50]/40 mx-1" />
+          <button
+            type="button"
+            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-500/15 text-[#FF8A80] hover:text-[#FFAAA6] transition-all duration-150 text-left active:scale-[0.98] cursor-pointer"
+            @click="handleLogout"
+          >
+            <Icon name="heroicons:arrow-right-on-rectangle" class="w-5 h-5 text-[#FF8A80] shrink-0" />
+            <span class="font-sans text-sm font-medium">Logout</span>
+          </button>
+        </div>
+      </Transition>
 
       <button
         class="flex items-center w-full gap-3 text-left"
         @click="profileDropdownOpen = !profileDropdownOpen"
       >
-        <div class="w-12 h-12 rounded-full bg-[#3B1F0E] flex items-center justify-center shrink-0">
-          <span class="font-display font-semibold text-[#FFF0D1]" style="font-size: 19.69px">
+        <div class="w-12 h-12 rounded-full bg-[#3B1F0E] flex items-center justify-center shrink-0 overflow-hidden">
+          <img
+            v-if="userPhotoUrl"
+            :src="userPhotoUrl"
+            alt="Profile Photo"
+            class="w-full h-full object-cover"
+          />
+          <span v-else class="font-display font-semibold text-[#FFF0D1]" style="font-size: 19.69px">
             {{ initials }}
           </span>
         </div>
@@ -314,29 +375,63 @@ function toggleDropdown(link: NavLink) {
     <NotificationBell placement="topbar" />
     <div ref="mobileProfileRef" class="relative">
       <button type="button" class="flex items-center justify-center" @click="profileDropdownOpen = !profileDropdownOpen">
-        <div class="w-8 h-8 rounded-full bg-[#3B1F0E] flex items-center justify-center shrink-0">
-          <span class="font-display font-semibold text-[#FFF0D1] text-sm">
+        <div class="w-8 h-8 rounded-full bg-[#3B1F0E] flex items-center justify-center shrink-0 overflow-hidden">
+          <img
+            v-if="userPhotoUrl"
+            :src="userPhotoUrl"
+            alt="Profile Photo"
+            class="w-full h-full object-cover"
+          />
+          <span v-else class="font-display font-semibold text-[#FFF0D1] text-sm">
             {{ initials }}
           </span>
         </div>
       </button>
 
-      <div
-        v-if="profileDropdownOpen"
-        class="absolute top-[calc(100%+8px)] right-0 w-[200px] bg-[#FFFDF9] rounded-xl shadow-lg border border-[#EEDFC4] overflow-hidden py-1 z-50"
+      <Transition
+        enter-active-class="transition duration-200 cubic-bezier(0.16, 1, 0.3, 1)"
+        leave-active-class="transition duration-150 ease-in"
+        enter-from-class="opacity-0 -translate-y-2 scale-95"
+        enter-to-class="opacity-100 translate-y-0 scale-100"
+        leave-from-class="opacity-100 translate-y-0 scale-100"
+        leave-to-class="opacity-0 -translate-y-2 scale-95"
       >
-        <div class="px-4 py-3 border-b border-[#EEDFC4]">
-          <p class="font-display font-semibold text-sm text-[#3B1F0E] truncate">{{ displayName }}</p>
-          <p class="font-sans text-xs text-[#3B1F0E]/60 truncate">{{ displayRole }}</p>
-        </div>
-        <button
-          class="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FBF2E1] transition-colors text-left"
-          @click="handleLogout"
+        <div
+          v-if="profileDropdownOpen"
+          class="absolute top-[calc(100%+10px)] right-0 w-[210px] bg-[#3A2923]/98 backdrop-blur-md rounded-2xl shadow-[0_20px_45px_-10px_rgba(26,14,10,0.65),0_4px_16px_rgba(0,0,0,0.3)] border border-[#7D5A50]/60 ring-1 ring-white/10 p-1.5 space-y-1 z-50 select-none"
         >
-          <Icon name="heroicons:arrow-right-on-rectangle" class="w-5 h-5 text-[#D9534F] shrink-0" />
-          <span class="font-sans text-sm font-medium text-[#D9534F]">Logout</span>
-        </button>
-      </div>
+          <div class="px-3 py-2 border-b border-[#7D5A50]/40 mb-1">
+            <p class="font-display font-semibold text-sm text-[#FFF8EA] truncate">{{ displayName }}</p>
+            <p class="font-sans text-xs text-[#D8C7B8] truncate">{{ displayRole }}</p>
+          </div>
+          <button
+            type="button"
+            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#7D5A50]/40 text-[#FFF8EA] hover:text-white transition-all duration-150 text-left active:scale-[0.98] cursor-pointer"
+            @click="handleOpenProfile"
+          >
+            <Icon name="heroicons:user-circle" class="w-5 h-5 text-[#FFF0D1] shrink-0" />
+            <span class="font-sans text-sm font-medium">Account Profile</span>
+          </button>
+          <button
+            v-if="isWalkthroughEligible"
+            type="button"
+            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#7D5A50]/40 text-[#FFF8EA] hover:text-white transition-all duration-150 text-left active:scale-[0.98] cursor-pointer"
+            @click="handleOpenTour"
+          >
+            <Icon name="heroicons:academic-cap" class="w-5 h-5 text-[#FFF0D1] shrink-0" />
+            <span class="font-sans text-sm font-medium">System Tour</span>
+          </button>
+          <div class="my-1 h-px bg-[#7D5A50]/40 mx-1" />
+          <button
+            type="button"
+            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-500/15 text-[#FF8A80] hover:text-[#FFAAA6] transition-all duration-150 text-left active:scale-[0.98] cursor-pointer"
+            @click="handleLogout"
+          >
+            <Icon name="heroicons:arrow-right-on-rectangle" class="w-5 h-5 text-[#FF8A80] shrink-0" />
+            <span class="font-sans text-sm font-medium">Logout</span>
+          </button>
+        </div>
+      </Transition>
     </div>
     </div>
   </div>

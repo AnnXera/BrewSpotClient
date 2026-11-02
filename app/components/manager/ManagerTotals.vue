@@ -13,6 +13,7 @@ defineProps<{
 <template>
   <section
     aria-label="Branch totals"
+    data-walkthrough="feat-totals"
     class="totals relative overflow-hidden rounded-[22px] bg-[#3B1F0E] text-[#FFF0D1] shadow-[0_18px_40px_-24px_rgba(59,31,14,0.7)]"
   >
     <div class="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">

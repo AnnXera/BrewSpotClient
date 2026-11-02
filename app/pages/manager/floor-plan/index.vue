@@ -1035,6 +1035,7 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
           </button>
           <button
             type="button"
+            data-walkthrough="floorplan-save-btn"
             :class="[iconBtn, 'bg-[#3A2923] text-white hover:bg-[#2C1E19]']"
             :disabled="!dirty || saving"
             @click="saveLayout"
@@ -1057,7 +1058,10 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
 
       <div v-else-if="!planLocked && branchUuid" class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_270px] gap-5 items-start">
         <!-- Canvas card -->
-        <section class="bg-white border border-[#F4E6DE] rounded-2xl overflow-hidden min-w-0">
+        <section
+          data-walkthrough="floorplan-workspace"
+          class="bg-white border border-[#F4E6DE] rounded-2xl overflow-hidden min-w-0"
+        >
           <div class="flex flex-wrap items-center justify-between gap-2 px-[18px] py-3 border-b border-[#F4E6DE]">
             <div class="flex flex-wrap items-center gap-[6px]" :role="manyFloors ? undefined : 'tablist'" :aria-label="manyFloors ? undefined : 'Floor plans'">
               <!-- Four or more floors: one switcher instead of a row of tabs that would overflow -->
@@ -1168,11 +1172,13 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
           <div v-if="plan" class="relative">
           <div
             ref="scrollEl"
-            class="overflow-auto p-[18px] max-h-[78vh] bg-white"
+            class="overflow-auto p-[18px] bg-white"
             :class="panning ? 'cursor-grabbing' : panMode ? 'cursor-grab touch-none' : ''"
+            :style="{ height: `min(${canvasH + 36}px, 78vh)` }"
             @pointerdown="startPan"
           >
-            <!-- Takes up the scaled size so the scroll area matches the zoomed canvas -->
+            <!-- Takes up the scaled size so the scroll area matches the zoomed canvas.
+                 The scroll area itself is sized for 100%, so the card stays put while zooming. -->
             <div class="mx-auto" :style="{ width: `${canvasW * zoom}px`, height: `${canvasH * zoom}px` }">
             <div
               ref="canvasEl"
@@ -1345,7 +1351,11 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
         </section>
 
         <!-- Side panels -->
-        <aside v-if="!preview" class="flex flex-col gap-3">
+        <aside
+          v-if="!preview"
+          data-walkthrough="floorplan-objects"
+          class="flex flex-col gap-3"
+        >
           <div class="grid grid-cols-2 gap-1 rounded-[12px] bg-[#F1E9DE] p-1" role="tablist" aria-label="Side panel">
             <button
               id="fp-tab-objects"
@@ -1403,6 +1413,6 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
     </main>
 
     <FloorPlanDialog :spec="dialogSpec" @close="closeDialog" />
-    <FloorPlanToast :show="savedToast" message="Layout saved" />
+    <FloorPlanToast :show="savedToast" message="Layout saved" @close="savedToast = false" />
   </div>
 </template>

@@ -15,7 +15,8 @@ export function useApi() {
         },
         onResponseError({ response }) {
             if (response.status === 401) {
-                token.value = null
+                const authStore = useAuthStore()
+                authStore.clear()
                 navigateTo('/login')
             }
         },
