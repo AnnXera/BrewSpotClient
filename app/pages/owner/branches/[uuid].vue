@@ -14,12 +14,14 @@ const ownerService = useOwnerProfileService()
 const branch = ref<BranchDetail | null>(null)
 const loading = ref(true)
 const errorMessage = ref('')
-const activeTab = ref<'details' | 'employees'>(
-  route.query.tab === 'employees' ? 'employees' : 'details'
-)
+type BranchTab = 'details' | 'employees' | 'floor-plans'
+const TABS: BranchTab[] = ['details', 'employees', 'floor-plans']
+const isTab = (value: unknown): value is BranchTab => TABS.includes(value as BranchTab)
+
+const activeTab = ref<BranchTab>(isTab(route.query.tab) ? route.query.tab : 'details')
 
 watch(() => route.query.tab, (newTab) => {
-  if (newTab === 'details' || newTab === 'employees') {
+  if (isTab(newTab)) {
     activeTab.value = newTab
   }
 })
@@ -39,12 +41,11 @@ function backToEmployees() {
   router.push({ query: { ...restQuery, tab: 'employees' } })
 }
 
-function selectTab(tab: 'details' | 'employees') {
+function selectTab(tab: BranchTab) {
   activeTab.value = tab
-  if (viewedEmployee.value) {
-    const { employee, ...restQuery } = route.query
-    router.replace({ query: { ...restQuery, tab } })
-  }
+  // Keep the tab in the URL so a refresh stays on it.
+  const { employee, ...restQuery } = route.query
+  router.replace({ query: { ...restQuery, tab: tab === 'details' ? undefined : tab } })
 }
 
 const isMain = computed(() => (branch.value?.branch_type || '').toLowerCase() === 'main')
@@ -186,6 +187,20 @@ onMounted(fetchBranch)
             class="absolute inset-x-0 -bottom-px h-0.5 bg-[#3A2923] rounded-full"
           />
         </button>
+
+        <button
+          type="button"
+          class="group relative pb-3 pt-1 text-sm font-semibold transition-colors duration-150 flex items-center gap-2 cursor-pointer focus-visible:outline-none active:scale-[0.98]"
+          :class="activeTab === 'floor-plans' ? 'text-[#3A2923]' : 'text-[#8C6E63] hover:text-[#3A2923]'"
+          @click="selectTab('floor-plans')"
+        >
+          <Icon name="heroicons:map" class="size-4.5 transition-colors" :class="activeTab === 'floor-plans' ? 'text-[#A96746]' : 'text-[#8C6E63] group-hover:text-[#3A2923]'" />
+          <span>Floor Plans</span>
+          <span
+            v-if="activeTab === 'floor-plans'"
+            class="absolute inset-x-0 -bottom-px h-0.5 bg-[#3A2923] rounded-full"
+          />
+        </button>
       </nav>
 
       <!-- Smooth Content Transition after Loading -->
@@ -312,6 +327,11 @@ onMounted(fetchBranch)
               <div class="cafe-card cafe-card-3 lg:col-span-2">
                 <PosDevicesCard :branch-uuid="branch.uuid" scope="owner" />
               </div>
+            </div>
+
+            <!-- Floor Plans Tab: what the branch manager has built, view only -->
+            <div v-else-if="activeTab === 'floor-plans'" key="floor-plans" class="mt-4">
+              <FloorPlanViewer :branch-uuid="branch.uuid" />
             </div>
 
             <!-- Employees Tab: the list, or one employee's details -->
