@@ -331,7 +331,7 @@ function selectTable(table: FloorPlanTable) {
   inspectedTable.value = null
   selectedTable.value = table
   selectedChair.value = null
-  reservation.partySize = Math.min(Math.max(1, reservation.partySize), table.capacity)
+  reservation.partySize = Math.min(Math.max(1, reservation.partySize), Math.max(1, seatsFree(table)))
 }
 
 function selectChair(chair: FloorPlanElement) {
@@ -590,13 +590,42 @@ function jumpTo(entry: { start: Date }) {
 }
 
 const phoneDigits = computed(() => reservation.customerPhone.replace(/\D/g, ''))
+
+// Most guests the selection can take: one chair is one seat, counter seating only
+// has the seats other bookings that day leave free, any other table its capacity.
+function seatsFree(table: FloorPlanTable) {
+  if (!isShared(table)) return table.capacity
+  const held = tableHolds(table).reduce((sum, entry) => sum + entry.item.party_size, 0)
+  return Math.max(0, table.capacity - held)
+}
+
+const maxGuests = computed(() => {
+  if (selectedChair.value) return 1
+  return selectedTable.value ? seatsFree(selectedTable.value) : 0
+})
+
+const guestsError = computed(() => {
+  const size = reservation.partySize
+  if (!selectedTable.value || !Number.isFinite(size)) return ''
+  if (!Number.isInteger(size) || size < 1) return 'Enter at least 1 guest.'
+  if (size > maxGuests.value) {
+    const seats = `${maxGuests.value} ${maxGuests.value === 1 ? 'seat' : 'seats'}`
+    return isShared(selectedTable.value) && !selectedChair.value && maxGuests.value < selectedTable.value.capacity
+      ? `Only ${seats} left at ${selectedTable.value.table_name} that day.`
+      : `${selectedTable.value.table_name} has ${seats}. Pick a bigger table for ${size} guests.`
+  }
+  return ''
+})
+
 const canConfirm = computed(() =>
   !windowIsPast.value
   && selectedSlotValid.value
   && Boolean(selectedTable.value)
   && Boolean(reservation.customerName.trim())
   && phoneDigits.value.length === 11
+  && Number.isInteger(reservation.partySize)
   && reservation.partySize >= 1
+  && reservation.partySize <= maxGuests.value
   && !submitting.value)
 
 async function confirmReservation() {
@@ -995,7 +1024,13 @@ onBeforeUnmount(() => {
           <div v-else-if="selectedTable" class="mt-4 flex items-center justify-between gap-3 rounded-xl bg-[#7D5A50] px-3 py-3 text-[#FFF0D1]">
             <div>
               <p class="text-sm font-medium">{{ selectedTable.table_name }}</p>
-              <p class="text-xs text-[#F2E0D2]">{{ selectedChair ? '1 seat at the communal table' : `Seats up to ${selectedTable.capacity}` }}</p>
+              <p class="text-xs text-[#F2E0D2]">{{
+                selectedChair
+                  ? '1 seat at the communal table'
+                  : maxGuests < selectedTable.capacity
+                    ? `${maxGuests} of ${selectedTable.capacity} seats free that day`
+                    : `Seats up to ${selectedTable.capacity}`
+              }}</p>
             </div>
             <button type="button" class="rounded-md border border-[#FFF0D1]/40 px-2.5 py-1 text-xs transition-colors hover:bg-[#FFF0D1]/10" @click="clearSelection">Change</button>
           </div>
@@ -1016,12 +1051,15 @@ onBeforeUnmount(() => {
                   v-model.number="reservation.partySize"
                   type="number"
                   min="1"
-                  :max="selectedChair ? 1 : (selectedTable ? selectedTable.capacity : 50)"
+                  :max="selectedTable ? maxGuests : 50"
                   :readonly="!!selectedChair"
+                  :aria-invalid="!!guestsError"
+                  aria-describedby="guests-error"
                   class="field tabular-nums read-only:bg-[#F8EFE7]"
                 >
               </label>
             </div>
+            <p v-if="guestsError" id="guests-error" class="text-xs text-[#A4472E]" role="alert">{{ guestsError }}</p>
             <p v-if="reservation.customerPhone && phoneDigits.length !== 11" class="text-xs text-[#76605A]">Phone numbers have 11 digits.</p>
             <label class="block text-xs text-[#5B463C]">Notes
               <textarea v-model="reservation.notes" rows="2" placeholder="Allergies, occasion, high chair…" class="field resize-none" />
