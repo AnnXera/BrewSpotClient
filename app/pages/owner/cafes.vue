@@ -313,7 +313,7 @@ function viewDetails(uuid: string) {
               <span class="w-9" aria-hidden="true"></span>
             </div>
 
-            <ul class="divide-y divide-[#F3E7D2]">
+            <ul class="divide-y divide-[#F3E7D2]" data-walkthrough="cafe-branch-list">
               <li v-for="branch in branches" :key="branch.uuid">
                 <CafeManagementBranchCard
                   :branch="branch"

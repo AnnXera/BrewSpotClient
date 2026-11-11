@@ -133,6 +133,7 @@ onMounted(fetchBranch)
       <nav class="flex items-center gap-6 border-b border-[#EDD8CC] mt-4" aria-label="Tabs">
         <button
           type="button"
+          data-walkthrough="branch-tab-details"
           class="group relative pb-3 pt-1 text-sm font-semibold transition-colors duration-150 flex items-center gap-2 cursor-pointer focus-visible:outline-none active:scale-[0.98]"
           :class="activeTab === 'details' ? 'text-[#3A2923]' : 'text-[#8C6E63] hover:text-[#3A2923]'"
           @click="selectTab('details')"
@@ -162,6 +163,7 @@ onMounted(fetchBranch)
 
         <button
           type="button"
+          data-walkthrough="branch-tab-floor-plans"
           class="group relative pb-3 pt-1 text-sm font-semibold transition-colors duration-150 flex items-center gap-2 cursor-pointer focus-visible:outline-none active:scale-[0.98]"
           :class="activeTab === 'floor-plans' ? 'text-[#3A2923]' : 'text-[#8C6E63] hover:text-[#3A2923]'"
           @click="selectTab('floor-plans')"

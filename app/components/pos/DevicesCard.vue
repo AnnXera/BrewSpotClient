@@ -72,7 +72,7 @@ function formatDate(iso: string | null) {
         </span>
       </div>
       <div v-if="!loading && !planLocked" class="flex items-center gap-2">
-        <CommonA2HSButton variant="card" label="Install POS App" />
+        <CommonA2HSButton variant="card" label="Install POS App" data-walkthrough="pos-install-btn" />
         <button
           type="button"
           class="inline-flex items-center gap-1.5 rounded-lg text-[13px] font-semibold text-[#7D5A50] hover:text-[#3D2B24] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
