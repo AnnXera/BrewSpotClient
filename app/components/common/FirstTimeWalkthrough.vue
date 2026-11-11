@@ -45,6 +45,7 @@ const {
   goToStep,
   finishAllMissions,
   exitMissionGuide,
+  syncRouteToActiveStep,
 } = useFirstTimeWalkthrough()
 
 const route = useRoute()
@@ -85,6 +86,7 @@ const isTargetFound = ref(false)
 const popoverPlacement = ref<'top' | 'bottom'>('bottom')
 const arrowOffsetLeft = ref(30)
 const popoverStyle = ref<Record<string, string>>({})
+const popoverEl = ref<HTMLElement | null>(null)
 
 function isSidebarOrNavElement(element: HTMLElement): boolean {
   // Never target elements inside the sidebar navigation, bell, tour mode button, or walkthrough modal itself
@@ -208,8 +210,8 @@ function updateTargetPosition() {
   // Arrow position relative to popover card (points directly to target center)
   arrowOffsetLeft.value = Math.max(16, Math.min(popoverWidth - 16, targetCenterX - left))
 
-  // Vertical placement: compact popover height is ~240px
-  const popoverEstimatedHeight = 240
+  // Vertical placement: use the rendered popover height (text wraps taller on narrow screens)
+  const popoverEstimatedHeight = popoverEl.value?.offsetHeight || 240
   const verticalGap = 12
   const spaceBelow = window.innerHeight - rect.bottom
   const spaceAbove = rect.top
@@ -264,13 +266,15 @@ function focusAndHighlightTarget() {
         const r = el.getBoundingClientRect()
         const isVisible = r.top >= 60 && r.bottom <= window.innerHeight - 60 && r.left >= 0 && r.right <= window.innerWidth
         if (!isVisible) {
-          el.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' })
+          // Center the target so the popover has room above or below without covering it
+          el.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' })
         }
         updateTargetPosition()
         requestAnimationFrame(updateTargetPosition)
         setTimeout(updateTargetPosition, 80)
         setTimeout(updateTargetPosition, 200)
-      } else if (attempts < 25) {
+      } else if (attempts < 80) {
+        // Up to ~8s: some targets (e.g. POS Registers card) render only after the page fetches its data
         attempts++
         setTimeout(tryFind, 100)
       } else {
@@ -282,6 +286,11 @@ function focusAndHighlightTarget() {
 }
 
 // Watchers & Lifecycle
+// Steps can live on a different page than their mission (e.g. a branch details page)
+watch([isMissionGuideActive, activeMissionIndex, activeStepIndex], () => {
+  syncRouteToActiveStep()
+})
+
 watch([isMissionGuideActive, activeMissionIndex, activeStepIndex, isCompanionMinimized], () => {
   if (isMissionGuideActive.value && !isCompanionMinimized.value) {
     focusAndHighlightTarget()
@@ -480,6 +489,7 @@ function handleReplayTour() {
         leave-to-class="opacity-0 scale-95 translate-y-2"
       >
         <div
+          ref="popoverEl"
           class="fixed pointer-events-auto z-[110] font-sans transition-all duration-200"
           :style="popoverStyle"
           @click.stop
@@ -600,7 +610,7 @@ function handleReplayTour() {
                 :class="showBlockedNotice ? 'ring-2 ring-amber-400 ring-offset-1 animate-pulse' : ''"
                 @click="nextStep"
               >
-                <span>Next Mission 🚀</span>
+                <span>Next Mission</span>
               </button>
               <button
                 v-else
@@ -609,7 +619,7 @@ function handleReplayTour() {
                 :class="showBlockedNotice ? 'ring-2 ring-emerald-400 ring-offset-1 animate-pulse' : ''"
                 @click="nextStep"
               >
-                <span>Finish Setup 🎉</span>
+                <span>Finish Setup</span>
               </button>
             </div>
           </div>
@@ -629,7 +639,8 @@ function handleReplayTour() {
         title="Resume button walkthrough"
       >
         <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-        <span>🎓 {{ currentActiveStep.title }} (Step {{ activeStepIndex + 1 }}/{{ totalStepsInActiveMission }})</span>
+        <Icon name="heroicons:academic-cap" class="w-4 h-4 text-[#F5EBE1]" />
+        <span>{{ currentActiveStep.title }} (Step {{ activeStepIndex + 1 }}/{{ totalStepsInActiveMission }})</span>
         <Icon name="heroicons:chevron-up" class="w-4 h-4 text-[#F5EBE1]/80 group-hover:translate-y-[-2px] transition-transform" />
       </button>
     </div>
@@ -652,7 +663,7 @@ function handleReplayTour() {
 
           <div class="space-y-1.5">
             <h2 class="font-display text-2xl sm:text-3xl font-extrabold text-[#3D2B24]">
-              All {{ totalMissions }} Setup Tasks Completed! ☕🎉
+              All {{ totalMissions }} Setup Tasks Completed!
             </h2>
             <p class="text-sm text-[#7D5A50] max-w-md mx-auto">
               {{ isManager
@@ -674,8 +685,8 @@ function handleReplayTour() {
               class="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#7D5A50] hover:bg-[#684940] active:scale-95 text-white font-bold text-sm shadow-md transition-all"
               @click="handleGrandFinaleFinish"
             >
-              <span v-if="isManager">Go to Manager Dashboard 🚀</span>
-              <span v-else>Go to Owner Dashboard 🚀</span>
+              <span v-if="isManager">Go to Manager Dashboard</span>
+              <span v-else>Go to Owner Dashboard</span>
             </button>
             <button
               type="button"
@@ -995,8 +1006,9 @@ function handleReplayTour() {
                       <span class="font-display text-sm sm:text-base font-bold text-[#3D2B24]">
                         {{ feature.name }}
                       </span>
-                      <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#F8F4EE] text-[#7D5A50]">
-                        📍 {{ feature.location }}
+                      <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#F8F4EE] text-[#7D5A50] inline-flex items-center gap-1">
+                        <Icon name="heroicons:map-pin" class="w-3 h-3" />
+                        {{ feature.location }}
                       </span>
                     </div>
 
