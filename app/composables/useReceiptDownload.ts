@@ -22,6 +22,7 @@ export interface ReceiptDownloadData {
   discountType?: string | null
   discountAmount?: number
   total: number
+  orderType?: string | null
   paymentMethod?: string | null
   amountTendered?: number | null
   change?: number | null
@@ -162,6 +163,16 @@ export function useReceiptDownload() {
       ctx.textAlign = 'right'
       ctx.fillStyle = '#2D201B'
       ctx.fillText(data.cashier, rightX, y)
+      y += 18
+
+      const orderTypeDisplay = (data.orderType || 'dine_in').replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      ctx.textAlign = 'left'
+      ctx.fillStyle = '#6B5048'
+      ctx.fillText('Order Type:', leftX, y)
+      ctx.textAlign = 'right'
+      ctx.fillStyle = '#2D201B'
+      ctx.font = 'bold 12px "Inter", sans-serif'
+      ctx.fillText(orderTypeDisplay, rightX, y)
       y += 18
 
       if (data.status && data.status.toLowerCase() === 'refunded') {
@@ -396,6 +407,7 @@ export function useReceiptDownload() {
       rows.push(line('Receipt No:', `#${data.receiptNumber}`))
       rows.push(line('Date:', formatDate(data.date)))
       rows.push(line('Cashier:', data.cashier))
+      rows.push(line('Order Type:', (data.orderType || 'dine_in').replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())))
       if (data.status && data.status.toLowerCase() === 'refunded') {
         rows.push(center('** SALE REFUNDED **'))
       }

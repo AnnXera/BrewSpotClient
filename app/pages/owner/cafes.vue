@@ -12,6 +12,7 @@ const links = OWNER_NAV_LINKS
 
 const ownerService = useOwnerProfileService()
 const { hasFeature, fetchCurrentSubscription } = usePlanFeature()
+const { refresh: refreshNotifications } = useNotifications()
 
 // State
 const branches = ref<BranchSummary[]>([])
@@ -29,13 +30,17 @@ const status = ref('')
 // Business Info
 const cafeName = ref('')
 const mainTinPrefix = ref<string | null>(null)
+const lowStockThresholdPercent = ref<number | null>(null)
 
 // Modal Controls
 const isAddBranchOpen = ref(false)
 const isOperatingHoursOpen = ref(false)
+const isLowStockModalOpen = ref(false)
 const savingBranch = ref(false)
 const savingHours = ref(false)
+const savingLowStock = ref(false)
 const hoursError = ref('')
+const lowStockError = ref('')
 const toastMessage = ref('')
 const backendErrors = ref<Record<string, string[]>>({})
 
@@ -75,7 +80,12 @@ async function fetchBranches() {
     if (res.success && res.cafe_name) {
       cafeName.value = res.cafe_name
     }
-    if (res.success) mainTinPrefix.value = res.main_tin_prefix ?? null
+    if (res.success) {
+      mainTinPrefix.value = res.main_tin_prefix ?? null
+      if (res.low_stock_threshold_percent !== undefined) {
+        lowStockThresholdPercent.value = res.low_stock_threshold_percent
+      }
+    }
     if (res.success && res.branches?.data) {
       branches.value = res.branches.data
       currentPage.value = res.branches.current_page
@@ -138,6 +148,28 @@ async function handleSaveOperatingHours(schedule: DaySchedule[]) {
       : (e?.data?.message ?? 'Could not save operating hours. Please try again.')
   } finally {
     savingHours.value = false
+  }
+}
+
+// Low stock threshold (%) is cafe-wide: shared across every branch, alerting both Manager and Owner.
+async function handleSaveLowStockThreshold(percent: number) {
+  savingLowStock.value = true
+  lowStockError.value = ''
+  try {
+    const res = await ownerService.updateLowStockThreshold(percent)
+    if (res.success) {
+      lowStockThresholdPercent.value = res.low_stock_threshold_percent
+      isLowStockModalOpen.value = false
+      showToast(res.message || `Low stock alert limit updated to ${percent}% for all branches.`)
+      refreshNotifications().catch(() => {})
+    }
+  } catch (e: any) {
+    const errors = e?.data?.errors as Record<string, string[]> | undefined
+    lowStockError.value = errors
+      ? Object.values(errors).flat().join('\n')
+      : (e?.data?.message ?? 'Could not save low stock threshold. Please try again.')
+  } finally {
+    savingLowStock.value = false
   }
 }
 
@@ -263,10 +295,12 @@ function viewDetails(uuid: string) {
           :total-count="branches.length"
           :can-add-branch="canAddBranch"
           :bulk-loading="bulkLoading"
+          :low-stock-threshold-percent="lowStockThresholdPercent"
           @toggle-select-all="toggleSelectAll"
           @bulk-action="bulkUpdateStatus"
           @cancel-selection="selectedBranches = []"
           @open-add-branch="openAddBranch"
+          @open-low-stock="isLowStockModalOpen = true"
         />
 
         <!-- List Content -->
@@ -358,6 +392,15 @@ function viewDetails(uuid: string) {
         :error="hoursError"
         @close="isOperatingHoursOpen = false; hoursError = ''"
         @save="handleSaveOperatingHours"
+      />
+
+      <CafeManagementLowStockLimitModal
+        :show="isLowStockModalOpen"
+        :current-percent="lowStockThresholdPercent"
+        :saving="savingLowStock"
+        :error="lowStockError"
+        @close="isLowStockModalOpen = false; lowStockError = ''"
+        @save="handleSaveLowStockThreshold"
       />
     </main>
   </div>

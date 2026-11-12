@@ -1,7 +1,8 @@
 // app/plugins/pwa.client.ts
+import { isStandalonePwaWindow, useA2HS } from '~/composables/useA2HS'
 
 export default defineNuxtPlugin(() => {
-  const { setDeferredPrompt, markAsInstalled } = useA2HS()
+  const { setDeferredPrompt, markAsInstalled, redirectToOwnerLoginForPosSetup } = useA2HS()
 
   if (typeof window !== 'undefined') {
     // 1. Pick up beforeinstallprompt if caught early by inline script in head
@@ -21,13 +22,42 @@ export default defineNuxtPlugin(() => {
       setDeferredPrompt(e)
     })
 
-    // 3. Track when app has been installed
+    // 3. Track when app has been installed (via prompt or browser omnibox/menu)
     window.addEventListener('appinstalled', () => {
       markAsInstalled()
-      console.log('BrewSpot POS PWA successfully installed to home screen / desktop.')
     })
 
-    // 4. Register service worker immediately (don't wait for 'load' if document is already ready)
+    // 4. Also listen for display-mode transitioning to standalone (when Chrome reparents the tab into the PWA window)
+    const standaloneMedia = window.matchMedia('(display-mode: standalone)')
+    const handleDisplayModeChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        markAsInstalled()
+      }
+    }
+    if (typeof standaloneMedia.addEventListener === 'function') {
+      standaloneMedia.addEventListener('change', handleDisplayModeChange)
+    }
+
+    // 5. If already launched in standalone A2HS mode on a dashboard route, immediately leave the dashboard
+    if (isStandalonePwaWindow()) {
+      const posDeviceCookie = usePosDeviceToken()
+      const currentPath = window.location.pathname
+      const isAllowedStandalonePath =
+        currentPath === '/pos' ||
+        currentPath === '/pos/setup' ||
+        currentPath === '/login' ||
+        currentPath === '/verify-login-code'
+
+      if (!isAllowedStandalonePath) {
+        if (posDeviceCookie.value) {
+          navigateTo('/pos', { replace: true })
+        } else {
+          redirectToOwnerLoginForPosSetup()
+        }
+      }
+    }
+
+    // 6. Register service worker immediately
     if ('serviceWorker' in navigator) {
       const registerSW = () => {
         navigator.serviceWorker

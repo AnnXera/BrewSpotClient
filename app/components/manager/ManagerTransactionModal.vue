@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import type { ManagerTransactionDetail } from '~/services/ManagerDashboardService'
 import type { OwnerTransactionDetail } from '~/services/OwnerAnalyticsService'
-import { formatCount, formatMethod, formatPeso, formatPesoCents } from '~/utils/dashboardFormat'
+import { formatCount, formatMethod, formatOrderType, formatPeso, formatPesoCents } from '~/utils/dashboardFormat'
 import { variantLabel } from '~/utils/variant'
 
 // The owner's transaction log passes its own loader (no branch needed) and gets the
@@ -144,10 +144,22 @@ function statusBadgeClass(status: string) {
 
           <template v-else-if="detail">
             <!-- Summary Bar -->
-            <div class="p-3.5 rounded-xl bg-[#FDF8F3] border border-[#EADFD3] flex items-center justify-between">
+            <div class="p-3.5 rounded-xl bg-[#FDF8F3] border border-[#EADFD3] flex items-center justify-between gap-3">
               <div>
                 <span class="text-xs text-[#8A6E64]">Cashier</span>
                 <p class="font-semibold text-sm text-[#2D201B]">{{ detail.staff_name }}</p>
+              </div>
+              <div class="text-center">
+                <span class="text-xs text-[#8A6E64]">Order Type</span>
+                <div>
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#F6EBDD] text-[#3D2B24] border border-[#D5BEAA]">
+                    <Icon
+                      :name="detail.order_type === 'delivery' ? 'heroicons:truck' : detail.order_type === 'take_out' ? 'heroicons:shopping-bag' : 'heroicons:building-storefront'"
+                      class="w-3 h-3 text-[#7D5A50]"
+                    />
+                    {{ formatOrderType(detail.order_type) }}
+                  </span>
+                </div>
               </div>
               <div class="text-right">
                 <span class="text-xs text-[#8A6E64]">Status</span>

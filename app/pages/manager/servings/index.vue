@@ -51,6 +51,7 @@ const categorySort = ref<ServingCategorySort>('name')
 const categoryPage = ref(1)
 const categories = ref<ServingCategorySummary[]>([])
 const categoryLastPage = ref(1)
+const lowStockThresholdPercent = ref<number | null>(null)
 const categorySortOptions: { label: string; value: ServingCategorySort }[] = [
   { label: 'Name (A-Z)', value: 'name' },
   { label: 'Most left', value: 'remaining_desc' },
@@ -97,6 +98,7 @@ async function loadCategories() {
   })
   categories.value = res.categories.data
   categoryLastPage.value = res.categories.last_page
+  lowStockThresholdPercent.value = res.low_stock_threshold_percent ?? null
 }
 
 async function loadIngredients() {
@@ -214,6 +216,13 @@ onBeforeUnmount(() => {
               </h1>
               <span class="inline-block rounded-md border border-[#E3CFB4] bg-white px-2.5 py-0.5 font-mono text-[11px] font-medium tracking-wide uppercase text-[#7D5A50]">
                 Live Operations
+              </span>
+              <span
+                v-if="lowStockThresholdPercent"
+                class="inline-flex items-center gap-1 rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-amber-800"
+              >
+                <Icon name="heroicons:bell-alert" class="w-3.5 h-3.5 text-amber-600" />
+                Low Stock Alert: ≤{{ lowStockThresholdPercent }}%
               </span>
             </div>
 

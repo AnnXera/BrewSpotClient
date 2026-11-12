@@ -24,6 +24,8 @@ export interface LockScreenStaff {
     pin_must_change: boolean
 }
 
+export type PosOrderType = 'dine_in' | 'take_out' | 'delivery'
+
 export interface PosTransactionDetail {
     uuid: string
     receipt_number: string
@@ -33,6 +35,7 @@ export interface PosTransactionDetail {
     created_at: string
     staff_name: string
     status: string
+    order_type?: PosOrderType | string | null
     walk_in_note?: string | null
     subtotal: number
     discount_type: string | null
@@ -174,14 +177,15 @@ export class DevicePosService extends BaseService {
         })
     }
 
-    checkout(items: any[], paymentMethod: string,amountTendered: number, referenceNumber?: string, discountType?: string, discountAmount?: number) {
-        return this.post<{ success: boolean; message: string; transaction_uuid: string; receipt_number?: string }>('/pos/device/checkout', {
+    checkout(items: any[], paymentMethod: string, amountTendered: number, referenceNumber?: string, discountType?: string, discountAmount?: number, orderType: PosOrderType = 'dine_in') {
+        return this.post<{ success: boolean; message: string; transaction_uuid: string; receipt_number?: string; order_type?: PosOrderType }>('/pos/device/checkout', {
             items,
             payment_method: paymentMethod,
             amount_tendered: amountTendered,
             reference_number: referenceNumber,
             discount_type: discountType,
-            discount_amount: discountAmount
+            discount_amount: discountAmount,
+            order_type: orderType
         })
     }
 

@@ -22,6 +22,7 @@ const targetFraction = computed(() => {
 const displayedFraction = ref(0)
 const dash = computed(() => `${displayedFraction.value * CIRCUMFERENCE} ${CIRCUMFERENCE}`)
 const soldOut = computed(() => props.category.status === 'sold_out' || props.category.remaining === 0)
+const isLowStock = computed(() => !soldOut.value && Boolean(props.category.is_low_stock))
 
 let animTimeout: ReturnType<typeof setTimeout> | undefined
 
@@ -110,7 +111,7 @@ watch(() => [props.category.remaining, props.category.expected_servings], () => 
           cy="34"
           :r="RADIUS"
           fill="none"
-          :stroke="soldOut ? '#DC2626' : '#7D5A50'"
+          :stroke="soldOut ? '#DC2626' : isLowStock ? '#D97706' : '#7D5A50'"
           stroke-width="3.5"
           stroke-linecap="round"
           :stroke-dasharray="dash"
@@ -131,9 +132,13 @@ watch(() => [props.category.remaining, props.category.expected_servings], () => 
         </p>
         <span
           class="font-display font-semibold text-[11px] rounded-full px-2.5 py-0.5 shrink-0 whitespace-nowrap transition-colors duration-160"
-          :class="soldOut ? 'bg-rose-50 text-rose-700 border border-rose-200/80' : 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'"
+          :class="soldOut
+            ? 'bg-rose-50 text-rose-700 border border-rose-200/80'
+            : isLowStock
+              ? 'bg-amber-50 text-amber-800 border border-amber-200/80'
+              : 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'"
         >
-          {{ soldOut ? 'Sold Out' : 'Available' }}
+          {{ soldOut ? 'Sold Out' : isLowStock ? 'Low Stock' : 'Available' }}
         </span>
       </div>
 

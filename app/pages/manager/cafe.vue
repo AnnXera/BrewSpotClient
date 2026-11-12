@@ -256,6 +256,17 @@ onMounted(init)
                     <p class="text-sm sm:text-base font-medium text-[#3D2B24]">{{ branch.cafe_phonenumber || '—' }}</p>
                   </div>
                 </div>
+
+                <div class="rounded-xl bg-[#FAF4ED] border border-[#EDD8CC] px-3.5 py-2.5 flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <Icon name="heroicons:bell-alert" class="w-4 h-4 text-amber-600 shrink-0" />
+                    <span class="text-xs font-bold text-[#3D2B24]">Low Stock Alert Limit</span>
+                    <span class="text-[11px] font-medium text-[#9E7060] hidden sm:inline">· Cafe-wide setting</span>
+                  </div>
+                  <span class="inline-flex items-center rounded-lg bg-white border border-[#E3CFB4] px-2.5 py-1 text-xs font-extrabold text-[#3D2B24] tabular-nums">
+                    {{ branch.low_stock_threshold_percent ? `${branch.low_stock_threshold_percent}%` : 'Not set' }}
+                  </span>
+                </div>
               </section>
 
               <!-- BIR Document (file download stays owner/admin only) -->
