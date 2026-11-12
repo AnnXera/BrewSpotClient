@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { niceMax } from '~/utils/dashboardFormat'
 
-// Single-series column chart with a hover/focus tooltip and a screen-reader table.
+// Single-series column chart with a hover/focus tooltip and a screen-reader table
 export interface BarPoint {
   key: string
   label: string   // under the bar
