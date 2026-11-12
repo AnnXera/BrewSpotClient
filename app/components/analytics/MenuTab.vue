@@ -10,7 +10,7 @@ import { formatCount, formatPeso, formatPesoCents } from '~/utils/dashboardForma
 const props = defineProps<{ filters: AnalyticsFilters }>()
 
 const service = useOwnerAnalyticsService()
-const { data, loading, refreshing, error, reload } = useAnalyticsTab(toRef(props, 'filters'), f => service.getMenu(f))
+const { data, loading, refreshing, error, lock, reload } = useAnalyticsTab(toRef(props, 'filters'), f => service.getMenu(f))
 
 // ── Item table ──────────────────────────────────────────────
 type SortKey = 'name' | 'orders' | 'quantity' | 'sales' | 'change'
@@ -166,7 +166,7 @@ defineExpose({ excelReport, exportReady: computed(() => !!data.value) })
 </script>
 
 <template>
-  <AnalyticsStatus v-if="error && !data" :kind="error === 'locked' ? 'locked' : 'failed'" @retry="reload" />
+  <AnalyticsStatus v-if="error && !data" :kind="error === 'locked' ? 'locked' : 'failed'" :lock="lock" @retry="reload" />
 
   <div v-else class="space-y-6" :class="{ 'opacity-60 transition-opacity': refreshing }">
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">

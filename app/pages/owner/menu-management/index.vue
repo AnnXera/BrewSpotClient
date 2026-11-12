@@ -16,6 +16,7 @@ definePageMeta({
 })
 
 const route = useRoute()
+const { canEditMenu } = useMenuEditGate()
 const router = useRouter()
 const menuService = useMenuService()
 const { refresh: refreshNavCategories } = useNavCategories() // keeps the sidebar's category list current
@@ -111,6 +112,7 @@ function handleCategoryClick(id: string | number) {
 }
 
 function handleAddAction() {
+  if (!canEditMenu()) return
   router.push({ query: { ...route.query, action: 'add-category' } })
 }
 
@@ -126,6 +128,7 @@ const categoryToEdit = computed(() => {
 })
 
 function handleEditCategory(catUuid: string) {
+  if (!canEditMenu()) return
   router.push({ query: { ...route.query, action: 'edit-category', category_id: catUuid } })
 }
 
@@ -141,6 +144,7 @@ function onCategorySaved() {
 }
 
 function handleDeleteCategory(catUuid: string) {
+  if (!canEditMenu()) return
   askConfirm({
     title: 'Delete Category',
     message: 'Are you sure you want to delete this category?',

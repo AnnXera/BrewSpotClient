@@ -13,7 +13,7 @@ import { WEEKDAYS_LONG, formatCount, formatDay, formatHour, formatMethod, format
 const props = defineProps<{ filters: AnalyticsFilters }>()
 
 const service = useOwnerAnalyticsService()
-const { data, loading, refreshing, error, reload } = useAnalyticsTab(toRef(props, 'filters'), f => service.getSales(f))
+const { data, loading, refreshing, error, lock, reload } = useAnalyticsTab(toRef(props, 'filters'), f => service.getSales(f))
 
 const measure = ref<'revenue' | 'orders'>('revenue')
 
@@ -147,7 +147,7 @@ defineExpose({ excelReport, exportReady: computed(() => !!data.value) })
 </script>
 
 <template>
-  <AnalyticsStatus v-if="error && !data" :kind="error === 'locked' ? 'locked' : 'failed'" @retry="reload" />
+  <AnalyticsStatus v-if="error && !data" :kind="error === 'locked' ? 'locked' : 'failed'" :lock="lock" @retry="reload" />
 
   <div v-else class="space-y-6" :class="{ 'opacity-60 transition-opacity': refreshing }">
     <!-- KPI band -->

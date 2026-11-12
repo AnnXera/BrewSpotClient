@@ -61,6 +61,11 @@ const pendingBranchesCount = computed(() => {
 })
 
 const canAddBranch = computed(() => hasFeature('multi_branch'))
+const { requireFeature } = useSubscriptionGate()
+
+function openAddBranch() {
+  if (requireFeature('multi_branch', 'Multiple branches')) isAddBranchOpen.value = true
+}
 
 async function fetchBranches() {
   errorMessage.value = ''
@@ -261,7 +266,7 @@ function viewDetails(uuid: string) {
           @toggle-select-all="toggleSelectAll"
           @bulk-action="bulkUpdateStatus"
           @cancel-selection="selectedBranches = []"
-          @open-add-branch="isAddBranchOpen = true"
+          @open-add-branch="openAddBranch"
         />
 
         <!-- List Content -->

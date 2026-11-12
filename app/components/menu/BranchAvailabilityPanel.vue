@@ -45,6 +45,7 @@ const sourceDefault = ref<boolean | null>(null)
 const sourceName = ref('')
 let fetchToken = 0
 const confirming = ref<'hide-all' | 'reset' | null>(null)
+const { canEditMenu } = useMenuEditGate(false) // the page already refreshed the plan
 const filterQuery = ref('')
 // Below lg the panel collapses to a summary row; at lg it is always expanded via CSS.
 const isExpanded = ref(false)
@@ -125,6 +126,7 @@ function describeChange(next: boolean, where: string) {
 }
 
 async function toggleBranch(branch: BranchStatus) {
+  if (!canEditMenu()) return
   if (isBulkPending.value || pending.value.has(branch.branch_uuid)) return
 
   bulkError.value = null
@@ -238,7 +240,7 @@ watch(() => props.sourceKey, () => {
         <button
           type="button"
           :disabled="isLoading || exceptionCount === 0 || isBulkPending || confirming !== null"
-          @click="confirming = 'reset'"
+          @click="canEditMenu() && (confirming = 'reset')"
           class="text-sm font-semibold text-[#3B1F0E] rounded-sm hover:text-[#7D5A50] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:text-[#B4846C] disabled:cursor-not-allowed"
         >
           Reset all
@@ -256,7 +258,7 @@ watch(() => props.sourceKey, () => {
             v-if="!isCard"
             type="button"
             :disabled="exceptionCount === 0 || isBulkPending || confirming !== null"
-            @click="confirming = 'reset'"
+            @click="canEditMenu() && (confirming = 'reset')"
             class="lg:hidden text-sm font-semibold text-[#3B1F0E] rounded-sm hover:text-[#7D5A50] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:text-[#B4846C] disabled:cursor-not-allowed"
           >
             Reset all
@@ -300,7 +302,7 @@ watch(() => props.sourceKey, () => {
             <button
               type="button"
               :disabled="noneVisible || isBulkPending"
-              @click="confirming = 'hide-all'"
+              @click="canEditMenu() && (confirming = 'hide-all')"
               class="h-11 lg:h-8 rounded-lg border border-[#EEDFC4] bg-[#FDF8F3] text-xs font-semibold text-[#7D5A50] hover:bg-[#F5EAD4] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:opacity-50 disabled:hover:bg-[#FDF8F3] disabled:cursor-not-allowed"
             >
               Hide all

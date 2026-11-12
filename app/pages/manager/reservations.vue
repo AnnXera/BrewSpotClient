@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { PlanLock } from '~/utils/planLock'
 import type { FloorPlan, FloorPlanElement, FloorPlanTable } from '~/services/FloorPlanService'
 import type { ReservationRecord } from '~/services/ReservationService'
 import type { OpeningHour, ReservationStatus } from '~/services/ReservationService'
@@ -37,6 +38,8 @@ const plans = ref<FloorPlan[]>([])
 const planLoading = ref(false)
 const loading = ref(true)
 const errorMessage = ref('')
+// API 403: the cafe's plan lacks reservations, or its subscription has expired.
+const planLock = ref<PlanLock | null>(null)
 const reservationError = ref('')
 const reservationNotice = ref('')
 const reservations = ref<ReservationRecord[]>([])
@@ -447,6 +450,7 @@ async function loadPlan() {
   if (!branchUuid.value) return
   loading.value = true
   errorMessage.value = ''
+  planLock.value = null
   try {
     const response = await service.list(branchUuid.value)
     plans.value = response.floor_plans
@@ -458,7 +462,8 @@ async function loadPlan() {
     clearSelection()
   } catch (error: any) {
     activePlan.value = null
-    errorMessage.value = error?.data?.message ?? 'Could not load the saved floor plan.'
+    planLock.value = planLockFromError(error)
+    if (!planLock.value) errorMessage.value = error?.data?.message ?? 'Could not load the saved floor plan.'
   } finally {
     loading.value = false
   }
@@ -873,6 +878,7 @@ onBeforeUnmount(() => {
             </div>
 
             <div v-if="loading" class="mt-4 flex min-h-[360px] items-center justify-center rounded-xl bg-[#FFFDF9] text-sm text-[#76605A]">Loading floor plan…</div>
+            <SubscriptionLockedState v-else-if="planLock" :lock="planLock" audience="staff" class="mt-4" />
             <div v-else-if="errorMessage" class="mt-4 flex min-h-[360px] items-center justify-center rounded-xl bg-[#FFFDF9] text-sm text-[#A4472E]">{{ errorMessage }}</div>
             <div v-else-if="!activePlan" class="mt-4 flex min-h-[360px] flex-col items-center justify-center gap-3 rounded-xl bg-[#FFFDF9] text-sm text-[#76605A]">
               No floor plan has been saved for this branch yet.

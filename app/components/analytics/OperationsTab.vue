@@ -12,7 +12,7 @@ import { WEEKDAYS_LONG, WEEKDAYS_SHORT, formatCount, formatPeso, formatPesoCents
 const props = defineProps<{ filters: AnalyticsFilters }>()
 
 const service = useOwnerAnalyticsService()
-const { data, loading, refreshing, error, reload } = useAnalyticsTab(toRef(props, 'filters'), f => service.getOperations(f))
+const { data, loading, refreshing, error, lock, reload } = useAnalyticsTab(toRef(props, 'filters'), f => service.getOperations(f))
 
 const staffMax = computed(() => Math.max(1, ...(data.value?.staff ?? []).map(s => s.revenue)))
 
@@ -206,7 +206,7 @@ defineExpose({ excelReport, exportReady: computed(() => !!data.value) })
 </script>
 
 <template>
-  <AnalyticsStatus v-if="error && !data" :kind="error === 'locked' ? 'locked' : 'failed'" @retry="reload" />
+  <AnalyticsStatus v-if="error && !data" :kind="error === 'locked' ? 'locked' : 'failed'" :lock="lock" @retry="reload" />
 
   <div v-else class="grid grid-cols-1 gap-6 xl:grid-cols-12" :class="{ 'opacity-60 transition-opacity': refreshing }">
     <!-- Staff -->

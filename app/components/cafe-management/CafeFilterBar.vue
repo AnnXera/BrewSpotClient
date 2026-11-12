@@ -93,13 +93,13 @@ const emit = defineEmits<{
       <div class="ml-auto">
         <button
           type="button"
-          :disabled="!canAddBranch"
-          :title="canAddBranch ? undefined : 'Your current plan does not include multiple branches. Upgrade to add more.'"
+          :aria-describedby="canAddBranch ? undefined : 'add-branch-locked'"
           @click="emit('openAddBranch')"
           class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-white font-bold text-sm bg-[#7D5A50] hover:bg-[#65463D] transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#7D5A50]"
         >
-          <Icon name="heroicons:plus" class="w-4 h-4" />
+          <Icon :name="canAddBranch ? 'heroicons:plus' : 'heroicons:lock-closed'" class="w-4 h-4" />
           <span>Add Branch</span>
+          <span v-if="!canAddBranch" id="add-branch-locked" class="sr-only">Not included in your current plan</span>
         </button>
       </div>
     </template>
