@@ -2,6 +2,7 @@
 <!-- Read-only floor plans of one branch for the owner. Managers build them under Floor Plan;
      this shows every floor as saved, with each table's current status. -->
 <script setup lang="ts">
+import type { PlanLock } from '~/utils/planLock'
 import type { FloorPlan, FloorPlanElement, FloorPlanTable as TableRow } from '~/services/FloorPlanService'
 import { tableAsset, doorAsset } from '~/utils/floorPlanCatalog'
 import FloorPlanTable from '~/components/floor-plan/Table.vue'
@@ -18,7 +19,8 @@ const plans = ref<FloorPlan[]>([])
 const plan = ref<FloorPlan | null>(null)
 const loading = ref(true)
 const switching = ref(false)
-const planLocked = ref(false) // API 403: plan has no reservations feature
+// API 403: the plan lacks reservations, or the subscription has expired.
+const planLock = ref<PlanLock | null>(null)
 const errorMessage = ref('')
 
 const manyFloors = computed(() => plans.value.length >= 4)
@@ -26,16 +28,14 @@ const canvasW = computed(() => plan.value?.canvas_width ?? DEFAULT_CANVAS.width)
 const canvasH = computed(() => plan.value?.canvas_height ?? DEFAULT_CANVAS.height)
 
 function failure(e: any, fallback: string) {
-  planLocked.value = e?.response?.status === 403 && !!e?.data?.required_feature
-  errorMessage.value = planLocked.value
-    ? 'Floor plans are not included in your cafe\'s plan.'
-    : e?.data?.message ?? fallback
+  planLock.value = planLockFromError(e)
+  errorMessage.value = planLock.value ? '' : e?.data?.message ?? fallback
 }
 
 async function load() {
   loading.value = true
   errorMessage.value = ''
-  planLocked.value = false
+  planLock.value = null
   try {
     const res = await service.list(props.branchUuid)
     plans.value = res.floor_plans
@@ -142,18 +142,12 @@ const seats = computed(() => (plan.value?.tables ?? []).reduce((sum, t) => sum +
     <p class="text-xs font-medium text-[#8C6E63] animate-pulse">Loading floor plans...</p>
   </div>
 
-  <!-- Feature not on the plan -->
-  <div v-else-if="planLocked" class="bg-white border border-[#EDD8CC] rounded-2xl p-8 shadow-sm text-center">
-    <Icon name="heroicons:lock-closed" class="size-8 text-[#A96746] mx-auto" />
-    <p class="mt-3 text-base font-semibold text-[#3D2B24]">{{ errorMessage }}</p>
-    <p class="mt-1 text-sm text-[#8C6E63]">Add the Reservations feature from Subscription to use floor plans.</p>
-    <NuxtLink
-      to="/owner/subscription"
-      class="mt-4 inline-flex rounded-[10px] bg-[#3D2B24] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#2C1E19] transition-colors"
-    >
-      View subscription
-    </NuxtLink>
-  </div>
+  <!-- Reservations not on the plan, or the subscription has expired -->
+  <SubscriptionLockedState
+    v-else-if="planLock"
+    :lock="planLock"
+    description="Floor plans come with the Reservations feature."
+  />
 
   <!-- Error -->
   <div v-else-if="errorMessage" class="bg-red-50 text-red-800 border border-red-200 rounded-xl p-4 flex items-center gap-3">

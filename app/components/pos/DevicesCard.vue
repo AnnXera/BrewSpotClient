@@ -1,6 +1,7 @@
 <!-- app/components/pos/DevicesCard.vue -->
 <!-- The POS registers set up for one branch. Shown on the owner's Branch Details and the manager's Cafe Management. -->
 <script setup lang="ts">
+import type { PlanLock } from '~/utils/planLock'
 import type { BranchPosDevice } from '~/services/PosService'
 
 const props = defineProps<{
@@ -13,18 +14,19 @@ const posService = usePosService()
 const devices = ref<BranchPosDevice[]>([])
 const loading = ref(true)
 const error = ref('')
-const planLocked = ref(false) // the cafe's plan doesn't include the POS system
+// The cafe's plan lacks the POS system, or its subscription has expired.
+const planLock = ref<PlanLock | null>(null)
 
 async function load() {
   loading.value = true
   error.value = ''
-  planLocked.value = false
+  planLock.value = null
   try {
     const res = await posService.listBranchDevices(props.scope, props.branchUuid)
     devices.value = res.devices ?? []
   } catch (e: any) {
-    if (e?.data?.required_feature) planLocked.value = true
-    else error.value = 'The registers could not be loaded.'
+    planLock.value = planLockFromError(e)
+    if (!planLock.value) error.value = 'The registers could not be loaded.'
     devices.value = []
   } finally {
     loading.value = false
@@ -71,8 +73,8 @@ function formatDate(iso: string | null) {
           {{ devices.length }} {{ devices.length === 1 ? 'register' : 'registers' }}<template v-if="inUseCount"> · {{ inUseCount }} in use</template>
         </span>
       </div>
-      <div v-if="!loading && !planLocked" class="flex items-center gap-2">
-        <CommonA2HSButton variant="card" label="Install POS App" />
+      <div v-if="!loading && !planLock" class="flex items-center gap-2">
+        <CommonA2HSButton variant="card" label="Install POS App" data-walkthrough="pos-install-btn" />
         <button
           type="button"
           class="inline-flex items-center gap-1.5 rounded-lg text-[13px] font-semibold text-[#7D5A50] hover:text-[#3D2B24] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
@@ -92,23 +94,14 @@ function formatDate(iso: string | null) {
       </div>
     </div>
 
-    <!-- Plan doesn't include POS -->
-    <div v-else-if="planLocked" class="rounded-xl bg-[#FFF8EA] border border-[#EDD8CC] px-5 py-6 flex flex-col sm:flex-row sm:items-center gap-3">
-      <Icon name="heroicons:lock-closed" class="w-6 h-6 text-[#9E7060] shrink-0" />
-      <div class="flex-1">
-        <p class="text-[15px] font-semibold text-[#3D2B24]">The POS system isn't on the current plan</p>
-        <p class="text-sm text-[#9E7060]">
-          {{ scope === 'owner' ? 'Upgrade your plan to ring up orders on registers at this branch.' : 'Ask the cafe owner to upgrade their plan to use registers at this branch.' }}
-        </p>
-      </div>
-      <NuxtLink
-        v-if="scope === 'owner'"
-        to="/owner/subscription"
-        class="shrink-0 border border-[#EDD8CC] rounded-[10px] px-4 py-2 text-[13px] font-semibold text-[#7D5A50] hover:bg-[#FFF0D1] transition-colors"
-      >
-        See plans
-      </NuxtLink>
-    </div>
+    <!-- The cafe's plan lacks the POS system, or its subscription has expired -->
+    <SubscriptionLockedState
+      v-else-if="planLock"
+      :lock="planLock"
+      :audience="scope === 'manager' ? 'staff' : 'owner'"
+      description="Ring up orders on registers at this branch."
+      compact
+    />
 
     <!-- Error -->
     <div v-else-if="error" class="bg-red-50 text-red-800 border border-red-200 rounded-xl p-4 flex items-center gap-3">

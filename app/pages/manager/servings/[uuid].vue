@@ -1,6 +1,7 @@
 <!-- app/pages/manager/servings/[uuid].vue -->
 <!-- One category's items: set each item's daily limit and switch it on or off for today, then Save Changes. -->
 <script setup lang="ts">
+import type { PlanLock } from '~/utils/planLock'
 import DropdownList from '~/components/common/DropdownList.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
 import CommonPagination from '~/components/common/Pagination.vue'
@@ -51,7 +52,9 @@ const loading = ref(true)
 const saving = ref(false)
 const errorMessage = ref('')
 const rowErrors = ref<Record<string, string>>({}) // item uuid -> message from the server
-const planLocked = ref(false)
+// API 403: the cafe's plan lacks the feature or its subscription has expired.
+const planLock = ref<PlanLock | null>(null)
+const planLocked = computed(() => !!planLock.value)
 
 // Toast Notification State (Save Layout / Floor Plan style)
 const toastShow = ref(false)
@@ -100,10 +103,8 @@ function toggle(i: CategoryServingItem) {
 const dirtyCount = computed(() => Object.keys(drafts.value).length)
 
 function failure(e: any, fallback: string) {
-  planLocked.value = e?.response?.status === 403 && !!e?.data?.required_feature
-  errorMessage.value = planLocked.value
-    ? 'Servings management is not included in your cafe\'s plan.'
-    : e?.data?.message ?? fallback
+  planLock.value = planLockFromError(e)
+  errorMessage.value = planLock.value ? '' : e?.data?.message ?? fallback
 }
 
 async function load() {
@@ -265,6 +266,8 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Items Card Section with Scroll Reveal -->
+        <SubscriptionLockedState v-if="planLock" :lock="planLock" audience="staff" />
+
         <section v-if="!planLocked && branchUuid" class="scroll-reveal bg-white border border-[#E3CFB4] rounded-2xl shadow-xs overflow-hidden">
           <!-- Toolbar: Search, Sort, Save Button -->
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 border-b border-[#E3CFB4] bg-[#FFFDF9]/60">

@@ -56,7 +56,7 @@ defineProps<{
         </span>
       </div>
       <div class="bg-white/70 rounded-lg p-2 text-center text-[11px] font-semibold text-[#7D5A50] border border-[#EDD8CC]">
-        🏪 Multi-branch hours & counter terminal management
+        Multi-branch hours & counter terminal management
       </div>
     </div>
 
@@ -91,20 +91,20 @@ defineProps<{
     <div v-else-if="type === 'inventory'" class="w-full max-w-xs flex flex-col gap-2">
       <div class="bg-white rounded-xl p-2 border border-[#EDD8CC] shadow-xs flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <span class="text-sm">☕</span>
+          <Icon name="heroicons:beaker" class="w-4 h-4 text-[#7D5A50]" />
           <span class="text-xs font-bold text-[#3D2B24]">Arabica Beans</span>
         </div>
         <span class="text-xs font-bold text-red-600 tabular-nums animate-pulse">- 18 g</span>
       </div>
       <div class="bg-white rounded-xl p-2 border border-[#EDD8CC] shadow-xs flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <span class="text-sm">🥛</span>
+          <Icon name="heroicons:beaker" class="w-4 h-4 text-[#7D5A50]" />
           <span class="text-xs font-bold text-[#3D2B24]">Whole Dairy</span>
         </div>
         <span class="text-xs font-bold text-red-600 tabular-nums animate-pulse">- 150 ml</span>
       </div>
       <div class="text-[10px] font-semibold text-center text-[#7D5A50] bg-[#FFF0D1] rounded py-1">
-        ⚡ Stock auto-deducts on POS sales
+        Stock auto-deducts on POS sales
       </div>
     </div>
 

@@ -2,4 +2,5 @@
   <NuxtPage />
   <CommonFirstTimeWalkthrough />
   <CommonDocumentViewer />
+  <SubscriptionFeatureGateModal />
 </template>

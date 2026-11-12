@@ -1,5 +1,6 @@
 <!-- app/pages/manager/floor-plan/index.vue -->
 <script setup lang="ts">
+import type { PlanLock } from '~/utils/planLock'
 import type {
   FloorPlan,
   FloorPlanAssets,
@@ -93,7 +94,9 @@ const loading = ref(true)
 const saving = ref(false)
 const statusBusy = ref(false)
 const errorMessage = ref('')
-const planLocked = ref(false) // API 403: plan has no reservations feature
+// API 403: the cafe's plan lacks the feature or its subscription has expired.
+const planLock = ref<PlanLock | null>(null)
+const planLocked = computed(() => !!planLock.value)
 const saveErrors = ref<Record<string, string[]>>({})
 
 const panel = ref<null | 'new' | 'settings'>(null)
@@ -663,10 +666,8 @@ function onKeydown(e: KeyboardEvent) {
 
 // ── API ──────────────────────────────────────────────────────────────────
 function failure(e: any, fallback: string) {
-  planLocked.value = e?.response?.status === 403 && !!e?.data?.required_feature
-  errorMessage.value = planLocked.value
-    ? 'Floor plans are not included in your cafe\'s plan.'
-    : e?.data?.message ?? fallback
+  planLock.value = planLockFromError(e)
+  errorMessage.value = planLock.value ? '' : e?.data?.message ?? fallback
 }
 
 async function loadPlans(preferUuid?: string) {
@@ -1055,6 +1056,8 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
       </p>
 
       <p v-if="loading" class="text-[14px] text-[#9E7060]">Loading...</p>
+
+      <SubscriptionLockedState v-else-if="planLock" :lock="planLock" audience="staff" />
 
       <div v-else-if="!planLocked && branchUuid" class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_270px] gap-5 items-start">
         <!-- Canvas card -->

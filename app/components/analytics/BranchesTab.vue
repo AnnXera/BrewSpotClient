@@ -11,7 +11,7 @@ import { formatCount, formatPeso, formatPesoCents, formatSpan } from '~/utils/da
 const props = defineProps<{ filters: AnalyticsFilters }>()
 
 const service = useOwnerAnalyticsService()
-const { data, loading, refreshing, error, reload } = useAnalyticsTab(toRef(props, 'filters'), f => service.getBranches(f))
+const { data, loading, refreshing, error, lock, reload } = useAnalyticsTab(toRef(props, 'filters'), f => service.getBranches(f))
 
 const top = computed(() => Math.max(1, ...(data.value?.branches ?? []).map(b => b.revenue)))
 const totals = computed(() => {
@@ -70,7 +70,7 @@ defineExpose({ excelReport, exportReady: computed(() => !!data.value) })
 </script>
 
 <template>
-  <AnalyticsStatus v-if="error && !data" :kind="error === 'locked' ? 'locked' : 'failed'" @retry="reload" />
+  <AnalyticsStatus v-if="error && !data" :kind="error === 'locked' ? 'locked' : 'failed'" :lock="lock" @retry="reload" />
 
   <AnalyticsPanel
     v-else

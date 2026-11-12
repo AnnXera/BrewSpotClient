@@ -22,6 +22,10 @@ export interface MissionStep {
   targetHint: string
   targetSelector: string
   visualType?: string
+  // Optional page for this step when it differs from the mission route.
+  // A plain path, or the token 'owner-first-branch' (optionally with a query,
+  // e.g. 'owner-first-branch?tab=employees') resolved at runtime (see resolveStepRoute).
+  route?: string
 }
 
 export interface SetupMission {
@@ -39,7 +43,7 @@ export interface SetupMission {
   proTip: string
 }
 
-// 1. THE 6 CORE OWNER SETUP MISSIONS (Focusing on anchored button-by-button on-screen teaching)
+// 1. THE 7 CORE OWNER SETUP MISSIONS (Focusing on anchored button-by-button on-screen teaching)
 export const OWNER_SETUP_MISSIONS: SetupMission[] = [
   {
     id: 'mission-menu',
@@ -146,12 +150,16 @@ export const OWNER_SETUP_MISSIONS: SetupMission[] = [
     priority: 'High',
     icon: 'heroicons:building-storefront',
     actionText: 'Open Branch Settings',
-    description: 'Manage your cafe locations. Set your daily opening and closing hours, update address and phone numbers, and ensure customers and baristas know active operational times.',
+    description: 'Manage your cafe locations. Set your daily opening and closing hours, update address and phone numbers, and ensure customers and baristas know active operational times. Then open a branch to review its details, employees, and floor plans.',
     steps: [
       'Click Cafe Operating Hours to set weekly schedule',
       'Review Branch KPI Summary Cards',
       'Search branches & Add Branch toolbar',
-      'Check top-left live Open/Closed ticker'
+      'Check top-left live Open/Closed ticker',
+      'Open a branch from the list',
+      'Branch Details tab: info, BIR document, POS registers',
+      'Employees tab: staff assigned to the branch',
+      'Floor Plans tab: dining layout built by the manager'
     ],
     detailedSteps: [
       {
@@ -181,6 +189,37 @@ export const OWNER_SETUP_MISSIONS: SetupMission[] = [
         proTip: 'If the indicator shows "Closed now" during store hours, check your opening schedule in step 1.',
         targetHint: 'Header Status Ticker',
         targetSelector: '[data-walkthrough="feat-ticker"], .tabular-nums, header'
+      },
+      {
+        title: 'Open a Branch',
+        instruction: 'Click any branch in this list to open its details page. Press Next Step and the tour will open your first branch for you.',
+        proTip: 'Each branch has its own details, employees, and floor plans.',
+        targetHint: 'Branch list',
+        targetSelector: '[data-walkthrough="cafe-branch-list"]'
+      },
+      {
+        title: 'Branch Details Tab',
+        instruction: 'The Branch Details tab shows the branch name, address, email, and phone number, the BIR document with its TIN and VAT type, and the POS Registers connected to this branch.',
+        proTip: 'The POS Registers card shows which counter devices are registered and who is signed in on each.',
+        targetHint: 'Branch Details tab',
+        targetSelector: '[data-walkthrough="branch-tab-details"]',
+        route: 'owner-first-branch?tab=details'
+      },
+      {
+        title: 'Employees Tab',
+        instruction: 'The Employees tab lists every manager and cashier assigned to this branch. Click an employee to see their full details.',
+        proTip: 'Check this list before a shift so every cashier on duty can sign in to the register.',
+        targetHint: 'Employees tab',
+        targetSelector: '[data-walkthrough="cafe-employees-tab"]',
+        route: 'owner-first-branch?tab=employees'
+      },
+      {
+        title: 'Floor Plans Tab',
+        instruction: 'The Floor Plans tab shows the dining layouts your branch manager has built: tables, seats, and fixtures. Owners can view them here; managers edit them in their Floor Plan page.',
+        proTip: 'Saved floor plans appear on the POS so cashiers can assign dine-in orders to tables.',
+        targetHint: 'Floor Plans tab',
+        targetSelector: '[data-walkthrough="branch-tab-floor-plans"]',
+        route: 'owner-first-branch?tab=floor-plans'
       }
     ],
     proTip: 'The dashboard’s live operating ticker switches between "Open now" and "Closed now" automatically based on the hours you define here.'
@@ -307,6 +346,66 @@ export const OWNER_SETUP_MISSIONS: SetupMission[] = [
       }
     ],
     proTip: 'Use the top-right refresh button during rush periods to pull the latest sales numbers instantly without refreshing the page.'
+  },
+  {
+    id: 'mission-pos-install',
+    title: '7. Download & Install BrewSpot POS (A2HS)',
+    subtitle: 'Where to get the POS app and how to add it to your device',
+    route: '/owner/cafes',
+    badge: 'Essential',
+    priority: 'Essential',
+    icon: 'heroicons:arrow-down-tray',
+    actionText: 'Open Branches',
+    description: 'BrewSpot POS is installed straight from your browser using Add to Home Screen (A2HS). There is no app store download. Open a branch from Cafe Management, find the POS Registers card, and click "Install POS App" on the counter device you want to use as a register.',
+    steps: [
+      'Open a branch from Cafe Management',
+      'Click "Install POS App" in the POS Registers card',
+      'Install on Android, Windows, or Mac (Chrome / Edge / Brave)',
+      'Install on iPad or iPhone (Safari)',
+      'Launch the app and register the device'
+    ],
+    detailedSteps: [
+      {
+        title: 'Where to Download: Open a Branch',
+        instruction: 'Click any branch in this list to open its details page. The POS Registers card on that page holds the "Install POS App" download button. Press Next Step and the tour will open your first branch for you.',
+        proTip: 'Do this on the actual counter tablet or computer you will use as a register, not on your personal phone.',
+        targetHint: 'Branch list in Cafe Management',
+        targetSelector: '[data-walkthrough="cafe-branch-list"]'
+      },
+      {
+        title: 'Click "Install POS App"',
+        instruction: 'This "Install POS App" button in the POS Registers card is where you download BrewSpot POS. Every branch details page has one. You can also open /pos/setup on the device and click "Install POS to Home Screen (A2HS)".',
+        proTip: 'If the button says "POS App Ready", the app is already installed on this device.',
+        targetHint: 'POS Registers card > Install POS App button',
+        targetSelector: '[data-walkthrough="pos-install-btn"]',
+        route: 'owner-first-branch?tab=details'
+      },
+      {
+        title: 'Install on Android, Windows, or Mac',
+        instruction: 'In Chrome, Edge, or Brave, confirm the install prompt that appears. If no prompt shows, click the Install icon at the right end of the address bar, or open the browser menu (three dots) and choose "Install BrewSpot POS".',
+        proTip: 'Firefox does not support installing web apps. Use Chrome, Edge, or Brave.',
+        targetHint: 'Browser install prompt',
+        targetSelector: '[data-walkthrough="pos-install-btn"]',
+        route: 'owner-first-branch?tab=details'
+      },
+      {
+        title: 'Install on iPad or iPhone',
+        instruction: 'Open BrewSpot in Safari, tap the Share button in the toolbar, choose "Add to Home Screen", then tap "Add".',
+        proTip: 'On iOS, only Safari can add BrewSpot POS to the home screen.',
+        targetHint: 'Safari Share menu',
+        targetSelector: '[data-walkthrough="pos-install-btn"]',
+        route: 'owner-first-branch?tab=details'
+      },
+      {
+        title: 'Launch & Register the Device',
+        instruction: 'Open the new BrewSpot POS icon on the home screen or desktop. It opens straight to /pos. On first launch, pick the branch, name the register (e.g. Front Counter 1), and click "Register Device".',
+        proTip: 'Registering logs your account out on that device so cashiers can sign in with their PIN.',
+        targetHint: 'BrewSpot POS app icon',
+        targetSelector: '[data-walkthrough="pos-install-btn"]',
+        route: 'owner-first-branch?tab=details'
+      }
+    ],
+    proTip: 'Install the POS on every counter device once. After that, staff open it from the home screen icon like a normal app.'
   }
 ]
 
@@ -490,6 +589,54 @@ export const MANAGER_SETUP_MISSIONS: SetupMission[] = [
       }
     ],
     proTip: 'Review item portion limits at the start of every shift so kitchen prep matches customer volume.'
+  },
+  {
+    id: 'mgr-pos-install',
+    title: '6. Download & Install BrewSpot POS (A2HS)',
+    subtitle: 'Where to get the POS app and how to add it to your counter devices',
+    route: '/manager/cafe',
+    badge: 'Essential',
+    priority: 'Essential',
+    icon: 'heroicons:arrow-down-tray',
+    actionText: 'Open Branch Settings',
+    description: 'BrewSpot POS is installed straight from your browser using Add to Home Screen (A2HS). There is no app store download. On the counter device, open Cafe Management, find the POS Registers card, and click "Install POS App".',
+    steps: [
+      'Click "Install POS App" in the POS Registers card',
+      'Install on Android, Windows, or Mac (Chrome / Edge / Brave)',
+      'Install on iPad or iPhone (Safari)',
+      'Launch the app and register the device'
+    ],
+    detailedSteps: [
+      {
+        title: 'Where to Download: Install POS App',
+        instruction: 'This "Install POS App" button in the POS Registers card is where you download BrewSpot POS. Click it on the counter tablet or computer you want to turn into a register. You can also open /pos/setup and click "Install POS to Home Screen (A2HS)".',
+        proTip: 'If the button says "POS App Ready", the app is already installed on this device.',
+        targetHint: 'POS Registers card > Install POS App button',
+        targetSelector: '[data-walkthrough="pos-install-btn"]'
+      },
+      {
+        title: 'Install on Android, Windows, or Mac',
+        instruction: 'In Chrome, Edge, or Brave, confirm the install prompt that appears. If no prompt shows, click the Install icon at the right end of the address bar, or open the browser menu (three dots) and choose "Install BrewSpot POS".',
+        proTip: 'Firefox does not support installing web apps. Use Chrome, Edge, or Brave.',
+        targetHint: 'Browser install prompt',
+        targetSelector: '[data-walkthrough="pos-install-btn"]'
+      },
+      {
+        title: 'Install on iPad or iPhone',
+        instruction: 'Open BrewSpot in Safari, tap the Share button in the toolbar, choose "Add to Home Screen", then tap "Add".',
+        proTip: 'On iOS, only Safari can add BrewSpot POS to the home screen.',
+        targetHint: 'Safari Share menu',
+        targetSelector: '[data-walkthrough="pos-install-btn"]'
+      },
+      {
+        title: 'Launch & Register the Device',
+        instruction: 'Open the new BrewSpot POS icon on the home screen or desktop. It opens straight to /pos. On first launch, pick your branch, name the register (e.g. Front Counter 1), and click "Register Device".',
+        proTip: 'Registering logs your manager account out on that device so cashiers can sign in with their PIN.',
+        targetHint: 'BrewSpot POS app icon',
+        targetSelector: '[data-walkthrough="pos-install-btn"]'
+      }
+    ],
+    proTip: 'Install the POS once on every counter device. After that, staff open it from the home screen icon like a normal app.'
   }
 ]
 
@@ -859,6 +1006,9 @@ const isCompanionMinimized = ref(false)
 const missionCelebration = ref<{ show: boolean; title: string; subtitle: string } | null>(null)
 const isGrandFinaleOpen = ref(false)
 
+// Cached uuid of the owner's first branch, used by steps that need the branch details page
+const ownerFirstBranchUuid = ref<string | null>(null)
+
 export function useFirstTimeWalkthrough() {
   const authStore = useAuthStore()
   const router = useRouter()
@@ -1100,7 +1250,7 @@ export function useFirstTimeWalkthrough() {
         // Trigger celebratory transition banner
         missionCelebration.value = {
           show: true,
-          title: `Mission Complete! 🎉`,
+          title: 'Mission Complete!',
           subtitle: `Great job! Continuing directly to: ${nextMissionObj.title}...`
         }
         setTimeout(() => {
@@ -1188,6 +1338,42 @@ export function useFirstTimeWalkthrough() {
     isMissionGuideActive.value = false
   }
 
+  // Resolve the page a step lives on. Falls back to the mission route when a
+  // dynamic route cannot be resolved (e.g. owner has no branches yet).
+  const resolveStepRoute = async (mission: SetupMission, step: MissionStep | undefined): Promise<string> => {
+    if (!step?.route) return mission.route
+    const [base, query] = step.route.split('?')
+    if (base !== 'owner-first-branch') return step.route
+
+    if (!ownerFirstBranchUuid.value) {
+      try {
+        const res = await useOwnerProfileService().getBranches(1, 1)
+        ownerFirstBranchUuid.value = res.success ? res.branches?.data?.[0]?.uuid ?? null : null
+      } catch (e) {
+        console.warn('Failed to resolve branch for walkthrough step', e)
+      }
+    }
+    if (!ownerFirstBranchUuid.value) return mission.route
+    return `/owner/branches/${ownerFirstBranchUuid.value}${query ? `?${query}` : ''}`
+  }
+
+  // Keep the browser on the page the active step belongs to
+  const syncRouteToActiveStep = async () => {
+    if (!isMissionGuideActive.value) return
+    const mission = currentActiveMission.value
+    // Only missions that define per-step routes are driven here; others keep mission-level navigation
+    if (!mission || !mission.detailedSteps.some(s => s.route)) return
+    const missionIdx = activeMissionIndex.value
+    const stepIdx = activeStepIndex.value
+    const target = await resolveStepRoute(mission, currentActiveStep.value)
+    // Ignore stale results if the user moved on while resolving
+    if (missionIdx !== activeMissionIndex.value || stepIdx !== activeStepIndex.value) return
+    // fullPath so tab changes (?tab=...) on the same page also navigate
+    if (route.fullPath !== target) {
+      router.push(target)
+    }
+  }
+
   // Initial load
   if (typeof window !== 'undefined') {
     loadProgress()
@@ -1261,5 +1447,6 @@ export function useFirstTimeWalkthrough() {
     goToStep,
     finishAllMissions,
     exitMissionGuide,
+    syncRouteToActiveStep,
   }
 }

@@ -1,24 +1,24 @@
 <script setup lang="ts">
 // Shown in place of a tab when its figures could not be loaded, or the plan lacks analytics.
-defineProps<{ kind: 'failed' | 'locked' }>()
+import type { PlanLock } from '~/utils/planLock'
+
+const props = defineProps<{ kind: 'failed' | 'locked'; lock?: PlanLock | null }>()
+
+// Older responses without a reason still read as "not on your plan".
+const planLock = computed<PlanLock>(() => props.lock ?? {
+  reason: 'feature_not_in_plan',
+  feature: 'advanced_analytics',
+  featureName: 'Advanced Analytics & Reports',
+})
 defineEmits<{ retry: [] }>()
 </script>
 
 <template>
-  <div
+  <SubscriptionLockedState
     v-if="kind === 'locked'"
-    class="rounded-[22px] border border-[#EEDFC4] bg-white px-6 py-10 text-center"
-  >
-    <Icon name="heroicons:lock-closed" class="mx-auto h-8 w-8 text-[#B4846C]" />
-    <h2 class="mt-3 font-display text-lg font-semibold text-[#3B1F0E]">Analytics isn't on your plan</h2>
-    <p class="mx-auto mt-1 max-w-sm text-sm text-[#8B6656]">Switch to a plan with Advanced Analytics &amp; Reports to see sales trends, peak hours and branch comparisons.</p>
-    <NuxtLink
-      to="/owner/subscription"
-      class="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#7D5A50] px-4 py-2.5 text-sm font-semibold text-[#FFF0D1] transition-colors hover:bg-[#684940] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] focus-visible:ring-offset-2"
-    >
-      View plans
-    </NuxtLink>
-  </div>
+    :lock="planLock"
+    description="See sales trends, peak hours and branch comparisons."
+  />
 
   <div
     v-else

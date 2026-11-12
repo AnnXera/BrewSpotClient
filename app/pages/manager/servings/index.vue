@@ -1,5 +1,6 @@
 <!-- app/pages/manager/servings/index.vue -->
 <script setup lang="ts">
+import type { PlanLock } from '~/utils/planLock'
 import DropdownList from '~/components/common/DropdownList.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
 import CommonPagination from '~/components/common/Pagination.vue'
@@ -72,7 +73,9 @@ const voidingUuid = ref<string | null>(null)
 
 const loading = ref(true)
 const errorMessage = ref('')
-const planLocked = ref(false) // API 403: plan has no menu management
+// API 403: the cafe's plan lacks the feature or its subscription has expired.
+const planLock = ref<PlanLock | null>(null)
+const planLocked = computed(() => !!planLock.value)
 
 // Scroll reveal observer that activates sections as they scroll into view
 useScrollReveal(categories)
@@ -81,10 +84,8 @@ useScrollReveal(categories)
 const refreshKey = ref(0)
 
 function failure(e: any, fallback: string) {
-  planLocked.value = e?.response?.status === 403 && !!e?.data?.required_feature
-  errorMessage.value = planLocked.value
-    ? 'Servings management is not included in your cafe\'s plan.'
-    : e?.data?.message ?? fallback
+  planLock.value = planLockFromError(e)
+  errorMessage.value = planLock.value ? '' : e?.data?.message ?? fallback
 }
 
 async function loadCategories() {
@@ -248,6 +249,8 @@ onBeforeUnmount(() => {
           <Icon name="heroicons:exclamation-circle" class="h-5 w-5 shrink-0 text-rose-600" />
           <p class="font-medium">{{ errorMessage }}</p>
         </div>
+
+        <SubscriptionLockedState v-if="planLock" :lock="planLock" audience="staff" />
 
         <template v-if="!planLocked && branchUuid">
           <!-- Categories Card Section with Scroll Reveal -->
