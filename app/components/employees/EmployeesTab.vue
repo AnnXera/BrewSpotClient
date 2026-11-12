@@ -1,6 +1,7 @@
 <!-- app/components/employees/EmployeesTab.vue -->
 <!-- Employees tab of a branch (owner and manager side). View Details emits an event for the parent to open the employee. -->
 <script setup lang="ts">
+import type { PlanLock } from '~/utils/planLock'
 import type { BranchStaffStats, EmploymentStatus, StaffMember, StaffRole } from '~/services/StaffService'
 import DropdownList from '~/components/common/DropdownList.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
@@ -57,8 +58,8 @@ const to = ref<number | null>(null)
 
 const loading = ref(true)
 const errorMessage = ref('')
-// Set when the owner's plan doesn't include staff management (API 403 + required_feature).
-const planLocked = ref(false)
+// Set when the cafe's plan lacks staff management or its subscription has expired (API 403).
+const planLock = ref<PlanLock | null>(null)
 
 const hasFilters = computed(() => !!(search.value.trim() || status.value || position.value))
 const branchIsEmpty = computed(() => !loading.value && stats.value?.total === 0)
@@ -68,8 +69,9 @@ const inactiveHint = computed(() =>
 )
 
 function handleError(e: any, fallback: string) {
-  if (e?.status === 403 && e?.data?.required_feature) {
-    planLocked.value = true
+  const lock = planLockFromError(e)
+  if (lock) {
+    planLock.value = lock
     return
   }
   errorMessage.value = e?.data?.message || fallback
@@ -112,7 +114,7 @@ async function fetchMembers() {
 }
 
 function refresh() {
-  planLocked.value = false
+  planLock.value = null
   return Promise.all([fetchStats(), fetchMembers()])
 }
 
@@ -155,20 +157,13 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="mt-4 flex flex-col gap-4">
-    <!-- Plan doesn't include staff management -->
-    <div v-if="planLocked" class="bg-white border border-[#EDD8CC] rounded-2xl p-10 flex flex-col items-center gap-3 text-center">
-      <Icon name="heroicons:lock-closed" class="w-10 h-10 text-[#9E7060]" />
-      <p class="font-display text-lg font-bold text-[#3D2B24]">Employee management isn't in your plan</p>
-      <p v-if="scope === 'manager'" class="font-sans text-sm text-[#9E7060] max-w-md">Ask the cafe owner to upgrade the subscription to manage employees here.</p>
-      <p v-else class="font-sans text-sm text-[#9E7060] max-w-md">Upgrade your subscription to add employees, set schedules, and give cashiers access to the register.</p>
-      <NuxtLink
-        v-if="scope !== 'manager'"
-        to="/owner/subscription"
-        class="mt-2 px-4 py-3 rounded-[10px] bg-[#7D5A50] font-display font-semibold text-sm text-[#FFF0D1] hover:bg-[#6B4A40] transition-colors"
-      >
-        View plans
-      </NuxtLink>
-    </div>
+    <!-- The cafe's plan lacks staff management, or its subscription has expired -->
+    <SubscriptionLockedState
+      v-if="planLock"
+      :lock="planLock"
+      :audience="scope === 'manager' ? 'staff' : 'owner'"
+      description="Add employees, set schedules, and give cashiers access to the register."
+    />
 
     <template v-else>
       <!-- Stat cards -->

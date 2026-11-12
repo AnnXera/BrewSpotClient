@@ -20,6 +20,7 @@ definePageMeta({
 })
 
 const route = useRoute()
+const { canEditMenu } = useMenuEditGate()
 const router = useRouter()
 const menuService = useMenuService()
 const { refresh: refreshNavCategories } = useNavCategories() // keeps the sidebar's category list current
@@ -106,6 +107,7 @@ const itemToEdit = computed(() => {
 })
 
 function handleAddAction() {
+  if (!canEditMenu()) return
   router.push({ query: { ...route.query, action: 'assign-items' } })
 }
 
@@ -129,6 +131,7 @@ function onItemSaved() {
 }
 
 function handleDeleteItem(itemUuid: string) {
+  if (!canEditMenu()) return
   askConfirm({
     title: 'Delete Item',
     message: 'Are you sure you want to delete this item?',
@@ -149,6 +152,7 @@ const isDeletingCategory = ref(false)
 
 function handleDeleteCategory() {
   if (!currentCategory.value || isDeletingCategory.value) return
+  if (!canEditMenu()) return
   const category = currentCategory.value
   askConfirm({
     title: 'Delete Category',
@@ -180,6 +184,7 @@ function closeAssignItemsModal() {
 }
 
 function openAddItemModal() {
+  if (!canEditMenu()) return
   showInnerItemModal.value = true
 }
 
@@ -217,7 +222,7 @@ const links = OWNER_NAV_LINKS
             class="w-9 h-9 rounded-full bg-white border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center hover:bg-[#F5EAD4] transition-colors"
             title="Edit Category"
             aria-label="Edit category"
-            @click="isCategoryModalOpen = true"
+            @click="canEditMenu() && (isCategoryModalOpen = true)"
           >
             <Icon name="heroicons:pencil-square" class="w-5 h-5" />
           </button>

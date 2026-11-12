@@ -14,6 +14,7 @@ definePageMeta({
 })
 
 const route = useRoute()
+const { canEditMenu } = useMenuEditGate()
 const router = useRouter()
 const menuService = useMenuService()
 
@@ -100,10 +101,12 @@ const ingredientToEdit = computed(() => {
 })
 
 function handleAddAction() {
+  if (!canEditMenu()) return
   router.push({ query: { ...route.query, action: 'add-ingredient' } })
 }
 
 function editIngredient(uuid: string) {
+  if (!canEditMenu()) return
   router.push({ query: { ...route.query, action: 'edit-ingredient', ingredient: uuid } })
 }
 
@@ -123,6 +126,7 @@ function toggleSelection(uuid: string, isSelected: boolean) {
 }
 
 function confirmBulkAction(action: 'retire'|'restore'|'delete') {
+  if (!canEditMenu()) return
   bulkActionType.value = action
   let msg = ''
   let title = ''

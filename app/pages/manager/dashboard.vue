@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import type { DashboardRange } from '~/services/OwnerProfileService'
 import type { ManagedBranchInfo, ManagerDashboardStats } from '~/services/ManagerDashboardService'
 import { formatSpan } from '~/utils/dashboardFormat'
+import type { PlanLock } from '~/utils/planLock'
 import ManagerTotals from '~/components/manager/ManagerTotals.vue'
 import ManagerIncomeChart from '~/components/manager/ManagerIncomeChart.vue'
 import ManagerReservationsCard from '~/components/manager/ManagerReservationsCard.vue'
@@ -27,6 +28,8 @@ const links = [
 ]
 
 const service = useManagerDashboardService()
+// Cards for features the cafe's plan lacks (or after it expires) show a locked card instead.
+const { refresh: refreshPlanAccess, lockFor } = usePlanAccess()
 const route = useRoute()
 const router = useRouter()
 
@@ -40,6 +43,13 @@ const stats = ref<ManagerDashboardStats | null>(null)
 const loading = ref(true)
 const refreshing = ref(false)
 const error = ref('')
+// Without a running subscription (expired or never subscribed) the whole dashboard is replaced.
+const dashboardLock = ref<PlanLock | null>(null)
+
+function lockFromError(err: any): PlanLock | null {
+  const lock = planLockFromError(err)
+  return lock ? { ...lock, featureName: 'the dashboard' } : null
+}
 
 // Initialize scroll reveal observer that only activates when scrolling into view
 useScrollReveal(stats)
@@ -62,6 +72,7 @@ const transactionsCard = ref<InstanceType<typeof ManagerTransactionsCard> | null
 
 function refreshAll() {
   loadStats()
+  refreshPlanAccess()
   transactionsCard.value?.refresh()
 }
 
@@ -78,6 +89,7 @@ async function loadStats() {
     const res = await service.getDashboardStats(branchUuid.value, range.value)
 
     if (id !== requestId) return
+    dashboardLock.value = null
     if (res?.success) {
       stats.value = res
     } else {
@@ -85,6 +97,8 @@ async function loadStats() {
     }
   } catch (err: any) {
     if (id !== requestId) return
+    dashboardLock.value = lockFromError(err)
+    if (dashboardLock.value) return
     console.warn('Manager dashboard fetch error:', err)
     error.value = err?.data?.message || 'The dashboard figures could not be loaded. Please check your connection.'
   } finally {
@@ -123,7 +137,10 @@ watch(range, (val) => {
   loadStats()
 })
 
-onMounted(init)
+onMounted(() => {
+  init()
+  refreshPlanAccess()
+})
 useAutoRefresh(refreshAll)
 
 const span = computed(() => (stats.value ? formatSpan(stats.value.period.from, stats.value.period.to) : ''))
@@ -185,8 +202,14 @@ const { isOpenNow } = useOperatingHours()
           </button>
         </div>
 
+        <SubscriptionLockedState
+          v-if="dashboardLock"
+          :lock="dashboardLock"
+          audience="staff"
+        />
+
         <!-- Dashboard Content with Scroll Reveal (Only animates when scrolling into view, not on refresh) -->
-        <template v-if="stats || !error">
+        <template v-else-if="stats || !error">
           <div
             class="space-y-6 transition-opacity duration-200"
             :class="{ 'opacity-65 pointer-events-none': refreshing }"
@@ -236,13 +259,29 @@ const { isOpenNow } = useOperatingHours()
             <!-- 3. Key Manager Details: Reservations + Employees Side-by-Side -->
             <div class="scroll-reveal grid grid-cols-1 gap-6 lg:grid-cols-2">
               <!-- Table Reservations Card -->
+              <SubscriptionLockedState
+                v-if="lockFor('reservations')"
+                :lock="lockFor('reservations')!"
+                audience="staff"
+                compact
+                class="flex h-full flex-col items-center justify-center"
+              />
               <ManagerReservationsCard
+                v-else
                 :reservations="stats?.reservations ?? null"
                 :loading="loading"
               />
 
               <!-- Branch Team & Coverage Card -->
+              <SubscriptionLockedState
+                v-if="lockFor('staff_management')"
+                :lock="lockFor('staff_management')!"
+                audience="staff"
+                compact
+                class="flex h-full flex-col items-center justify-center"
+              />
               <ManagerEmployeesCard
+                v-else
                 :employees="stats?.employees ?? null"
                 :loading="loading"
               />

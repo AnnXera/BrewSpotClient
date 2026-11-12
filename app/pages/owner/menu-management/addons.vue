@@ -11,6 +11,7 @@ definePageMeta({
 })
 
 const route = useRoute()
+const { canEditMenu } = useMenuEditGate()
 const router = useRouter()
 const menuService = useMenuService()
 
@@ -66,10 +67,12 @@ const addonToEdit = computed(() => {
 })
 
 function handleAddAction() {
+  if (!canEditMenu()) return
   router.push({ query: { ...route.query, action: 'add-addon' } })
 }
 
 function editAddon(uuid: string) {
+  if (!canEditMenu()) return
   router.push({ query: { ...route.query, action: 'edit-addon', addon: uuid } })
 }
 
