@@ -16,6 +16,8 @@ const props = withDefaults(
   { audience: 'owner', description: '', compact: false },
 )
 
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
+
 const copy = computed(() => {
   const { reason, featureName } = props.lock
   const owner = props.audience === 'owner'
@@ -24,15 +26,15 @@ const copy = computed(() => {
   if (reason === 'subscription_expired') {
     return owner
       ? { icon: 'heroicons:clock', title: 'Your subscription has expired', text: `Renew your subscription to use ${featureName} again.`, cta: 'Renew subscription' }
-      : { icon: 'heroicons:clock', title: "Your cafe's subscription has expired", text: `${featureName} is unavailable until the cafe owner renews the subscription.`, cta: '' }
+      : { icon: 'heroicons:clock', title: "Your cafe's subscription has expired", text: cap(`${featureName} is unavailable until the cafe owner renews the subscription.`), cta: '' }
   }
   if (reason === 'no_subscription') {
     return owner
       ? { icon: 'heroicons:credit-card', title: 'No active subscription', text: `Choose a plan to start using ${featureName}.`, cta: 'Choose a plan' }
-      : { icon: 'heroicons:credit-card', title: 'Your cafe has no active subscription', text: `${featureName} is unavailable until the cafe owner subscribes to a plan.`, cta: '' }
+      : { icon: 'heroicons:credit-card', title: 'Your cafe has no active subscription', text: cap(`${featureName} is unavailable until the cafe owner subscribes to a plan.`), cta: '' }
   }
   return owner
-    ? { icon: 'heroicons:lock-closed', title: `${featureName} isn't on your plan`, text: `Switch to a plan that includes ${featureName}.${extra}`, cta: 'View plans' }
+    ? { icon: 'heroicons:lock-closed', title: cap(`${featureName} isn't on your plan`), text: `Switch to a plan that includes ${featureName}.${extra}`, cta: 'View plans' }
     : { icon: 'heroicons:lock-closed', title: `Your cafe doesn't have ${featureName}`, text: `The cafe's current plan doesn't include ${featureName}. Ask the cafe owner to upgrade the plan.`, cta: '' }
 })
 </script>
