@@ -27,6 +27,7 @@ export const OWNER_NAV_LINKS = [
     { label: 'Cafe Management', to: '/owner/cafes', icon: 'building-storefront' },
     { label: 'Menu Management', to: '/owner/menu-management', icon: 'book-open' },
     { label: 'Analytics', to: '/owner/analytics', icon: 'chart-bar' },
+    { label: 'Activity Log', to: '/owner/activity-log', icon: 'clipboard-document-list' },
     { label: 'Subscription', to: '/owner/subscription', icon: 'credit-card' },
 ];
 
@@ -37,6 +38,7 @@ export const MANAGER_NAV_LINKS = [
     { label: 'Servings', to: '/manager/servings', icon: 'cake' },
     { label: 'Reservations', to: '/manager/reservations', icon: 'calendar-days' },
     { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
+    { label: 'Activity Log', to: '/manager/activity-log', icon: 'clipboard-document-list' },
 ];
 
 // Sidebar links on admin pages.

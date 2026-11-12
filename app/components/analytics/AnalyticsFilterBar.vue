@@ -7,7 +7,7 @@ import { ANALYTICS_PRESETS, rangeFor, type AnalyticsFilterState, type AnalyticsP
 // Date range presets (or a custom range) and the branch picker for the Analytics page.
 const props = defineProps<{
   modelValue: AnalyticsFilterState
-  branches: { value: string | null; label: string }[]
+  branches: { value: string | null; label: string }[] // empty: no branch picker (a manager's one branch)
   branchDisabled?: boolean // the Branches tab always shows every branch
 }>()
 
@@ -72,7 +72,7 @@ function setBranch(branch: string | null) {
       </div>
     </div>
 
-    <div class="w-full sm:w-64">
+    <div v-if="branches.length" class="w-full sm:w-64">
       <DropdownList
         :model-value="modelValue.branch"
         :options="branches"

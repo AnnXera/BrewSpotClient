@@ -45,6 +45,7 @@ async function load() {
 watch(() => props.employeeUuid, load, { immediate: true })
 
 const isTerminated = computed(() => member.value?.assignment?.employment_status === 'terminated')
+const canTerminate = computed(() => (props.scope ?? 'owner') === 'owner')
 
 const fullName = computed(() => {
   const m = member.value
@@ -153,7 +154,9 @@ async function terminate() {
             Edit Employee
           </button>
 
+          <!-- Only the owner can end someone's employment; managers can edit but not terminate. -->
           <button
+            v-if="canTerminate"
             type="button"
             class="inline-flex items-center gap-2 px-3 py-3 rounded-[10.5px] bg-[#FDE8E8] border border-[#DC3545] font-display font-semibold text-sm text-[#B31E1E] hover:bg-[#FBD5D5] transition-colors"
             @click="confirmTerminate = true"
