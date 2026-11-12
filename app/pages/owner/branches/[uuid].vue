@@ -250,6 +250,21 @@ onMounted(fetchBranch)
                       <p class="text-sm sm:text-base font-medium text-[#3D2B24]">{{ branch.cafe_phonenumber || '—' }}</p>
                     </div>
                   </div>
+
+                  <div class="mt-1 rounded-xl bg-[#FAF4ED] border border-[#EDD8CC] px-3.5 py-2.5 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <Icon name="heroicons:bell-alert" class="w-4 h-4 text-amber-600 shrink-0" />
+                      <span class="text-xs font-bold text-[#3D2B24]">Low Stock Alert Limit</span>
+                      <span class="text-[11px] font-medium text-[#9E7060] hidden sm:inline">· Shared across all branches</span>
+                    </div>
+                    <NuxtLink
+                      to="/owner/cafes"
+                      class="inline-flex items-center gap-1.5 rounded-lg bg-white border border-[#E3CFB4] hover:border-[#7D5A50] px-2.5 py-1 text-xs font-extrabold text-[#3D2B24] tabular-nums transition-colors"
+                    >
+                      <span>{{ branch.low_stock_threshold_percent ? `${branch.low_stock_threshold_percent}%` : 'Not set' }}</span>
+                      <Icon name="heroicons:pencil-square" class="w-3.5 h-3.5 text-[#7D5A50]" />
+                    </NuxtLink>
+                  </div>
                 </div>
               </section>
 

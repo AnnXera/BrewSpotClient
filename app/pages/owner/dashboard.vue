@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import MissionProgressCard from '~/components/dashboard/MissionProgressCard.vue'
 import OwnerTotals from '~/components/dashboard/OwnerTotals.vue'
 import OwnerIncomeChart from '~/components/dashboard/OwnerIncomeChart.vue'
 import OwnerBranchBreakdown from '~/components/dashboard/OwnerBranchBreakdown.vue'
@@ -136,6 +137,9 @@ const updatedAt = computed(() =>
           :refreshing="refreshing"
           @refresh="load"
         />
+
+        <!-- Setup Missions / User Tasks Progress Bar -->
+        <MissionProgressCard />
 
         <div
           v-if="error"

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import logoIcon from '~/assets/images/logo-icon.svg'
 import FloorPlanModal from '~/components/pos/FloorPlanModal.vue'
+import { formatOrderType } from '~/utils/dashboardFormat'
+import type { PosOrderType } from '~/services/PosService'
 import { variantLabel, TEMPERATURE_LABELS, type Temperature } from '~/utils/variant'
 
 // POS Register uses its own auth via pos_device_token cookie
@@ -263,6 +265,7 @@ async function lockRegister() {
     cart.value = []
     optionsItem.value = null
     selectedCategory.value = 'all'
+    selectedOrderType.value = 'dine_in'
   } catch (e) {
     console.error('Failed to lock', e)
   } finally {
@@ -465,6 +468,13 @@ const baseItemsTotal = computed(() => {
 const subtotal = computed(() => baseItemsTotal.value)
 
 const selectedDiscountType = ref<'none'|'PWD'|'Senior'>('none')
+const selectedOrderType = ref<PosOrderType>('dine_in')
+const orderTypeOptions: { value: PosOrderType; label: string; icon: string }[] = [
+  { value: 'dine_in', label: 'Dine In', icon: 'heroicons:building-storefront' },
+  { value: 'take_out', label: 'Take Out', icon: 'heroicons:shopping-bag' },
+  { value: 'delivery', label: 'Delivery', icon: 'heroicons:truck' },
+]
+
 const discountAmount = computed(() => {
   if (selectedDiscountType.value === 'none') return 0
   return subtotal.value * 0.20 // 20% discount
@@ -803,11 +813,13 @@ async function completeOrder() {
       Number(amountTendered.value) || total.value, 
       fullRef || referenceNumber.value,
       selectedDiscountType.value !== 'none' ? selectedDiscountType.value : undefined,
-      discountAmount.value
+      discountAmount.value,
+      selectedOrderType.value
     )
     if (res.success) {
       completedOrderDetails.value = {
         receiptNumber: res.receipt_number || res.transaction_uuid,
+        orderType: res.order_type || selectedOrderType.value,
         items: currentItems,
         baseItemsTotal: baseItemsTotal.value,
         subtotal: subtotal.value,
@@ -828,6 +840,7 @@ async function completeOrder() {
       referenceNumber.value = ''
       discountIdNumber.value = ''
       selectedDiscountType.value = 'none'
+      selectedOrderType.value = 'dine_in'
       // Servings left changed with this sale.
       devicePosService.getMenu().then((m) => { if (m.success) menuItems.value = m.items }).catch(() => {})
       refreshShiftStats()
@@ -893,6 +906,7 @@ function openFloorPlan() {
 
 function onTableSelectedFromFloorPlan(table: any) {
   selectedTableForOrder.value = { ...table, status: 'occupied' }
+  selectedOrderType.value = 'dine_in'
   isFloorPlanOpen.value = false
   showNotice(`Assigned ${table.table_name} (Occupied) to current order.`)
 }
@@ -994,6 +1008,7 @@ async function downloadCurrentReceipt() {
     discountType: o.discountType !== 'none' ? o.discountType : null,
     discountAmount: o.discountAmount || 0,
     total: o.total,
+    orderType: formatOrderType(o.orderType),
     paymentMethod: o.paymentMethod || 'Cash',
     change: o.change,
   })
@@ -1002,11 +1017,12 @@ async function downloadCurrentReceipt() {
 function exportTransactionsCSV() {
   if (!transactionsData.value || !transactionsData.value.transactions) return
   
-  const headers = ['Receipt Number', 'Date', 'Staff', 'Total Amount', 'Status', 'Items Count']
+  const headers = ['Receipt Number', 'Date', 'Staff', 'Order Type', 'Total Amount', 'Status', 'Items Count']
   const rows = transactionsData.value.transactions.map((t: any) => [
     t.receipt_number || t.uuid,
     new Date(t.created_at).toLocaleString(),
     t.staff_name,
+    formatOrderType(t.order_type),
     t.total_amount,
     t.status,
     t.items_count
@@ -1392,6 +1408,27 @@ function formatCurrency(amount: number) {
             </button>
           </div>
 
+          <!-- Order Type Selector (Dine In / Take Out / Delivery) -->
+          <div class="px-4 py-2.5 border-b border-[#F0EBE3] bg-[#FAF8F5]/70 shrink-0">
+            <div role="radiogroup" aria-label="Order Type" class="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[#EFEAE2]/75 border border-[#E5DEC9]/70">
+              <button
+                v-for="opt in orderTypeOptions"
+                :key="opt.value"
+                type="button"
+                role="radio"
+                :aria-checked="selectedOrderType === opt.value"
+                @click="selectedOrderType = opt.value"
+                class="h-8 rounded-lg text-[11px] font-bold transition-all duration-150 flex items-center justify-center gap-1.5 select-none active:scale-[0.97] cursor-pointer"
+                :class="selectedOrderType === opt.value
+                  ? 'bg-[#7B5A50] text-white shadow-[0_1px_3px_rgba(45,32,27,0.18)]'
+                  : 'text-[#5C453C] hover:text-[#2D201B] hover:bg-white/60'"
+              >
+                <Icon :name="opt.icon" class="w-3.5 h-3.5 shrink-0" />
+                <span>{{ opt.label }}</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Table Assigned to Order Indicator -->
           <div v-if="selectedTableForOrder" class="px-3.5 py-2 bg-[#FDF3E7] border-b border-[#E3CFB4] flex items-center justify-between text-xs shrink-0">
             <div class="flex items-center gap-1.5 min-w-0 mr-2">
@@ -1552,6 +1589,13 @@ function formatCurrency(amount: number) {
                 <Icon name="heroicons:credit-card" class="w-4 h-4" />
               </div>
               <h2 id="pay-title" class="text-base sm:text-lg font-bold text-[#2D201B]">Process Payment</h2>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#F6EBDD] text-[#3D2B24] border border-[#D5BEAA]">
+                <Icon
+                  :name="selectedOrderType === 'delivery' ? 'heroicons:truck' : selectedOrderType === 'take_out' ? 'heroicons:shopping-bag' : 'heroicons:building-storefront'"
+                  class="w-3 h-3 text-[#7B5A50]"
+                />
+                {{ formatOrderType(selectedOrderType) }}
+              </span>
             </div>
             <button @click="closePayment" :disabled="isProcessingOrder" aria-label="Close payment" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-white rounded-lg border border-transparent hover:border-[#EFECE6] transition-all disabled:opacity-50">
               <Icon name="heroicons:x-mark" class="w-4 h-4" />
@@ -1990,6 +2034,10 @@ function formatCurrency(amount: number) {
                 <span class="text-xl font-black text-gray-900 tabular-nums">{{ formatCurrency(completedOrderDetails.total) }}</span>
               </div>
               <div class="flex justify-between items-center mb-2 text-xs text-gray-500">
+                <span>Order Type</span>
+                <span class="font-bold text-[#7B5A50]">{{ formatOrderType(completedOrderDetails.orderType) }}</span>
+              </div>
+              <div class="flex justify-between items-center mb-2 text-xs text-gray-500">
                 <span>Payment Method</span>
                 <span class="font-bold capitalize text-gray-800">{{ completedOrderDetails.paymentMethod }}</span>
               </div>
@@ -2001,13 +2049,13 @@ function formatCurrency(amount: number) {
           </div>
 
           <div class="p-3.5 border-t border-[#EFECE6] flex gap-2 bg-white shrink-0 emil-stagger-4">
-            <button @click="downloadCurrentReceipt" class="emil-btn-press flex-1 bg-white border border-[#D6C5B8] hover:bg-[#FBF7F2] text-[#2d201b] font-bold rounded-xl py-2.5 text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 shadow-2xs">
+            <button @click="downloadCurrentReceipt" class="emil-btn-press flex-1 bg-white border border-[#D6C5B8] hover:bg-[#FBF7F2] text-[#2d201b] font-bold rounded-xl py-2.5 text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer">
               <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 text-[#7B5A50]" /> Download
             </button>
-            <button @click="printReceipt" class="emil-btn-press flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl py-2.5 text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 shadow-2xs">
-              <Icon name="heroicons:printer" class="w-4 h-4 text-gray-600" /> Print
+            <button @click="printReceipt" class="emil-btn-press flex-1 bg-[#F3E5D4] hover:bg-[#E8D5BE] border border-[#C9AF96] text-[#2D201B] font-bold rounded-xl py-2.5 text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer">
+              <Icon name="heroicons:printer" class="w-4 h-4 text-[#7B5A50]" /> Print
             </button>
-            <button @click="closeReceipt" class="emil-btn-press flex-1 bg-[#7B5A50] hover:bg-[#65463D] text-white font-bold rounded-xl py-2.5 text-xs sm:text-sm transition-all shadow-sm">
+            <button @click="closeReceipt" class="emil-btn-press flex-1 bg-[#7B5A50] hover:bg-[#65463D] text-white font-bold rounded-xl py-2.5 text-xs sm:text-sm transition-all shadow-sm cursor-pointer">
               Next order
             </button>
           </div>
@@ -2093,6 +2141,10 @@ function formatCurrency(amount: number) {
         <div class="flex justify-between">
           <span>Cashier:</span>
           <span>{{ completedOrderDetails.staff }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span>Order Type:</span>
+          <span class="font-bold">{{ formatOrderType(completedOrderDetails.orderType) }}</span>
         </div>
       </div>
 

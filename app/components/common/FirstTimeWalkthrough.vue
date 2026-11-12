@@ -32,6 +32,12 @@ const {
   isFirstMission,
   nextMissionObject,
   isCompanionMinimized,
+  isMissionCheckpointOpen,
+  isPracticeMode,
+  lastCompletedMission,
+  currentPlanName,
+  isTrialPlan,
+  canAddBranchInWalkthrough,
   missionCelebration,
   isGrandFinaleOpen,
   toggleMission,
@@ -40,6 +46,10 @@ const {
   openGuide,
   startMission,
   startFullTour,
+  pauseToPractice,
+  guideToAddBranch,
+  guideToUpgradePlan,
+  continueToNextMission,
   nextStep,
   prevStep,
   goToStep,
@@ -567,60 +577,89 @@ function handleReplayTour() {
               </div>
             </div>
 
-            <!-- Popover Footer: Back, Step Indicators, Next Step -->
-            <div class="px-3.5 py-2.5 bg-[#FAF5EE] border-t border-[#3D2B24]/[0.06] flex items-center justify-between gap-2">
-              <!-- Back button -->
-              <button
-                v-if="!(isFirstMission && isFirstStepOfMission)"
-                type="button"
-                class="px-2.5 py-1 rounded-lg bg-[#3D2B24]/[0.06] hover:bg-[#3D2B24]/[0.12] active:scale-95 text-[11px] font-bold text-[#7D5A50] transition-all"
-                @click="prevStep"
-              >
-                ← Back
-              </button>
-              <div v-else />
-
-              <!-- Step dots -->
-              <div class="flex items-center gap-1">
+            <!-- Popover Footer: Back, Step Indicators, Stop/Try & Next Step (Emil Kowalski style) -->
+            <div class="px-3.5 py-2.5 bg-[#FAF5EE] border-t border-[#3D2B24]/[0.06] flex flex-col gap-2">
+              <div class="flex items-center justify-between gap-2">
+                <!-- Back button -->
                 <button
-                  v-for="(st, idx) in currentActiveMission.detailedSteps"
-                  :key="idx"
+                  v-if="!(isFirstMission && isFirstStepOfMission)"
                   type="button"
-                  class="h-1.5 rounded-full transition-all"
-                  :class="idx === activeStepIndex ? 'bg-[#7D5A50] w-3.5' : idx < activeStepIndex ? 'bg-emerald-500 w-1.5' : 'bg-[#EADAC5] w-1.5'"
-                  @click="goToStep(idx)"
-                  :title="`Go to Step ${idx + 1}`"
-                />
+                  class="px-2.5 py-1 rounded-lg bg-[#3D2B24]/[0.06] hover:bg-[#3D2B24]/[0.12] active:scale-[0.96] text-[11px] font-bold text-[#7D5A50] transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer"
+                  @click="prevStep"
+                >
+                  ← Back
+                </button>
+                <button
+                  v-else
+                  type="button"
+                  class="px-2.5 py-1 rounded-lg bg-[#3D2B24]/[0.05] hover:bg-[#3D2B24]/[0.10] active:scale-[0.96] text-[10px] font-semibold text-[#7D5A50] transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer"
+                  @click="pauseToPractice(false)"
+                  title="Pause tour to try clicking buttons yourself"
+                >
+                  Pause & Try
+                </button>
+
+                <!-- Step dots -->
+                <div class="flex items-center gap-1">
+                  <button
+                    v-for="(st, idx) in currentActiveMission.detailedSteps"
+                    :key="idx"
+                    type="button"
+                    class="h-1.5 rounded-full transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] cursor-pointer"
+                    :class="idx === activeStepIndex ? 'bg-[#7D5A50] w-4' : idx < activeStepIndex ? 'bg-emerald-500 w-1.5' : 'bg-[#EADAC5] w-1.5'"
+                    @click="goToStep(idx)"
+                    :title="`Go to Step ${idx + 1}`"
+                  />
+                </div>
+
+                <!-- Next Step Button (advances to next button or opens Mission Checkpoint!) -->
+                <button
+                  v-if="!isLastStepOfMission"
+                  type="button"
+                  class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#7D5A50] hover:bg-[#684940] active:scale-[0.96] text-white font-bold text-[11px] shadow-xs transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer"
+                  :class="showBlockedNotice ? 'ring-2 ring-amber-400 ring-offset-1 animate-pulse' : ''"
+                  @click="nextStep"
+                >
+                  <span>Next Step →</span>
+                </button>
+                <button
+                  v-else-if="!isLastMission"
+                  type="button"
+                  class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-[0.96] text-white font-bold text-[11px] shadow-xs transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer"
+                  :class="showBlockedNotice ? 'ring-2 ring-emerald-400 ring-offset-1 animate-pulse' : ''"
+                  @click="nextStep"
+                >
+                  <Icon name="heroicons:check-circle-20-solid" class="w-3.5 h-3.5" />
+                  <span>Complete Mission</span>
+                </button>
+                <button
+                  v-else
+                  type="button"
+                  class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-[0.96] text-white font-bold text-[11px] shadow-xs transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer"
+                  :class="showBlockedNotice ? 'ring-2 ring-emerald-400 ring-offset-1 animate-pulse' : ''"
+                  @click="nextStep"
+                >
+                  <span>Finish Setup</span>
+                </button>
               </div>
 
-              <!-- Next Step Button (advances to next button or next mission!) -->
-              <button
-                v-if="!isLastStepOfMission"
-                type="button"
-                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#7D5A50] hover:bg-[#684940] active:scale-95 text-white font-bold text-[11px] shadow-sm transition-all"
-                :class="showBlockedNotice ? 'ring-2 ring-amber-400 ring-offset-1 animate-pulse' : ''"
-                @click="nextStep"
+              <!-- Quick "Stop & Try It Now" action on the last step of Mission 1 (or any mission) -->
+              <div
+                v-if="isLastStepOfMission && !isLastMission"
+                class="pt-1.5 border-t border-[#3D2B24]/[0.06] flex items-center justify-between gap-2"
               >
-                <span>Next Step →</span>
-              </button>
-              <button
-                v-else-if="!isLastMission"
-                type="button"
-                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#7D5A50] hover:bg-[#684940] active:scale-95 text-white font-bold text-[11px] shadow-sm transition-all"
-                :class="showBlockedNotice ? 'ring-2 ring-amber-400 ring-offset-1 animate-pulse' : ''"
-                @click="nextStep"
-              >
-                <span>Next Mission</span>
-              </button>
-              <button
-                v-else
-                type="button"
-                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-[11px] shadow-sm transition-all"
-                :class="showBlockedNotice ? 'ring-2 ring-emerald-400 ring-offset-1 animate-pulse' : ''"
-                @click="nextStep"
-              >
-                <span>Finish Setup</span>
-              </button>
+                <span class="text-[10px] font-medium text-[#8B6656]">
+                  Want to set up your account first?
+                </span>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 text-[10px] font-bold text-[#3D2B24] hover:text-[#7D5A50] underline decoration-[#7D5A50]/40 underline-offset-2 active:scale-[0.97] transition-all cursor-pointer"
+                  @click="pauseToPractice(true)"
+                >
+                  <span>Stop & Try Now</span>
+                  <Icon name="heroicons:cursor-arrow-rays" class="w-3 h-3 text-[#7D5A50]" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -634,7 +673,7 @@ function handleReplayTour() {
     >
       <button
         type="button"
-        class="flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#3D2B24] hover:bg-[#2A1D18] active:scale-95 text-[#F5EBE1] shadow-2xl text-xs font-bold transition-all group"
+        class="flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#3D2B24] hover:bg-[#2A1D18] active:scale-95 text-[#F5EBE1] shadow-2xl text-xs font-bold transition-all group cursor-pointer"
         @click="isCompanionMinimized = false"
         title="Resume button walkthrough"
       >
@@ -644,6 +683,214 @@ function handleReplayTour() {
         <Icon name="heroicons:chevron-up" class="w-4 h-4 text-[#F5EBE1]/80 group-hover:translate-y-[-2px] transition-transform" />
       </button>
     </div>
+
+    <!-- ================= 3B. EMIL KOWALSKI MISSION COMPLETED CHECKPOINT (STOP & TRY vs CONTINUE) ================= -->
+    <Transition
+      enter-active-class="transition duration-250 ease-[cubic-bezier(0.16,1,0.3,1)]"
+      leave-active-class="transition duration-150 ease-in"
+      enter-from-class="opacity-0 translate-y-3.5 scale-[0.98]"
+      enter-to-class="opacity-100 translate-y-0 scale-100"
+      leave-from-class="opacity-100 translate-y-0 scale-100"
+      leave-to-class="opacity-0 translate-y-1.5 scale-[0.99]"
+    >
+      <div
+        v-if="isMissionCheckpointOpen && isEligible && isOwnerRoute"
+        class="fixed inset-0 z-[115] flex items-end sm:items-center justify-center p-4"
+      >
+        <!-- Scrim -->
+        <div
+          class="absolute inset-0 bg-[#3A2923]/45 transition-opacity"
+          @click="pauseToPractice(true)"
+        />
+
+        <!-- Dialog Panel (Matching DialogShell + Emil Kowalski precision) -->
+        <div
+          role="dialog"
+          aria-modal="true"
+          class="relative w-full max-w-[460px] rounded-[20px] bg-[#FFFDF9] border border-[#EDD8CC] overflow-hidden shadow-[0_28px_56px_-16px_rgba(58,41,35,0.35),0_3px_8px_rgba(58,41,35,0.08)] font-sans"
+        >
+          <!-- Blueprint-dotted header -->
+          <div class="relative h-[76px] bg-[#F6EBDD] [background-image:radial-gradient(#E3D3BF_1px,transparent_1px)] [background-size:16px_16px] px-6 flex items-center justify-end">
+            <span class="mr-9 inline-flex items-center gap-1.5 rounded-full bg-[#FFFDF9]/90 border border-[#E3D3BF] px-2.5 py-1 text-[11px] font-semibold text-[#7D5A50] tabular-nums">
+              <span class="size-1.5 rounded-full bg-[#2E7D5B]" />
+              Mission {{ activeMissionIndex + 1 }} of {{ totalMissions }} · {{ missionsProgressPercent }}%
+            </span>
+
+            <button
+              type="button"
+              class="absolute right-3 top-3 size-8 rounded-full flex items-center justify-center text-[#7D5A50] hover:bg-[#EDD8CC]/70 active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] transition-all duration-150 cursor-pointer"
+              aria-label="Close and practice"
+              @click="pauseToPractice(true)"
+            >
+              <Icon name="heroicons:x-mark" class="size-[18px]" />
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="px-6 pb-6">
+            <!-- Overlapping tone tile -->
+            <span class="-mt-7 relative flex size-[52px] items-center justify-center rounded-[16px] border-4 border-[#FFFDF9] bg-[#E8F3EE] text-[#2E7D5B]">
+              <Icon name="heroicons:check-20-solid" class="size-6" />
+            </span>
+
+            <!-- Title -->
+            <h2 class="mt-3 font-display font-bold text-[22px] leading-[1.2] tracking-[-0.01em] text-[#3D2B24] text-balance">
+              {{ (lastCompletedMission || currentActiveMission)?.title.replace(/^\d+\.\s*/, '') }}
+            </h2>
+
+            <!-- Description (Role & Subscription aware after Mission 1) -->
+            <p
+              v-if="isOwner && (lastCompletedMission || currentActiveMission)?.id === 'mission-branch'"
+              class="mt-2 text-[14px] leading-[1.55] text-[#6B5A52]"
+            >
+              <template v-if="canAddBranchInWalkthrough">
+                Mission 1 is complete. Your <strong class="font-semibold text-[#3D2B24]">{{ currentPlanName || 'subscription' }}</strong> supports multiple branches—you can stop the tour now to add a new branch, or continue to the next mission.
+              </template>
+              <template v-else>
+                Mission 1 is complete. Stop the tour now to configure your operating hours and main branch details, or continue straight to the next mission.
+              </template>
+            </p>
+            <p v-else class="mt-2 text-[14px] leading-[1.55] text-[#6B5A52]">
+              You’ve completed this mission. Stop the tour now to try these controls and set up your account, or continue to the next mission.
+            </p>
+
+            <!-- Subtle Subscription / Trial Plan callout after Mission 1 -->
+            <div
+              v-if="isOwner && (lastCompletedMission || currentActiveMission)?.id === 'mission-branch' && !canAddBranchInWalkthrough"
+              class="mt-3.5 flex items-center justify-between gap-3 rounded-[12px] bg-[#FBF4EB] border border-[#EDD8CC] px-3.5 py-2.5 text-[12px] text-[#6B5A52]"
+            >
+              <span class="flex items-center gap-2 min-w-0">
+                <Icon name="heroicons:lock-closed-16-solid" class="size-3.5 text-[#A96746] shrink-0" />
+                <span class="truncate">
+                  <strong class="font-semibold text-[#3D2B24]">{{ isTrialPlan ? 'Trial Plan' : (currentPlanName || 'Current Plan') }}:</strong> Adding extra branches requires a paid multi-branch plan.
+                </span>
+              </span>
+              <button
+                type="button"
+                class="shrink-0 font-semibold text-[#7D5A50] hover:text-[#3D2B24] underline underline-offset-2 transition-colors cursor-pointer"
+                @click="guideToUpgradePlan"
+              >
+                Upgrade
+              </button>
+            </div>
+
+            <!-- Compact Segmented Progress Box -->
+            <div class="mt-4 rounded-[14px] bg-[#FAF5EE] border border-[#EDD8CC] px-4 py-3.5 space-y-2.5">
+              <div class="flex items-center justify-between text-[12px]">
+                <span class="font-medium text-[#7D5A50]">Setup progress</span>
+                <span class="font-semibold text-[#3D2B24] tabular-nums">{{ completedMissionsCount }} of {{ totalMissions }} completed</span>
+              </div>
+
+              <div class="grid gap-1.5" :style="{ gridTemplateColumns: `repeat(${totalMissions}, minmax(0, 1fr))` }">
+                <div
+                  v-for="(m, idx) in missions"
+                  :key="m.id"
+                  class="h-1.5 rounded-full transition-colors duration-300"
+                  :class="completedMissionIds.includes(m.id)
+                    ? 'bg-[#2E7D5B]'
+                    : idx === activeMissionIndex + 1
+                      ? 'bg-[#7D5A50]/60'
+                      : 'bg-[#E5D5C3]'"
+                  :title="m.title"
+                />
+              </div>
+
+              <div v-if="nextMissionObject" class="flex items-center justify-between gap-2 pt-0.5 text-[12px] text-[#6B5A52]">
+                <span class="truncate">
+                  Next: <strong class="font-semibold text-[#3D2B24]">{{ nextMissionObject.title }}</strong>
+                </span>
+              </div>
+            </div>
+
+            <!-- Clean Action Row (Emil Kowalski / DialogShell button proportions) -->
+            <div class="mt-6 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2.5">
+              <button
+                v-if="nextMissionObject"
+                type="button"
+                class="whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold border border-[#EDD8CC] bg-white text-[#3D2B24] hover:bg-[#F6EBDD] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFFDF9] focus-visible:ring-[#7D5A50] transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer inline-flex items-center justify-center gap-1.5"
+                @click="continueToNextMission"
+              >
+                <span>Next mission</span>
+                <Icon name="heroicons:arrow-right-16-solid" class="size-3.5 text-[#7D5A50]" />
+              </button>
+
+              <!-- If Owner finished Mission 1 and has a paid Multi-Branch plan, offer 1-click Add Branch -->
+              <button
+                v-if="isOwner && (lastCompletedMission || currentActiveMission)?.id === 'mission-branch' && canAddBranchInWalkthrough"
+                type="button"
+                class="whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold border border-[#EDD8CC] bg-[#FAF5EE] text-[#3D2B24] hover:bg-[#F1E6D8] active:scale-[0.98] transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer inline-flex items-center justify-center gap-1.5"
+                @click="pauseToPractice(true)"
+              >
+                <span>Stop & try</span>
+              </button>
+
+              <button
+                v-if="isOwner && (lastCompletedMission || currentActiveMission)?.id === 'mission-branch' && canAddBranchInWalkthrough"
+                type="button"
+                data-autofocus
+                class="whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold bg-[#3A2923] text-white hover:bg-[#2C1E19] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFFDF9] focus-visible:ring-[#3A2923] transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer inline-flex items-center justify-center gap-1.5"
+                @click="guideToAddBranch"
+              >
+                <Icon name="heroicons:plus-16-solid" class="size-4" />
+                <span>Add branch now</span>
+              </button>
+
+              <!-- Default Primary Action: Stop & Set Up Account -->
+              <button
+                v-else
+                type="button"
+                data-autofocus
+                class="whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold bg-[#3A2923] text-white hover:bg-[#2C1E19] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFFDF9] focus-visible:ring-[#3A2923] transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer inline-flex items-center justify-center gap-1.5"
+                @click="pauseToPractice(true)"
+              >
+                <span>Stop & set up account</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ================= 3C. EMIL KOWALSKI PRACTICE MODE FLOATING DOCK ================= -->
+    <Transition
+      enter-active-class="transition duration-250 ease-[cubic-bezier(0.16,1,0.3,1)]"
+      leave-active-class="transition duration-150 ease-in"
+      enter-from-class="opacity-0 translate-y-3 scale-[0.98]"
+      enter-to-class="opacity-100 translate-y-0 scale-100"
+      leave-from-class="opacity-100 translate-y-0 scale-100"
+      leave-to-class="opacity-0 translate-y-2 scale-[0.98]"
+    >
+      <div
+        v-if="isPracticeMode && !isMissionGuideActive && !isMissionCheckpointOpen && isEligible && isOwnerRoute"
+        class="fixed bottom-5 right-5 z-[95]"
+      >
+        <div class="flex items-center gap-3 rounded-[14px] bg-[#FFFDF9] border border-[#EDD8CC] px-3.5 py-2.5 shadow-[0_18px_40px_-12px_rgba(58,41,35,0.28),0_2px_6px_rgba(58,41,35,0.06)] font-sans">
+          <span class="size-2 rounded-full bg-[#2E7D5B] shrink-0" />
+          <div class="text-[12px] text-[#3D2B24] pr-1">
+            <span class="font-semibold">Practice mode</span>
+            <span class="mx-1.5 text-[#C9B3A3]">·</span>
+            <span class="text-[#7D5A50] tabular-nums">{{ completedMissionsCount }}/{{ totalMissions }} done</span>
+          </div>
+          <button
+            v-if="nextMissionObject"
+            type="button"
+            class="rounded-[8px] bg-[#3A2923] hover:bg-[#2C1E19] active:scale-[0.97] px-3 py-1.5 text-[12px] font-semibold text-white transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer inline-flex items-center gap-1"
+            @click="continueToNextMission"
+          >
+            <span>Next mission</span>
+            <Icon name="heroicons:arrow-right-16-solid" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            class="size-6 rounded-md flex items-center justify-center text-[#7D5A50] hover:bg-[#F6EBDD] active:scale-[0.94] transition-all cursor-pointer"
+            @click="isPracticeMode = false"
+            aria-label="Dismiss practice bar"
+          >
+            <Icon name="heroicons:x-mark-16-solid" class="size-4" />
+          </button>
+        </div>
+      </div>
+    </Transition>
 
     <!-- ================= 4. GRAND FINALE CELEBRATION MODAL ================= -->
     <Transition

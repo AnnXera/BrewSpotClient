@@ -68,6 +68,7 @@ export interface TransactionLogRow {
     cashier: string | null // null: rung up without a signed-in staff member
     items: number
     payment_method: string | null
+    order_type?: string | null
     discount_type: string | null
     discount_amount: number
     total_amount: number

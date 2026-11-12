@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import logoFull from '~/assets/images/logo-with-tag.svg'
 import { getRedirectForRole, getSafeRedirect } from '~/utils/roleRedirects'
+import { isStandalonePwaWindow } from '~/composables/useA2HS'
 
 const route = useRoute()
 const email = ref((route.query.email as string) || '')
@@ -113,7 +114,15 @@ async function handleVerify() {
       token.value = res.token
       authStore.setSession(res.user, res.role)
 
-      navigateTo(redirect ?? getRedirectForRole(res.role))
+      try {
+        sessionStorage.setItem('pos_setup_login_done', '1')
+      } catch {}
+
+      if (isStandalonePwaWindow() || redirect === '/pos/setup') {
+        navigateTo('/pos/setup', { replace: true })
+      } else {
+        navigateTo(redirect ?? getRedirectForRole(res.role))
+      }
     } else {
       error.value = res.message || 'That code did not work. Check it and try again.'
       resetDigits()

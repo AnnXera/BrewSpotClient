@@ -3,6 +3,7 @@
 import { useRoute } from 'vue-router'
 import logoFull from '~/assets/images/logo-with-tag.svg'
 import { getSafeRedirect } from '~/utils/roleRedirects'
+import { isStandalonePwaWindow } from '~/composables/useA2HS'
 
 const route = useRoute()
 const notice = ref((route.query.notice as string) || '')
@@ -38,7 +39,9 @@ async function handleLogin() {
     const res = await authService.login(form.email, form.password)
 
     if (res.success && res.requires_2fa) {
-      const redirect = getSafeRedirect(route.query.redirect)
+      const redirect = isStandalonePwaWindow()
+        ? '/pos/setup'
+        : getSafeRedirect(route.query.redirect)
       navigateTo({ path: '/verify-login-code', query: { email: form.email, ...(redirect ? { redirect } : {}) } })
     } else {
       errors.auth = res.message

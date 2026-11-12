@@ -43,11 +43,94 @@ export interface SetupMission {
   proTip: string
 }
 
-// 1. THE 7 CORE OWNER SETUP MISSIONS (Focusing on anchored button-by-button on-screen teaching)
+// 1. THE 7 CORE OWNER SETUP MISSIONS (Starting with 1. Cafe Management)
 export const OWNER_SETUP_MISSIONS: SetupMission[] = [
   {
+    id: 'mission-branch',
+    title: '1. Cafe Management & Branch Setup',
+    subtitle: 'Manage cafe branches, operating hours, and create new branches',
+    route: '/owner/cafes',
+    badge: 'Essential',
+    priority: 'Essential',
+    icon: 'heroicons:building-storefront',
+    actionText: 'Open Cafe Management',
+    description: 'Start in Cafe Management to set your daily opening and closing hours, review branch summary cards, and add/create new cafe branches (requires an active paid subscription with Multi-Branch access; Trial Plan is not allowed to add extra branches). Then open a branch to inspect its details, employees, and floor plans.',
+    steps: [
+      'Click Cafe Operating Hours to set weekly schedule',
+      'Review Branch KPI Summary Cards',
+      'Search branches & Filter status toolbar',
+      'Click "+ Add Branch" to create a branch (Paid Subscription required; Trial Plan not allowed)',
+      'Open a branch from the list',
+      'Branch Details tab: info, BIR document, POS registers',
+      'Employees tab: staff assigned to the branch',
+      'Floor Plans tab: dining layout built by the manager'
+    ],
+    detailedSteps: [
+      {
+        title: 'Cafe Operating Hours Button',
+        instruction: 'Click here to open and customize your store\'s weekly schedule (Monday through Sunday) and mark rest days.',
+        proTip: 'Your live Open/Closed status in the top header is calculated directly from these hours.',
+        targetHint: 'Operating Hours Panel Button',
+        targetSelector: '[data-walkthrough="cafe-hours-btn"]'
+      },
+      {
+        title: 'Branch KPI Summary Cards',
+        instruction: 'Overview cards showing total branches, active cafe locations, and pending counter hardware registrations.',
+        proTip: 'Multi-store owners can track all locations from this single dashboard row.',
+        targetHint: 'KPI Metrics Grid',
+        targetSelector: '[data-walkthrough="cafe-kpis"]'
+      },
+      {
+        title: 'Branch Search & Status Filter Bar',
+        instruction: 'Search branches by name or filter by Active, Pending, or Inactive status.',
+        proTip: 'Store phone numbers and addresses entered here print on all POS customer receipts.',
+        targetHint: 'Filter & Search Bar',
+        targetSelector: '[data-walkthrough="cafe-filter-bar"]'
+      },
+      {
+        title: 'Add Branch Button (Paid Subscription)',
+        instruction: 'Click "+ Add Branch" to create and register a new cafe branch. Note: Trial Plan accounts are not allowed to add extra branches—an active paid subscription with Multi-Branch access is required!',
+        proTip: 'Once this 1st mission finishes, we will guide you to create/add a branch right away if you have an active subscription.',
+        targetHint: 'Add Branch Button',
+        targetSelector: '[data-walkthrough="cafe-add-branch-btn"], [data-walkthrough="cafe-filter-bar"]'
+      },
+      {
+        title: 'Open a Branch',
+        instruction: 'Click any branch in this list to open its details page. Press Next Step and the tour will open your first branch for you.',
+        proTip: 'Each branch has its own details, employees, and floor plans.',
+        targetHint: 'Branch list',
+        targetSelector: '[data-walkthrough="cafe-branch-list"]'
+      },
+      {
+        title: 'Branch Details Tab',
+        instruction: 'The Branch Details tab shows the branch name, address, email, and phone number, the BIR document with its TIN and VAT type, and the POS Registers connected to this branch.',
+        proTip: 'The POS Registers card shows which counter devices are registered and who is signed in on each.',
+        targetHint: 'Branch Details tab',
+        targetSelector: '[data-walkthrough="branch-tab-details"]',
+        route: 'owner-first-branch?tab=details'
+      },
+      {
+        title: 'Employees Tab',
+        instruction: 'The Employees tab lists every manager and cashier assigned to this branch. Click an employee to see their full details.',
+        proTip: 'Check this list before a shift so every cashier on duty can sign in to the register.',
+        targetHint: 'Employees tab',
+        targetSelector: '[data-walkthrough="cafe-employees-tab"]',
+        route: 'owner-first-branch?tab=employees'
+      },
+      {
+        title: 'Floor Plans Tab',
+        instruction: 'The Floor Plans tab shows the dining layouts your branch manager has built: tables, seats, and fixtures. Owners can view them here; managers edit them in their Floor Plan page.',
+        proTip: 'Saved floor plans appear on the POS so cashiers can assign dine-in orders to tables.',
+        targetHint: 'Floor Plans tab',
+        targetSelector: '[data-walkthrough="branch-tab-floor-plans"]',
+        route: 'owner-first-branch?tab=floor-plans'
+      }
+    ],
+    proTip: 'After completing this 1st mission, you can immediately create/add a branch if you have a paid subscription (Trial Plan is limited to 1 main branch).'
+  },
+  {
     id: 'mission-menu',
-    title: '1. Menu Management & Pricing',
+    title: '2. Menu Management & Pricing',
     subtitle: 'Create food & drinks, sizes, and temperature pricing',
     route: '/owner/menu-management',
     badge: 'Essential',
@@ -95,7 +178,7 @@ export const OWNER_SETUP_MISSIONS: SetupMission[] = [
   },
   {
     id: 'mission-ingredients',
-    title: '2. Raw Ingredients & Recipe Auto-Deductions',
+    title: '3. Raw Ingredients & Recipe Auto-Deductions',
     subtitle: 'Set up stock units and link recipe consumption',
     route: '/owner/menu-management/ingredients',
     badge: 'Essential',
@@ -140,89 +223,6 @@ export const OWNER_SETUP_MISSIONS: SetupMission[] = [
       }
     ],
     proTip: 'Linking recipes to cup sizes eliminates manual inventory counting and prevents running out of beans or syrups during peak morning rushes.'
-  },
-  {
-    id: 'mission-branch',
-    title: '3. Branch Operating Hours & Details',
-    subtitle: 'Configure store hours, location, and Open/Closed status',
-    route: '/owner/cafes',
-    badge: 'High',
-    priority: 'High',
-    icon: 'heroicons:building-storefront',
-    actionText: 'Open Branch Settings',
-    description: 'Manage your cafe locations. Set your daily opening and closing hours, update address and phone numbers, and ensure customers and baristas know active operational times. Then open a branch to review its details, employees, and floor plans.',
-    steps: [
-      'Click Cafe Operating Hours to set weekly schedule',
-      'Review Branch KPI Summary Cards',
-      'Search branches & Add Branch toolbar',
-      'Check top-left live Open/Closed ticker',
-      'Open a branch from the list',
-      'Branch Details tab: info, BIR document, POS registers',
-      'Employees tab: staff assigned to the branch',
-      'Floor Plans tab: dining layout built by the manager'
-    ],
-    detailedSteps: [
-      {
-        title: 'Cafe Operating Hours Button',
-        instruction: 'Click here to open and customize your store\'s weekly schedule (Monday through Sunday) and mark rest days.',
-        proTip: 'Your live Open/Closed status in the top header is calculated directly from these hours.',
-        targetHint: 'Operating Hours Panel Button',
-        targetSelector: '[data-walkthrough="cafe-hours-btn"]'
-      },
-      {
-        title: 'Branch KPI Summary Cards',
-        instruction: 'Overview cards showing total branches, active cafe locations, and pending counter hardware registrations.',
-        proTip: 'Multi-store owners can track all locations from this single dashboard row.',
-        targetHint: 'KPI Metrics Grid',
-        targetSelector: '[data-walkthrough="cafe-kpis"]'
-      },
-      {
-        title: 'Branch Filter & Add Toolbar',
-        instruction: 'Search branches by name, filter by status, or click "Add Branch" to open a new location.',
-        proTip: 'Store phone numbers and addresses entered here print on all POS customer receipts.',
-        targetHint: 'Filter & Search Bar',
-        targetSelector: '[data-walkthrough="cafe-filter-bar"]'
-      },
-      {
-        title: 'Live Operating Status Ticker',
-        instruction: 'Notice the top header: it automatically alternates between the current date and a glowing green "Open now" or red "Closed now" indicator.',
-        proTip: 'If the indicator shows "Closed now" during store hours, check your opening schedule in step 1.',
-        targetHint: 'Header Status Ticker',
-        targetSelector: '[data-walkthrough="feat-ticker"], .tabular-nums, header'
-      },
-      {
-        title: 'Open a Branch',
-        instruction: 'Click any branch in this list to open its details page. Press Next Step and the tour will open your first branch for you.',
-        proTip: 'Each branch has its own details, employees, and floor plans.',
-        targetHint: 'Branch list',
-        targetSelector: '[data-walkthrough="cafe-branch-list"]'
-      },
-      {
-        title: 'Branch Details Tab',
-        instruction: 'The Branch Details tab shows the branch name, address, email, and phone number, the BIR document with its TIN and VAT type, and the POS Registers connected to this branch.',
-        proTip: 'The POS Registers card shows which counter devices are registered and who is signed in on each.',
-        targetHint: 'Branch Details tab',
-        targetSelector: '[data-walkthrough="branch-tab-details"]',
-        route: 'owner-first-branch?tab=details'
-      },
-      {
-        title: 'Employees Tab',
-        instruction: 'The Employees tab lists every manager and cashier assigned to this branch. Click an employee to see their full details.',
-        proTip: 'Check this list before a shift so every cashier on duty can sign in to the register.',
-        targetHint: 'Employees tab',
-        targetSelector: '[data-walkthrough="cafe-employees-tab"]',
-        route: 'owner-first-branch?tab=employees'
-      },
-      {
-        title: 'Floor Plans Tab',
-        instruction: 'The Floor Plans tab shows the dining layouts your branch manager has built: tables, seats, and fixtures. Owners can view them here; managers edit them in their Floor Plan page.',
-        proTip: 'Saved floor plans appear on the POS so cashiers can assign dine-in orders to tables.',
-        targetHint: 'Floor Plans tab',
-        targetSelector: '[data-walkthrough="branch-tab-floor-plans"]',
-        route: 'owner-first-branch?tab=floor-plans'
-      }
-    ],
-    proTip: 'The dashboard’s live operating ticker switches between "Open now" and "Closed now" automatically based on the hours you define here.'
   },
   {
     id: 'mission-analytics',
@@ -746,6 +746,17 @@ export const CASHIER_SETUP_MISSIONS: SetupMission[] = [
 // 4. DETAILED EXPLANATION OF EVERY BUTTON & FEATURE ON THE DASHBOARD
 export const DASHBOARD_FEATURES: DashboardFeature[] = [
   {
+    id: 'feat-cafe-management',
+    name: 'Cafe Management & Add Branch Control',
+    location: 'Left Navigation: Cafe Management',
+    icon: 'heroicons:building-storefront',
+    color: 'text-amber-800 bg-amber-50 border-amber-200',
+    badge: 'Store & Branch Setup',
+    summary: 'Manage your cafe locations, configure weekly operating hours, inspect branch details, and add new branches.',
+    details: 'Central hub for configuring cafe-wide opening hours, viewing active/inactive branches, inspecting BIR documents, managing branch employees, and creating new branches (requires a paid subscription with Multi-Branch access; Trial Plan is limited to 1 main branch).',
+    tips: 'Complete the 1st Setup Mission (Cafe Management) first—if you have a paid subscription, you can immediately add a new branch right after the mission!'
+  },
+  {
     id: 'feat-refresh',
     name: 'Refresh Button',
     location: 'Top Right Header',
@@ -1003,6 +1014,9 @@ const isMissionGuideActive = ref(false)
 const activeMissionIndex = ref(0)
 const activeStepIndex = ref(0)
 const isCompanionMinimized = ref(false)
+const isMissionCheckpointOpen = ref(false)
+const isPracticeMode = ref(false)
+const lastCompletedMission = ref<SetupMission | null>(null)
 const missionCelebration = ref<{ show: boolean; title: string; subtitle: string } | null>(null)
 const isGrandFinaleOpen = ref(false)
 
@@ -1105,6 +1119,9 @@ export function useFirstTimeWalkthrough() {
   const resetProgress = () => {
     completedMissionIds.value = []
     isMissionGuideActive.value = false
+    isMissionCheckpointOpen.value = false
+    isPracticeMode.value = false
+    lastCompletedMission.value = null
     activeMissionIndex.value = 0
     activeStepIndex.value = 0
     isGrandFinaleOpen.value = false
@@ -1200,6 +1217,8 @@ export function useFirstTimeWalkthrough() {
     activeMissionIndex.value = idx >= 0 ? idx : 0
     activeStepIndex.value = stepIdx
     isGuideModalOpen.value = false
+    isMissionCheckpointOpen.value = false
+    isPracticeMode.value = false
     isMissionGuideActive.value = true
     isCompanionMinimized.value = false
 
@@ -1226,6 +1245,63 @@ export function useFirstTimeWalkthrough() {
     }
   }
 
+  // Stop / Pause tour after Mission 1 (or any mission) so the user can try setting up their account freely
+  const pauseToPractice = (markCurrentDone: boolean = true) => {
+    const current = currentActiveMission.value
+    if (markCurrentDone && current) {
+      markMissionComplete(current.id)
+      lastCompletedMission.value = current
+    }
+    isMissionGuideActive.value = false
+    isMissionCheckpointOpen.value = false
+    isCompanionMinimized.value = false
+    isPracticeMode.value = true
+
+    missionCelebration.value = {
+      show: true,
+      title: 'Practice Mode Unlocked!',
+      subtitle: 'Buttons are now unlocked—try setting up your account right here. Click "Continue Tour" at the bottom-right anytime.'
+    }
+    setTimeout(() => {
+      if (missionCelebration.value) {
+        missionCelebration.value.show = false
+      }
+    }, 4200)
+  }
+
+  // Continue from checkpoint or practice mode to the next mission
+  const continueToNextMission = () => {
+    isMissionCheckpointOpen.value = false
+    isPracticeMode.value = false
+
+    if (activeMissionIndex.value < totalMissions.value - 1) {
+      activeMissionIndex.value++
+      activeStepIndex.value = 0
+      const nextMissionObj = currentRoleMissions.value[activeMissionIndex.value]
+      if (!nextMissionObj) return
+
+      isMissionGuideActive.value = true
+      isCompanionMinimized.value = false
+
+      missionCelebration.value = {
+        show: true,
+        title: `Starting Mission ${activeMissionIndex.value + 1}`,
+        subtitle: `Navigating to: ${nextMissionObj.title}...`
+      }
+      setTimeout(() => {
+        if (missionCelebration.value) {
+          missionCelebration.value.show = false
+        }
+      }, 3500)
+
+      if (route.path !== nextMissionObj.route) {
+        router.push(nextMissionObj.route)
+      }
+    } else {
+      finishAllMissions()
+    }
+  }
+
   // Step progression: Next Step
   const nextStep = () => {
     const stepsCount = totalStepsInActiveMission.value
@@ -1237,32 +1313,13 @@ export function useFirstTimeWalkthrough() {
       const completedMission = currentActiveMission.value
       if (completedMission) {
         markMissionComplete(completedMission.id)
+        lastCompletedMission.value = completedMission
       }
 
       if (activeMissionIndex.value < totalMissions.value - 1) {
-        // DOES NOT STOP! Continues to the next mission's screen!
-        activeMissionIndex.value++
-        activeStepIndex.value = 0
-        const nextMissionObj = currentRoleMissions.value[activeMissionIndex.value]
-
-        if (!nextMissionObj) return
-
-        // Trigger celebratory transition banner
-        missionCelebration.value = {
-          show: true,
-          title: 'Mission Complete!',
-          subtitle: `Great job! Continuing directly to: ${nextMissionObj.title}...`
-        }
-        setTimeout(() => {
-          if (missionCelebration.value) {
-            missionCelebration.value.show = false
-          }
-        }, 4000)
-
-        // Navigate to the next mission page while keeping guide active!
-        if (route.path !== nextMissionObj.route) {
-          router.push(nextMissionObj.route)
-        }
+        // Pause & show Emil Kowalski Mission Checkpoint so the user can stop and try setting up their account after Mission 1 (or any mission), or continue!
+        isMissionGuideActive.value = false
+        isMissionCheckpointOpen.value = true
       } else {
         // Last step of the final mission! All missions completed!
         finishAllMissions()
@@ -1330,12 +1387,15 @@ export function useFirstTimeWalkthrough() {
   const finishAllMissions = () => {
     currentRoleMissions.value.forEach(m => markMissionComplete(m.id))
     isMissionGuideActive.value = false
+    isMissionCheckpointOpen.value = false
+    isPracticeMode.value = false
     isGrandFinaleOpen.value = true
     dismissGuide()
   }
 
   const exitMissionGuide = () => {
     isMissionGuideActive.value = false
+    isMissionCheckpointOpen.value = false
   }
 
   // Resolve the page a step lives on. Falls back to the mission route when a
@@ -1432,6 +1492,9 @@ export function useFirstTimeWalkthrough() {
     isFirstMission,
     nextMissionObject,
     isCompanionMinimized,
+    isMissionCheckpointOpen,
+    isPracticeMode,
+    lastCompletedMission,
     missionCelebration,
     isGrandFinaleOpen,
     toggleMission,
@@ -1441,6 +1504,8 @@ export function useFirstTimeWalkthrough() {
     openGuide,
     startMission,
     startFullTour,
+    pauseToPractice,
+    continueToNextMission,
     nextStep,
     prevStep,
     skipToNextMission,

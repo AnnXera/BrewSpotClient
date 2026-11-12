@@ -29,6 +29,7 @@ const branchUuid = ref('') // a manager runs exactly one branch
 
 const categoryName = ref('')
 const items = ref<CategoryServingItem[]>([])
+const lowStockThresholdPercent = ref<number | null>(null)
 const page = ref(1)
 const lastPage = ref(1)
 const search = ref('')
@@ -113,6 +114,7 @@ async function load() {
     categoryName.value = res.category.name
     items.value = res.items.data
     lastPage.value = res.items.last_page
+    lowStockThresholdPercent.value = res.low_stock_threshold_percent ?? null
     errorMessage.value = ''
   } catch (e: any) {
     failure(e, 'Could not load this category.')
@@ -223,6 +225,13 @@ onBeforeUnmount(() => {
               <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">
                 {{ categoryName || 'Category Items' }}
               </h1>
+              <span
+                v-if="lowStockThresholdPercent"
+                class="inline-flex items-center gap-1 rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-amber-800"
+              >
+                <Icon name="heroicons:bell-alert" class="w-3.5 h-3.5 text-amber-600" />
+                Low Stock Alert: ≤{{ lowStockThresholdPercent }}%
+              </span>
               <span
                 v-if="dirtyCount"
                 class="inline-block rounded-md border border-amber-300 bg-amber-50 px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-amber-800 animate-pulse"

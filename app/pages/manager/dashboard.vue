@@ -5,6 +5,7 @@ import type { DashboardRange } from '~/services/OwnerProfileService'
 import type { ManagedBranchInfo, ManagerDashboardStats } from '~/services/ManagerDashboardService'
 import { formatSpan } from '~/utils/dashboardFormat'
 import type { PlanLock } from '~/utils/planLock'
+import MissionProgressCard from '~/components/dashboard/MissionProgressCard.vue'
 import ManagerTotals from '~/components/manager/ManagerTotals.vue'
 import ManagerIncomeChart from '~/components/manager/ManagerIncomeChart.vue'
 import ManagerReservationsCard from '~/components/manager/ManagerReservationsCard.vue'
@@ -176,6 +177,9 @@ const { isOpenNow } = useOperatingHours()
           :refreshing="refreshing"
           @refresh="refreshAll"
         />
+
+        <!-- Setup Missions / User Tasks Progress Bar -->
+        <MissionProgressCard />
 
         <!-- Error Alert -->
         <div

@@ -46,6 +46,7 @@ export interface BranchDetail {
     uuid: string
     branch_name: string
     cafe_name?: string | null
+    low_stock_threshold_percent?: number | null
     cafe_picture_url: string | null
     cafe_email: string | null
     cafe_phonenumber: string | null
@@ -69,7 +70,27 @@ export class OwnerProfileService extends BaseService {
         const params: Record<string, any> = { per_page: perPage, page }
         if (search) params.search = search
         if (status) params.status = status
-        return this.get<{ success: boolean; cafe_name: string | null; main_tin_prefix?: string | null; branches: Paginated<BranchSummary> }>('/owner/branches', params)
+        return this.get<{
+            success: boolean
+            cafe_name: string | null
+            low_stock_threshold_percent?: number | null
+            main_tin_prefix?: string | null
+            branches: Paginated<BranchSummary>
+        }>('/owner/branches', params)
+    }
+
+    getLowStockThreshold() {
+        return this.get<{ success: boolean; low_stock_threshold_percent: number | null }>('/owner/low-stock-threshold')
+    }
+
+    updateLowStockThreshold(lowStockThresholdPercent: number) {
+        return this.put<{
+            success: boolean
+            message: string
+            low_stock_threshold_percent: number
+        }>('/owner/low-stock-threshold', {
+            low_stock_threshold_percent: lowStockThresholdPercent,
+        })
     }
 
     createBranch(payload: FormData | Record<string, any>) {
