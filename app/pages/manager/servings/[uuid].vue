@@ -2,6 +2,7 @@
 <!-- One category's items: set each item's daily limit and switch it on or off for today, then Save Changes. -->
 <script setup lang="ts">
 import type { PlanLock } from '~/utils/planLock'
+import DialogShell from '~/components/common/DialogShell.vue'
 import DropdownList from '~/components/common/DropdownList.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
 import CommonPagination from '~/components/common/Pagination.vue'
@@ -166,9 +167,40 @@ watch(sort, () => {
 })
 watch(page, load)
 
-onBeforeRouteLeave(() => {
-  if (dirtyCount.value && !window.confirm('You have unsaved changes. Leave without saving?')) return false
+// Unsaved-changes guard: hold the navigation, ask in a modal, then resume it if the manager chooses to leave.
+const leaveTarget = ref<string | null>(null)
+let allowLeave = false
+
+onBeforeRouteLeave((to) => {
+  if (allowLeave || !dirtyCount.value) return
+  leaveTarget.value = to.fullPath
+  return false
 })
+
+function stayOnPage() {
+  if (saving.value) return
+  leaveTarget.value = null
+}
+
+function proceedLeave() {
+  const target = leaveTarget.value
+  leaveTarget.value = null
+  if (!target) return
+  allowLeave = true
+  navigateTo(target)
+}
+
+function discardAndLeave() {
+  drafts.value = {}
+  proceedLeave()
+}
+
+async function saveAndLeave() {
+  await save()
+  // save() clears drafts only on success; on failure keep the manager here to fix the highlighted items.
+  if (dirtyCount.value) leaveTarget.value = null
+  else proceedLeave()
+}
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
   if (dirtyCount.value) e.preventDefault()
@@ -359,6 +391,46 @@ onBeforeUnmount(() => {
       :description="toastDescription"
       @close="toastShow = false"
     />
+
+    <!-- Unsaved changes guard -->
+    <DialogShell
+      :open="!!leaveTarget"
+      title="Leave without saving?"
+      :message="`You have ${dirtyCount} unsaved change${dirtyCount === 1 ? '' : 's'} in ${categoryName || 'this category'}. If you leave now, ${dirtyCount === 1 ? 'it' : 'they'} will be lost.`"
+      tone="warn"
+      icon="heroicons:exclamation-triangle"
+      :busy="saving"
+      @close="stayOnPage"
+    >
+      <template #actions>
+        <button
+          type="button"
+          data-autofocus
+          :disabled="saving"
+          class="whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold bg-transparent text-[#5E4A42] border border-[#DED4CA] hover:bg-[#F1E9DE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFFDF9] focus-visible:ring-[#7D5A50] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          @click="stayOnPage"
+        >
+          Keep editing
+        </button>
+        <button
+          type="button"
+          :disabled="saving"
+          class="whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold bg-transparent text-[#9E4F47] border border-[#E7C9C4] hover:bg-[#F3DFDC] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFFDF9] focus-visible:ring-[#9E4F47] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          @click="discardAndLeave"
+        >
+          Discard changes
+        </button>
+        <button
+          type="button"
+          :disabled="saving"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold text-white bg-[#3A2923] hover:bg-[#2C1E19] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFFDF9] focus-visible:ring-[#3A2923] transition-colors disabled:opacity-70 disabled:cursor-wait"
+          @click="saveAndLeave"
+        >
+          <Icon v-if="saving" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
+          {{ saving ? 'Saving...' : 'Save & leave' }}
+        </button>
+      </template>
+    </DialogShell>
   </div>
 </template>
 
