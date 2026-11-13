@@ -136,6 +136,7 @@ function onTabKey(e: KeyboardEvent, i: number) {
           <button
             v-if="activeTab?.excelReport"
             type="button"
+            data-walkthrough="analytics-export"
             class="inline-flex items-center gap-2 rounded-[12px] border border-[#E9D7BF] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#3B1F0E] shadow-[0_1px_2px_rgba(59,31,14,0.06)] transition-colors hover:bg-[#FBF4EA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="!activeTab.exportReady || exporting"
             :title="exportHint"
@@ -146,11 +147,13 @@ function onTabKey(e: KeyboardEvent, i: number) {
           </button>
         </header>
 
-        <AnalyticsFilterBar
-          v-model="state"
-          :branches="branches"
-          :branch-disabled="tab === 'branches'"
-        />
+        <div data-walkthrough="analytics-filters">
+          <AnalyticsFilterBar
+            v-model="state"
+            :branches="branches"
+            :branch-disabled="tab === 'branches'"
+          />
+        </div>
 
         <div
           role="tablist"

@@ -1,5 +1,6 @@
 <!-- app/pages/manager/servings/index.vue -->
 <script setup lang="ts">
+import type { PlanLock } from '~/utils/planLock'
 import DropdownList from '~/components/common/DropdownList.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
 import CommonPagination from '~/components/common/Pagination.vue'
@@ -20,13 +21,7 @@ definePageMeta({
   role: 'Manager',
 })
 
-const links = [
-  { label: 'Dashboard', to: '/manager/dashboard', icon: 'squares-2x2' },
-  { label: 'Cafe Management', to: '/manager/cafe', icon: 'building-storefront' },
-  { label: 'Servings', to: '/manager/servings', icon: 'cake' },
-  { label: 'Reservations', to: '/manager/reservations', icon: 'calendar-days' },
-  { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
-]
+const links = MANAGER_NAV_LINKS
 
 // Opens the category's items (for the manager's one branch).
 function openCategory(c: ServingCategorySummary) {
@@ -50,6 +45,7 @@ const categorySort = ref<ServingCategorySort>('name')
 const categoryPage = ref(1)
 const categories = ref<ServingCategorySummary[]>([])
 const categoryLastPage = ref(1)
+const lowStockThresholdPercent = ref<number | null>(null)
 const categorySortOptions: { label: string; value: ServingCategorySort }[] = [
   { label: 'Name (A-Z)', value: 'name' },
   { label: 'Most left', value: 'remaining_desc' },
@@ -72,7 +68,9 @@ const voidingUuid = ref<string | null>(null)
 
 const loading = ref(true)
 const errorMessage = ref('')
-const planLocked = ref(false) // API 403: plan has no menu management
+// API 403: the cafe's plan lacks the feature or its subscription has expired.
+const planLock = ref<PlanLock | null>(null)
+const planLocked = computed(() => !!planLock.value)
 
 // Scroll reveal observer that activates sections as they scroll into view
 useScrollReveal(categories)
@@ -81,10 +79,8 @@ useScrollReveal(categories)
 const refreshKey = ref(0)
 
 function failure(e: any, fallback: string) {
-  planLocked.value = e?.response?.status === 403 && !!e?.data?.required_feature
-  errorMessage.value = planLocked.value
-    ? 'Servings management is not included in your cafe\'s plan.'
-    : e?.data?.message ?? fallback
+  planLock.value = planLockFromError(e)
+  errorMessage.value = planLock.value ? '' : e?.data?.message ?? fallback
 }
 
 async function loadCategories() {
@@ -96,6 +92,7 @@ async function loadCategories() {
   })
   categories.value = res.categories.data
   categoryLastPage.value = res.categories.last_page
+  lowStockThresholdPercent.value = res.low_stock_threshold_percent ?? null
 }
 
 async function loadIngredients() {
@@ -174,7 +171,10 @@ watch(branchUuid, async () => {
   loading.value = false
 })
 
-useAutoRefresh(loadAll, { interval: REFRESH_MS })
+useAutoRefresh(async () => {
+  refreshKey.value++
+  await loadAll()
+}, { interval: REFRESH_MS })
 
 onMounted(async () => {
   try {
@@ -211,6 +211,13 @@ onBeforeUnmount(() => {
               <span class="inline-block rounded-md border border-[#E3CFB4] bg-white px-2.5 py-0.5 font-mono text-[11px] font-medium tracking-wide uppercase text-[#7D5A50]">
                 Live Operations
               </span>
+              <span
+                v-if="lowStockThresholdPercent"
+                class="inline-flex items-center gap-1 rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-amber-800"
+              >
+                <Icon name="heroicons:bell-alert" class="w-3.5 h-3.5 text-amber-600" />
+                Low Stock Alert: ≤{{ lowStockThresholdPercent }}%
+              </span>
             </div>
 
             <!-- Subtitle line -->
@@ -224,29 +231,15 @@ onBeforeUnmount(() => {
             </p>
           </div>
 
-          <!-- Controls: Live Time, Refresh Button -->
-          <div class="flex flex-wrap items-center gap-3 shrink-0">
-            <!-- Live Time Pill with Pulsing Indicator -->
-            <div class="inline-flex items-center gap-2 rounded-xl border border-[#E3CFB4] bg-white px-3.5 py-2 text-[13px] font-medium text-[#7D5A50] shadow-2xs">
-              <span class="relative flex h-2 w-2">
-                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-              </span>
-              <span class="tabular-nums font-mono">{{ timeLabel }}</span>
-              <span class="text-[#D9C3A5]">/</span>
-              <span>{{ dateLabel }}</span>
-            </div>
-
-            <!-- Refresh Button (triggers slow circle reload) -->
-            <button
-              type="button"
-              class="inline-flex items-center gap-2 rounded-xl border border-[#D9C3A5] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#3B1F0E] shadow-2xs transition-transform duration-160 ease-out hover:border-[#3B1F0E] hover:bg-[#FFFDF9] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:opacity-60 cursor-pointer"
-              :disabled="loading"
-              @click="handleRefresh"
-            >
-              <Icon name="heroicons:arrow-path-20-solid" class="h-4 w-4 text-[#7D5A50]" :class="{ 'animate-spin': loading }" />
-              <span>Refresh</span>
-            </button>
+          <!-- Live Time Pill with Pulsing Indicator (Auto-updates every 30s) -->
+          <div class="inline-flex items-center gap-2 rounded-xl border border-[#E3CFB4] bg-white px-3.5 py-2 text-[13px] font-medium text-[#7D5A50] shadow-2xs shrink-0 self-start sm:self-auto">
+            <span class="relative flex h-2 w-2">
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            <span class="tabular-nums font-mono">{{ timeLabel }}</span>
+            <span class="text-[#D9C3A5]">/</span>
+            <span>{{ dateLabel }}</span>
           </div>
         </header>
 
@@ -260,9 +253,14 @@ onBeforeUnmount(() => {
           <p class="font-medium">{{ errorMessage }}</p>
         </div>
 
+        <SubscriptionLockedState v-if="planLock" :lock="planLock" audience="staff" />
+
         <template v-if="!planLocked && branchUuid">
           <!-- Categories Card Section with Scroll Reveal -->
-          <section class="scroll-reveal bg-white border border-[#E3CFB4] rounded-2xl shadow-xs overflow-hidden">
+          <section
+            data-walkthrough="servings-categories"
+            class="scroll-reveal bg-white border border-[#E3CFB4] rounded-2xl shadow-xs overflow-hidden"
+          >
             <!-- Toolbar: Search, Sort, Title -->
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 border-b border-[#E3CFB4] bg-[#FFFDF9]/60">
               <div class="flex items-center gap-2">
@@ -322,13 +320,16 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <!-- Pagination Footer -->
-            <div class="border-t border-[#E3CFB4] bg-[#FFFDF9]/60 px-5">
+            <!-- Pagination Footer (only if more than 1 page) -->
+            <div v-if="categoryLastPage > 1" class="border-t border-[#E3CFB4] bg-[#FFFDF9]/60 px-5">
               <CommonPagination :page="categoryPage" :last-page="categoryLastPage" @change="categoryPage = $event" />
             </div>
           </section>
 
-          <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          <div
+            data-walkthrough="servings-usage"
+            class="grid grid-cols-1 xl:grid-cols-2 gap-5"
+          >
             <ServingsIngredientsUsedPanel
               v-model:search="ingredientSearch"
               v-model:sort="ingredientSort"

@@ -1,19 +1,90 @@
 //auth.global.ts
 import { useAuthStore } from "~/stores/auth"
 import { getRedirectForRole, getSafeRedirect } from "~/utils/roleRedirects"
+import { isStandalonePwaWindow } from "~/composables/useA2HS"
 
 export default defineNuxtRouteMiddleware((to) => {
     const token = useCookie<string | null>('auth_token')
     const authStore = useAuthStore()
 
     const userRoleCookie = useCookie<string | null>('user_role')
-    if (!authStore.role && userRoleCookie.value) {
-        authStore.role = userRoleCookie.value
+    const userDataCookie = useCookie<any>('user_data')
+    const posDeviceCookie = usePosDeviceToken()
+
+    if (!token.value) {
+        if (authStore.role || authStore.user || userRoleCookie.value || userDataCookie.value) {
+            authStore.clear()
+        }
+    } else {
+        if (!authStore.role && userRoleCookie.value) {
+            authStore.role = userRoleCookie.value
+        }
+        if (!authStore.user && userDataCookie.value) {
+            authStore.user = userDataCookie.value
+        }
     }
 
-    const userDataCookie = useCookie<any>('user_data')
-    if (!authStore.user && userDataCookie.value) {
-        authStore.user = userDataCookie.value
+    // ── A2HS / Standalone PWA Guard: NEVER allow A2HS to open any Dashboard ──
+    if (import.meta.client && isStandalonePwaWindow()) {
+        // 1. If this device already has its pos_device_token, always stay on /pos
+        if (posDeviceCookie.value) {
+            if (to.path !== '/pos') {
+                return navigateTo('/pos', { replace: true })
+            }
+            return
+        }
+
+        // 2. No pos_device_token yet: owner must log in specifically in A2HS to identify & register this device
+        let hasCompletedA2hsLogin = false
+        try {
+            hasCompletedA2hsLogin = sessionStorage.getItem('pos_setup_login_done') === '1'
+        } catch {}
+
+        // If auth_token was inherited from the main browser tab before A2HS login, clear it so the owner logs in fresh
+        if (token.value && !hasCompletedA2hsLogin) {
+            token.value = null
+            userRoleCookie.value = null
+            userDataCookie.value = null
+            authStore.clear()
+        }
+
+        if (token.value && hasCompletedA2hsLogin) {
+            if (to.path !== '/pos/setup') {
+                return navigateTo('/pos/setup', { replace: true })
+            }
+            return
+        }
+
+        // Unauthenticated inside A2HS without a device token: only allow /login and /verify-login-code (with redirect=/pos/setup)
+        if (to.path === '/login' || to.path === '/verify-login-code') {
+            if (to.query.redirect !== '/pos/setup') {
+                return navigateTo(
+                    {
+                        path: to.path,
+                        query: {
+                            ...to.query,
+                            redirect: '/pos/setup',
+                            ...(to.path === '/login' && !to.query.notice
+                                ? { notice: 'Sign in with your Cafe Owner or Manager account to identify and register this POS device.' }
+                                : {}),
+                        },
+                    },
+                    { replace: true }
+                )
+            }
+            return
+        }
+
+        return navigateTo(
+            {
+                path: '/login',
+                query: {
+                    redirect: '/pos/setup',
+                    notice: 'Sign in with your Cafe Owner or Manager account to identify and register this POS device.',
+                },
+            },
+            { replace: true }
+        )
     }
 
     // 1. Obsolete/removed step extensions automatically redirect to /login immediately without rendering

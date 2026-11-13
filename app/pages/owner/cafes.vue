@@ -12,6 +12,7 @@ const links = OWNER_NAV_LINKS
 
 const ownerService = useOwnerProfileService()
 const { hasFeature, fetchCurrentSubscription } = usePlanFeature()
+const { refresh: refreshNotifications } = useNotifications()
 
 // State
 const branches = ref<BranchSummary[]>([])
@@ -29,13 +30,17 @@ const status = ref('')
 // Business Info
 const cafeName = ref('')
 const mainTinPrefix = ref<string | null>(null)
+const lowStockThresholdPercent = ref<number | null>(null)
 
 // Modal Controls
 const isAddBranchOpen = ref(false)
 const isOperatingHoursOpen = ref(false)
+const isLowStockModalOpen = ref(false)
 const savingBranch = ref(false)
 const savingHours = ref(false)
+const savingLowStock = ref(false)
 const hoursError = ref('')
+const lowStockError = ref('')
 const toastMessage = ref('')
 const backendErrors = ref<Record<string, string[]>>({})
 
@@ -61,6 +66,11 @@ const pendingBranchesCount = computed(() => {
 })
 
 const canAddBranch = computed(() => hasFeature('multi_branch'))
+const { requireFeature } = useSubscriptionGate()
+
+function openAddBranch() {
+  if (requireFeature('multi_branch', 'Multiple branches')) isAddBranchOpen.value = true
+}
 
 async function fetchBranches() {
   errorMessage.value = ''
@@ -70,7 +80,12 @@ async function fetchBranches() {
     if (res.success && res.cafe_name) {
       cafeName.value = res.cafe_name
     }
-    if (res.success) mainTinPrefix.value = res.main_tin_prefix ?? null
+    if (res.success) {
+      mainTinPrefix.value = res.main_tin_prefix ?? null
+      if (res.low_stock_threshold_percent !== undefined) {
+        lowStockThresholdPercent.value = res.low_stock_threshold_percent
+      }
+    }
     if (res.success && res.branches?.data) {
       branches.value = res.branches.data
       currentPage.value = res.branches.current_page
@@ -133,6 +148,28 @@ async function handleSaveOperatingHours(schedule: DaySchedule[]) {
       : (e?.data?.message ?? 'Could not save operating hours. Please try again.')
   } finally {
     savingHours.value = false
+  }
+}
+
+// Low stock threshold (%) is cafe-wide: shared across every branch, alerting both Manager and Owner.
+async function handleSaveLowStockThreshold(percent: number) {
+  savingLowStock.value = true
+  lowStockError.value = ''
+  try {
+    const res = await ownerService.updateLowStockThreshold(percent)
+    if (res.success) {
+      lowStockThresholdPercent.value = res.low_stock_threshold_percent
+      isLowStockModalOpen.value = false
+      showToast(res.message || `Low stock alert limit updated to ${percent}% for all branches.`)
+      refreshNotifications().catch(() => {})
+    }
+  } catch (e: any) {
+    const errors = e?.data?.errors as Record<string, string[]> | undefined
+    lowStockError.value = errors
+      ? Object.values(errors).flat().join('\n')
+      : (e?.data?.message ?? 'Could not save low stock threshold. Please try again.')
+  } finally {
+    savingLowStock.value = false
   }
 }
 
@@ -212,11 +249,18 @@ function viewDetails(uuid: string) {
           <p class="text-xs sm:text-sm text-[#9E7060] mt-1 font-medium">Manage your branches and the opening hours they share.</p>
         </div>
 
-        <CafeManagementOperatingHoursPanel class="shrink-0" @edit="isOperatingHoursOpen = true" />
+        <CafeManagementOperatingHoursPanel
+          data-walkthrough="cafe-hours-btn"
+          class="shrink-0"
+          @edit="isOperatingHoursOpen = true"
+        />
       </header>
 
       <!-- 4 Metric Summary Cards -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div
+        data-walkthrough="cafe-kpis"
+        class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
+      >
         <div class="bg-white border border-[#F3E7D2] rounded-[20px] p-6 shadow-sm space-y-2 hover:border-[#7D5A50] transition-colors">
           <p class="text-[11px] font-bold text-[#9E7060] uppercase tracking-wider">Total Branches</p>
           <p class="text-3xl font-extrabold text-[#3D2B24]">{{ totalBranchesCount }}</p>
@@ -243,6 +287,7 @@ function viewDetails(uuid: string) {
       <div :class="['bg-white border border-[#EEDFC4] shadow-sm flex flex-col', branches.length > 0 ? 'rounded-t-[24px] border-b-0' : 'rounded-[24px]']">
         <!-- Filter Bar -->
         <CafeManagementCafeFilterBar
+          data-walkthrough="cafe-filter-bar"
           class="sticky top-0 z-20 bg-white rounded-t-[24px]"
           v-model:search="search"
           v-model:status="status"
@@ -250,10 +295,12 @@ function viewDetails(uuid: string) {
           :total-count="branches.length"
           :can-add-branch="canAddBranch"
           :bulk-loading="bulkLoading"
+          :low-stock-threshold-percent="lowStockThresholdPercent"
           @toggle-select-all="toggleSelectAll"
           @bulk-action="bulkUpdateStatus"
           @cancel-selection="selectedBranches = []"
-          @open-add-branch="isAddBranchOpen = true"
+          @open-add-branch="openAddBranch"
+          @open-low-stock="isLowStockModalOpen = true"
         />
 
         <!-- List Content -->
@@ -305,7 +352,7 @@ function viewDetails(uuid: string) {
               <span class="w-9" aria-hidden="true"></span>
             </div>
 
-            <ul class="divide-y divide-[#F3E7D2]">
+            <ul class="divide-y divide-[#F3E7D2]" data-walkthrough="cafe-branch-list">
               <li v-for="branch in branches" :key="branch.uuid">
                 <CafeManagementBranchCard
                   :branch="branch"
@@ -345,6 +392,15 @@ function viewDetails(uuid: string) {
         :error="hoursError"
         @close="isOperatingHoursOpen = false; hoursError = ''"
         @save="handleSaveOperatingHours"
+      />
+
+      <CafeManagementLowStockLimitModal
+        :show="isLowStockModalOpen"
+        :current-percent="lowStockThresholdPercent"
+        :saving="savingLowStock"
+        :error="lowStockError"
+        @close="isLowStockModalOpen = false; lowStockError = ''"
+        @save="handleSaveLowStockThreshold"
       />
     </main>
   </div>

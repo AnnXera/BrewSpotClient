@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // One sale opened from Today's sales: what was ordered, how it was paid, and who rang it up.
 import type { PosTransactionDetail } from '~/services/PosService'
+import { formatOrderType } from '~/utils/dashboardFormat'
 import { variantLabel } from '~/utils/variant'
 
 const props = defineProps<{
@@ -215,6 +216,10 @@ onUnmounted(() => clearTimeout(copiedTimer))
           <div class="flex justify-between gap-4">
             <dt class="text-[#6B5048] shrink-0">Cashier</dt>
             <dd class="text-[#2d201b] text-right">{{ detail.staff_name }}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-[#6B5048] shrink-0">Order type</dt>
+            <dd class="font-semibold text-[#2d201b] text-right">{{ formatOrderType(detail.order_type) }}</dd>
           </div>
           <div class="flex justify-between gap-4">
             <dt class="text-[#6B5048] shrink-0">Receipt no.</dt>

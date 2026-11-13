@@ -1,5 +1,6 @@
 <!-- app/pages/manager/floor-plan/index.vue -->
 <script setup lang="ts">
+import type { PlanLock } from '~/utils/planLock'
 import type {
   FloorPlan,
   FloorPlanAssets,
@@ -24,13 +25,7 @@ definePageMeta({
   role: 'Manager',
 })
 
-const links = [
-  { label: 'Dashboard', to: '/manager/dashboard', icon: 'squares-2x2' },
-  { label: 'Cafe Management', to: '/manager/cafe', icon: 'building-storefront' },
-  { label: 'Servings', to: '/manager/servings', icon: 'cake' },
-  { label: 'Reservations', to: '/manager/reservations', icon: 'calendar-days' },
-  { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
-]
+const links = MANAGER_NAV_LINKS
 
 const DEFAULT_CANVAS = { width: 760, height: 640 }
 const UNDO_LIMIT = 50
@@ -93,7 +88,9 @@ const loading = ref(true)
 const saving = ref(false)
 const statusBusy = ref(false)
 const errorMessage = ref('')
-const planLocked = ref(false) // API 403: plan has no reservations feature
+// API 403: the cafe's plan lacks the feature or its subscription has expired.
+const planLock = ref<PlanLock | null>(null)
+const planLocked = computed(() => !!planLock.value)
 const saveErrors = ref<Record<string, string[]>>({})
 
 const panel = ref<null | 'new' | 'settings'>(null)
@@ -663,10 +660,8 @@ function onKeydown(e: KeyboardEvent) {
 
 // ── API ──────────────────────────────────────────────────────────────────
 function failure(e: any, fallback: string) {
-  planLocked.value = e?.response?.status === 403 && !!e?.data?.required_feature
-  errorMessage.value = planLocked.value
-    ? 'Floor plans are not included in your cafe\'s plan.'
-    : e?.data?.message ?? fallback
+  planLock.value = planLockFromError(e)
+  errorMessage.value = planLock.value ? '' : e?.data?.message ?? fallback
 }
 
 async function loadPlans(preferUuid?: string) {
@@ -1035,6 +1030,7 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
           </button>
           <button
             type="button"
+            data-walkthrough="floorplan-save-btn"
             :class="[iconBtn, 'bg-[#3A2923] text-white hover:bg-[#2C1E19]']"
             :disabled="!dirty || saving"
             @click="saveLayout"
@@ -1055,9 +1051,14 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
 
       <p v-if="loading" class="text-[14px] text-[#9E7060]">Loading...</p>
 
+      <SubscriptionLockedState v-else-if="planLock" :lock="planLock" audience="staff" />
+
       <div v-else-if="!planLocked && branchUuid" class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_270px] gap-5 items-start">
         <!-- Canvas card -->
-        <section class="bg-white border border-[#F4E6DE] rounded-2xl overflow-hidden min-w-0">
+        <section
+          data-walkthrough="floorplan-workspace"
+          class="bg-white border border-[#F4E6DE] rounded-2xl overflow-hidden min-w-0"
+        >
           <div class="flex flex-wrap items-center justify-between gap-2 px-[18px] py-3 border-b border-[#F4E6DE]">
             <div class="flex flex-wrap items-center gap-[6px]" :role="manyFloors ? undefined : 'tablist'" :aria-label="manyFloors ? undefined : 'Floor plans'">
               <!-- Four or more floors: one switcher instead of a row of tabs that would overflow -->
@@ -1168,11 +1169,13 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
           <div v-if="plan" class="relative">
           <div
             ref="scrollEl"
-            class="overflow-auto p-[18px] max-h-[78vh] bg-white"
+            class="overflow-auto p-[18px] bg-white"
             :class="panning ? 'cursor-grabbing' : panMode ? 'cursor-grab touch-none' : ''"
+            :style="{ height: `min(${canvasH + 36}px, 78vh)` }"
             @pointerdown="startPan"
           >
-            <!-- Takes up the scaled size so the scroll area matches the zoomed canvas -->
+            <!-- Takes up the scaled size so the scroll area matches the zoomed canvas.
+                 The scroll area itself is sized for 100%, so the card stays put while zooming. -->
             <div class="mx-auto" :style="{ width: `${canvasW * zoom}px`, height: `${canvasH * zoom}px` }">
             <div
               ref="canvasEl"
@@ -1345,7 +1348,11 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
         </section>
 
         <!-- Side panels -->
-        <aside v-if="!preview" class="flex flex-col gap-3">
+        <aside
+          v-if="!preview"
+          data-walkthrough="floorplan-objects"
+          class="flex flex-col gap-3"
+        >
           <div class="grid grid-cols-2 gap-1 rounded-[12px] bg-[#F1E9DE] p-1" role="tablist" aria-label="Side panel">
             <button
               id="fp-tab-objects"
@@ -1403,6 +1410,6 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
     </main>
 
     <FloorPlanDialog :spec="dialogSpec" @close="closeDialog" />
-    <FloorPlanToast :show="savedToast" message="Layout saved" />
+    <FloorPlanToast :show="savedToast" message="Layout saved" @close="savedToast = false" />
   </div>
 </template>

@@ -22,6 +22,7 @@ const targetFraction = computed(() => {
 const displayedFraction = ref(0)
 const dash = computed(() => `${displayedFraction.value * CIRCUMFERENCE} ${CIRCUMFERENCE}`)
 const soldOut = computed(() => props.category.status === 'sold_out' || props.category.remaining === 0)
+const isLowStock = computed(() => !soldOut.value && Boolean(props.category.is_low_stock))
 
 let animTimeout: ReturnType<typeof setTimeout> | undefined
 
@@ -110,7 +111,7 @@ watch(() => [props.category.remaining, props.category.expected_servings], () => 
           cy="34"
           :r="RADIUS"
           fill="none"
-          :stroke="soldOut ? '#DC2626' : '#7D5A50'"
+          :stroke="soldOut ? '#DC2626' : isLowStock ? '#D97706' : '#7D5A50'"
           stroke-width="3.5"
           stroke-linecap="round"
           :stroke-dasharray="dash"
@@ -122,20 +123,27 @@ watch(() => [props.category.remaining, props.category.expected_servings], () => 
     <!-- Category Info & Numbers -->
     <div class="flex-1 min-w-0 flex flex-col gap-1.5">
       <!-- Title & Status Badge -->
-      <div class="flex items-center justify-between gap-2">
-        <p class="font-display font-bold text-[17px] text-[#3B1F0E] capitalize truncate group-hover:text-[#7D5A50] transition-colors duration-160">
+      <div class="flex items-start justify-between gap-2">
+        <p
+          class="font-display font-bold text-[16px] sm:text-[17px] text-[#3B1F0E] capitalize leading-snug group-hover:text-[#7D5A50] transition-colors duration-160 line-clamp-2"
+          :title="category.name"
+        >
           {{ category.name }}
         </p>
         <span
-          class="font-display font-semibold text-[11px] rounded-full px-2.5 py-0.5 shrink-0 transition-colors duration-160"
-          :class="soldOut ? 'bg-rose-50 text-rose-700 border border-rose-200/80' : 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'"
+          class="font-display font-semibold text-[11px] rounded-full px-2.5 py-0.5 shrink-0 whitespace-nowrap transition-colors duration-160"
+          :class="soldOut
+            ? 'bg-rose-50 text-rose-700 border border-rose-200/80'
+            : isLowStock
+              ? 'bg-amber-50 text-amber-800 border border-amber-200/80'
+              : 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'"
         >
-          {{ soldOut ? 'Sold Out' : 'Available' }}
+          {{ soldOut ? 'Sold Out' : isLowStock ? 'Low Stock' : 'Available' }}
         </span>
       </div>
 
       <!-- Numbers & Arrow -->
-      <div class="flex items-baseline justify-between">
+      <div class="flex items-baseline justify-between mt-0.5">
         <p class="flex items-baseline gap-1.5">
           <span class="font-display font-bold text-[28px] leading-none tabular-nums text-[#3B1F0E]">
             {{ category.remaining }}
@@ -170,10 +178,10 @@ watch(() => [props.category.remaining, props.category.expected_servings], () => 
   transform: scale(0.98);
 }
 
-/* Circle bar animated very slowly on refresh or scroll */
+/* Circle bar animated smoothly on load/refresh */
 .progress-circle {
-  transition: stroke-dasharray 2500ms cubic-bezier(0.16, 1, 0.3, 1),
-              stroke 600ms ease-out;
+  transition: stroke-dasharray 450ms cubic-bezier(0.23, 1, 0.32, 1),
+              stroke 300ms ease-out;
   will-change: stroke-dasharray;
 }
 

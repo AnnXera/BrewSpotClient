@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import type { ManagerTransactionItem, ManagerTransactionsResponse } from '~/services/ManagerDashboardService'
-import { formatCount, formatMethod, formatPeso, formatPesoCents } from '~/utils/dashboardFormat'
+import { formatCount, formatMethod, formatOrderType, formatPeso, formatPesoCents } from '~/utils/dashboardFormat'
 
 const props = defineProps<{
   branchUuid: string
@@ -148,7 +148,11 @@ function paymentIcon(method: string) {
 </script>
 
 <template>
-  <section class="flex flex-col gap-4 rounded-[22px] border border-[#EEDFC4] bg-white p-5 shadow-[0_1px_2px_rgba(59,31,14,0.04)] sm:p-6" aria-labelledby="transactions-heading">
+  <section
+    data-walkthrough="feat-transactions"
+    class="flex flex-col gap-4 rounded-[22px] border border-[#EEDFC4] bg-white p-5 shadow-[0_1px_2px_rgba(59,31,14,0.04)] sm:p-6"
+    aria-labelledby="transactions-heading"
+  >
     <!-- Header -->
     <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
@@ -235,6 +239,7 @@ function paymentIcon(method: string) {
             <th class="py-3 px-4">Receipt #</th>
             <th class="py-3 px-4">Date & Time</th>
             <th class="py-3 px-4">Cashier</th>
+            <th class="py-3 px-4">Order Type</th>
             <th class="py-3 px-4">Items</th>
             <th class="py-3 px-4">Payment</th>
             <th class="py-3 px-4 text-right">Total Amount</th>
@@ -300,6 +305,17 @@ function paymentIcon(method: string) {
             <!-- Cashier -->
             <td class="py-3 px-4 text-[#2D201B] font-medium whitespace-nowrap">
               {{ tx.staff_name }}
+            </td>
+
+            <!-- Order Type -->
+            <td class="py-3 px-4 whitespace-nowrap">
+              <span class="inline-flex items-center gap-1 rounded-md bg-[#FAF6F0] border border-[#EADFD3] px-2 py-0.5 text-[#3B1F0E] font-semibold">
+                <Icon
+                  :name="tx.order_type === 'delivery' ? 'heroicons:truck' : tx.order_type === 'take_out' ? 'heroicons:shopping-bag' : 'heroicons:building-storefront'"
+                  class="w-3.5 h-3.5 text-[#7D5A50]"
+                />
+                {{ formatOrderType(tx.order_type) }}
+              </span>
             </td>
 
             <!-- Items -->

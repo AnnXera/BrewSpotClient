@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatOrderType } from '~/utils/dashboardFormat'
+
 // Today's sales for this register's branch: totals, an hour-by-hour rhythm, and the sales ledger.
 interface PosTransaction {
   uuid: string
@@ -7,6 +9,7 @@ interface PosTransaction {
   staff_name: string
   total_amount: number
   status: string
+  order_type?: string | null
   items_count: number
 }
 
@@ -314,6 +317,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown, true))
                         <p class="flex items-center gap-2 min-w-0">
                           <span class="text-[13px] font-bold text-[#2d201b] tabular-nums truncate" :title="txn.receipt_number ? `#${txn.receipt_number}` : txn.uuid">
                             #{{ txn.receipt_number || txn.uuid }}
+                          </span>
+                          <span class="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#FAF6F0] text-[#7B5A50] border border-[#E2D5C8]">
+                            {{ formatOrderType(txn.order_type) }}
                           </span>
                           <span v-if="txn.status?.toLowerCase() === 'refunded'" class="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300">
                             REFUNDED

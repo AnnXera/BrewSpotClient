@@ -32,12 +32,35 @@ const status = computed<ServingItemStatus>(() => {
   return props.limit > 0 && stock.value === 0 ? 'sold_out' : 'available'
 })
 
-const badge = computed(() => ({
-  available: { label: 'Available', cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80' },
-  sold_out: { label: 'Sold Out', cls: 'bg-rose-50 text-rose-700 border border-rose-200/80' },
-  unavailable: { label: 'Unavailable', cls: 'bg-amber-50 text-amber-700 border border-amber-200/80' },
-  branch_unavailable: { label: 'Not at branch', cls: 'bg-stone-100 text-stone-600 border border-stone-200' },
-}[status.value]))
+const thresholdPercent = computed(() => props.item.low_stock_threshold_percent ?? null)
+
+const isLowStock = computed(() => {
+  if (status.value !== 'available' || props.limit <= 1 || stock.value <= 0) return false
+  const pct = thresholdPercent.value
+  if (!pct || pct <= 0) return false
+  const lowRemaining = Math.min(props.limit - 1, Math.max(1, Math.floor(props.limit * (pct / 100))))
+  return stock.value <= lowRemaining
+})
+
+const remainingPercent = computed(() => {
+  if (props.limit <= 0) return 0
+  return Math.round((stock.value / props.limit) * 100)
+})
+
+const badge = computed(() => {
+  if (isLowStock.value) {
+    return {
+      label: `Low Stock (${remainingPercent.value}%)`,
+      cls: 'bg-amber-50 text-amber-800 border border-amber-300/80',
+    }
+  }
+  return {
+    available: { label: 'Available', cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80' },
+    sold_out: { label: 'Sold Out', cls: 'bg-rose-50 text-rose-700 border border-rose-200/80' },
+    unavailable: { label: 'Unavailable', cls: 'bg-amber-50 text-amber-700 border border-amber-200/80' },
+    branch_unavailable: { label: 'Not at branch', cls: 'bg-stone-100 text-stone-600 border border-stone-200' },
+  }[status.value]
+})
 
 const editing = ref(false)
 const text = ref<string | number>('')

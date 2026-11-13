@@ -25,6 +25,8 @@ export interface ServingCategorySummary {
     servings_sold: number
     remaining: number
     status: 'available' | 'sold_out'
+    is_low_stock?: boolean
+    low_stock_threshold_percent?: number | null
 }
 
 export type ServingItemSort = 'name' | 'stock_desc' | 'stock_asc'
@@ -39,6 +41,8 @@ export interface CategoryServingItem {
     daily_limit: number
     servings_sold: number
     available_stock: number
+    is_low_stock?: boolean
+    low_stock_threshold_percent?: number | null
     enabled: boolean // the eye: offered today
     editable: boolean // false when the item is switched off for this branch
 }
@@ -104,8 +108,12 @@ export class ServingService extends BaseService {
     }
 
     categories(branchUuid: string, params: ServingListParams = {}) {
-        return this.get<{ success: boolean; date: string; categories: Paginated<ServingCategorySummary> }>(
-            `${this.base(branchUuid)}/categories`, this.clean(params))
+        return this.get<{
+            success: boolean
+            date: string
+            low_stock_threshold_percent?: number | null
+            categories: Paginated<ServingCategorySummary>
+        }>(`${this.base(branchUuid)}/categories`, this.clean(params))
     }
 
     // 'uncategorized' = items without a category.
@@ -113,6 +121,7 @@ export class ServingService extends BaseService {
         return this.get<{
             success: boolean
             date: string
+            low_stock_threshold_percent?: number | null
             category: { uuid: string | null; name: string }
             items: Paginated<CategoryServingItem>
         }>(`${this.base(branchUuid)}/categories/${categoryUuid}/items`, this.clean(params))

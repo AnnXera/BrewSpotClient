@@ -12,6 +12,7 @@ definePageMeta({
 const links = OWNER_NAV_LINKS
 
 const route = useRoute()
+const { canEditMenu } = useMenuEditGate()
 const menuService = useMenuService()
 
 const itemUuid = computed(() => route.params.uuid as string)
@@ -86,6 +87,7 @@ async function fetchItem() {
 }
 
 async function openEdit() {
+  if (!canEditMenu()) return
   if (categories.value.length === 0) {
     try {
       const res = await menuService.getMenuCategories()

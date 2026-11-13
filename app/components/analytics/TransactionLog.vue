@@ -4,7 +4,7 @@ import AnalyticsPanel from './AnalyticsPanel.vue'
 import DropdownList from '~/components/common/DropdownList.vue'
 import ManagerTransactionModal from '~/components/manager/ManagerTransactionModal.vue'
 import type { AnalyticsFilters, TransactionLog, TransactionLogRow, TransactionLogStatus } from '~/services/OwnerAnalyticsService'
-import { formatCount, formatMethod, formatPesoCents } from '~/utils/dashboardFormat'
+import { formatCount, formatMethod, formatOrderType, formatPesoCents } from '~/utils/dashboardFormat'
 
 // Every sale in the Sales tab's period, refunds and voids included, newest first.
 // Pages, status and search are local to this panel; the period and branch come
@@ -184,7 +184,12 @@ const loadReceipt = (uuid: string) => service.getTransaction(uuid)
         <li v-for="t in rows" :key="t.uuid">
           <button type="button" class="flex w-full items-start justify-between gap-3 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]" @click="openUuid = t.uuid">
             <span class="min-w-0">
-              <span class="block text-[14px] font-semibold text-[#3D2B24]">#{{ t.receipt_number }}</span>
+              <span class="flex items-center gap-2 text-[14px] font-semibold text-[#3D2B24]">
+                <span>#{{ t.receipt_number }}</span>
+                <span class="rounded-md border border-[#E9D7BF] bg-[#FAF6F0] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#7D5A50]">
+                  {{ formatOrderType(t.order_type) }}
+                </span>
+              </span>
               <span class="block text-[12px] text-[#8B6656]">
                 {{ formatWhen(t.created_at) }} · {{ t.cashier ?? 'No cashier' }}<template v-if="allBranches && t.branch"> · {{ t.branch }}</template>
               </span>
@@ -207,6 +212,7 @@ const loadReceipt = (uuid: string) => service.getTransaction(uuid)
               <th scope="col" class="py-2 pr-3 font-medium">Receipt</th>
               <th v-if="allBranches" scope="col" class="py-2 pr-3 font-medium">Branch</th>
               <th scope="col" class="py-2 pr-3 font-medium">Cashier</th>
+              <th scope="col" class="py-2 pr-3 font-medium">Order Type</th>
               <th scope="col" class="py-2 pr-3 text-right font-medium">Items</th>
               <th scope="col" class="py-2 pr-3 font-medium">Payment</th>
               <th scope="col" class="py-2 pr-3 text-right font-medium">Total</th>
@@ -226,6 +232,11 @@ const loadReceipt = (uuid: string) => service.getTransaction(uuid)
               </td>
               <td v-if="allBranches" class="py-2.5 pr-3">{{ t.branch ?? '-' }}</td>
               <td class="whitespace-nowrap py-2.5 pr-3">{{ t.cashier ?? 'No cashier' }}</td>
+              <td class="whitespace-nowrap py-2.5 pr-3">
+                <span class="inline-flex items-center gap-1 rounded-md border border-[#E9D7BF] bg-[#FAF6F0] px-2 py-0.5 text-[11px] font-semibold text-[#3B1F0E]">
+                  {{ formatOrderType(t.order_type) }}
+                </span>
+              </td>
               <td class="py-2.5 pr-3 text-right tabular-nums">{{ formatCount(t.items) }}</td>
               <td class="py-2.5 pr-3">{{ t.payment_method ? formatMethod(t.payment_method) : '-' }}</td>
               <td class="whitespace-nowrap py-2.5 pr-3 text-right tabular-nums">

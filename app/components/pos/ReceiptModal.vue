@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import type { PosTransactionDetail } from '~/services/PosService'
 import { useReceiptDownload, type ReceiptDownloadData } from '~/composables/useReceiptDownload'
+import { formatOrderType } from '~/utils/dashboardFormat'
 import { variantLabel } from '~/utils/variant'
 
 const props = defineProps<{
@@ -43,6 +44,7 @@ const receiptData = computed<ReceiptDownloadData>(() => {
       discountType: t.discount_type,
       discountAmount: t.discount_amount,
       total: t.total_amount,
+      orderType: formatOrderType(t.order_type),
       paymentMethod: t.payment?.method ?? 'Cash',
       amountTendered: t.payment?.amount_tendered,
       change: t.payment?.change,
@@ -72,6 +74,7 @@ const receiptData = computed<ReceiptDownloadData>(() => {
       discountType: o.discountType !== 'none' ? o.discountType : null,
       discountAmount: o.discountAmount || 0,
       total: o.total,
+      orderType: formatOrderType(o.orderType),
       paymentMethod: o.paymentMethod ?? 'Cash',
       amountTendered: o.amountTendered,
       change: o.change,
@@ -209,6 +212,10 @@ onUnmounted(() => clearTimeout(successTimer))
               <div class="flex justify-between">
                 <dt class="text-[#8A6E64]">Cashier:</dt>
                 <dd class="font-medium">{{ receiptData.cashier }}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-[#8A6E64]">Order Type:</dt>
+                <dd class="font-bold text-[#2D201B]">{{ receiptData.orderType || 'Dine In' }}</dd>
               </div>
               <div v-if="receiptData.status?.toLowerCase() === 'refunded'" class="flex justify-between text-amber-800 font-bold bg-amber-50 px-1.5 py-0.5 rounded">
                 <dt>Status:</dt>

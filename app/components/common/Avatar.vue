@@ -1,10 +1,19 @@
-<!-- app/components/common/Avatar.vue -->
 <template>
   <div
-    class="rounded-full flex items-center justify-center shrink-0 p-[10px]"
-    :style="{ backgroundColor: avatarColor(index), width: `${size}px`, height: `${size}px` }"
+    class="rounded-full flex items-center justify-center shrink-0 overflow-hidden"
+    :style="{ backgroundColor: photo ? 'transparent' : avatarColor(index), width: `${size}px`, height: `${size}px` }"
   >
-    <span class="font-display font-semibold tracking-[0.77%] text-[#FFF0D1]" :style="{ fontSize: `${fontSize}px` }">
+    <img
+      v-if="photo"
+      :src="photo"
+      alt="Avatar"
+      class="w-full h-full object-cover"
+    />
+    <span
+      v-else
+      class="font-display font-semibold tracking-[0.77%] text-[#FFF0D1]"
+      :style="{ fontSize: `${fontSize}px` }"
+    >
       {{ initials }}
     </span>
   </div>
@@ -12,6 +21,8 @@
 
 <script setup lang="ts">
 interface Props {
+  // Photo image URL
+  photo?: string | null
   // Preferred for detail views where first/last are already split
   firstname?: string | null
   lastname?: string | null
@@ -23,6 +34,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  photo: null,
   firstname: null,
   lastname: null,
   name: null,

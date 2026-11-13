@@ -8,13 +8,7 @@ definePageMeta({
   role: 'Manager',
 })
 
-const links = [
-  { label: 'Dashboard', to: '/manager/dashboard', icon: 'squares-2x2' },
-  { label: 'Cafe Management', to: '/manager/cafe', icon: 'building-storefront' },
-  { label: 'Servings', to: '/manager/servings', icon: 'cake' },
-  { label: 'Reservations', to: '/manager/reservations', icon: 'calendar-days' },
-  { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
-]
+const links = MANAGER_NAV_LINKS
 
 const route = useRoute()
 const router = useRouter()
@@ -60,15 +54,6 @@ function selectTab(tab: 'details' | 'employees') {
 }
 
 const isMain = computed(() => (branch.value?.branch_type || '').toLowerCase() === 'main')
-
-const pageTitle = computed(() => {
-  if (!branch.value) return 'Cafe Management'
-  const { cafe_name, branch_name } = branch.value
-  if (cafe_name && branch_name && !branch_name.toLowerCase().startsWith(cafe_name.toLowerCase())) {
-    return `${cafe_name} - ${branch_name}`
-  }
-  return branch_name || cafe_name || 'Cafe Management'
-})
 
 const birDocument = computed(() =>
   branch.value?.documents?.find(doc => doc.doc_type === 'BIR') ?? null,
@@ -134,164 +119,309 @@ onMounted(init)
 <template>
   <div class="flex flex-col md:flex-row min-h-screen bg-[#FFF8EA]">
     <NavBar :links="links" />
-    <main class="flex-1 p-6 sm:p-8 lg:p-12 font-display">
-      <div class="flex flex-wrap items-end justify-between gap-3">
-        <div class="min-w-0">
-          <p class="text-sm font-medium text-[#9E7060]">Cafe Management</p>
-          <h1 class="mt-1 text-2xl sm:text-[32px] font-bold text-[#3D2B24] break-words">{{ pageTitle }}</h1>
+    <main class="flex-1 p-6 sm:p-8 lg:p-12 font-display cafe-entrance">
+      <!-- Header -->
+      <header class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2">
+        <div class="space-y-1 min-w-0">
+          <h1 class="font-display font-bold text-2xl sm:text-3xl lg:text-4xl text-[#3A2923] tracking-tight">
+            Cafe Management
+          </h1>
+          <p class="text-xs sm:text-sm text-[#7D5A50]">
+            Branch overview, legal documentation, and employee records.
+          </p>
         </div>
-      </div>
 
-      <!-- Tabs -->
-      <div class="relative flex items-center mt-4">
+        <!-- Quick actions -->
+        <div class="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-[#DED4CA] bg-white text-xs font-semibold text-[#5B463C] shadow-sm hover:border-[#7D5A50] hover:bg-[#F8EFE7] active:scale-[0.97] transition-all duration-150 cursor-pointer disabled:opacity-50"
+            :disabled="loading"
+            title="Refresh branch details"
+            @click="retry"
+          >
+            <Icon name="heroicons:arrow-path" class="size-3.5 text-[#7D5A50]" :class="loading ? 'animate-spin' : ''" />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Clean Navigation Tabs -->
+      <nav class="flex items-center gap-6 border-b border-[#EDD8CC] mt-4" aria-label="Tabs">
         <button
           type="button"
-          class="font-display transition-colors relative z-10
-                 min-[360px]:px-5 min-[360px]:py-3.5 min-[360px]:text-[14px]
-                 md:px-5 md:py-3.5 md:text-[16px]"
-          :class="activeTab === 'details'
-            ? 'text-[#3B1F0E] font-bold'
-            : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
+          class="group relative pb-3 pt-1 text-sm font-semibold transition-colors duration-150 flex items-center gap-2 cursor-pointer focus-visible:outline-none active:scale-[0.98]"
+          :class="activeTab === 'details' ? 'text-[#3A2923]' : 'text-[#8C6E63] hover:text-[#3A2923]'"
           @click="selectTab('details')"
         >
-          Branch Details
+          <Icon name="heroicons:building-storefront" class="size-4.5 transition-colors" :class="activeTab === 'details' ? 'text-[#A96746]' : 'text-[#8C6E63] group-hover:text-[#3A2923]'" />
+          <span>Branch Details</span>
           <span
             v-if="activeTab === 'details'"
-            class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full"
+            class="absolute inset-x-0 -bottom-px h-0.5 bg-[#3A2923] rounded-full"
           />
         </button>
 
         <button
           type="button"
-          class="font-display transition-colors relative z-10
-                 min-[360px]:px-5 min-[360px]:py-3.5 min-[360px]:text-[14px]
-                 md:px-5 md:py-3.5 md:text-[16px]"
-          :class="activeTab === 'employees'
-            ? 'text-[#3B1F0E] font-bold'
-            : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
+          data-walkthrough="cafe-employees-tab"
+          class="group relative pb-3 pt-1 text-sm font-semibold transition-colors duration-150 flex items-center gap-2 cursor-pointer focus-visible:outline-none active:scale-[0.98]"
+          :class="activeTab === 'employees' ? 'text-[#3A2923]' : 'text-[#8C6E63] hover:text-[#3A2923]'"
           @click="selectTab('employees')"
         >
-          Employees
+          <Icon name="heroicons:users" class="size-4.5 transition-colors" :class="activeTab === 'employees' ? 'text-[#A96746]' : 'text-[#8C6E63] group-hover:text-[#3A2923]'" />
+          <span>Employees</span>
           <span
             v-if="activeTab === 'employees'"
-            class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full"
+            class="absolute inset-x-0 -bottom-px h-0.5 bg-[#3A2923] rounded-full"
           />
         </button>
+      </nav>
 
-        <!-- full-width baseline underneath both tabs -->
-        <div class="absolute left-0 right-0 bottom-0 h-px bg-[#EEDFC4]" />
-      </div>
-
-      <div v-if="loading" class="flex justify-center items-center py-16">
-        <Icon name="heroicons:arrow-path" class="w-8 h-8 animate-spin text-[#7D5A50]" />
-      </div>
-
-      <div v-else-if="errorMessage" class="mt-4 bg-red-50 text-red-800 border border-red-200 rounded-xl p-4 flex items-center gap-3">
-        <Icon name="heroicons:exclamation-triangle" class="w-5 h-5 shrink-0" />
-        <span class="text-sm font-medium">{{ errorMessage }}</span>
-        <button class="ml-auto text-sm font-bold underline hover:text-red-900" @click="retry">Retry</button>
-      </div>
-
-      <template v-else-if="branch">
-        <!-- Branch Details Tab -->
-        <div v-if="activeTab === 'details'" class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-          <!-- Branch Information -->
-          <section class="bg-white border border-[#EDD8CC] rounded-2xl p-6 flex flex-col gap-5">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <h2 class="text-2xl font-bold text-[#3D2B24]">Branch Information</h2>
-              <div class="flex items-center gap-1.5">
-                <span class="bg-[#FFF0D1] border border-[#EDD8CC] rounded-lg px-2.5 py-1 text-xs font-bold text-[#7D5A50] uppercase">
-                  {{ branch.branch_type }}
-                </span>
-                <StatusBadge :status="branch.status" />
-              </div>
-            </div>
-
-            <div class="flex items-start gap-4">
-              <img
-                v-if="branch.cafe_picture_url"
-                :src="branch.cafe_picture_url"
-                :alt="pageTitle"
-                class="w-24 h-24 sm:w-[120px] sm:h-[120px] rounded-xl object-cover shrink-0 border border-[#EDD8CC]"
-              />
-              <div v-else class="w-24 h-24 sm:w-[120px] sm:h-[120px] rounded-xl bg-[#F4ECE1] border border-[#EDD8CC] flex items-center justify-center shrink-0">
-                <Icon name="heroicons:building-storefront" class="w-10 h-10 text-[#9E7060]" />
-              </div>
-
-              <div class="flex-1 min-w-0 flex flex-col gap-3">
-                <div class="flex flex-col gap-1">
-                  <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">Branch Name</p>
-                  <p class="text-[15px] font-medium text-[#3D2B24] break-words">{{ branch.branch_name }}</p>
-                </div>
-                <div class="flex flex-col gap-1">
-                  <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">{{ isMain ? 'Main Address' : 'Address' }}</p>
-                  <p class="text-base font-medium text-[#3D2B24] break-words">{{ branch.address || '—' }}</p>
-                </div>
-              </div>
-            </div>
-
-            <hr class="border-t border-[#EDD8CC]" />
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div class="flex flex-col gap-1 min-w-0">
-                <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">Email Address</p>
-                <p class="text-base font-medium text-[#3D2B24] break-all">{{ branch.cafe_email || '—' }}</p>
-              </div>
-              <div class="flex flex-col gap-1 min-w-0">
-                <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">Phone Number</p>
-                <p class="text-base font-medium text-[#3D2B24]">{{ branch.cafe_phonenumber || '—' }}</p>
-              </div>
-            </div>
-          </section>
-
-          <!-- BIR Document (file download stays owner/admin only) -->
-          <section class="bg-white border border-[#EDD8CC] rounded-2xl p-6 flex flex-col gap-4">
-            <h2 class="text-[22px] font-bold text-[#3D2B24]">BIR Document</h2>
-
-            <div v-if="birDocument" class="flex flex-col gap-5">
-              <div class="border border-[#EDD8CC] rounded-xl p-4 flex items-center gap-3">
-                <div class="bg-[#FFF0D1] rounded-[10px] w-12 h-12 flex items-center justify-center shrink-0">
-                  <img src="/images/file-text.svg" alt="" width="20" height="20" />
-                </div>
-                <div class="flex-1 min-w-0 flex flex-col gap-1">
-                  <p class="text-sm font-semibold text-[#3D2B24] truncate">BIR Certificate</p>
-                  <p class="text-xs text-[#9E7060]">Uploaded {{ formatDate(birDocument.uploaded_at, 'short') }}</p>
-                </div>
-              </div>
-
-              <div class="grid grid-cols-2 gap-3">
-                <div class="flex flex-col gap-1 min-w-0">
-                  <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">TIN Number</p>
-                  <p class="text-[15px] font-medium text-[#3D2B24] break-all">{{ birDocument.tin_number || '—' }}</p>
-                </div>
-                <div class="flex flex-col gap-1">
-                  <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">VAT Type</p>
-                  <p class="text-[15px] font-medium text-[#3D2B24]">{{ formatVat(birDocument.vat) }}</p>
-                </div>
-                <div class="flex flex-col gap-1">
-                  <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">Registered Date</p>
-                  <p class="text-[15px] font-medium text-[#3D2B24]">{{ formatDate(birDocument.registered_at) }}</p>
-                </div>
-              </div>
-            </div>
-
-            <p v-else class="text-sm text-[#9E7060]">No BIR document uploaded for this branch.</p>
-          </section>
-
-          <!-- POS Registers (full width, under both cards) -->
-          <PosDevicesCard class="lg:col-span-2" :branch-uuid="branch.uuid" scope="manager" />
+      <!-- Smooth Content Transition after Loading -->
+      <Transition name="fade-content" mode="out-in">
+        <!-- Loading Spinner -->
+        <div v-if="loading" key="loading" class="flex flex-col items-center justify-center py-20 gap-3">
+          <div class="relative flex items-center justify-center">
+            <div class="size-9 rounded-full border-2 border-[#EDD8CC] border-t-[#7D5A50] animate-spin" />
+          </div>
+          <p class="text-xs font-medium text-[#8C6E63] animate-pulse">Loading cafe details...</p>
         </div>
 
-        <!-- Employees Tab: the list, or one employee's details. Managers can only add / edit cashiers and staff. -->
-        <EmployeesDetails
-          v-else-if="viewedEmployee"
-          :branch-uuid="branch.uuid"
-          :employee-uuid="viewedEmployee"
-          scope="manager"
-          @back="backToEmployees"
-        />
-        <EmployeesTab v-else :branch-uuid="branch.uuid" scope="manager" @view-employee="viewEmployee($event.uuid)" />
-      </template>
+        <!-- Error State -->
+        <div v-else-if="errorMessage" key="error" class="mt-4 bg-red-50 text-red-800 border border-red-200 rounded-xl p-4 flex items-center gap-3">
+          <Icon name="heroicons:exclamation-triangle" class="w-5 h-5 shrink-0" />
+          <span class="text-sm font-medium">{{ errorMessage }}</span>
+          <button class="ml-auto text-sm font-bold underline hover:text-red-900" @click="retry">Retry</button>
+        </div>
+
+        <!-- Loaded Content with Staggered Card Entrance -->
+        <div v-else-if="branch" key="content" class="fade-reveal">
+          <Transition name="fade-tab" mode="out-in">
+            <!-- Branch Details Tab -->
+            <div v-if="activeTab === 'details'" key="details" class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+              <!-- Branch Information -->
+              <section data-walkthrough="cafe-details-card" class="cafe-card cafe-card-1 bg-white border border-[#EDD8CC] rounded-2xl p-6 shadow-sm flex flex-col gap-5">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <h2 class="text-xl sm:text-2xl font-bold text-[#3D2B24] flex items-center gap-2">
+                    <Icon name="heroicons:information-circle" class="size-6 text-[#A96746]" />
+                    Branch Information
+                  </h2>
+                  <div class="flex items-center gap-1.5">
+                    <span class="bg-[#FFF0D1] border border-[#EDD8CC] rounded-lg px-2.5 py-1 text-xs font-bold text-[#7D5A50] uppercase">
+                      {{ branch.branch_type }}
+                    </span>
+                    <StatusBadge :status="branch.status" />
+                  </div>
+                </div>
+
+                <div class="flex items-start gap-4">
+                  <img
+                    v-if="branch.cafe_picture_url"
+                    :src="branch.cafe_picture_url"
+                    :alt="branch.branch_name || 'Branch photo'"
+                    class="w-24 h-24 sm:w-[120px] sm:h-[120px] rounded-2xl object-cover shrink-0 border border-[#EDD8CC] shadow-sm"
+                  />
+                  <div v-else class="w-24 h-24 sm:w-[120px] sm:h-[120px] rounded-2xl bg-[#F4ECE1] border border-[#EDD8CC] flex items-center justify-center shrink-0 shadow-sm">
+                    <Icon name="heroicons:building-storefront" class="w-10 h-10 text-[#9E7060]" />
+                  </div>
+
+                  <div class="flex-1 min-w-0 flex flex-col gap-3">
+                    <div class="flex flex-col gap-1">
+                      <p class="text-xs font-bold text-[#9E7060] uppercase tracking-wider">Branch Name</p>
+                      <p class="text-base font-semibold text-[#3D2B24] break-words">{{ branch.branch_name }}</p>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                      <p class="text-xs font-bold text-[#9E7060] uppercase tracking-wider">{{ isMain ? 'Main Address' : 'Address' }}</p>
+                      <p class="text-sm sm:text-base font-medium text-[#3D2B24] break-words">{{ branch.address || '—' }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <hr class="border-t border-[#EDD8CC]" />
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div class="flex flex-col gap-1 min-w-0">
+                    <p class="text-xs font-bold text-[#9E7060] uppercase tracking-wider">Email Address</p>
+                    <p class="text-sm sm:text-base font-medium text-[#3D2B24] break-all">{{ branch.cafe_email || '—' }}</p>
+                  </div>
+                  <div class="flex flex-col gap-1 min-w-0">
+                    <p class="text-xs font-bold text-[#9E7060] uppercase tracking-wider">Phone Number</p>
+                    <p class="text-sm sm:text-base font-medium text-[#3D2B24]">{{ branch.cafe_phonenumber || '—' }}</p>
+                  </div>
+                </div>
+
+                <div class="rounded-xl bg-[#FAF4ED] border border-[#EDD8CC] px-3.5 py-2.5 flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <Icon name="heroicons:bell-alert" class="w-4 h-4 text-amber-600 shrink-0" />
+                    <span class="text-xs font-bold text-[#3D2B24]">Low Stock Alert Limit</span>
+                    <span class="text-[11px] font-medium text-[#9E7060] hidden sm:inline">· Cafe-wide setting</span>
+                  </div>
+                  <span class="inline-flex items-center rounded-lg bg-white border border-[#E3CFB4] px-2.5 py-1 text-xs font-extrabold text-[#3D2B24] tabular-nums">
+                    {{ branch.low_stock_threshold_percent ? `${branch.low_stock_threshold_percent}%` : 'Not set' }}
+                  </span>
+                </div>
+              </section>
+
+              <!-- BIR Document (file download stays owner/admin only) -->
+              <section class="cafe-card cafe-card-2 bg-white border border-[#EDD8CC] rounded-2xl p-6 shadow-sm flex flex-col gap-4">
+                <h2 class="text-xl sm:text-2xl font-bold text-[#3D2B24] flex items-center gap-2">
+                  <Icon name="heroicons:document-text" class="size-6 text-[#A96746]" />
+                  BIR Document
+                </h2>
+
+                <div v-if="birDocument" class="flex flex-col gap-5">
+                  <div class="border border-[#EDD8CC] rounded-xl p-4 flex items-center gap-3">
+                    <div class="bg-[#FFF0D1] rounded-[10px] w-12 h-12 flex items-center justify-center shrink-0">
+                      <img src="/images/file-text.svg" alt="" width="20" height="20" />
+                    </div>
+                    <div class="flex-1 min-w-0 flex flex-col gap-1">
+                      <p class="text-sm font-semibold text-[#3D2B24] truncate">BIR Certificate</p>
+                      <p class="text-xs text-[#9E7060]">Uploaded {{ formatDate(birDocument.uploaded_at, 'short') }}</p>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-3">
+                    <div class="flex flex-col gap-1 min-w-0">
+                      <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">TIN Number</p>
+                      <p class="text-[15px] font-medium text-[#3D2B24] break-all">{{ birDocument.tin_number || '—' }}</p>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                      <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">VAT Type</p>
+                      <p class="text-[15px] font-medium text-[#3D2B24]">{{ formatVat(birDocument.vat) }}</p>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                      <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">Registered Date</p>
+                      <p class="text-[15px] font-medium text-[#3D2B24]">{{ formatDate(birDocument.registered_at) }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <p v-else class="text-sm text-[#9E7060]">No BIR document uploaded for this branch.</p>
+              </section>
+
+              <!-- POS Registers (full width, under both cards) -->
+              <div class="cafe-card cafe-card-3 lg:col-span-2">
+                <PosDevicesCard :branch-uuid="branch.uuid" scope="manager" />
+              </div>
+            </div>
+
+            <!-- Employees Tab -->
+            <div v-else key="employees" class="mt-4">
+              <EmployeesDetails
+                v-if="viewedEmployee"
+                :branch-uuid="branch.uuid"
+                :employee-uuid="viewedEmployee"
+                scope="manager"
+                @back="backToEmployees"
+              />
+              <EmployeesTab v-else :branch-uuid="branch.uuid" scope="manager" @view-employee="viewEmployee($event.uuid)" />
+            </div>
+          </Transition>
+        </div>
+      </Transition>
     </main>
   </div>
 </template>
+
+<style scoped>
+/* Page entrance */
+.cafe-entrance {
+  animation: cafePageEnter 260ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+@keyframes cafePageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Smooth content transition after loading */
+.fade-content-enter-active,
+.fade-content-leave-active {
+  transition: opacity 240ms cubic-bezier(0.23, 1, 0.32, 1), transform 240ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.fade-content-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.fade-content-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* Staggered card entrance on load */
+.fade-reveal .cafe-card {
+  opacity: 0;
+  animation: cardGlideUp 280ms cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+.fade-reveal .cafe-card-1 {
+  animation-delay: 0ms;
+}
+
+.fade-reveal .cafe-card-2 {
+  animation-delay: 60ms;
+}
+
+.fade-reveal .cafe-card-3 {
+  animation-delay: 120ms;
+}
+
+@keyframes cardGlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Tab change transition */
+.fade-tab-enter-active,
+.fade-tab-leave-active {
+  transition: opacity 180ms cubic-bezier(0.23, 1, 0.32, 1), transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.fade-tab-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.fade-tab-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .cafe-entrance,
+  .fade-reveal .cafe-card {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .fade-content-enter-active,
+  .fade-content-leave-active,
+  .fade-tab-enter-active,
+  .fade-tab-leave-active {
+    transition: opacity 120ms ease !important;
+    transform: none !important;
+  }
+  .fade-content-enter-from,
+  .fade-content-leave-to,
+  .fade-tab-enter-from,
+  .fade-tab-leave-to {
+    transform: none !important;
+  }
+}
+</style>

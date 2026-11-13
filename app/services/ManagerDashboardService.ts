@@ -44,6 +44,7 @@ export interface ManagerTransactionItem {
     staff_name: string
     total_amount: number
     status: string
+    order_type?: string | null
     items_count: number
     payment_method: string
     walk_in_note: string | null
@@ -136,6 +137,7 @@ export interface ManagerTransactionDetail {
     created_at: string
     staff_name: string
     status: string
+    order_type?: string | null
     walk_in_note: string | null
     subtotal: number
     discount_type: string | null

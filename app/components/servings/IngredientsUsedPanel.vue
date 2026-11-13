@@ -91,17 +91,17 @@ watch(() => props.ingredients, () => {
     class="bg-white border border-[#E3CFB4] rounded-2xl flex flex-col h-[520px] shadow-2xs overflow-hidden"
   >
     <!-- Header -->
-    <div class="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[#E3CFB4]/70">
-      <div class="flex items-center gap-2.5">
+    <div class="flex items-center justify-between gap-3 px-5 pt-4 pb-3 border-b border-[#E3CFB4]/70">
+      <div class="flex items-center gap-2.5 min-w-0">
         <div class="size-8 rounded-lg bg-[#FDF3E7] border border-[#E3CFB4] flex items-center justify-center text-[#7D5A50] shrink-0">
           <Icon name="heroicons:scale" class="w-4 h-4" />
         </div>
-        <div>
-          <h2 class="font-display font-bold text-[18px] text-[#3B1F0E] leading-tight">Ingredients Used in Sales</h2>
-          <p class="text-[12px] text-[#8B6656]">From each sold item's recipe. Spoiled servings are not included.</p>
+        <div class="min-w-0">
+          <h2 class="font-display font-bold text-[17px] sm:text-[18px] text-[#3B1F0E] leading-tight truncate">Ingredients Used in Sales</h2>
+          <p class="text-[12px] text-[#8B6656] truncate">From each sold item's recipe. Spoiled servings are not included.</p>
         </div>
       </div>
-      <span class="rounded-full bg-[#FDF3E7] border border-[#E3CFB4] px-2.5 py-0.5 text-xs font-semibold text-[#7D5A50] tabular-nums">
+      <span class="rounded-full bg-[#FDF3E7] border border-[#E3CFB4] px-2.5 py-0.5 text-xs font-semibold text-[#7D5A50] tabular-nums shrink-0 whitespace-nowrap">
         {{ ingredients.length }} active
       </span>
     </div>
@@ -137,7 +137,7 @@ watch(() => props.ingredients, () => {
         <p class="text-[12px] text-[#8B6656] mt-0.5">Ingredients will appear here as orders are prepared.</p>
       </div>
 
-      <!-- Ingredient Rows with slow smooth animated progress bars -->
+      <!-- Ingredient Rows with smooth animated progress bars -->
       <div
         v-else
         v-for="i in ingredients"
@@ -150,7 +150,7 @@ watch(() => props.ingredients, () => {
             {{ formatQuantity(i.quantity, 0.01) || i.quantity }} {{ unitLabel(i.quantity, i.unit) }}
           </span>
         </div>
-        <!-- Progress Bar Track & Fill with Slow Animation on Scroll / Refresh -->
+        <!-- Progress Bar Track & Fill with Smooth Animation on Scroll / Refresh -->
         <div class="h-2 rounded-full bg-[#FAF4ED] border border-[#EBE0D2] overflow-hidden">
           <div
             class="progress-fill h-full rounded-full bg-[#7D5A50]"
@@ -163,9 +163,9 @@ watch(() => props.ingredients, () => {
 </template>
 
 <style scoped>
-/* Very slow 2500ms smooth expansion */
+/* Snappy smooth 400ms expansion */
 .progress-fill {
-  transition: width 2500ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width 400ms cubic-bezier(0.23, 1, 0.32, 1);
   will-change: width;
 }
 

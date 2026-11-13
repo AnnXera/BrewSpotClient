@@ -16,6 +16,7 @@ definePageMeta({
 })
 
 const route = useRoute()
+const { canEditMenu } = useMenuEditGate()
 const router = useRouter()
 const menuService = useMenuService()
 const { confirmDialog, alertDialog, askConfirm, runConfirm, showAlert } = useDialogs()
@@ -83,6 +84,7 @@ const itemToEdit = computed(() => {
 })
 
 function handleAddAction() {
+  if (!canEditMenu()) return
   router.push({ query: { ...route.query, action: 'add-item' } })
 }
 
@@ -102,6 +104,7 @@ function onItemSaved() {
 }
 
 function handleDeleteItem(itemUuid: string) {
+  if (!canEditMenu()) return
   askConfirm({
     title: 'Delete Item',
     message: 'Are you sure you want to delete this item?',

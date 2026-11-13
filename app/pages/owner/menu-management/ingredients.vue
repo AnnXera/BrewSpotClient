@@ -14,6 +14,7 @@ definePageMeta({
 })
 
 const route = useRoute()
+const { canEditMenu } = useMenuEditGate()
 const router = useRouter()
 const menuService = useMenuService()
 
@@ -100,10 +101,12 @@ const ingredientToEdit = computed(() => {
 })
 
 function handleAddAction() {
+  if (!canEditMenu()) return
   router.push({ query: { ...route.query, action: 'add-ingredient' } })
 }
 
 function editIngredient(uuid: string) {
+  if (!canEditMenu()) return
   router.push({ query: { ...route.query, action: 'edit-ingredient', ingredient: uuid } })
 }
 
@@ -123,6 +126,7 @@ function toggleSelection(uuid: string, isSelected: boolean) {
 }
 
 function confirmBulkAction(action: 'retire'|'restore'|'delete') {
+  if (!canEditMenu()) return
   bulkActionType.value = action
   let msg = ''
   let title = ''
@@ -134,7 +138,7 @@ function confirmBulkAction(action: 'retire'|'restore'|'delete') {
     msg = `You are about to restore ${selectedUuids.value.size} ingredients. Proceed?`
   } else {
     title = 'Delete Ingredients?'
-    msg = `You are about to permanently delete ${selectedUuids.value.size} ingredients. This cannot be undone. Proceed?`
+    msg = `You are about to permanently delete ${selectedUuids.value.size} ingredients. This cannot be undone. Ingredients still used in a menu item or add-on are skipped; retire those instead. Proceed?`
   }
   
   confirmModal.value = {
@@ -165,9 +169,20 @@ async function executeBulkAction() {
       }
     })
     
-    await Promise.allSettled(promises)
+    const results = await Promise.allSettled(promises)
     selectedUuids.value.clear()
     await fetchData()
+
+    // The server refuses some (e.g. deleting an ingredient a recipe still uses); say which and why.
+    const reasons = results
+      .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+      .map(r => r.reason?.data?.message as string | undefined)
+    if (reasons.length) {
+      const explained = reasons.filter((m): m is string => !!m)
+      errorMessage.value = reasons.length === uuids.length && reasons.length === 1
+        ? (explained[0] ?? 'That ingredient could not be updated. Please try again.')
+        : `${reasons.length} of ${uuids.length} ingredients were not changed.` + (explained.length ? ' ' + [...new Set(explained)].join(' ') : '')
+    }
   } catch (error) {
     console.error('Bulk action failed', error)
     errorMessage.value = 'Failed to process some ingredients. Please try again.'

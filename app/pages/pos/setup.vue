@@ -11,6 +11,7 @@ const posService = usePosService()
 const router = useRouter()
 const endManagerSession = useLogout({ redirectTo: false })
 const posDeviceCookie = usePosDeviceToken()
+const { isInstalled } = useA2HS()
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -28,6 +29,9 @@ async function fetchBranches() {
       branches.value = res.branches
       if (branches.value.length > 0) {
         selectedBranch.value = branches.value[0].uuid
+        if (!deviceName.value) {
+          deviceName.value = 'Front Counter 1'
+        }
       }
     } else {
       errorMessage.value = 'Failed to load branches for setup.'
@@ -53,12 +57,16 @@ async function registerDevice() {
     if (res.success && res.device_token) {
       // 1. Save the POS device token
       posDeviceCookie.value = res.device_token
-      
+
+      try {
+        sessionStorage.removeItem('pos_setup_login_done')
+      } catch {}
+
       // 2. End the owner/manager session on this shared device (revokes the token server-side too)
       await endManagerSession()
-      
+
       // 3. Redirect to the actual POS register screen
-      router.push('/pos')
+      router.replace('/pos')
     } else {
       errorMessage.value = res.message || 'Failed to register device.'
     }
@@ -87,7 +95,7 @@ onMounted(() => {
       </div>
 
       <form @submit.prevent="registerDevice" class="space-y-5">
-        <div>
+        <div data-walkthrough="pos-branch-select">
           <label class="block text-sm font-bold text-[#3D2B24] mb-2">Branch</label>
           <DropdownList
             v-model="selectedBranch"
@@ -97,7 +105,7 @@ onMounted(() => {
           />
         </div>
 
-        <div>
+        <div data-walkthrough="pos-device-name">
           <label class="block text-sm font-bold text-[#3D2B24] mb-2">Register Name</label>
           <input 
             v-model="deviceName" 
@@ -110,12 +118,25 @@ onMounted(() => {
 
         <button 
           type="submit" 
+          data-walkthrough="pos-register-btn"
           class="w-full bg-[#7D5A50] hover:bg-[#684940] text-white font-bold rounded-xl py-3.5 transition-colors flex items-center justify-center gap-2 mt-4"
           :disabled="loading"
         >
           <Icon v-if="loading" name="heroicons:arrow-path" class="w-5 h-5 animate-spin" />
           {{ loading ? 'Registering...' : 'Register Device' }}
         </button>
+
+        <template v-if="!isInstalled">
+          <div class="relative my-4 flex items-center">
+            <div class="flex-grow border-t border-[#EDD8CC]"></div>
+            <span class="flex-shrink mx-3 text-xs text-[#9E7060]">OR INSTALL APP</span>
+            <div class="flex-grow border-t border-[#EDD8CC]"></div>
+          </div>
+
+          <div data-walkthrough="pos-a2hs-btn">
+            <CommonA2HSButton variant="setup" />
+          </div>
+        </template>
         
         <p class="text-xs text-center text-[#8B6656] mt-4">
           Note: This will log you out of your manager account on this device so staff can safely use the register.

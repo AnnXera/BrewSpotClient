@@ -61,3 +61,14 @@ export function formatMethod(key: string): string {
     const known: Record<string, string> = { cash: 'Cash', gcash: 'GCash', maya: 'Maya', paymaya: 'Maya', card: 'Card', unknown: 'Not recorded' }
     return known[key.toLowerCase()] ?? key.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
+
+// Order type keys from the POS ("dine_in", "take_out", "delivery") as display labels.
+export function formatOrderType(key?: string | null): string {
+    if (!key) return 'Dine In'
+    const known: Record<string, string> = {
+        dine_in: 'Dine In',
+        take_out: 'Take Out',
+        delivery: 'Delivery',
+    }
+    return known[key.toLowerCase()] ?? key.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}

@@ -2,6 +2,7 @@
 <!-- Host stand for the register: today's arrivals queue on the left, the live floor on the right.
      The queue leads because seating guests is the job during service; the floor answers "where". -->
 <script setup lang="ts">
+import type { PlanLock } from '~/utils/planLock'
 import { tableAsset, doorAsset } from '~/utils/floorPlanCatalog'
 import FloorPlanTable from '~/components/floor-plan/Table.vue'
 import ReservationActions from '~/components/pos/ReservationActions.vue'
@@ -112,7 +113,8 @@ function onFullscreenChange() {
 const loading = ref(true)
 const syncing = ref(false)
 const errorMessage = ref('')
-const planLocked = ref(false)
+// The cafe's plan lacks reservations, or its subscription has expired.
+const planLock = ref<PlanLock | null>(null)
 const busyBooking = ref<string | null>(null)
 const updatingTable = ref(false)
 
@@ -145,7 +147,7 @@ async function loadFloorPlan(silent = false) {
   if (!silent) {
     loading.value = true
     errorMessage.value = ''
-    planLocked.value = false
+    planLock.value = null
   }
   try {
     const res = await devicePosService.getFloorPlan()
@@ -156,8 +158,8 @@ async function loadFloorPlan(silent = false) {
       }
     }
   } catch (e: any) {
-    if (e?.response?.status === 403 || e?.status === 403) planLocked.value = true
-    else if (!silent) errorMessage.value = e?.data?.message || 'The floor plan could not be loaded. Check the connection and try again.'
+    planLock.value = planLockFromError(e)
+    if (!planLock.value && !silent) errorMessage.value = e?.data?.message || 'The floor plan could not be loaded. Check the connection and try again.'
   } finally {
     if (!silent) loading.value = false
   }
@@ -753,11 +755,8 @@ onUnmounted(() => {
           <div ref="viewport" class="rsv-scroll relative min-h-0 flex-1 overflow-auto" @click.self="selectedTableUuid = null; sheetOpen = false">
             <div v-if="loading && !currentPlan" class="grid h-full place-items-center text-[14px] text-[#7D5A50]">Loading the floor…</div>
 
-            <div v-else-if="planLocked" class="grid h-full place-items-center p-6">
-              <div class="max-w-sm text-center">
-                <p class="font-display text-[18px] font-semibold text-[#2D1E17]">Reservations are not on this plan</p>
-                <p class="mt-1 text-[14px] leading-relaxed text-[#7D5A50]">The floor and bookings need the Reservations feature on the cafe's subscription. The owner can add it from Subscription.</p>
-              </div>
+            <div v-else-if="planLock" class="grid h-full place-items-center p-6">
+              <SubscriptionLockedState :lock="planLock" audience="staff" class="max-w-md" />
             </div>
 
             <div v-else-if="errorMessage" class="grid h-full place-items-center p-6">

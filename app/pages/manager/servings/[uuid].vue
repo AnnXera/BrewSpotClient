@@ -1,6 +1,7 @@
 <!-- app/pages/manager/servings/[uuid].vue -->
 <!-- One category's items: set each item's daily limit and switch it on or off for today, then Save Changes. -->
 <script setup lang="ts">
+import type { PlanLock } from '~/utils/planLock'
 import DropdownList from '~/components/common/DropdownList.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
 import CommonPagination from '~/components/common/Pagination.vue'
@@ -15,13 +16,7 @@ definePageMeta({
   role: 'Manager',
 })
 
-const links = [
-  { label: 'Dashboard', to: '/manager/dashboard', icon: 'squares-2x2' },
-  { label: 'Cafe Management', to: '/manager/cafe', icon: 'building-storefront' },
-  { label: 'Servings', to: '/manager/servings', icon: 'cake' },
-  { label: 'Reservations', to: '/manager/reservations', icon: 'calendar-days' },
-  { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
-]
+const links = MANAGER_NAV_LINKS
 
 const PER_PAGE = 6
 
@@ -34,6 +29,7 @@ const branchUuid = ref('') // a manager runs exactly one branch
 
 const categoryName = ref('')
 const items = ref<CategoryServingItem[]>([])
+const lowStockThresholdPercent = ref<number | null>(null)
 const page = ref(1)
 const lastPage = ref(1)
 const search = ref('')
@@ -50,9 +46,26 @@ const drafts = ref<Record<string, { daily_limit: number; enabled: boolean }>>({}
 const loading = ref(true)
 const saving = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
 const rowErrors = ref<Record<string, string>>({}) // item uuid -> message from the server
-const planLocked = ref(false)
+// API 403: the cafe's plan lacks the feature or its subscription has expired.
+const planLock = ref<PlanLock | null>(null)
+const planLocked = computed(() => !!planLock.value)
+
+// Toast Notification State (Save Layout / Floor Plan style)
+const toastShow = ref(false)
+const toastTitle = ref('Servings saved')
+const toastDescription = ref('Daily category limits updated successfully')
+let toastTimer: ReturnType<typeof setTimeout> | undefined
+
+function triggerToast(title: string, desc: string) {
+  toastTitle.value = title
+  toastDescription.value = desc
+  toastShow.value = true
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastShow.value = false
+  }, 2800)
+}
 
 // Activate scroll reveal when items load
 useScrollReveal(items)
@@ -85,10 +98,8 @@ function toggle(i: CategoryServingItem) {
 const dirtyCount = computed(() => Object.keys(drafts.value).length)
 
 function failure(e: any, fallback: string) {
-  planLocked.value = e?.response?.status === 403 && !!e?.data?.required_feature
-  errorMessage.value = planLocked.value
-    ? 'Servings management is not included in your cafe\'s plan.'
-    : e?.data?.message ?? fallback
+  planLock.value = planLockFromError(e)
+  errorMessage.value = planLock.value ? '' : e?.data?.message ?? fallback
 }
 
 async function load() {
@@ -103,6 +114,7 @@ async function load() {
     categoryName.value = res.category.name
     items.value = res.items.data
     lastPage.value = res.items.last_page
+    lowStockThresholdPercent.value = res.low_stock_threshold_percent ?? null
     errorMessage.value = ''
   } catch (e: any) {
     failure(e, 'Could not load this category.')
@@ -113,7 +125,7 @@ async function save() {
   if (!dirtyCount.value || saving.value) return
   saving.value = true
   errorMessage.value = ''
-  successMessage.value = ''
+  toastShow.value = false
   rowErrors.value = {}
 
   const changes: CategoryServingChange[] = Object.entries(drafts.value).map(([uuid, d]) => ({
@@ -125,7 +137,7 @@ async function save() {
   try {
     const res = await service.saveCategoryItems(branchUuid.value, categoryUuid.value, changes)
     drafts.value = {}
-    successMessage.value = res.message
+    triggerToast(res.message || 'Servings saved', 'Daily category limits updated successfully')
     await load()
   } catch (e: any) {
     const errors = e?.data?.errors as Record<string, string[]> | undefined
@@ -214,6 +226,13 @@ onBeforeUnmount(() => {
                 {{ categoryName || 'Category Items' }}
               </h1>
               <span
+                v-if="lowStockThresholdPercent"
+                class="inline-flex items-center gap-1 rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-amber-800"
+              >
+                <Icon name="heroicons:bell-alert" class="w-3.5 h-3.5 text-amber-600" />
+                Low Stock Alert: ≤{{ lowStockThresholdPercent }}%
+              </span>
+              <span
                 v-if="dirtyCount"
                 class="inline-block rounded-md border border-amber-300 bg-amber-50 px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-amber-800 animate-pulse"
               >
@@ -249,17 +268,9 @@ onBeforeUnmount(() => {
           <p class="font-medium">{{ errorMessage }}</p>
         </div>
 
-        <!-- Success Notification -->
-        <div
-          v-else-if="successMessage"
-          role="status"
-          class="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-[14px] text-emerald-800 shadow-2xs"
-        >
-          <Icon name="heroicons:check-circle" class="h-5 w-5 shrink-0 text-emerald-600" />
-          <p class="font-medium">{{ successMessage }}</p>
-        </div>
-
         <!-- Items Card Section with Scroll Reveal -->
+        <SubscriptionLockedState v-if="planLock" :lock="planLock" audience="staff" />
+
         <section v-if="!planLocked && branchUuid" class="scroll-reveal bg-white border border-[#E3CFB4] rounded-2xl shadow-xs overflow-hidden">
           <!-- Toolbar: Search, Sort, Save Button -->
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 border-b border-[#E3CFB4] bg-[#FFFDF9]/60">
@@ -333,13 +344,21 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <!-- Pagination Footer -->
-          <div class="border-t border-[#E3CFB4] bg-[#FFFDF9]/60 px-5">
+          <!-- Pagination Footer (only if more than 1 page) -->
+          <div v-if="lastPage > 1" class="border-t border-[#E3CFB4] bg-[#FFFDF9]/60 px-5">
             <CommonPagination :page="page" :last-page="lastPage" @change="page = $event" />
           </div>
         </section>
       </div>
     </main>
+
+    <!-- Emil Kowalski Toast (Save Layout style) -->
+    <FloorPlanToast
+      :show="toastShow"
+      :message="toastTitle"
+      :description="toastDescription"
+      @close="toastShow = false"
+    />
   </div>
 </template>
 

@@ -1,20 +1,16 @@
 <script setup lang="ts">
+import type { PlanLock } from '~/utils/planLock'
 import type { FloorPlan, FloorPlanElement, FloorPlanTable } from '~/services/FloorPlanService'
 import type { ReservationRecord } from '~/services/ReservationService'
 import type { OpeningHour, ReservationStatus } from '~/services/ReservationService'
 import { FLOOR_TAB_LIMIT, doorAsset, tableAsset } from '~/utils/floorPlanCatalog'
+import EmilCalendar from '~/components/common/EmilCalendar.vue'
 
 definePageMeta({
   role: 'Manager',
 })
 
-const links = [
-  { label: 'Dashboard', to: '/manager/dashboard', icon: 'squares-2x2' },
-  { label: 'Cafe Management', to: '/manager/cafe', icon: 'building-storefront' },
-  { label: 'Servings', to: '/manager/servings', icon: 'cake' },
-  { label: 'Reservations', to: '/manager/reservations', icon: 'calendar-days' },
-  { label: 'Floor Plan', to: '/manager/floor-plan', icon: 'map' },
-]
+const links = MANAGER_NAV_LINKS
 
 // Statuses that hold a table (mirrors floor_plan.blocking_reservation_statuses).
 // A booking holds its table for the whole day: guests may stay as long as they like.
@@ -36,9 +32,27 @@ const plans = ref<FloorPlan[]>([])
 const planLoading = ref(false)
 const loading = ref(true)
 const errorMessage = ref('')
+// API 403: the cafe's plan lacks reservations, or its subscription has expired.
+const planLock = ref<PlanLock | null>(null)
 const reservationError = ref('')
 const reservationNotice = ref('')
 const reservations = ref<ReservationRecord[]>([])
+
+// Toast Notification State (matching Save Layout / Floor Plan style)
+const toastShow = ref(false)
+const toastTitle = ref('Reservation confirmed')
+const toastDescription = ref('')
+let toastTimer: ReturnType<typeof setTimeout> | undefined
+
+function triggerToast(title: string, desc: string = '') {
+  toastTitle.value = title
+  toastDescription.value = desc
+  toastShow.value = true
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastShow.value = false
+  }, 3200)
+}
 const dayReservations = ref<ReservationRecord[]>([])
 const openingHours = ref<OpeningHour[]>([])
 const dayLoading = ref(false)
@@ -53,7 +67,6 @@ const waitlistStatusFilter = ref('all')
 const selectedTable = ref<FloorPlanTable | null>(null)
 const selectedChair = ref<FloorPlanElement | null>(null)
 const inspectedTable = ref<FloorPlanTable | null>(null)
-const datePicker = ref<HTMLInputElement | null>(null)
 const slotStrip = ref<HTMLElement | null>(null)
 const planFrame = ref<HTMLElement | null>(null)
 const planFrameWidth = ref(0)
@@ -158,16 +171,6 @@ function shiftDate(days: number) {
   const key = localDateKey(date)
   if (key < todayDate.value) return
   selectedDate.value = key
-}
-
-function openDatePicker() {
-  const input = datePicker.value
-  if (!input) return
-  try {
-    input.showPicker()
-  } catch {
-    input.focus()
-  }
 }
 
 function formatClock(date: Date) {
@@ -325,7 +328,7 @@ function selectTable(table: FloorPlanTable) {
   inspectedTable.value = null
   selectedTable.value = table
   selectedChair.value = null
-  reservation.partySize = Math.min(Math.max(1, reservation.partySize), table.capacity)
+  reservation.partySize = Math.min(Math.max(1, reservation.partySize), Math.max(1, seatsFree(table)))
 }
 
 function selectChair(chair: FloorPlanElement) {
@@ -441,6 +444,7 @@ async function loadPlan() {
   if (!branchUuid.value) return
   loading.value = true
   errorMessage.value = ''
+  planLock.value = null
   try {
     const response = await service.list(branchUuid.value)
     plans.value = response.floor_plans
@@ -452,7 +456,8 @@ async function loadPlan() {
     clearSelection()
   } catch (error: any) {
     activePlan.value = null
-    errorMessage.value = error?.data?.message ?? 'Could not load the saved floor plan.'
+    planLock.value = planLockFromError(error)
+    if (!planLock.value) errorMessage.value = error?.data?.message ?? 'Could not load the saved floor plan.'
   } finally {
     loading.value = false
   }
@@ -516,6 +521,9 @@ async function updateReservationStatus(item: ReservationRecord, status: Reservat
     // Swap in the server's copy so the row shows its new status and actions right away.
     reservations.value = reservations.value.map((reservation) => reservation.uuid === item.uuid ? response.reservation : reservation)
     await loadDayReservations()
+    const statusLabel = status.charAt(0).toUpperCase() + status.slice(1)
+    const tableName = item.table?.table_name ? `Table ${item.table.table_name}` : 'Reservation'
+    triggerToast(`Reservation ${statusLabel}`, `${tableName} for ${item.customer_name} marked as ${status}.`)
   } catch (error: any) {
     // The row stays as it was; the message shows above the list instead of replacing it.
     waitlistActionError.value = error?.data?.message ?? 'Could not update the reservation status.'
@@ -581,13 +589,42 @@ function jumpTo(entry: { start: Date }) {
 }
 
 const phoneDigits = computed(() => reservation.customerPhone.replace(/\D/g, ''))
+
+// Most guests the selection can take: one chair is one seat, counter seating only
+// has the seats other bookings that day leave free, any other table its capacity.
+function seatsFree(table: FloorPlanTable) {
+  if (!isShared(table)) return table.capacity
+  const held = tableHolds(table).reduce((sum, entry) => sum + entry.item.party_size, 0)
+  return Math.max(0, table.capacity - held)
+}
+
+const maxGuests = computed(() => {
+  if (selectedChair.value) return 1
+  return selectedTable.value ? seatsFree(selectedTable.value) : 0
+})
+
+const guestsError = computed(() => {
+  const size = reservation.partySize
+  if (!selectedTable.value || !Number.isFinite(size)) return ''
+  if (!Number.isInteger(size) || size < 1) return 'Enter at least 1 guest.'
+  if (size > maxGuests.value) {
+    const seats = `${maxGuests.value} ${maxGuests.value === 1 ? 'seat' : 'seats'}`
+    return isShared(selectedTable.value) && !selectedChair.value && maxGuests.value < selectedTable.value.capacity
+      ? `Only ${seats} left at ${selectedTable.value.table_name} that day.`
+      : `${selectedTable.value.table_name} has ${seats}. Pick a bigger table for ${size} guests.`
+  }
+  return ''
+})
+
 const canConfirm = computed(() =>
   !windowIsPast.value
   && selectedSlotValid.value
   && Boolean(selectedTable.value)
   && Boolean(reservation.customerName.trim())
   && phoneDigits.value.length === 11
+  && Number.isInteger(reservation.partySize)
   && reservation.partySize >= 1
+  && reservation.partySize <= maxGuests.value
   && !submitting.value)
 
 async function confirmReservation() {
@@ -612,7 +649,9 @@ async function confirmReservation() {
       notes: reservation.notes.trim() || undefined,
     })
     // Clear the selection before reloading, or the watcher reports the new booking as a clash.
-    reservationNotice.value = `${tableName} booked for ${reservation.customerName.trim()} at ${formatClock(windowStart.value)}.`
+    const noticeText = `${tableName} booked for ${reservation.customerName.trim()} at ${formatClock(windowStart.value)}.`
+    reservationNotice.value = noticeText
+    triggerToast('Reservation confirmed', noticeText)
     reservation.customerName = ''
     reservation.customerPhone = ''
     reservation.notes = ''
@@ -678,6 +717,7 @@ onBeforeUnmount(() => {
         <div class="flex items-center gap-2">
           <button
             type="button"
+            data-walkthrough="reservations-waitlist-btn"
             class="inline-flex h-10 items-center gap-2 rounded-lg border border-[#C79679] px-4 text-sm text-[#5B463C] transition-colors hover:bg-[#F8EFE7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/30"
             :class="showWaitlist ? 'bg-[#F8EFE7]' : 'bg-white'"
             @click.stop="openWaitlist"
@@ -690,7 +730,7 @@ onBeforeUnmount(() => {
       </header>
 
       <!-- When: date strip, arrival time -->
-      <section class="mt-6 rounded-2xl border border-[#E8D7C7] bg-[#FFFDF9] p-4 md:p-5" aria-label="Reservation date and time">
+      <section data-walkthrough="reservations-date-strip" class="mt-6 rounded-2xl border border-[#E8D7C7] bg-[#FFFDF9] p-4 md:p-5" aria-label="Reservation date and time">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h2 class="font-display text-lg font-semibold text-[#3B2A24]">{{ selectedDateLabel }}</h2>
           <div class="flex items-center gap-1">
@@ -711,25 +751,23 @@ onBeforeUnmount(() => {
             >
               <Icon name="heroicons:chevron-right" class="size-5" />
             </button>
-            <div class="relative">
-              <button
-                type="button"
-                class="inline-flex h-9 items-center gap-2 rounded-lg border border-[#DCC8B8] bg-white px-3 text-sm text-[#5B463C] transition-colors hover:border-[#7D5A50]"
-                @click="openDatePicker"
-              >
-                <Icon name="heroicons:calendar-days" class="size-4" />
-                Other date
-              </button>
-              <input
-                ref="datePicker"
-                v-model="selectedDate"
-                type="date"
-                :min="todayDate"
-                tabindex="-1"
-                aria-hidden="true"
-                class="pointer-events-none absolute inset-0 opacity-0"
-              >
-            </div>
+            <EmilCalendar
+              v-model="selectedDate"
+              :min="todayDate"
+              align="right"
+            >
+              <template #trigger="{ open, toggle }">
+                <button
+                  type="button"
+                  class="inline-flex h-9 items-center gap-2 rounded-lg border border-[#DCC8B8] bg-white px-3 text-sm font-medium text-[#5B463C] shadow-2xs transition-all hover:border-[#7D5A50] hover:bg-[#F8EFE7] active:scale-[0.97] cursor-pointer"
+                  :class="{ 'border-[#7D5A50] bg-[#F8EFE7] ring-2 ring-[#7D5A50]/20': open }"
+                  @click="toggle"
+                >
+                  <Icon name="heroicons:calendar-days" class="size-4 text-[#7D5A50]" />
+                  <span>Other date</span>
+                </button>
+              </template>
+            </EmilCalendar>
           </div>
         </div>
 
@@ -834,6 +872,7 @@ onBeforeUnmount(() => {
             </div>
 
             <div v-if="loading" class="mt-4 flex min-h-[360px] items-center justify-center rounded-xl bg-[#FFFDF9] text-sm text-[#76605A]">Loading floor plan…</div>
+            <SubscriptionLockedState v-else-if="planLock" :lock="planLock" audience="staff" class="mt-4" />
             <div v-else-if="errorMessage" class="mt-4 flex min-h-[360px] items-center justify-center rounded-xl bg-[#FFFDF9] text-sm text-[#A4472E]">{{ errorMessage }}</div>
             <div v-else-if="!activePlan" class="mt-4 flex min-h-[360px] flex-col items-center justify-center gap-3 rounded-xl bg-[#FFFDF9] text-sm text-[#76605A]">
               No floor plan has been saved for this branch yet.
@@ -985,7 +1024,13 @@ onBeforeUnmount(() => {
           <div v-else-if="selectedTable" class="mt-4 flex items-center justify-between gap-3 rounded-xl bg-[#7D5A50] px-3 py-3 text-[#FFF0D1]">
             <div>
               <p class="text-sm font-medium">{{ selectedTable.table_name }}</p>
-              <p class="text-xs text-[#F2E0D2]">{{ selectedChair ? '1 seat at the communal table' : `Seats up to ${selectedTable.capacity}` }}</p>
+              <p class="text-xs text-[#F2E0D2]">{{
+                selectedChair
+                  ? '1 seat at the communal table'
+                  : maxGuests < selectedTable.capacity
+                    ? `${maxGuests} of ${selectedTable.capacity} seats free that day`
+                    : `Seats up to ${selectedTable.capacity}`
+              }}</p>
             </div>
             <button type="button" class="rounded-md border border-[#FFF0D1]/40 px-2.5 py-1 text-xs transition-colors hover:bg-[#FFF0D1]/10" @click="clearSelection">Change</button>
           </div>
@@ -1006,18 +1051,20 @@ onBeforeUnmount(() => {
                   v-model.number="reservation.partySize"
                   type="number"
                   min="1"
-                  :max="selectedChair ? 1 : (selectedTable ? selectedTable.capacity : 50)"
+                  :max="selectedTable ? maxGuests : 50"
                   :readonly="!!selectedChair"
+                  :aria-invalid="!!guestsError"
+                  aria-describedby="guests-error"
                   class="field tabular-nums read-only:bg-[#F8EFE7]"
                 >
               </label>
             </div>
+            <p v-if="guestsError" id="guests-error" class="text-xs text-[#A4472E]" role="alert">{{ guestsError }}</p>
             <p v-if="reservation.customerPhone && phoneDigits.length !== 11" class="text-xs text-[#76605A]">Phone numbers have 11 digits.</p>
             <label class="block text-xs text-[#5B463C]">Notes
               <textarea v-model="reservation.notes" rows="2" placeholder="Allergies, occasion, high chair…" class="field resize-none" />
             </label>
             <p v-if="reservationError" class="text-xs text-[#A4472E]" role="alert">{{ reservationError }}</p>
-            <p v-if="reservationNotice" class="text-xs text-[#2F6B45]" role="status">{{ reservationNotice }}</p>
             <button
               type="submit"
               :disabled="!canConfirm"
@@ -1145,6 +1192,14 @@ onBeforeUnmount(() => {
           </div>
         </section>
       </div>
+
+      <!-- Toast Notification (Save Layout / Floor Plan style) -->
+      <FloorPlanToast
+        :show="toastShow"
+        :message="toastTitle"
+        :description="toastDescription"
+        @close="toastShow = false"
+      />
     </main>
   </div>
 </template>

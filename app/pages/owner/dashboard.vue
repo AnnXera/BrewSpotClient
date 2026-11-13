@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import MissionProgressCard from '~/components/dashboard/MissionProgressCard.vue'
 import OwnerTotals from '~/components/dashboard/OwnerTotals.vue'
 import OwnerIncomeChart from '~/components/dashboard/OwnerIncomeChart.vue'
 import OwnerBranchBreakdown from '~/components/dashboard/OwnerBranchBreakdown.vue'
 import OwnerTrendingItems from '~/components/dashboard/OwnerTrendingItems.vue'
 import OwnerTopCategories from '~/components/dashboard/OwnerTopCategories.vue'
 import TransactionLog from '~/components/analytics/TransactionLog.vue'
-import OwnerWelcomeModal from '~/components/dashboard/OwnerWelcomeModal.vue'
 import type { DashboardRange, OwnerDashboardStats } from '~/services/OwnerProfileService'
 import { formatSpan } from '~/utils/dashboardFormat'
+import type { PlanLock } from '~/utils/planLock'
 
 definePageMeta({
   role: 'Cafe Owner',
@@ -17,6 +18,9 @@ definePageMeta({
 const links = OWNER_NAV_LINKS
 
 const ownerProfileService = useOwnerProfileService()
+// The transaction log comes from Analytics: locked when the plan lacks it or has expired.
+const { refresh: refreshPlanAccess, lockFor } = usePlanAccess()
+const analyticsLock = computed(() => lockFor('advanced_analytics'))
 const route = useRoute()
 const router = useRouter()
 
@@ -28,6 +32,13 @@ const stats = ref<OwnerDashboardStats | null>(null)
 const loading = ref(true)     // nothing loaded yet
 const refreshing = ref(false) // reloading with data already on screen
 const error = ref('')
+// Without a running subscription (expired or never subscribed) the whole dashboard is replaced.
+const dashboardLock = ref<PlanLock | null>(null)
+
+function lockFromError(err: any): PlanLock | null {
+  const lock = planLockFromError(err)
+  return lock ? { ...lock, featureName: 'the dashboard' } : null
+}
 
 // A late response for a range the owner already left must not overwrite the newer one.
 let requestId = 0
@@ -43,6 +54,7 @@ async function load() {
   try {
     const res = await ownerProfileService.getDashboardStats(range.value)
     if (id !== requestId) return
+    dashboardLock.value = null
     if (res?.success) {
       stats.value = res
     } else {
@@ -50,6 +62,8 @@ async function load() {
     }
   } catch (err) {
     if (id !== requestId) return
+    dashboardLock.value = lockFromError(err)
+    if (dashboardLock.value) return
     console.warn('Dashboard fetch error:', err)
     error.value = 'The dashboard figures could not be loaded. Check your connection and try again.'
   } finally {
@@ -65,7 +79,10 @@ watch(range, (value) => {
   load()
 })
 
-onMounted(load)
+onMounted(() => {
+  load()
+  refreshPlanAccess()
+})
 useAutoRefresh(load)
 
 // ── Transaction log: the chart's period, with its own branch picker ──
@@ -99,21 +116,6 @@ const logFilters = computed(() => {
   return { from, to: to > today ? today : to }
 })
 
-// ── First-login welcome ──
-const authStore = useAuthStore()
-const showWelcome = ref(!!authStore.user?.welcome_pending)
-
-async function closeWelcome(to?: string) {
-  showWelcome.value = false
-  authStore.markWelcomed()
-  try {
-    await ownerProfileService.dismissWelcome()
-  } catch (err) {
-    console.warn('Welcome dismiss error:', err)
-  }
-  if (to) router.push(to)
-}
-
 const span = computed(() => (stats.value ? formatSpan(stats.value.period.from, stats.value.period.to) : ''))
 const updatedAt = computed(() =>
   stats.value ? new Date(stats.value.generated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '',
@@ -136,6 +138,9 @@ const updatedAt = computed(() =>
           @refresh="load"
         />
 
+        <!-- Setup Missions / User Tasks Progress Bar -->
+        <MissionProgressCard />
+
         <div
           v-if="error"
           role="alert"
@@ -154,14 +159,20 @@ const updatedAt = computed(() =>
           </button>
         </div>
 
+        <SubscriptionLockedState
+          v-if="dashboardLock"
+          :lock="dashboardLock"
+          audience="owner"
+        />
+
         <!-- Dashboard Content with Scroll Reveal (Only animates when scrolling into view, not on refresh) -->
-        <template v-if="stats || !error">
+        <template v-else-if="stats || !error">
           <div
             class="space-y-6 transition-opacity duration-200"
             :class="{ 'opacity-65 pointer-events-none': refreshing }"
           >
             <!-- 1. Owner Totals Banner -->
-            <div class="scroll-reveal">
+            <div class="scroll-reveal" data-walkthrough="feat-totals">
               <OwnerTotals :totals="stats?.totals ?? null" :loading="loading" />
             </div>
 
@@ -169,6 +180,7 @@ const updatedAt = computed(() =>
             <div class="scroll-reveal grid grid-cols-1 gap-6 lg:grid-cols-12">
               <OwnerIncomeChart
                 v-model:range="range"
+                data-walkthrough="feat-chart"
                 class="lg:col-span-12 xl:col-span-8"
                 :period="stats?.period ?? null"
                 :series="stats?.series ?? []"
@@ -199,8 +211,14 @@ const updatedAt = computed(() =>
             </div>
 
             <!-- 4. Transaction Log -->
-            <div v-if="logFilters" class="scroll-reveal">
+            <div v-if="logFilters" class="scroll-reveal" data-walkthrough="feat-transactions">
+              <SubscriptionLockedState
+                v-if="analyticsLock"
+                :lock="analyticsLock"
+                description="See every sale with who handled it, plus refunds and voids."
+              />
               <TransactionLog
+                v-else
                 :filters="logFilters"
                 :branches="logBranches"
                 :note="`Every sale for ${span}, with who handled it. Refunds and voids stay listed with who approved them.`"
@@ -210,8 +228,6 @@ const updatedAt = computed(() =>
         </template>
       </div>
     </main>
-
-    <OwnerWelcomeModal :open="showWelcome" :firstname="authStore.user?.firstname" @close="closeWelcome" />
   </div>
 </template>
 
