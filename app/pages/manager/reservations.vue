@@ -5,6 +5,7 @@ import type { ReservationRecord } from '~/services/ReservationService'
 import type { OpeningHour, ReservationStatus } from '~/services/ReservationService'
 import { FLOOR_TAB_LIMIT, doorAsset, tableAsset } from '~/utils/floorPlanCatalog'
 import EmilCalendar from '~/components/common/EmilCalendar.vue'
+import DialogShell from '~/components/common/DialogShell.vue'
 
 definePageMeta({
   role: 'Manager',
@@ -666,6 +667,47 @@ async function confirmReservation() {
   }
 }
 
+// ── Unbooked draft guard: a picked table or typed guest details that were never booked ──
+
+const hasUnbookedDraft = computed(() =>
+  Boolean(selectedTable.value)
+  || Boolean(reservation.customerName.trim())
+  || Boolean(reservation.customerPhone.trim())
+  || Boolean(reservation.notes.trim()))
+
+const leaveTarget = ref<string | null>(null)
+let allowLeave = false
+
+onBeforeRouteLeave((to) => {
+  if (allowLeave || !hasUnbookedDraft.value) return
+  leaveTarget.value = to.fullPath
+  return false
+})
+
+function stayOnPage() {
+  if (submitting.value) return
+  leaveTarget.value = null
+}
+
+function proceedLeave() {
+  const target = leaveTarget.value
+  leaveTarget.value = null
+  if (!target) return
+  allowLeave = true
+  navigateTo(target)
+}
+
+async function bookAndLeave() {
+  await confirmReservation()
+  // confirmReservation() clears the selected table only when the booking went through.
+  if (selectedTable.value) leaveTarget.value = null
+  else proceedLeave()
+}
+
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (hasUnbookedDraft.value) e.preventDefault()
+}
+
 // Open on the first day that still has a bookable time, instead of a closed or finished today.
 function openOnBookableDay() {
   if (!noSlotsLeft.value) return
@@ -683,6 +725,7 @@ onMounted(async () => {
   clock = setInterval(() => { now.value = new Date() }, 60_000)
   updateViewportHeight()
   window.addEventListener('resize', updateViewportHeight)
+  window.addEventListener('beforeunload', onBeforeUnload)
   scrollActiveSlotIntoView()
   try {
     const response = await service.managedBranches()
@@ -702,6 +745,7 @@ onBeforeUnmount(() => {
   clearInterval(clock)
   frameObserver?.disconnect()
   window.removeEventListener('resize', updateViewportHeight)
+  window.removeEventListener('beforeunload', onBeforeUnload)
 })
 </script>
 
@@ -1200,6 +1244,51 @@ onBeforeUnmount(() => {
         :description="toastDescription"
         @close="toastShow = false"
       />
+
+      <!-- Unbooked draft guard -->
+      <DialogShell
+        :open="!!leaveTarget"
+        title="Leave without booking?"
+        :message="`${selectedTable ? `${selectedTable.table_name} is picked` : 'You started a booking'}${reservation.customerName.trim() ? ` for ${reservation.customerName.trim()}` : ''}, but it has not been booked yet. If you leave now, the details will be lost.`"
+        tone="warn"
+        icon="heroicons:exclamation-triangle"
+        :busy="submitting"
+        @close="stayOnPage"
+      >
+        <p v-if="!canConfirm && !submitting" class="rounded-lg bg-[#F8EFE7] px-3 py-2 text-xs text-[#5B463C]">
+          To book it, stay and finish the table, guest name, 11-digit phone number and guest count.
+        </p>
+        <p v-if="reservationError" role="alert" class="mt-2 text-xs text-[#A4472E]">{{ reservationError }}</p>
+        <template #actions>
+          <button
+            type="button"
+            data-autofocus
+            :disabled="submitting"
+            class="whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold bg-transparent text-[#5E4A42] border border-[#DED4CA] hover:bg-[#F1E9DE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFFDF9] focus-visible:ring-[#7D5A50] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            @click="stayOnPage"
+          >
+            Keep editing
+          </button>
+          <button
+            type="button"
+            :disabled="submitting"
+            class="whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold bg-transparent text-[#9E4F47] border border-[#E7C9C4] hover:bg-[#F3DFDC] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFFDF9] focus-visible:ring-[#9E4F47] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            @click="proceedLeave"
+          >
+            Leave without booking
+          </button>
+          <button
+            v-if="canConfirm || submitting"
+            type="button"
+            :disabled="submitting"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold text-white bg-[#3A2923] hover:bg-[#2C1E19] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFFDF9] focus-visible:ring-[#3A2923] transition-colors disabled:opacity-70 disabled:cursor-wait"
+            @click="bookAndLeave"
+          >
+            <Icon v-if="submitting" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
+            {{ submitting ? 'Booking...' : 'Book & leave' }}
+          </button>
+        </template>
+      </DialogShell>
     </main>
   </div>
 </template>
