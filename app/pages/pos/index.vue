@@ -1359,22 +1359,42 @@ function formatCurrency(amount: number) {
                 </div>
 
                 <!-- Info matching reference layout -->
-                <div class="flex-1 flex flex-col justify-between">
-                  <h3 :title="item.menu_name" class="font-bold text-xs sm:text-sm text-[#2D201B] line-clamp-2 leading-snug mb-1.5 min-h-8">
+                <!-- Text wraps instead of clipping: names and categories are always shown in full. -->
+                <div
+                  class="flex-1 min-w-0 flex flex-col transition-opacity duration-200"
+                  :class="item.description?.trim() ? 'group-hover:opacity-0 group-focus-visible:opacity-0' : ''"
+                >
+                  <h3 class="font-bold text-xs sm:text-sm text-[#2D201B] leading-snug break-words [overflow-wrap:anywhere]">
                     {{ item.menu_name }}
                   </h3>
 
-                  <div class="flex items-baseline justify-between mt-auto pt-1">
-                    <span class="text-[11px] text-[#8A6E64] capitalize truncate max-w-[55%]">
+                  <div class="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 mt-auto pt-2">
+                    <span class="min-w-0 text-[11px] text-[#8A6E64] capitalize break-words [overflow-wrap:anywhere]">
                       {{ getCategoryName(item.category_uuid) }}
                     </span>
-                    <span class="font-bold text-xs sm:text-sm text-[#2D201B] tabular-nums">
+                    <span class="ml-auto font-bold text-xs sm:text-sm text-[#2D201B] tabular-nums whitespace-nowrap">
                       {{ formatCurrency(item.base_price) }}
                     </span>
                   </div>
 
                   <p v-if="!item.sold_out" class="text-[10px] text-gray-400 mt-0.5">
                     {{ item.available_stock }} left
+                  </p>
+                </div>
+
+                <!-- Description on hover: covers the card text; scrolls inside the card if it is very long. -->
+                <div
+                  v-if="item.description?.trim()"
+                  class="desc-overlay absolute inset-0 z-10 rounded-2xl bg-white p-3 flex flex-col overflow-y-auto opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto group-focus-visible:opacity-100 group-focus-visible:translate-y-0"
+                >
+                  <p class="font-bold text-xs sm:text-sm text-[#2D201B] leading-snug break-words [overflow-wrap:anywhere]">
+                    {{ item.menu_name }}
+                  </p>
+                  <p class="mt-1.5 text-[11px] sm:text-xs leading-relaxed text-[#A4847A] whitespace-pre-line break-words [overflow-wrap:anywhere]">
+                    {{ item.description.trim() }}
+                  </p>
+                  <p class="mt-auto pt-2 font-bold text-xs sm:text-sm text-[#2D201B] tabular-nums">
+                    {{ formatCurrency(item.base_price) }}
                   </p>
                 </div>
               </button>
@@ -2344,5 +2364,18 @@ select:focus-visible,
 .list-leave-to {
   opacity: 0;
   transform: translateX(30px);
+}
+
+/* Menu card description: fades up over the card text on hover. */
+.desc-overlay {
+  transition: opacity 200ms cubic-bezier(0.23, 1, 0.32, 1), transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+  scrollbar-width: thin;
+  scrollbar-color: #e3cfb4 transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .desc-overlay {
+    transition: opacity 120ms linear;
+    transform: none !important;
+  }
 }
 </style>

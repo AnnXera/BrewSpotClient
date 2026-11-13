@@ -39,7 +39,6 @@ const statusTabs: { value: TransactionLogStatus | null; label: string; key: 'all
   { value: null, label: 'All', key: 'all' },
   { value: 'settled', label: 'Completed', key: 'settled' },
   { value: 'refunded', label: 'Refunded', key: 'refunded' },
-  { value: 'void', label: 'Voided', key: 'void' },
 ]
 
 let requestId = 0
@@ -122,7 +121,7 @@ const loadReceipt = (uuid: string) => service.getTransaction(uuid)
 <template>
   <AnalyticsPanel
     title="Transaction log"
-    :note="note ?? 'Every sale rung up in this period, with who handled it. Refunds and voids stay listed with who approved them.'"
+    :note="note ?? 'Every sale rung up in this period, with who handled it. Refunds stay listed with who approved them.'"
   >
     <template #actions>
       <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
