@@ -1,9 +1,10 @@
 <!-- components/StatusBadge.vue -->
 <template>
   <span
-    class="inline-flex items-center gap-1.5 rounded-full px-2 min-[360px]:px-2.5 py-0.5 min-[360px]:py-1 font-display font-semibold text-xs min-[360px]:text-[13px] sm:text-[14px] shrink-0"
+    class="inline-flex items-center gap-1.5 rounded-full px-2 min-[360px]:px-2.5 py-0.5 min-[360px]:py-1 font-display font-semibold text-xs min-[360px]:text-[13px] shrink-0"
     :class="classes"
   >
+    <span class="w-1.5 h-1.5 rounded-full bg-current opacity-70" aria-hidden="true" />
     {{ label }}
   </span>
 </template>

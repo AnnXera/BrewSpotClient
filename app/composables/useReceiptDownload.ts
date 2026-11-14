@@ -131,7 +131,7 @@ export function useReceiptDownload() {
 
       ctx.fillStyle = '#7B5A50'
       ctx.font = 'bold 12px "Inter", sans-serif'
-      ctx.fillText('SALES RECEIPT', centerX, y)
+      ctx.fillText('RECEIPT', centerX, y)
       y += 14
 
       drawDottedLine(y)
@@ -180,6 +180,12 @@ export function useReceiptDownload() {
         ctx.fillStyle = '#92400E'
         ctx.font = 'bold 12px "Inter", sans-serif'
         ctx.fillText('** SALE REFUNDED **', centerX, y)
+        y += 18
+      } else if (data.status && data.status.toLowerCase() === 'voided') {
+        ctx.textAlign = 'center'
+        ctx.fillStyle = '#BE123C'
+        ctx.font = 'bold 12px "Inter", sans-serif'
+        ctx.fillText('** SALE VOIDED **', centerX, y)
         y += 18
       }
 
@@ -402,7 +408,7 @@ export function useReceiptDownload() {
       ]
       if (data.branchName) rows.push(center(data.branchName))
       if (data.branchAddress) rows.push(center(data.branchAddress))
-      rows.push(center('SALES RECEIPT'))
+      rows.push(center('RECEIPT'))
       rows.push(divider)
       rows.push(line('Receipt No:', `#${data.receiptNumber}`))
       rows.push(line('Date:', formatDate(data.date)))
@@ -410,6 +416,8 @@ export function useReceiptDownload() {
       rows.push(line('Order Type:', (data.orderType || 'dine_in').replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())))
       if (data.status && data.status.toLowerCase() === 'refunded') {
         rows.push(center('** SALE REFUNDED **'))
+      } else if (data.status && data.status.toLowerCase() === 'voided') {
+        rows.push(center('** SALE VOIDED **'))
       }
       rows.push(divider)
       rows.push(line('ITEM', 'AMOUNT'))

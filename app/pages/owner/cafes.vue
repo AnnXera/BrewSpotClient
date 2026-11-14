@@ -2,6 +2,7 @@
 import type { BranchSummary } from '~/services/OwnerProfileService'
 import { usePlanFeature } from '~/composables/usePlanFeature'
 import { useOperatingHours, type DaySchedule } from '~/composables/useOperatingHours'
+import { isOperationalBranchStatus } from '~/utils/branchStatus'
 import Pagination from '~/components/common/Pagination.vue'
 
 definePageMeta({
@@ -201,8 +202,11 @@ watch(search, () => {
 const selectedBranches = ref<string[]>([])
 const bulkLoading = ref(false)
 
+// Pending and rejected branches are admin-controlled, so bulk activate/deactivate skips them
+const selectableBranches = computed(() => branches.value.filter(b => isOperationalBranchStatus(b.status)))
+
 function toggleSelectAll(checked: boolean) {
-  selectedBranches.value = checked ? branches.value.map(b => b.uuid) : []
+  selectedBranches.value = checked ? selectableBranches.value.map(b => b.uuid) : []
 }
 
 async function bulkUpdateStatus(newStatus: string) {
@@ -339,8 +343,8 @@ function viewDetails(uuid: string) {
             >
               <input
                 type="checkbox"
-                :checked="selectedBranches.length === branches.length"
-                :indeterminate="selectedBranches.length > 0 && selectedBranches.length < branches.length"
+                :checked="selectableBranches.length > 0 && selectedBranches.length === selectableBranches.length"
+                :indeterminate="selectedBranches.length > 0 && selectedBranches.length < selectableBranches.length"
                 @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
                 aria-label="Select all branches on this page"
                 class="w-5 h-5 rounded border-[#D9C4A8] text-[#7D5A50] focus:ring-[#7D5A50] cursor-pointer"

@@ -93,24 +93,25 @@ onMounted(loadPaymentHistory)
 </script>
 
 <template>
-  <div>
-    <!-- Header Title & Refresh Button -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+  <div class="w-full max-w-full min-w-0">
+    <!-- Header Title & Tactile Refresh Button -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-6 md:mb-8 gap-4 w-full">
       <div>
-        <h1 class="font-display text-2xl md:text-3xl font-bold text-[#3D2B24]">
+        <h1 class="font-display text-2xl font-extrabold text-[#3D2B24] tracking-tight sm:text-[32px] sm:leading-[40px]">
           Payment History
         </h1>
-        <p class="font-sans text-sm text-[#8B6656] mt-1">
+        <p class="font-sans text-[13px] text-[#9E7060] mt-1 sm:text-[15px]">
           Subscription transactions and billing history for registered cafe owners.
         </p>
       </div>
 
       <button
         type="button"
-        class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-display text-sm font-semibold bg-[#7D5A50] text-[#FFF0D1] hover:bg-[#684940] transition-colors self-start sm:self-auto shadow-sm"
+        class="inline-flex items-center gap-2 px-4 h-10 rounded-[10px] bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-medium text-[14px] shadow-[0_1px_2px_rgba(61,43,36,0.04)] cursor-pointer transition-[transform,background-color,border-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] disabled:opacity-60 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#FDF3E7] [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#D9C4B8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B4846C]/40 self-start sm:self-auto"
+        :disabled="loading"
         @click="loadPaymentHistory"
       >
-        <Icon name="heroicons:arrow-path" class="w-4 h-4" :class="{ 'animate-spin': loading }" />
+        <Icon name="heroicons:arrow-path" class="w-4 h-4" :class="{ 'animate-spin': loading }" aria-hidden="true" />
         <span>Refresh Data</span>
       </button>
     </div>
