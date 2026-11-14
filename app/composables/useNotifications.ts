@@ -17,6 +17,7 @@ export type NotificationTone = 'neutral' | 'good' | 'warning' | 'bad'
 // The icon and tone each kind of server notification shows.
 const KIND_STYLE: Record<NotificationKind, { icon: string; tone: NotificationTone }> = {
     owner_application: { icon: 'user-plus', tone: 'neutral' },
+    owner_resubmission: { icon: 'arrow-path-rounded-square', tone: 'warning' },
     branch_submission: { icon: 'building-storefront', tone: 'neutral' },
 
     account_approved: { icon: 'check-badge', tone: 'good' },
@@ -44,7 +45,7 @@ const KIND_STYLE: Record<NotificationKind, { icon: string; tone: NotificationTon
 function fromApi(n: ApiNotification): AppNotification {
     // Admin approval notices carry the approval; owner notices carry their own link.
     const to = n.link
-        ?? (n.kind === 'owner_application' || n.kind === 'branch_submission'
+        ?? (n.kind === 'owner_application' || n.kind === 'owner_resubmission' || n.kind === 'branch_submission'
             ? (n.approval_uuid ? `/admin/approvals?uuid=${n.approval_uuid}` : '/admin/approvals')
             : undefined)
 

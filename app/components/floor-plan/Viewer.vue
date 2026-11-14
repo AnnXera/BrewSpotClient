@@ -1,6 +1,6 @@
 <!-- app/components/floor-plan/Viewer.vue -->
-<!-- Read-only floor plans of one branch for the owner. Managers build them under Floor Plan;
-     this shows every floor as saved, with each table's current status. -->
+<!-- Read-only floor plans of one branch for the owner. The owner or the branch manager builds them
+     under Floor Plan; this shows every floor as saved, with each table's current status. -->
 <script setup lang="ts">
 import type { PlanLock } from '~/utils/planLock'
 import type { FloorPlan, FloorPlanElement, FloorPlanTable as TableRow } from '~/services/FloorPlanService'
@@ -161,8 +161,15 @@ const seats = computed(() => (plan.value?.tables ?? []).reduce((sum, t) => sum +
     <Icon name="heroicons:map" class="size-8 text-[#A96746] mx-auto" />
     <p class="mt-3 text-base font-semibold text-[#3D2B24]">No floor plans yet</p>
     <p class="mt-1 text-sm text-[#8C6E63] max-w-[44ch] mx-auto">
-      This branch's manager can create floor plans under Floor Plan. They show up here once saved.
+      Create one in the Floor Plan editor, or let this branch's manager do it. They show up here once saved.
     </p>
+    <NuxtLink
+      :to="{ path: '/owner/floor-plan', query: { branch: props.branchUuid } }"
+      class="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[#3A2923] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2C1E19] transition-colors"
+    >
+      <Icon name="heroicons:pencil-square" class="size-3.5" />
+      Open the Floor Plan editor
+    </NuxtLink>
   </div>
 
   <section v-else class="bg-white border border-[#EDD8CC] rounded-2xl shadow-sm overflow-hidden">
@@ -272,7 +279,15 @@ const seats = computed(() => (plan.value?.tables ?? []).reduce((sum, t) => sum +
       <li class="flex items-center gap-1.5"><span class="size-3 rounded border-[1.5px] border-[#B4846C] bg-[#F4E7DA]" />Reserved <b class="tabular-nums font-semibold">{{ tableCounts.reserved }}</b></li>
       <li class="flex items-center gap-1.5"><span class="size-3 rounded border-[1.5px] border-[#BDBDBD] bg-[#D9D9D9]" />Occupied <b class="tabular-nums font-semibold">{{ tableCounts.occupied }}</b></li>
       <li v-if="tableCounts.cleaning" class="flex items-center gap-1.5"><span class="size-3 rounded border-[1.5px] border-[#CFCAC6] bg-[#EFEDEB]" />Cleaning <b class="tabular-nums font-semibold">{{ tableCounts.cleaning }}</b></li>
-      <li class="ml-auto text-[#8C6E63]">View only. The branch manager edits floor plans.</li>
+      <li class="ml-auto">
+        <NuxtLink
+          :to="{ path: '/owner/floor-plan', query: { branch: props.branchUuid } }"
+          class="inline-flex items-center gap-1.5 font-semibold text-[#7D5A50] hover:text-[#3A2923] transition-colors"
+        >
+          <Icon name="heroicons:pencil-square" class="size-3.5" />
+          Edit in Floor Plan
+        </NuxtLink>
+      </li>
     </ul>
   </section>
 </template>

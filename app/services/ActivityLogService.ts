@@ -3,7 +3,7 @@ import { BaseService } from './BaseService'
 
 // Activity Log pages (owner: whole cafe; manager: one branch): who signed in or out, who used
 // a register, and who changed servings, floor plans, employees or the menu. Dates are Y-m-d and inclusive; no branch means every branch.
-export type ActivityCategory = 'auth' | 'pos' | 'servings' | 'floor_plans' | 'employees' | 'menu'
+export type ActivityCategory = 'auth' | 'pos' | 'servings' | 'floor_plans' | 'reservations' | 'employees' | 'menu'
 export type ActivityRole = 'owner' | 'manager' | 'cashier'
 
 export interface ActivityLogQuery {
@@ -23,6 +23,13 @@ export interface ServingChange {
     after: { daily_limit: number; enabled: boolean }
 }
 
+// One field a reservation edit changed. Contact details (phone, email) come without values.
+export interface ReservationChange {
+    field: string
+    before?: string | null
+    after?: string | null
+}
+
 export interface ActivityLogRow {
     uuid: string
     created_at: string
@@ -32,6 +39,7 @@ export interface ActivityLogRow {
     // | employee.created | employee.updated | employee.schedule_updated | employee.pin_reset | employee.terminated
     // | menu.item_created | menu.item_updated | menu.item_deleted | menu.item_availability
     // | menu.category_created | menu.category_updated | menu.category_deleted | menu.category_availability
+    // | reservation.created | reservation.updated | reservation.cancelled
     action: string
     description: string
     actor: { name: string | null; role: string | null }
@@ -42,6 +50,7 @@ export interface ActivityLogRow {
         items?: ServingChange[] // serving.category_saved
         before?: Record<string, any> // employee.schedule_updated: day name => "08:00-17:00" | "Day off"
         after?: Record<string, any>
+        changes?: ReservationChange[] // reservation.updated
     }) | null
 }
 
