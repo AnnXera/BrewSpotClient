@@ -9,11 +9,17 @@ interface User {
     role?: { role_name: string }
 }
 
+// Most roles get `requires_2fa` and finish on /verify-login-code. Admins skip the code and get
+// the session fields right away.
 interface LoginResponse {
     success: boolean
     message: string
     requires_2fa?: boolean
     user_uuid?: string
+    token?: string
+    role?: string
+    redirect?: string
+    user?: User
 }
 
 interface VerifyLoginCodeResponse {

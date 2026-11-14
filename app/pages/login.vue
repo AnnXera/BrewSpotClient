@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
 import logoFull from '~/assets/images/logo-with-tag.svg'
-import { getSafeRedirect } from '~/utils/roleRedirects'
+import { getRedirectForRole, getSafeRedirect } from '~/utils/roleRedirects'
 import { isStandalonePwaWindow } from '~/composables/useA2HS'
 
 const route = useRoute()
@@ -23,6 +23,7 @@ const showPassword = ref(false)
 const isLoading = ref(false)
 
 const authService = useAuthService()
+const authStore = useAuthStore()
 
 function clearErrors() {
   errors.auth = ''
@@ -43,6 +44,11 @@ async function handleLogin() {
         ? '/pos/setup'
         : getSafeRedirect(route.query.redirect)
       navigateTo({ path: '/verify-login-code', query: { email: form.email, ...(redirect ? { redirect } : {}) } })
+    } else if (res.success && res.token && res.user && res.role) {
+      // Admins sign in without the emailed code.
+      useCookie<string | null>('auth_token', { maxAge: 60 * 60 * 24 * 7 }).value = res.token
+      authStore.setSession(res.user, res.role)
+      navigateTo(getSafeRedirect(route.query.redirect) ?? getRedirectForRole(res.role))
     } else {
       errors.auth = res.message
     }

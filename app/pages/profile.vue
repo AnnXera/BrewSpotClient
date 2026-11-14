@@ -20,7 +20,15 @@ const dashboardRoute = computed(() => {
   return '/owner/dashboard'
 })
 
-const activeTab = ref<'details' | 'password'>('details')
+const activeTab = ref<'details' | 'password' | 'pin'>('details')
+
+// Owners and managers approve voids and refunds on the register with a 6-digit PIN.
+const canSetPin = computed(() => authStore.role === 'Cafe Owner' || authStore.role === 'Manager')
+const pinSet = ref(false)
+const isChangingPin = ref(false)
+const pinError = ref('')
+const pinForm = reactive({ current_password: '', pin: '', pin_confirmation: '' })
+const showPinPassword = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 
 // Loading States
@@ -100,6 +108,7 @@ async function fetchProfile() {
       detailsForm.role_name = (res.user.role as any)?.role_name ?? authStore.role ?? 'User'
       detailsForm.photo_url = res.user.photo_url ?? null
       workplace.value = res.workplace ?? null
+      pinSet.value = !!res.user.pin_set
 
       // Sync into authStore
       authStore.updateUser({
@@ -265,6 +274,49 @@ async function handleChangePassword() {
     passwordError.value = err?.data?.message || err?.message || 'Failed to change password. Please check your current password.'
   } finally {
     isChangingPassword.value = false
+  }
+}
+
+const onlyDigits = (value: string) => value.replace(/\D/g, '').slice(0, 6)
+
+function onPinInput(event: Event, field: 'pin' | 'pin_confirmation') {
+  const input = event.target as HTMLInputElement
+  pinForm[field] = onlyDigits(input.value)
+  input.value = pinForm[field]
+}
+
+async function handleChangePin() {
+  pinError.value = ''
+
+  if (!pinForm.current_password) {
+    pinError.value = 'Please enter your current password.'
+    return
+  }
+  if (!/^\d{6}$/.test(pinForm.pin)) {
+    pinError.value = 'PIN must be exactly 6 digits.'
+    return
+  }
+  if (pinForm.pin !== pinForm.pin_confirmation) {
+    pinError.value = 'The two PINs do not match.'
+    return
+  }
+
+  isChangingPin.value = true
+  try {
+    const res = await profileService.changePin({ current_password: pinForm.current_password, pin: pinForm.pin })
+    if (res.success) {
+      triggerToast(pinSet.value ? 'PIN changed' : 'PIN set', 'Use it on the register to approve voids and refunds')
+      pinSet.value = true
+      pinForm.current_password = ''
+      pinForm.pin = ''
+      pinForm.pin_confirmation = ''
+    } else {
+      pinError.value = res.message || 'Could not save your PIN.'
+    }
+  } catch (err: any) {
+    pinError.value = err?.data?.message || err?.message || 'Could not save your PIN. Please check your current password.'
+  } finally {
+    isChangingPin.value = false
   }
 }
 
@@ -438,6 +490,26 @@ function resetPasswordForm() {
               </span>
               <span
                 v-if="activeTab === 'password'"
+                class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full"
+              />
+            </button>
+
+            <button
+              v-if="canSetPin"
+              type="button"
+              class="font-display transition-colors relative z-10 px-5 py-3.5 text-sm sm:text-base cursor-pointer"
+              :class="activeTab === 'pin'
+                ? 'text-[#3B1F0E] font-bold'
+                : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
+              @click="activeTab = 'pin'"
+            >
+              <span class="flex items-center gap-2">
+                <Icon name="heroicons:key" class="w-4 h-4" />
+                <span>Register PIN</span>
+                <span v-if="!isLoading && !pinSet" class="size-2 rounded-full bg-amber-500" aria-label="Not set yet" />
+              </span>
+              <span
+                v-if="activeTab === 'pin'"
                 class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full"
               />
             </button>
@@ -700,6 +772,107 @@ function resetPasswordForm() {
                   >
                     <span v-if="isChangingPassword" class="w-4 h-4 border-2 border-[#FFF0D1] border-t-transparent rounded-full animate-spin"></span>
                     <span>{{ isChangingPassword ? 'Updating Password...' : 'Update Password' }}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Tab 3: Register PIN (owners and managers) -->
+            <div v-else-if="activeTab === 'pin' && canSetPin" class="space-y-6">
+              <div class="p-4 rounded-xl bg-[#FBF2E1] border border-[#EEDFC4] flex items-start gap-3">
+                <Icon name="heroicons:receipt-refund" class="w-5 h-5 text-[#7D5A50] shrink-0 mt-0.5" />
+                <div class="min-w-0">
+                  <h3 class="text-xs font-bold text-[#3B1F0E] uppercase tracking-wider flex flex-wrap items-center gap-2">
+                    Void &amp; Refund Approval
+                    <span
+                      class="rounded-md px-2 py-0.5 text-[11px] font-semibold normal-case tracking-normal border"
+                      :class="pinSet ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'"
+                    >{{ pinSet ? 'PIN set' : 'Not set yet' }}</span>
+                  </h3>
+                  <p class="text-xs sm:text-sm text-gray-600 mt-1 leading-relaxed">
+                    When a cashier voids or refunds a sale, the register asks an approver for their 6-digit PIN.
+                    {{ authStore.role === 'Cafe Owner' ? 'Set yours so you can approve at any of your branches.' : 'Set yours so you can approve at your branch.' }}
+                    Only you should know it.
+                  </p>
+                </div>
+              </div>
+
+              <div
+                v-if="pinError"
+                class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-3 animate-in fade-in"
+              >
+                <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
+                <span class="font-medium">{{ pinError }}</span>
+              </div>
+
+              <form @submit.prevent="handleChangePin" class="space-y-5 max-w-xl">
+                <div>
+                  <label class="block text-xs font-semibold text-[#3B1F0E] uppercase tracking-wider mb-1.5">
+                    Current Password <span class="text-red-500">*</span>
+                  </label>
+                  <div class="relative flex items-center">
+                    <input
+                      v-model="pinForm.current_password"
+                      :type="showPinPassword ? 'text' : 'password'"
+                      required
+                      autocomplete="current-password"
+                      placeholder="Confirm it's you"
+                      class="w-full h-11 rounded-xl border border-[#EEDFC4] bg-white pl-3.5 pr-11 text-sm text-[#3B1F0E] outline-none transition focus:border-[#7D5A50] focus:ring-2 focus:ring-[#7D5A50]/20"
+                    />
+                    <button
+                      type="button"
+                      class="absolute right-3.5 text-gray-400 hover:text-[#7D5A50] focus:outline-none cursor-pointer"
+                      :aria-label="showPinPassword ? 'Hide password' : 'Show password'"
+                      @click="showPinPassword = !showPinPassword"
+                    >
+                      <Icon :name="showPinPassword ? 'heroicons:eye-slash' : 'heroicons:eye'" class="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs font-semibold text-[#3B1F0E] uppercase tracking-wider mb-1.5">
+                      {{ pinSet ? 'New PIN' : 'PIN' }} <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                      :value="pinForm.pin"
+                      type="password"
+                      inputmode="numeric"
+                      autocomplete="new-password"
+                      maxlength="6"
+                      required
+                      placeholder="6 digits"
+                      class="w-full h-11 rounded-xl border border-[#EEDFC4] bg-white px-3.5 text-sm tracking-[0.3em] placeholder:tracking-normal text-[#3B1F0E] outline-none transition focus:border-[#7D5A50] focus:ring-2 focus:ring-[#7D5A50]/20"
+                      @input="onPinInput($event, 'pin')"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-[#3B1F0E] uppercase tracking-wider mb-1.5">
+                      Confirm PIN <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                      :value="pinForm.pin_confirmation"
+                      type="password"
+                      inputmode="numeric"
+                      autocomplete="new-password"
+                      maxlength="6"
+                      required
+                      placeholder="Repeat the 6 digits"
+                      class="w-full h-11 rounded-xl border border-[#EEDFC4] bg-white px-3.5 text-sm tracking-[0.3em] placeholder:tracking-normal text-[#3B1F0E] outline-none transition focus:border-[#7D5A50] focus:ring-2 focus:ring-[#7D5A50]/20"
+                      @input="onPinInput($event, 'pin_confirmation')"
+                    />
+                  </div>
+                </div>
+
+                <div class="pt-3">
+                  <button
+                    type="submit"
+                    :disabled="isChangingPin"
+                    class="px-6 h-11 rounded-xl bg-[#7D5A50] hover:bg-[#65463D] text-[#FFF0D1] text-sm font-semibold transition disabled:opacity-50 flex items-center gap-2 shadow cursor-pointer"
+                  >
+                    <span v-if="isChangingPin" class="w-4 h-4 border-2 border-[#FFF0D1] border-t-transparent rounded-full animate-spin"></span>
+                    <span>{{ isChangingPin ? 'Saving PIN...' : (pinSet ? 'Change PIN' : 'Set PIN') }}</span>
                   </button>
                 </div>
               </form>
