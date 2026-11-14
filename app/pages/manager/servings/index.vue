@@ -7,34 +7,34 @@ import CommonPagination from '~/components/common/Pagination.vue'
 import ServingsCategoryCard from '~/components/servings/CategoryCard.vue'
 import ServingsIngredientsUsedPanel from '~/components/servings/IngredientsUsedPanel.vue'
 import ServingsServingLogPanel from '~/components/servings/ServingLogPanel.vue'
+import BranchPicker from '~/components/common/BranchPicker.vue'
 import type {
   IngredientUsage,
   IngredientUsageSort,
-  ManagedBranch,
   ServingCategorySort,
   ServingCategorySummary,
   ServingLogEntry,
 } from '~/services/ServingService'
 import { spoilageItemLabel, type SpoilageLog } from '~/services/PosService'
 
+// Shared with owners, who reach it at /owner/servings for any of their branches.
 definePageMeta({
-  role: 'Manager',
+  role: ['Manager', 'Cafe Owner'],
+  alias: ['/owner/servings'],
 })
 
-const links = MANAGER_NAV_LINKS
+const workspace = useBranchWorkspace()
+const { links, basePath, lockAudience, branchUuid, branchOptions, showBranchPicker } = workspace
 
-// Opens the category's items (for the manager's one branch).
+// Opens the category's items (for the selected branch).
 function openCategory(c: ServingCategorySummary) {
-  navigateTo({ path: `/manager/servings/${c.uuid ?? 'uncategorized'}` })
+  navigateTo({ path: `${basePath}/servings/${c.uuid ?? 'uncategorized'}`, query: workspace.isOwner ? { branch: branchUuid.value } : {} })
 }
 
 const CATEGORIES_PER_PAGE = 6
 const REFRESH_MS = 30_000
 
-const service = useServingService('manager')
-
-const branches = ref<ManagedBranch[]>([])
-const branchUuid = ref('') // a manager runs exactly one branch
+const service = useServingService(workspace.scope)
 
 // Live clock in the header
 const { timeLabel, dateLabel } = useNowClock()
@@ -178,10 +178,7 @@ useAutoRefresh(async () => {
 
 onMounted(async () => {
   try {
-    const res = await service.managedBranches()
-    branches.value = res.branches
-    if (!res.branches.length) errorMessage.value = 'You are not assigned to a branch yet.'
-    else branchUuid.value = res.branches[0]!.uuid
+    if (!(await workspace.loadBranches())) errorMessage.value = workspace.noBranchMessage
   } catch (e: any) {
     failure(e, 'Could not load your branches.')
   }
@@ -231,6 +228,9 @@ onBeforeUnmount(() => {
             </p>
           </div>
 
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center shrink-0 self-start sm:self-auto">
+          <BranchPicker v-if="showBranchPicker" v-model="branchUuid" :options="branchOptions" />
+
           <!-- Live Time Pill with Pulsing Indicator (Auto-updates every 30s) -->
           <div class="inline-flex items-center gap-2 rounded-xl border border-[#E3CFB4] bg-white px-3.5 py-2 text-[13px] font-medium text-[#7D5A50] shadow-2xs shrink-0 self-start sm:self-auto">
             <span class="relative flex h-2 w-2">
@@ -240,6 +240,7 @@ onBeforeUnmount(() => {
             <span class="tabular-nums font-mono">{{ timeLabel }}</span>
             <span class="text-[#D9C3A5]">/</span>
             <span>{{ dateLabel }}</span>
+          </div>
           </div>
         </header>
 
@@ -253,7 +254,7 @@ onBeforeUnmount(() => {
           <p class="font-medium">{{ errorMessage }}</p>
         </div>
 
-        <SubscriptionLockedState v-if="planLock" :lock="planLock" audience="staff" />
+        <SubscriptionLockedState v-if="planLock" :lock="planLock" :audience="lockAudience" />
 
         <template v-if="!planLocked && branchUuid">
           <!-- Categories Card Section with Scroll Reveal -->

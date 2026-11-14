@@ -6,12 +6,16 @@ import type { OpeningHour, ReservationStatus } from '~/services/ReservationServi
 import { FLOOR_TAB_LIMIT, doorAsset, tableAsset } from '~/utils/floorPlanCatalog'
 import EmilCalendar from '~/components/common/EmilCalendar.vue'
 import DialogShell from '~/components/common/DialogShell.vue'
+import BranchPicker from '~/components/common/BranchPicker.vue'
 
+// Shared with owners, who reach it at /owner/reservations for any of their branches.
 definePageMeta({
-  role: 'Manager',
+  role: ['Manager', 'Cafe Owner'],
+  alias: ['/owner/reservations'],
 })
 
-const links = MANAGER_NAV_LINKS
+const workspace = useBranchWorkspace()
+const { links, basePath, lockAudience, branchUuid, branchOptions, showBranchPicker } = workspace
 
 // Statuses that hold a table (mirrors floor_plan.blocking_reservation_statuses).
 // A booking holds its table for the whole day: guests may stay as long as they like.
@@ -24,10 +28,8 @@ const PLAN_MAX_SCALE = 1.5
 const PLAN_MIN_SCALE = 0.6
 const PLAN_MAX_VIEWPORT = 0.62
 
-const service = useFloorPlanService('manager')
-const reservationService = useReservationService('manager')
-const branches = ref<{ uuid: string; branch_name: string }[]>([])
-const branchUuid = ref('')
+const service = useFloorPlanService(workspace.scope)
+const reservationService = useReservationService(workspace.scope)
 const activePlan = ref<FloorPlan | null>(null)
 const plans = ref<FloorPlan[]>([])
 const planLoading = ref(false)
@@ -728,18 +730,35 @@ onMounted(async () => {
   window.addEventListener('beforeunload', onBeforeUnload)
   scrollActiveSlotIntoView()
   try {
-    const response = await service.managedBranches()
-    branches.value = response.branches
-    branchUuid.value = branches.value[0]?.uuid ?? ''
-    await Promise.all([loadPlan(), loadOpeningHours()])
-    openOnBookableDay()
-    await Promise.all([loadReservations(), loadDayReservations()])
-    scrollActiveSlotIntoView()
+    if (!(await workspace.loadBranches())) {
+      errorMessage.value = workspace.noBranchMessage
+      loading.value = false
+      return
+    }
+    await loadBranch()
+    branchReady = true
   } catch (error: any) {
     errorMessage.value = error?.data?.message ?? 'Could not load branches.'
     loading.value = false
   }
 })
+
+// An owner switching branches reloads everything for the new branch.
+let branchReady = false
+watch(branchUuid, () => {
+  if (!branchReady) return
+  loadBranch().catch((error: any) => {
+    errorMessage.value = error?.data?.message ?? 'Could not load this branch.'
+    loading.value = false
+  })
+})
+
+async function loadBranch() {
+  await Promise.all([loadPlan(), loadOpeningHours()])
+  openOnBookableDay()
+  await Promise.all([loadReservations(), loadDayReservations()])
+  scrollActiveSlotIntoView()
+}
 
 onBeforeUnmount(() => {
   clearInterval(clock)
@@ -758,7 +777,8 @@ onBeforeUnmount(() => {
           <h1 class="font-display text-3xl font-semibold tracking-tight text-[#3B2A24]">Reservations</h1>
           <p class="mt-1 text-sm text-[#76605A]">Pick a date and time to see which tables are free.</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <BranchPicker v-if="showBranchPicker" v-model="branchUuid" :options="branchOptions" />
           <button
             type="button"
             data-walkthrough="reservations-waitlist-btn"
@@ -916,11 +936,11 @@ onBeforeUnmount(() => {
             </div>
 
             <div v-if="loading" class="mt-4 flex min-h-[360px] items-center justify-center rounded-xl bg-[#FFFDF9] text-sm text-[#76605A]">Loading floor plan…</div>
-            <SubscriptionLockedState v-else-if="planLock" :lock="planLock" audience="staff" class="mt-4" />
+            <SubscriptionLockedState v-else-if="planLock" :lock="planLock" :audience="lockAudience" class="mt-4" />
             <div v-else-if="errorMessage" class="mt-4 flex min-h-[360px] items-center justify-center rounded-xl bg-[#FFFDF9] text-sm text-[#A4472E]">{{ errorMessage }}</div>
             <div v-else-if="!activePlan" class="mt-4 flex min-h-[360px] flex-col items-center justify-center gap-3 rounded-xl bg-[#FFFDF9] text-sm text-[#76605A]">
               No floor plan has been saved for this branch yet.
-              <NuxtLink to="/manager/floor-plan" class="rounded-lg bg-[#3B2A24] px-4 py-2 text-xs text-white">Set up the floor plan</NuxtLink>
+              <NuxtLink :to="`${basePath}/floor-plan`" class="rounded-lg bg-[#3B2A24] px-4 py-2 text-xs text-white">Set up the floor plan</NuxtLink>
             </div>
             <div v-else ref="planFrame" class="plan scroll-strip mt-4 overflow-auto rounded-xl bg-[#FBF6EF] p-3 md:p-4">
               <!-- The room at its saved canvas size, drawn like the Floor Plan editor's preview -->

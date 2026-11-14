@@ -13,20 +13,22 @@ import type {
   ServingItemSort,
 } from '~/services/ServingService'
 
+// Shared with owners, who reach it at /owner/servings/<category> for the branch picked on the list.
 definePageMeta({
-  role: 'Manager',
+  role: ['Manager', 'Cafe Owner'],
+  alias: ['/owner/servings/:uuid()'],
 })
 
-const links = MANAGER_NAV_LINKS
+const workspace = useBranchWorkspace()
+const { links, basePath, lockAudience, branchUuid, branchName } = workspace
 
 const PER_PAGE = 6
 
 const route = useRoute()
-const service = useServingService('manager')
+const service = useServingService(workspace.scope)
 const { timeLabel, dateLabel } = useNowClock()
 
 const categoryUuid = computed(() => route.params.uuid as string)
-const branchUuid = ref('') // a manager runs exactly one branch
 
 const categoryName = ref('')
 const items = ref<CategoryServingItem[]>([])
@@ -209,12 +211,10 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 onMounted(async () => {
   window.addEventListener('beforeunload', onBeforeUnload)
   try {
-    const res = await service.managedBranches()
-    if (!res.branches.length) {
-      errorMessage.value = 'You are not assigned to a branch yet.'
+    if (!(await workspace.loadBranches())) {
+      errorMessage.value = workspace.noBranchMessage
       return
     }
-    branchUuid.value = res.branches[0]!.uuid
     await load()
   } catch (e: any) {
     failure(e, 'Could not load your branches.')
@@ -242,7 +242,7 @@ onBeforeUnmount(() => {
             <!-- Breadcrumb Navigation -->
             <nav aria-label="Breadcrumb" class="flex items-center gap-2 text-[13px] font-medium mb-1.5">
               <NuxtLink
-                to="/manager/servings"
+                :to="`${basePath}/servings`"
                 class="inline-flex items-center gap-1.5 text-[#8B6656] hover:text-[#3B1F0E] transition-colors duration-160"
               >
                 <Icon name="heroicons:arrow-left" class="w-3.5 h-3.5 text-[#B4846C]" />
@@ -274,7 +274,7 @@ onBeforeUnmount(() => {
 
             <!-- Subtitle -->
             <p class="mt-1 text-[13px] text-[#8B6656]">
-              Set daily limits and switch items on/off for today's service.
+              Set daily limits and switch items on/off for today's service<template v-if="workspace.isOwner && branchName"> at <span class="font-semibold text-[#3B1F0E]">{{ branchName }}</span></template>.
             </p>
           </div>
 
@@ -301,7 +301,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Items Card Section with Scroll Reveal -->
-        <SubscriptionLockedState v-if="planLock" :lock="planLock" audience="staff" />
+        <SubscriptionLockedState v-if="planLock" :lock="planLock" :audience="lockAudience" />
 
         <section v-if="!planLocked && branchUuid" class="scroll-reveal bg-white border border-[#E3CFB4] rounded-2xl shadow-xs overflow-hidden">
           <!-- Toolbar: Search, Sort, Save Button -->

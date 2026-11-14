@@ -10,6 +10,7 @@ import type {
 } from '~/services/FloorPlanService'
 import type { EditorElement, EditorTable } from '~/components/floor-plan/Inspector.vue'
 import type { DialogItem } from '~/composables/useFloorPlanDialog'
+import BranchPicker from '~/components/common/BranchPicker.vue'
 import {
   DOOR_ASSETS,
   DRAWN,
@@ -21,18 +22,21 @@ import {
   type PlaceSpec,
 } from '~/utils/floorPlanCatalog'
 
+// Shared with owners, who reach it at /owner/floor-plan for any of their branches.
 definePageMeta({
-  role: 'Manager',
+  role: ['Manager', 'Cafe Owner'],
+  alias: ['/owner/floor-plan'],
 })
 
-const links = MANAGER_NAV_LINKS
+const workspace = useBranchWorkspace()
+const { links, lockAudience, branchUuid, branchOptions, showBranchPicker } = workspace
 
 const DEFAULT_CANVAS = { width: 760, height: 640 }
 const UNDO_LIMIT = 50
 const GRID = 20 // matches the dotted canvas background
 const NUDGE = GRID
 
-const service = useFloorPlanService('manager')
+const service = useFloorPlanService(workspace.scope)
 const { spec: dialogSpec, open: openDialog, close: closeDialog } = useFloorPlanDialog()
 
 // A plain "got it" notice (limits and the like).
@@ -60,8 +64,6 @@ function flashSaved() {
 }
 
 // ── State ────────────────────────────────────────────────────────────────
-const branches = ref<{ uuid: string; branch_name: string }[]>([])
-const branchUuid = ref('') // a manager runs exactly one branch
 const catalog = ref<FloorPlanAssets | null>(null)
 const plans = ref<FloorPlan[]>([])
 const plan = ref<FloorPlan | null>(null)
@@ -949,10 +951,7 @@ onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('beforeunload', onBeforeUnload)
   try {
-    const res = await service.managedBranches()
-    branches.value = res.branches
-    if (!res.branches.length) errorMessage.value = 'You are not assigned to a branch yet.'
-    else branchUuid.value = res.branches[0]!.uuid
+    if (!(await workspace.loadBranches())) errorMessage.value = workspace.noBranchMessage
   } catch (e: any) {
     failure(e, 'Could not load your branches.')
   }
@@ -1014,6 +1013,13 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
           <p class="font-display text-[12px] text-[#7D5A50]">Arrange your cafe, set capacities, and prepare tables for reservations.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
+          <BranchPicker
+            v-if="showBranchPicker"
+            v-model="branchUuid"
+            :options="branchOptions"
+            :disabled="dirty || saving"
+            :title="dirty ? 'Save or undo your layout changes before switching branches.' : undefined"
+          />
           <button type="button" :class="iconBtn" :disabled="!undoStack.length || preview" @click="undo">
             <Icon name="heroicons:arrow-uturn-left" class="size-4" />
             Undo
@@ -1051,7 +1057,7 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
 
       <p v-if="loading" class="text-[14px] text-[#9E7060]">Loading...</p>
 
-      <SubscriptionLockedState v-else-if="planLock" :lock="planLock" audience="staff" />
+      <SubscriptionLockedState v-else-if="planLock" :lock="planLock" :audience="lockAudience" />
 
       <div v-else-if="!planLocked && branchUuid" class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_270px] gap-5 items-start">
         <!-- Canvas card -->

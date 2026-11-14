@@ -26,6 +26,10 @@ export const OWNER_NAV_LINKS = [
     { label: 'Dashboard', to: '/owner/dashboard', icon: 'squares-2x2' },
     { label: 'Cafe Management', to: '/owner/cafes', icon: 'building-storefront' },
     { label: 'Menu Management', to: '/owner/menu-management', icon: 'book-open' },
+    // Same screens as the manager's, for whichever branch the owner picks.
+    { label: 'Servings', to: '/owner/servings', icon: 'cake' },
+    { label: 'Reservations', to: '/owner/reservations', icon: 'calendar-days' },
+    { label: 'Floor Plan', to: '/owner/floor-plan', icon: 'map' },
     { label: 'Analytics', to: '/owner/analytics', icon: 'chart-bar' },
     { label: 'Activity Log', to: '/owner/activity-log', icon: 'clipboard-document-list' },
     { label: 'Subscription', to: '/owner/subscription', icon: 'credit-card' },
