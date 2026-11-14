@@ -1,6 +1,7 @@
 <!-- app/components/profile/AccountProfileModal.vue -->
 <script setup lang="ts">
-import { useUserProfileService, type WorkplaceInfo } from '~/composables/useUserProfileService'
+import { useUserProfileService } from '~/composables/useUserProfileService'
+import type { WorkplaceInfo } from '~/services/UserProfileService'
 
 const props = defineProps<{
   open: boolean

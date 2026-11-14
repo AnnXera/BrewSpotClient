@@ -1,6 +1,7 @@
 <!-- app/pages/profile.vue -->
 <script setup lang="ts">
-import { useUserProfileService, type WorkplaceInfo } from '~/composables/useUserProfileService'
+import { useUserProfileService } from '~/composables/useUserProfileService'
+import type { WorkplaceInfo } from '~/services/UserProfileService'
 import { OWNER_NAV_LINKS, MANAGER_NAV_LINKS, ADMIN_NAV_LINKS } from '~/utils/constants'
 
 const authStore = useAuthStore()

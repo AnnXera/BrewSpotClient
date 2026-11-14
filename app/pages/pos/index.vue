@@ -4,6 +4,8 @@ import FloorPlanModal from '~/components/pos/FloorPlanModal.vue'
 import { formatOrderType } from '~/utils/dashboardFormat'
 import type { PosOrderType } from '~/services/PosService'
 import { variantLabel, TEMPERATURE_LABELS, type Temperature } from '~/utils/variant'
+import OwnerQrGenerator from '~/components/pos/OwnerQrGenerator.vue'
+import QRModal from '~/components/pos/QRModal.vue'
 
 const temperatureOptions: Temperature[] = ['hot', 'iced']
 
