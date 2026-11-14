@@ -201,9 +201,14 @@ function toggleDropdown(link: NavLink) {
 
     <!-- Nav items: fills the space between logo and profile, scrolls if taller -->
     <nav class="flex-1 min-h-0 overflow-y-auto nav-scroll flex flex-col gap-2 mt-6 -mx-2 px-2">
-      <template v-for="link in dynamicLinks" :key="link.to">
+      <template v-for="(link, i) in dynamicLinks" :key="link.label + link.to">
+        <!-- Section header: a divider (except above the first) and a small label -->
+        <div v-if="link.isHeader" class="flex flex-col gap-2" :class="i > 0 ? 'mt-2' : ''">
+          <div v-if="i > 0" class="h-px bg-[#B4846C] mx-1" />
+          <span class="px-3 pt-1 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-[#FFF0D1]/60">{{ link.label }}</span>
+        </div>
         <!-- Parent Link / Dropdown Toggle -->
-        <div v-if="link.isDropdown" class="flex flex-col">
+        <div v-else-if="link.isDropdown" class="flex flex-col">
           <button
             class="h-12 rounded-xl flex items-center transition-colors w-full px-3 py-3 gap-[9px] text-left"
             :class="isActive(link) ? 'bg-[#B4846C]' : 'hover:bg-[#8B6656]'"
@@ -475,8 +480,13 @@ function toggleDropdown(link: NavLink) {
 
             <!-- Nav items -->
             <nav class="flex-1 min-h-0 overflow-y-auto nav-scroll flex flex-col gap-2 -mx-2 px-2">
-              <template v-for="link in dynamicLinks" :key="link.to">
-                <div v-if="link.isDropdown" class="flex flex-col">
+              <template v-for="(link, i) in dynamicLinks" :key="link.label + link.to">
+                <!-- Section header: a divider (except above the first) and a small label -->
+                <div v-if="link.isHeader" class="flex flex-col gap-2" :class="i > 0 ? 'mt-2' : ''">
+                  <div v-if="i > 0" class="h-px bg-[#B4846C] mx-1" />
+                  <span class="px-3 pt-1 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-[#FFF0D1]/60">{{ link.label }}</span>
+                </div>
+                <div v-else-if="link.isDropdown" class="flex flex-col">
                   <button
                     class="h-12 rounded-xl flex items-center transition-colors w-full px-3 py-3 gap-[9px] text-left"
                     :class="isActive(link) ? 'bg-[#B4846C]' : 'hover:bg-[#8B6656]'"

@@ -38,6 +38,7 @@ const categoryTabs: { value: ActivityCategory | null; label: string; key: 'all' 
   { value: 'menu', label: 'Menu', key: 'menu' },
   { value: 'servings', label: 'Servings', key: 'servings' },
   { value: 'floor_plans', label: 'Floor plans', key: 'floor_plans' },
+  { value: 'reservations', label: 'Reservations', key: 'reservations' },
   { value: 'auth', label: 'Dashboard sign-ins', key: 'auth' },
 ]
 
@@ -72,8 +73,8 @@ const scopeLabel = computed(() => {
 })
 
 const note = computed(() => isOwner.value
-  ? 'Who signed in or out, who used a register, and who changed employees, the menu, servings or floor plans. Newest first.'
-  : 'Who used this branch\'s registers, and who changed its employees, servings or floor plans. Menu changes the owner made for the whole cafe are listed too. Newest first.')
+  ? 'Who signed in or out, who used a register, and who changed employees, the menu, servings, floor plans or reservations. Newest first.'
+  : 'Who used this branch\'s registers, and who changed its employees, servings, floor plans or reservations. Menu changes the owner made for the whole cafe are listed too. Newest first.')
 
 // ── Loading ──
 const data = ref<ActivityLogResponse | null>(null)
@@ -164,6 +165,9 @@ const ACTIONS: Record<string, { label: string; icon: string; tone: string }> = {
   'floor_plan.activated': { label: 'On register', icon: 'heroicons:eye', tone: ON },
   'floor_plan.deactivated': { label: 'Off register', icon: 'heroicons:eye-slash', tone: OFF },
   'floor_plan.deleted': { label: 'Floor plan deleted', icon: 'heroicons:trash', tone: REMOVE },
+  'reservation.created': { label: 'Reservation booked', icon: 'heroicons:calendar-days', tone: ADD },
+  'reservation.updated': { label: 'Reservation edited', icon: 'heroicons:pencil-square', tone: EDIT },
+  'reservation.cancelled': { label: 'Reservation cancelled', icon: 'heroicons:x-circle', tone: REMOVE },
   'employee.created': { label: 'Employee added', icon: 'heroicons:user-plus', tone: ADD },
   'employee.updated': { label: 'Employee edited', icon: 'heroicons:pencil-square', tone: EDIT },
   'employee.schedule_updated': { label: 'Schedule changed', icon: 'heroicons:calendar-days', tone: EDIT },
@@ -210,9 +214,14 @@ function toggle(uuid: string) {
   else next.add(uuid)
   expanded.value = next
 }
-// Lines under "Show changes": a category save's items, or the days a schedule change touched.
+// Lines under "Show changes": a category save's items, the days a schedule change touched, or what a reservation edit changed.
 function detailLines(l: ActivityLogRow): string[] {
   if (l.meta?.items?.length) return l.meta.items.map(changeLine)
+  if (l.action === 'reservation.updated' && l.meta?.changes?.length) {
+    return l.meta.changes.map(c => ('before' in c || 'after' in c)
+      ? `${c.field}: ${c.before || 'none'} → ${c.after || 'none'}`
+      : `${c.field} changed`)
+  }
   if (l.action === 'employee.schedule_updated' && l.meta?.after) {
     const before = l.meta.before ?? {}
     const after = l.meta.after
