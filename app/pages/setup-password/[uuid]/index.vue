@@ -21,7 +21,7 @@ const invalidMessage = ref('')
 const error = ref('')
 const isLoading = ref(false)
 
-// Managers continue to the PIN page (their PIN approves voids/refunds). Both
+// Owners and managers continue to the PIN page (their PIN approves voids/refunds). Both
 // are sent together there, so the account only activates once both are set.
 const needsPin = ref(false)
 const draft = useSetupPasswordDraft()
@@ -52,7 +52,7 @@ onMounted(async () => {
       return
     }
 
-    needsPin.value = res.role === 'Manager'
+    needsPin.value = res.role === 'Manager' || res.role === 'Cafe Owner'
   } catch (e: any) {
     const data = e?.data
     if (data?.already_active) {

@@ -36,7 +36,7 @@ export interface ActivityLogRow {
     category: ActivityCategory
     // auth.login | auth.logout | pos.unlock | pos.lock | serving.created | serving.updated | serving.deleted | serving.category_saved
     // | floor_plan.created | floor_plan.updated | floor_plan.deleted | floor_plan.layout_saved | floor_plan.activated | floor_plan.deactivated
-    // | employee.created | employee.updated | employee.schedule_updated | employee.pin_reset | employee.terminated
+    // | employee.created | employee.updated | employee.schedule_updated | employee.pin_reset | employee.pin_changed | employee.terminated
     // | menu.item_created | menu.item_updated | menu.item_deleted | menu.item_availability
     // | menu.category_created | menu.category_updated | menu.category_deleted | menu.category_availability
     // | reservation.created | reservation.updated | reservation.cancelled

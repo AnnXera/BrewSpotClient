@@ -13,6 +13,7 @@ export interface User {
     photo_url?: string | null
     role?: { role_name: string }
     welcome_pending?: boolean
+    pin_set?: boolean // owners and managers: a register PIN for void/refund approval is set
 }
 
 export const useAuthStore = defineStore('auth', {

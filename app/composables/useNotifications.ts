@@ -38,6 +38,7 @@ const KIND_STYLE: Record<NotificationKind, { icon: string; tone: NotificationTon
     servings_low: { icon: 'arrow-trending-down', tone: 'warning' },
     sold_out: { icon: 'no-symbol', tone: 'bad' },
     pin_locked: { icon: 'lock-closed', tone: 'bad' },
+    pin_changed: { icon: 'key', tone: 'warning' },
     refund_approved: { icon: 'receipt-refund', tone: 'neutral' },
     spoilage_logged: { icon: 'trash', tone: 'warning' },
 }

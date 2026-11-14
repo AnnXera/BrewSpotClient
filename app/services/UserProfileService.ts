@@ -30,6 +30,11 @@ export interface ChangePasswordPayload {
     password_confirmation: string
 }
 
+export interface ChangePinPayload {
+    current_password: string
+    pin: string
+}
+
 export class UserProfileService extends BaseService {
     getProfile() {
         return this.get<UserProfileResponse>('/user/profile')
@@ -49,5 +54,10 @@ export class UserProfileService extends BaseService {
 
     changePassword(payload: ChangePasswordPayload) {
         return this.put<{ success: boolean; message: string }>('/user/change-password', payload)
+    }
+
+    // Owners and managers: the register PIN that approves voids and refunds.
+    changePin(payload: ChangePinPayload) {
+        return this.put<{ success: boolean; message: string }>('/user/pin', payload)
     }
 }

@@ -172,6 +172,7 @@ const ACTIONS: Record<string, { label: string; icon: string; tone: string }> = {
   'employee.updated': { label: 'Employee edited', icon: 'heroicons:pencil-square', tone: EDIT },
   'employee.schedule_updated': { label: 'Schedule changed', icon: 'heroicons:calendar-days', tone: EDIT },
   'employee.pin_reset': { label: 'PIN reset', icon: 'heroicons:key', tone: EDIT },
+  'employee.pin_changed': { label: 'Own PIN changed', icon: 'heroicons:key', tone: EDIT },
   'employee.terminated': { label: 'Terminated', icon: 'heroicons:user-minus', tone: REMOVE },
   'menu.item_created': { label: 'Item added', icon: 'heroicons:plus-circle', tone: ADD },
   'menu.item_updated': { label: 'Item edited', icon: 'heroicons:pencil-square', tone: EDIT },

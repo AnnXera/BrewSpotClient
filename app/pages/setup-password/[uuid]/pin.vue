@@ -1,4 +1,4 @@
-<!--Manager PIN setup page (step 2 of the invitation, after the password)-->
+<!--Owner and manager PIN setup page (step 2 of password setup, after the password)-->
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import { useRoute } from 'vue-router'
@@ -128,14 +128,14 @@ async function handleSubmit() {
             Almost there.
           </h2>
           <p class="text-sm text-[#e5d9d4] leading-relaxed">
-            Your PIN signs you in on the register and approves voids and refunds at your branch.
+            Your PIN approves voids and refunds on the register. Managers also use it to sign in there.
           </p>
         </div>
 
         <div class="grid grid-cols-3 gap-3 pt-4">
           <div class="rounded-lg border border-[#9a776c]/60 bg-[#65463d]/30 p-4 text-center">
             <Icon name="heroicons:computer-desktop" class="w-6 h-6 mx-auto text-white" />
-            <p class="text-xs font-semibold mt-2 text-white">Register Sign-in</p>
+            <p class="text-xs font-semibold mt-2 text-white">Used on the Register</p>
           </div>
           <div class="rounded-lg border border-[#9a776c]/60 bg-[#65463d]/30 p-4 text-center">
             <Icon name="heroicons:receipt-refund" class="w-6 h-6 mx-auto text-white" />
