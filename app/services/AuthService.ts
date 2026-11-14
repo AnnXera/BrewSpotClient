@@ -91,8 +91,45 @@ export interface ApplicationDetails {
     approval: {
         status: string
         reason?: string | null
+        /** Rejected and the admin allowed the applicant to edit and resubmit */
+        can_resubmit?: boolean
         submitted_at: string
         reviewed_at?: string | null
+    }
+    /** Set only while the owner may edit and resubmit from the application page */
+    editable?: PreviousApplication | null
+}
+
+/** Sent in place of a temp upload path to reuse a document from the rejected application */
+export const KEEP_FILE = 'keep'
+
+/** The rejected application being resubmitted, used to prefill the registration form */
+export interface PreviousApplication {
+    reason: string | null
+    rejected_at: string | null
+    firstname: string | null
+    middlename: string | null
+    lastname: string | null
+    username: string | null
+    phone_number: string | null
+    owner_address: string | null
+    id_type: string | null
+    cafe_name: string | null
+    cafe_doc_type: 'DTI' | 'SEC' | null
+    branch_name: string | null
+    address: string | null
+    cafe_email: string | null
+    cafe_phonenumber: string | null
+    bir_registered_at: string | null
+    tin_number: string | null
+    vat: 'vat-registered' | 'non-vat' | null
+    /** File names of documents that can be kept; null when there is none */
+    documents: {
+        file: string | null
+        file_back: string | null
+        dti_sec_file: string | null
+        bir_file: string | null
+        cafe_picture: string | null
     }
 }
 
@@ -144,6 +181,18 @@ export class AuthService extends BaseService {
             `/auth/validate-registration-step/${userUuid}`,
             data
         )
+    }
+
+    /** Needs a re-verified email; application is null when there is nothing to resubmit */
+    previousApplication(userUuid: string) {
+        return this.get<{ success: boolean; application: PreviousApplication | null }>(
+            `/auth/register/${userUuid}/previous-application`
+        )
+    }
+
+    /** Edit a rejected application from its page (no OTP); same fields as register */
+    resubmitApplication(uuid: string, payload: Record<string, string>) {
+        return this.post<SimpleResponse>(`/auth/application/${uuid}/resubmit`, payload)
     }
 
     register(userUuid: string, payload: FormData) {

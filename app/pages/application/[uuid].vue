@@ -110,6 +110,28 @@ function formatIdType(type?: string | null): string {
 function goLogin() {
   navigateTo('/login')
 }
+
+// Rejected, or already re-verifying their email to resubmit (status moves to email_unverified then)
+const isRejected = computed(() =>
+  application.value?.user.status === 'rejected' || application.value?.approval.status === 'rejected'
+)
+
+// Rejected with resubmission allowed: the cards below turn into an editable form
+const editing = ref(false)
+const resubmitted = ref(false)
+
+function startEditing() {
+  resubmitted.value = false
+  editing.value = true
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+async function onResubmitted() {
+  editing.value = false
+  resubmitted.value = true
+  await fetchApplication()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 </script>
 
 <template>
@@ -267,18 +289,59 @@ function goLogin() {
           </div>
 
           <div
-            v-else-if="application.user.status === 'rejected'"
-            class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-900 space-y-2"
+            v-else-if="isRejected"
+            class="rounded-xl border-2 border-red-300 bg-red-50 text-red-900 overflow-hidden"
+            role="alert"
           >
-            <div class="flex items-start gap-3">
-              <Icon name="heroicons:x-circle" class="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
-              <div>
-                <p class="font-bold text-sm">Application Needs Attention</p>
-                <p class="text-xs text-red-700 mt-0.5">
-                  {{ application.approval.reason || 'Your application was not approved. Please review requirements and reach out to our team.' }}
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 bg-red-100/70 border-b border-red-200">
+              <div class="flex items-center gap-3">
+                <Icon name="heroicons:exclamation-triangle" class="w-7 h-7 text-red-600 shrink-0" />
+                <div>
+                  <p class="font-bold text-base">Your application was not approved</p>
+                  <p class="text-xs text-red-700">
+                    Reviewed {{ formatDate(application.approval.reviewed_at) }}
+                  </p>
+                </div>
+              </div>
+              <button
+                v-if="application.editable && !editing"
+                type="button"
+                class="px-5 py-2.5 rounded-lg bg-[#7B5A50] hover:bg-[#65463d] text-white text-sm font-bold transition text-center shadow-sm shrink-0"
+                @click="startEditing"
+              >
+                Edit Application
+              </button>
+            </div>
+
+            <div class="px-5 py-4 space-y-3">
+              <!-- The admin's reason, the thing the owner has to act on -->
+              <div class="rounded-lg bg-white border-l-4 border-red-500 shadow-sm px-4 py-3">
+                <p class="text-[0.7rem] font-bold uppercase tracking-wider text-red-600">Reason for rejection</p>
+                <p class="mt-1 text-base font-semibold leading-relaxed text-[#2d201b] whitespace-pre-line">
+                  {{ application.approval.reason || 'No reason was given. Please review the requirements or contact our team.' }}
                 </p>
               </div>
+
+              <p class="text-sm text-red-800">
+                {{ application.approval.can_resubmit
+                  ? (editing
+                    ? 'Change what was flagged below, then resubmit. Documents you do not replace are kept.'
+                    : 'You can fix this and resubmit here. Your details and documents are kept, so you only need to change what was flagged.')
+                  : 'This decision is final, so this application cannot be resubmitted. Contact our team if you think this is a mistake.' }}
+              </p>
             </div>
+          </div>
+
+          <div
+            v-else-if="resubmitted"
+            class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3 text-emerald-900"
+            role="status"
+          >
+            <Icon name="heroicons:check-circle" class="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            <p class="text-xs leading-relaxed">
+              <span class="font-bold">Application resubmitted.</span>
+              It is back with our team for review. You will get an email once an administrator has reviewed it.
+            </p>
           </div>
 
           <div
@@ -293,6 +356,17 @@ function goLogin() {
           </div>
         </div>
 
+        <!-- Edit mode: same sections as inputs -->
+        <ApplicationResubmitForm
+          v-if="editing && application.editable"
+          :uuid="uuid"
+          :email="application.user.email"
+          :editable="application.editable"
+          @cancel="editing = false"
+          @submitted="onResubmitted"
+        />
+
+        <template v-else>
         <!-- Two Column Detailed Inputs View -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
@@ -484,6 +558,8 @@ function goLogin() {
             </div>
           </div>
         </div>
+
+        </template>
 
         <!-- Footer Actions -->
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[#7B5A50]/15">

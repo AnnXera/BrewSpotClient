@@ -3,6 +3,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import logoFull from '~/assets/images/logo-with-tag.svg'
 import DropdownList, { type DropdownListOption } from '~/components/common/DropdownList.vue'
+import { KEEP_FILE, type PreviousApplication } from '~/services/AuthService'
 
 const PHONE_TYPE_OPTIONS: DropdownListOption<'mobile' | 'telephone'>[] = [
   { value: 'mobile', label: 'Phone (+63)' },
@@ -25,8 +26,17 @@ const CAFE_DOC_TYPE_OPTIONS: DropdownListOption<'DTI' | 'SEC'>[] = [
 ]
 
 const authService = useAuthService()
+const route = useRoute()
 
 const currentStep = ref(1)
+
+// Resubmitting a rejected application: the admin's reason, shown above the form,
+// and the document types the kept files belong to (a kept file is sent as KEEP_FILE).
+const resubmitting = ref(false)
+const resubmitReason = ref('')
+const keptIdType = ref('')
+const keptCafeDocType = ref('')
+const reapplyHint = ref('') // step 1 note when arriving from "Edit and Resubmit"
 
 const error = ref('')
 const success = ref('')
@@ -213,6 +223,15 @@ watch(idType, (newVal) => {
     governmentIdFileBack.value = null
     governmentIdFileBackName.value = ''
   }
+  // A kept ID only counts for the ID type it was submitted as
+  if (newVal !== keptIdType.value) {
+    if (governmentIdFilePath.value === KEEP_FILE) {
+      governmentIdFile.value = null; governmentIdFileName.value = ''; governmentIdFilePath.value = ''
+    }
+    if (governmentIdFileBackPath.value === KEEP_FILE) {
+      governmentIdFileBack.value = null; governmentIdFileBackName.value = ''; governmentIdFileBackPath.value = ''
+    }
+  }
 })
 
 // Step 4: Business Details & Documents
@@ -305,6 +324,13 @@ const birRegisteredAt = ref('')
 const tinNumber = ref('')
 const vat = ref<'vat-registered' | 'non-vat'>('non-vat')
 
+// A kept DTI/SEC file only counts for the document type it was submitted as
+watch(cafeDocType, (newVal) => {
+  if (newVal !== keptCafeDocType.value && dtiSecFilePath.value === KEEP_FILE) {
+    dtiSecFile.value = null; dtiSecFileName.value = ''; dtiSecFilePath.value = ''; dtiSecFileSize.value = ''
+  }
+})
+
 // XXX-XXX-XXX-XXXXX: 9-digit TIN + 5-digit branch code (00000 = head office / main branch)
 function formatTinNumber(val: string): string {
   const raw = val.replace(/[^0-9]/g, '').slice(0, 14)
@@ -390,6 +416,12 @@ function clearAllInputs() {
   birRegisteredAt.value = ''
   tinNumber.value = ''
   vat.value = 'non-vat'
+  // Resubmission
+  resubmitting.value = false
+  resubmitReason.value = ''
+  keptIdType.value = ''
+  keptCafeDocType.value = ''
+  reapplyHint.value = ''
   // Errors & state
   error.value = ''
   success.value = ''
@@ -420,6 +452,7 @@ async function handleSendCode() {
   // Already verified this email in this tab: go straight back to the application.
   if (userUuid.value && trimmedEmail.toLowerCase() === verifiedEmail.value.toLowerCase()) {
     currentStep.value = 3
+    if (!resubmitting.value) await loadPreviousApplication()
     return
   }
   loading.value = true
@@ -513,6 +546,7 @@ async function handleVerifyOTP() {
     if (res.user_uuid) {
       userUuid.value = res.user_uuid
       verifiedEmail.value = email.value.trim()
+      await loadPreviousApplication()
       currentStep.value = 3
     } else {
       error.value = res.message || 'That code did not work. Check it and try again.'
@@ -548,6 +582,82 @@ async function handleResendOTP() {
   } finally {
     resending.value = false
   }
+}
+
+/** Splits a stored phone (+639xxxxxxxxx or 082xxxxxxx) into the wizard's type and digits */
+function splitPhone(value: string | null): { type: 'mobile' | 'telephone'; mobile: string; landline: string } {
+  if (value && value.startsWith('082')) return { type: 'telephone', mobile: '', landline: value }
+  return { type: 'mobile', mobile: value ? cleanMobileDigits(value) : '', landline: '' }
+}
+
+/** Marks a previous document as kept: shown as uploaded, sent back as KEEP_FILE */
+function keptFile(name: string | null) {
+  return name
+    ? { file: new File([''], name, { type: 'application/octet-stream' }), name, path: KEEP_FILE }
+    : { file: null, name: '', path: '' }
+}
+
+/**
+ * Resubmitting after a rejection: prefill every step from the rejected
+ * application so the owner only changes what the admin flagged.
+ */
+async function loadPreviousApplication() {
+  if (!userUuid.value) return
+  let prev: PreviousApplication | null = null
+  try {
+    const res = await authService.previousApplication(userUuid.value)
+    prev = res.application ?? null
+  } catch {
+    return // nothing to resubmit, or not available: continue as a new application
+  }
+  if (!prev) return
+
+  resubmitting.value = true
+  resubmitReason.value = prev.reason || ''
+  keptIdType.value = prev.id_type || ''
+  keptCafeDocType.value = prev.cafe_doc_type || ''
+
+  firstname.value = prev.firstname || ''
+  middlename.value = prev.middlename || ''
+  lastname.value = prev.lastname || ''
+  username.value = prev.username || ''
+  ownerAddress.value = prev.owner_address || ''
+  const phone = splitPhone(prev.phone_number)
+  phoneType.value = phone.type
+  mobileDigits.value = phone.mobile
+  landlineDigits.value = phone.landline
+  syncPhoneNumber()
+
+  if (prev.id_type) idType.value = prev.id_type
+  const front = keptFile(prev.documents.file)
+  governmentIdFile.value = front.file; governmentIdFileName.value = front.name; governmentIdFilePath.value = front.path
+  const back = keptFile(prev.documents.file_back)
+  governmentIdFileBack.value = back.file; governmentIdFileBackName.value = back.name; governmentIdFileBackPath.value = back.path
+
+  cafeName.value = prev.cafe_name || ''
+  if (prev.cafe_doc_type) cafeDocType.value = prev.cafe_doc_type
+  branchName.value = prev.branch_name || ''
+  address.value = prev.address || ''
+  cafeEmail.value = prev.cafe_email || ''
+  const cafePhoneParts = splitPhone(prev.cafe_phonenumber)
+  cafePhoneType.value = cafePhoneParts.type
+  cafeMobileDigits.value = cafePhoneParts.mobile
+  cafeLandlineDigits.value = cafePhoneParts.landline
+  syncCafePhone()
+
+  const bir = keptFile(prev.documents.bir_file)
+  birFile.value = bir.file; birFileName.value = bir.name; birFilePath.value = bir.path; birFileSize.value = ''
+  const dti = keptFile(prev.documents.dti_sec_file)
+  dtiSecFile.value = dti.file; dtiSecFileName.value = dti.name; dtiSecFilePath.value = dti.path; dtiSecFileSize.value = ''
+  if (prev.documents.cafe_picture) {
+    cafePictureName.value = prev.documents.cafe_picture
+    cafePicturePath.value = KEEP_FILE
+    cafePicturePreview.value = ''
+  }
+  birRegisteredAt.value = prev.bir_registered_at || ''
+  tinNumber.value = prev.tin_number ? formatTinNumber(prev.tin_number) : ''
+  if (prev.vat) vat.value = prev.vat
+  fieldErrors.value = {}
 }
 
 function extractErrorMessage(e: any, defaultMsg: string): string {
@@ -1256,6 +1366,10 @@ function saveDraft() {
     dtiSecFilePath: dtiSecFilePath.value,
     cafePicturePath: cafePicturePath.value,
     cafePictureName: cafePictureName.value,
+    resubmitting: resubmitting.value,
+    resubmitReason: resubmitReason.value,
+    keptIdType: keptIdType.value,
+    keptCafeDocType: keptCafeDocType.value,
     // File names for display
     governmentIdFileName: governmentIdFileName.value,
     governmentIdFileBackName: governmentIdFileBackName.value,
@@ -1270,6 +1384,12 @@ function restoreDraft() {
   if (saved) {
     try {
       const draft = JSON.parse(saved)
+      if (draft.resubmitting) {
+        resubmitting.value = true
+        resubmitReason.value = draft.resubmitReason || ''
+        keptIdType.value = draft.keptIdType || ''
+        keptCafeDocType.value = draft.keptCafeDocType || ''
+      }
       if (draft.email) email.value = draft.email
       if (draft.firstname) firstname.value = draft.firstname
       if (draft.middlename) middlename.value = draft.middlename
@@ -1347,8 +1467,24 @@ function handleBeforeUnload(e: BeforeUnloadEvent) {
   }
 }
 
+// Arriving from a rejected application's "Edit and Resubmit": start at the email
+// step with the applicant's email filled in; verifying it loads the old answers.
+async function startReapply(applicationUuid: string) {
+  try {
+    const res = await authService.getApplicationDetails(applicationUuid)
+    if (res.success && res.application?.user.email) {
+      email.value = res.application.user.email
+      reapplyHint.value = 'We\'ll send a code to this email. Once verified, your previous application opens with your details and documents filled in.'
+    }
+  } catch {
+    // Unknown link: leave the normal registration start
+  }
+}
+
 onMounted(() => {
   restoreDraft()
+  const reapply = route.query.reapply
+  if (typeof reapply === 'string' && reapply && !userUuid.value) startReapply(reapply)
   window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
@@ -1401,6 +1537,21 @@ onBeforeUnmount(() => {
     <!-- Right Form Section -->
     <section class="flex items-center justify-center bg-[#FFF8EA] px-8 py-12 h-full overflow-y-auto">
       <div class="w-full max-w-md space-y-6 my-auto relative">
+        <!-- Resubmitting a rejected application: what the admin flagged -->
+        <div
+          v-if="resubmitting && (currentStep === 3 || currentStep === 4)"
+          class="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-3"
+        >
+          <Icon name="heroicons:pencil-square" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div class="text-sm">
+            <p class="font-semibold">Editing your rejected application</p>
+            <p v-if="resubmitReason" class="mt-1"><span class="font-medium">Reason:</span> {{ resubmitReason }}</p>
+            <p class="text-xs text-amber-800/80 mt-1">
+              Your previous details and documents are filled in. Change what was flagged, then resubmit for review.
+            </p>
+          </div>
+        </div>
+
         <Transition name="fade-slide" mode="out-in">
         <!-- STEP 1: Email Verification -->
         <div v-if="currentStep === 1" key="step1" class="space-y-6">
@@ -1413,9 +1564,9 @@ onBeforeUnmount(() => {
           </NuxtLink>
 
           <div>
-            <h1 class="text-3xl font-bold text-[#2d201b]">Register your business</h1>
+            <h1 class="text-3xl font-bold text-[#2d201b]">{{ reapplyHint ? 'Resubmit your application' : 'Register your business' }}</h1>
             <p class="text-gray-600 text-sm mt-1 mb-6">
-              Create your BrewSpot account. We'll need a few documents to verify your business.
+              {{ reapplyHint || "Create your BrewSpot account. We'll need a few documents to verify your business." }}
             </p>
           </div>
 

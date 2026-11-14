@@ -145,7 +145,7 @@ async function handleDecision(status: 'approved' | 'rejected', reason?: string) 
     if (registrationTab.value === 'owner') {
       const ownerUuid = modalApproval.value.user?.uuid
       if (!ownerUuid) return
-      await ownerService.updateStatus(ownerUuid, status, reason)
+      await ownerService.updateStatus(ownerUuid, status, reason, allowResubmit.value)
     } else {
       const branchUuid = modalApproval.value.branch?.uuid
       if (!branchUuid) return
@@ -155,6 +155,7 @@ async function handleDecision(status: 'approved' | 'rejected', reason?: string) 
     closeModal()
     rejectModalOpen.value = false
     rejectReason.value = ''
+    allowResubmit.value = true
     fetchStats()
     fetchApprovals()
   } catch (e) {
@@ -167,15 +168,19 @@ async function handleDecision(status: 'approved' | 'rejected', reason?: string) 
 // Reject modal
 const rejectModalOpen = ref(false)
 const rejectReason = ref('')
+// Owner applications only: unchecked makes the rejection final
+const allowResubmit = ref(true)
 
 function openRejectModal() {
   rejectReason.value = ''
+  allowResubmit.value = true
   rejectModalOpen.value = true
 }
 
 function closeRejectModal() {
   rejectModalOpen.value = false
   rejectReason.value = ''
+  allowResubmit.value = true
 }
 
 async function confirmReject() {
@@ -465,6 +470,25 @@ watch(() => route.query.uuid, async (uuid) => {
             placeholder="e.g. Submitted documents are unclear or expired."
             class="w-full rounded-xl border border-[#EDD8CC] px-4 py-3 font-sans text-sm text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30 resize-none"
           />
+
+          <label
+            v-if="registrationTab === 'owner'"
+            class="flex items-start gap-3 mt-4 cursor-pointer select-none"
+          >
+            <input
+              v-model="allowResubmit"
+              type="checkbox"
+              class="mt-0.5 h-4 w-4 rounded border-[#EDD8CC] text-[#7D5A50] focus:ring-[#7D5A50]/30"
+            />
+            <span class="font-sans text-sm text-[#3B1F0E]">
+              Let the applicant edit and resubmit
+              <span class="block text-xs text-[#3B1F0E]/60 mt-0.5">
+                {{ allowResubmit
+                  ? 'They can fix the issue and send the same application back for review.'
+                  : 'Final rejection. Use for ineligible or suspicious applications; they cannot reapply with this email.' }}
+              </span>
+            </span>
+          </label>
 
           <div class="flex items-center justify-end gap-3 mt-6">
             <button

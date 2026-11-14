@@ -436,6 +436,14 @@ function viewCafePicture() {
                                     <p class="font-semibold text-[#7D5A50]">Reason</p>
                                     <p class="text-[#DC3545]">{{ approval.reason }}</p>
                                 </div>
+
+                                <div
+                                    v-if="approval.status === 'rejected' && approval.can_resubmit !== undefined"
+                                    class="grid grid-cols-[35%_65%] bg-[#FFF8EA] px-[20px] py-[10px] border-t border-[#EDD8CC]"
+                                >
+                                    <p class="font-semibold text-[#7D5A50]">Resubmission</p>
+                                    <p class="text-[#3B1F0E]">{{ approval.can_resubmit ? 'Allowed' : 'Not allowed (final)' }}</p>
+                                </div>
                             </div>
                         </template>
                     </div>

@@ -72,6 +72,8 @@ export interface ApprovalListItem {
     uuid: string
     status: string
     reason: string | null
+    /** False when the rejection is final and the applicant cannot resubmit */
+    can_resubmit?: boolean
     reviewed_at: string | null
     reviewer: ApprovalReviewer | null
     user: ApprovalUser | null
@@ -159,8 +161,13 @@ export class OwnerManagementService extends BaseService {
         }>(`/admin/owners/${uuid}`)
     }
 
-    updateStatus(uuid: string, status: string, reason?: string) {
-        return this.patch<{ success: boolean; message: string }>(`/admin/owners/${uuid}/status`, { status, reason })
+    /** allowResubmit applies to rejections: false makes the rejection final */
+    updateStatus(uuid: string, status: string, reason?: string, allowResubmit = true) {
+        return this.patch<{ success: boolean; message: string }>(`/admin/owners/${uuid}/status`, {
+            status,
+            reason,
+            ...(status === 'rejected' ? { allow_resubmit: allowResubmit } : {})
+        })
     }
 
     approvals(params: ListApprovalsParams = {}) {

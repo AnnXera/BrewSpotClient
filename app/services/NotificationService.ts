@@ -3,7 +3,7 @@ import { BaseService } from './BaseService'
 
 export type NotificationKind =
     // Admin
-    | 'owner_application' | 'branch_submission'
+    | 'owner_application' | 'owner_resubmission' | 'branch_submission'
     // Owner: account and branch decisions
     | 'account_approved' | 'account_rejected' | 'account_suspended' | 'account_reactivated'
     | 'branch_approved' | 'branch_rejected'
