@@ -130,26 +130,44 @@ async function openDetails(approval: ApprovalListItem) {
 }
 
 function closeModal() {
+  decisionError.value = ''
   modalOpen.value = false
   modalApproval.value = null
   modalOwnerDetails.value = null
 }
 
 const decisionLoading = ref(false)
+const decisionError = ref('')
+
+// Owner application (main branch) or side-branch submission. Taken from the
+// approval itself: an approval opened from a notification link may not match
+// the tab that happens to be selected.
+function kindOf(approval: Pick<ApprovalListItem, 'branch'> | null): RegistrationTab {
+  const type = approval?.branch?.branch_type
+  return type === 'side' ? 'branch' : type === 'main' ? 'owner' : registrationTab.value
+}
+const modalKind = computed<RegistrationTab>(() => kindOf(modalApproval.value))
 
 async function handleDecision(status: 'approved' | 'rejected', reason?: string) {
   if (!modalApproval.value) return
-  decisionLoading.value = true
+  decisionError.value = ''
 
+  const isBranch = modalKind.value === 'branch'
+  const targetUuid = isBranch ? modalApproval.value.branch?.uuid : modalApproval.value.user?.uuid
+  if (!targetUuid) {
+    decisionError.value = 'This approval is missing its owner or branch, so it cannot be reviewed. Refresh and try again.'
+    return
+  }
+
+  decisionLoading.value = true
   try {
-    if (registrationTab.value === 'owner') {
-      const ownerUuid = modalApproval.value.user?.uuid
-      if (!ownerUuid) return
-      await ownerService.updateStatus(ownerUuid, status, reason, allowResubmit.value)
-    } else {
-      const branchUuid = modalApproval.value.branch?.uuid
-      if (!branchUuid) return
-      await ownerService.updateBranchStatus(branchUuid, status, reason)
+    const res = isBranch
+      ? await ownerService.updateBranchStatus(targetUuid, status, reason)
+      : await ownerService.updateStatus(targetUuid, status, reason, allowResubmit.value)
+
+    if (!res.success) {
+      decisionError.value = res.message || 'The decision could not be saved. Please try again.'
+      return
     }
 
     closeModal()
@@ -158,8 +176,9 @@ async function handleDecision(status: 'approved' | 'rejected', reason?: string) 
     allowResubmit.value = true
     fetchStats()
     fetchApprovals()
-  } catch (e) {
+  } catch (e: any) {
     console.error('Failed to update status', e)
+    decisionError.value = e?.data?.message || e?.response?._data?.message || 'The decision could not be saved. Please try again.'
   } finally {
     decisionLoading.value = false
   }
@@ -178,6 +197,7 @@ function openRejectModal() {
 }
 
 function closeRejectModal() {
+  decisionError.value = ''
   rejectModalOpen.value = false
   rejectReason.value = ''
   allowResubmit.value = true
@@ -199,9 +219,16 @@ async function openFromQuery(uuid: string) {
   try {
     const res = await ownerService.approvalSnapshot(uuid)
     if (res.success) {
+      // A branch submission link opens on the Branch tab, so the list and the
+      // modal both match the approval.
+      const kind = kindOf({ branch: res.branch } as any)
+      if (kind !== registrationTab.value) switchRegistrationTab(kind)
+
       modalApproval.value = {
         uuid,
-        status: 'pending_approval',
+        status: res.approval?.status ?? 'pending_approval',
+        reason: res.approval?.reason ?? null,
+        reviewed_at: res.approval?.reviewed_at ?? null,
         user: res.owner,
         cafe: res.cafe,
         branch: res.branch,
@@ -425,12 +452,12 @@ watch(() => route.query.uuid, async (uuid) => {
     </main>
 
     <ApprovalDetailsModal
-      v-if="registrationTab === 'owner'"
+      v-if="modalKind === 'owner'"
       :open="modalOpen"
       :loading="modalLoading"
       :approval="modalApproval"
       :owner-details="modalOwnerDetails"
-      :registration-type="registrationTab"
+      :registration-type="modalKind"
       :decision-loading="decisionLoading"
       @close="closeModal"
       @approve="handleDecision('approved')"
@@ -450,6 +477,21 @@ watch(() => route.query.uuid, async (uuid) => {
       @approve="handleDecision('approved')"
       @reject="openRejectModal"
     />
+
+    <!-- Approve failures (reject failures show inside the reason dialog) -->
+    <Teleport to="body">
+      <div
+        v-if="decisionError && modalOpen && !rejectModalOpen"
+        class="fixed top-6 left-1/2 -translate-x-1/2 z-[70] max-w-md w-[calc(100%-2rem)] rounded-xl bg-white border border-[#F5C2C0] shadow-lg px-4 py-3 flex items-start gap-3"
+        role="alert"
+      >
+        <Icon name="heroicons:exclamation-triangle" class="w-5 h-5 text-[#D9534F] shrink-0 mt-0.5" />
+        <p class="flex-1 font-sans text-sm text-[#3B1F0E]">{{ decisionError }}</p>
+        <button type="button" class="text-[#3B1F0E]/50 hover:text-[#3B1F0E]" aria-label="Dismiss" @click="decisionError = ''">
+          <Icon name="heroicons:x-mark" class="w-4 h-4" />
+        </button>
+      </div>
+    </Teleport>
 
     <!-- Rejection reason prompt -->
     <Teleport to="body">
@@ -472,7 +514,7 @@ watch(() => route.query.uuid, async (uuid) => {
           />
 
           <label
-            v-if="registrationTab === 'owner'"
+            v-if="modalKind === 'owner'"
             class="flex items-start gap-3 mt-4 cursor-pointer select-none"
           >
             <input
@@ -489,6 +531,10 @@ watch(() => route.query.uuid, async (uuid) => {
               </span>
             </span>
           </label>
+
+          <p v-if="decisionError" class="mt-4 rounded-lg bg-[#FDE8E8] px-3 py-2 font-sans text-sm text-[#B42318]" role="alert">
+            {{ decisionError }}
+          </p>
 
           <div class="flex items-center justify-end gap-3 mt-6">
             <button

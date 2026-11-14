@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import type { BranchSummary } from '~/services/OwnerProfileService'
 import { useOperatingHours } from '~/composables/useOperatingHours'
+import { isOperationalBranchStatus } from '~/utils/branchStatus'
 
 const props = defineProps<{
   branch: BranchSummary
@@ -20,6 +21,8 @@ const imageError = ref(false)
 const status = computed(() => (props.branch.status || 'active').toLowerCase())
 const isActive = computed(() => status.value === 'active' || status.value === 'approved')
 const statusLabel = computed(() => status.value.replaceAll('_', ' '))
+// Pending and rejected branches are admin-controlled: not selectable for bulk status changes
+const selectable = computed(() => isOperationalBranchStatus(status.value))
 
 function statusColor(s: string) {
   switch (s) {
@@ -50,9 +53,11 @@ function statusColor(s: string) {
       <input
         type="checkbox"
         :checked="selected"
+        :disabled="!selectable"
+        :title="selectable ? undefined : 'Only approved branches can be activated or deactivated'"
         @change="emit('update:selected', ($event.target as HTMLInputElement).checked)"
         :aria-label="`Select ${branch.branch_name || 'branch'}`"
-        class="w-5 h-5 rounded border-[#D9C4A8] text-[#7D5A50] focus:ring-[#7D5A50] cursor-pointer"
+        class="w-5 h-5 rounded border-[#D9C4A8] text-[#7D5A50] focus:ring-[#7D5A50] cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
       />
     </label>
 

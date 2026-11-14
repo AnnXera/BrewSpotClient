@@ -5,6 +5,7 @@
 // branch they are assigned to; an owner picks any of their branches, and the choice is
 // kept in a cookie (and the ?branch= query) so it follows them between these screens.
 import { useAuthStore } from '~/stores/auth'
+import { isOperationalBranchStatus } from '~/utils/branchStatus'
 
 export interface WorkspaceBranch {
   uuid: string
@@ -26,7 +27,9 @@ export function useBranchWorkspace() {
   const basePath = `/${scope}`
   const links = isOwner ? OWNER_NAV_LINKS : MANAGER_NAV_LINKS
   const lockAudience: 'owner' | 'staff' = isOwner ? 'owner' : 'staff'
-  const noBranchMessage = isOwner ? 'Add a branch to your cafe first.' : 'You are not assigned to a branch yet.'
+  const noBranchMessage = isOwner
+    ? 'You have no approved branch yet. Branches waiting for approval or rejected ones are not listed here.'
+    : 'You are not assigned to a branch yet.'
 
   const branches = ref<WorkspaceBranch[]>([])
   const branchUuid = ref('')
@@ -40,8 +43,9 @@ export function useBranchWorkspace() {
     const res = await api<{ success: boolean; branches: { data: WorkspaceBranch[] } }>('/owner/branches', {
       params: { per_page: OWNER_BRANCH_LIMIT },
     })
-    // Active branches first, then by name, so the default pick is one that is running.
-    return [...res.branches.data].sort((a, b) =>
+    // Pending and rejected branches can't be operated (the server refuses them), so they are
+    // left out of the picker. Active branches first, then by name, so the default pick is running.
+    return res.branches.data.filter(b => isOperationalBranchStatus(b.status)).sort((a, b) =>
       Number(b.status === 'active') - Number(a.status === 'active') || a.branch_name.localeCompare(b.branch_name),
     )
   }
