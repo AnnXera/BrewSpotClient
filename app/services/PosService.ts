@@ -177,7 +177,7 @@ export class DevicePosService extends BaseService {
         })
     }
 
-    checkout(items: any[], paymentMethod: string, amountTendered: number, referenceNumber?: string, discountType?: string, discountAmount?: number, orderType: PosOrderType = 'dine_in') {
+    checkout(items: any[], paymentMethod: string, amountTendered: number, referenceNumber?: string, discountType?: string, discountAmount?: number, orderType: PosOrderType = 'dine_in', note?: string) {
         return this.post<{ success: boolean; message: string; transaction_uuid: string; receipt_number?: string; order_type?: PosOrderType }>('/pos/device/checkout', {
             items,
             payment_method: paymentMethod,
@@ -185,7 +185,9 @@ export class DevicePosService extends BaseService {
             reference_number: referenceNumber,
             discount_type: discountType,
             discount_amount: discountAmount,
-            order_type: orderType
+            order_type: orderType,
+            note,
+            walk_in_note: note,
         })
     }
 
@@ -200,6 +202,15 @@ export class DevicePosService extends BaseService {
             pin,
             reason,
             restock,
+        })
+    }
+
+    // Void completely invalidates the transaction with manager PIN authorization; servings are automatically restocked.
+    voidTransaction(transactionUuid: string, managerUuid: string, pin: string, reason?: string) {
+        return this.post<{ success: boolean; message: string; transaction?: PosTransactionDetail }>('/pos/device/transactions/' + transactionUuid + '/void', {
+            manager_uuid: managerUuid,
+            pin,
+            reason,
         })
     }
 

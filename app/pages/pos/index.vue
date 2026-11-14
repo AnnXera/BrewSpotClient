@@ -5,6 +5,8 @@ import { formatOrderType } from '~/utils/dashboardFormat'
 import type { PosOrderType } from '~/services/PosService'
 import { variantLabel, TEMPERATURE_LABELS, type Temperature } from '~/utils/variant'
 
+const temperatureOptions: Temperature[] = ['hot', 'iced']
+
 // POS Register uses its own auth via pos_device_token cookie
 // It does not use the standard user auth, so we don't define a 'role' requirement here.
 definePageMeta({
@@ -632,6 +634,12 @@ function clearCart() {
   if (isProcessingOrder.value || cart.value.length === 0) return
   const snapshot = cart.value.map(i => ({ ...i }))
   cart.value = []
+  orderNote.value = ''
+  selectedDiscountType.value = 'none'
+  discountIdNumber.value = ''
+  amountTendered.value = ''
+  referenceNumber.value = ''
+  selectedTableForOrder.value = null
   showNotice('Order cleared.', snapshot)
 }
 
@@ -641,6 +649,7 @@ const selectedPaymentMethod = ref('cash')
 const amountTendered = ref<number | string>('')
 const referenceNumber = ref('')
 const discountIdNumber = ref('')
+const orderNote = ref('')
 
 const changeAmount = computed(() => {
   if (selectedPaymentMethod.value !== 'cash') return 0
@@ -713,7 +722,7 @@ const canCheckout = computed(() => {
 })
 
 
-watch([() => cart.value.length, total, selectedPaymentMethod, amountTendered, referenceNumber, discountIdNumber, selectedDiscountType], () => { checkoutError.value = '' })
+watch([() => cart.value.length, total, selectedPaymentMethod, amountTendered, referenceNumber, discountIdNumber, selectedDiscountType, orderNote], () => { checkoutError.value = '' })
 
 const cartCount = computed(() => cart.value.reduce((n, i) => n + i.quantity, 0))
 
@@ -814,7 +823,8 @@ async function completeOrder() {
       fullRef || referenceNumber.value,
       selectedDiscountType.value !== 'none' ? selectedDiscountType.value : undefined,
       discountAmount.value,
-      selectedOrderType.value
+      selectedOrderType.value,
+      orderNote.value.trim() || undefined
     )
     if (res.success) {
       completedOrderDetails.value = {
@@ -826,6 +836,7 @@ async function completeOrder() {
         discountType: selectedDiscountType.value,
         discountAmount: discountAmount.value,
         discountIdNumber: discountIdNumber.value.trim(),
+        walkInNote: orderNote.value.trim() || undefined,
         total: currentTotal,
         paymentMethod: currentMethod,
         change: currentChange,
@@ -835,6 +846,7 @@ async function completeOrder() {
       isPaymentModalOpen.value = false
       isReceiptModalOpen.value = true
       cart.value = []
+      orderNote.value = ''
       selectedTableForOrder.value = null
       amountTendered.value = ''
       referenceNumber.value = ''
@@ -1601,7 +1613,7 @@ function formatCurrency(amount: number) {
 
       <!-- ── PAYMENT MODAL ────────────────────────────────────────────────── -->
       <div v-if="isPaymentModalOpen" role="dialog" aria-modal="true" aria-labelledby="pay-title" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4 print:hidden" @click.self="closePayment">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden modal-pop max-h-[92vh] border border-[#EFECE6]">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-[500px] flex flex-col overflow-hidden emil-modal-enter max-h-[92vh] border border-[#EFECE6]">
           <!-- Modal Header -->
           <div class="px-5 py-3.5 border-b border-[#EFECE6] flex items-center justify-between bg-[#FAF8F5] shrink-0">
             <div class="flex items-center gap-2">
@@ -1848,18 +1860,60 @@ function formatCurrency(amount: number) {
               <span class="block text-xs font-bold text-gray-600 uppercase tracking-wider">Reference number</span>
               <input ref="referenceInput" v-model="referenceNumber" @keydown.enter="completeOrder" type="text" class="w-full h-12 bg-white border-2 border-gray-200 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/15 text-gray-900 rounded-xl px-4 text-base font-semibold outline-none transition-all shadow-xs" placeholder="From the terminal or app" />
             </label>
+
+            <!-- Order Note Field (Emil Kowalski micro-interaction design) -->
+            <div class="space-y-1.5 pt-2 border-t border-[#F0EBE3]">
+              <div class="flex items-center justify-between">
+                <label for="order-note-input" class="text-xs font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1.5 cursor-pointer">
+                  <Icon name="heroicons:pencil-square" class="w-3.5 h-3.5 text-[#7B5A50]" />
+                  <span>Order Note</span>
+                  <span class="text-[10px] text-gray-400 font-normal lowercase">(optional)</span>
+                </label>
+                <span v-if="orderNote" class="text-[10px] text-gray-400 font-mono tabular-nums">
+                  {{ orderNote.length }}/200
+                </span>
+              </div>
+              <div class="relative flex items-center">
+                <input
+                  id="order-note-input"
+                  v-model="orderNote"
+                  maxlength="200"
+                  type="text"
+                  placeholder="Special instructions (e.g. less ice, extra hot, customer request)..."
+                  class="w-full h-11 bg-white border border-[#D8CEBE] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/15 text-[#2D201B] placeholder:text-gray-400 rounded-xl pl-3.5 pr-9 text-xs sm:text-sm font-medium outline-none transition-all shadow-2xs"
+                />
+                <button
+                  v-if="orderNote"
+                  type="button"
+                  @click="orderNote = ''"
+                  title="Clear note"
+                  class="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center transition-colors active:scale-90"
+                >
+                  <Icon name="heroicons:x-mark" class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </fieldset>
 
-          <div class="px-5 py-3 border-t border-[#EFECE6] bg-[#FAF8F5] shrink-0">
+          <div class="px-5 py-3.5 border-t border-[#EFECE6] bg-[#FAF8F5] shrink-0">
             <p v-if="checkoutError" role="alert" class="mb-2 p-2 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-800">{{ checkoutError }}</p>
             <div class="flex gap-2.5">
-              <button @click="closePayment" :disabled="isProcessingOrder" class="px-5 h-11 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold rounded-xl text-sm transition-colors disabled:opacity-50">Cancel</button>
               <button
+                type="button"
+                @click="closePayment"
+                :disabled="isProcessingOrder"
+                class="px-5 h-11 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold rounded-xl text-sm transition-all active:scale-[0.97] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
                 @click="completeOrder"
-                class="flex-1 h-11 bg-[#7B5A50] hover:bg-[#65463D] text-white font-bold rounded-xl text-sm sm:text-base transition-all shadow-md active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+                class="flex-1 h-11 bg-[#7B5A50] hover:bg-[#65463D] text-white font-bold rounded-xl text-sm sm:text-base transition-all shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 :disabled="!canCheckout || isProcessingOrder"
               >
-                {{ isProcessingOrder ? 'Recording sale...' : `Charge ${formatCurrency(total)}` }}
+                <Icon v-if="isProcessingOrder" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
+                <span>{{ isProcessingOrder ? 'Recording sale...' : `Charge ${formatCurrency(total)}` }}</span>
               </button>
             </div>
             <p v-if="!canCheckout && !isProcessingOrder" class="mt-1.5 text-[11px] sm:text-xs text-gray-500 text-center truncate">{{ checkoutHint }}</p>
@@ -1913,7 +1967,7 @@ function formatCurrency(amount: number) {
               <legend class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Hot or iced</legend>
               <div role="radiogroup" aria-label="Hot or iced" class="grid grid-cols-2 gap-2">
                 <button
-                  v-for="temp in (['hot', 'iced'] as const)"
+                  v-for="temp in temperatureOptions"
                   :key="temp"
                   role="radio"
                   :aria-checked="optionsTemperature === temp"
@@ -2165,6 +2219,10 @@ function formatCurrency(amount: number) {
         <div class="flex justify-between">
           <span>Order Type:</span>
           <span class="font-bold">{{ formatOrderType(completedOrderDetails.orderType) }}</span>
+        </div>
+        <div v-if="completedOrderDetails.walkInNote" class="flex justify-between text-xs italic">
+          <span>Note:</span>
+          <span class="max-w-[220px] text-right break-words">{{ completedOrderDetails.walkInNote }}</span>
         </div>
       </div>
 
