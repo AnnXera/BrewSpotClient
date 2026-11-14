@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { BranchDetail } from '~/services/OwnerProfileService'
+import { isOperationalBranchStatus } from '~/utils/branchStatus'
 
 definePageMeta({
   role: 'Cafe Owner',
@@ -49,6 +50,14 @@ function selectTab(tab: BranchTab) {
 }
 
 const isMain = computed(() => (branch.value?.branch_type || '').toLowerCase() === 'main')
+
+// Only approved branches can be operated. A pending or rejected branch shows its
+// details and documents, but no employees, floor plans or registers.
+const branchStatus = computed(() => (branch.value?.status || '').toLowerCase())
+const isOperational = computed(() => !branch.value || isOperationalBranchStatus(branchStatus.value))
+watch(isOperational, (ok) => {
+  if (!ok && activeTab.value !== 'details') selectTab('details')
+})
 
 const pageTitle = computed(() => branch.value?.branch_name || 'Branch Details')
 
@@ -147,6 +156,7 @@ onMounted(fetchBranch)
         </button>
 
         <button
+          v-if="isOperational"
           type="button"
           data-walkthrough="cafe-employees-tab"
           class="group relative pb-3 pt-1 text-sm font-semibold transition-colors duration-150 flex items-center gap-2 cursor-pointer focus-visible:outline-none active:scale-[0.98]"
@@ -162,6 +172,7 @@ onMounted(fetchBranch)
         </button>
 
         <button
+          v-if="isOperational"
           type="button"
           data-walkthrough="branch-tab-floor-plans"
           class="group relative pb-3 pt-1 text-sm font-semibold transition-colors duration-150 flex items-center gap-2 cursor-pointer focus-visible:outline-none active:scale-[0.98]"
@@ -196,6 +207,29 @@ onMounted(fetchBranch)
 
         <!-- Loaded Content with Staggered Card Entrance -->
         <div v-else-if="branch" key="content" class="fade-reveal">
+          <div
+            v-if="!isOperational"
+            class="mt-4 rounded-xl border px-4 py-3 flex items-start gap-3"
+            :class="branchStatus === 'rejected' ? 'bg-red-50 border-red-200 text-red-900' : 'bg-amber-50 border-amber-200 text-amber-900'"
+            role="status"
+          >
+            <Icon
+              :name="branchStatus === 'rejected' ? 'heroicons:no-symbol' : 'heroicons:clock'"
+              class="w-5 h-5 shrink-0 mt-0.5"
+              :class="branchStatus === 'rejected' ? 'text-red-600' : 'text-amber-600'"
+            />
+            <div class="text-sm">
+              <p class="font-bold">
+                {{ branchStatus === 'rejected' ? 'This branch was rejected' : 'This branch is waiting for approval' }}
+              </p>
+              <p class="mt-0.5">
+                {{ branchStatus === 'rejected'
+                  ? 'An administrator did not approve this branch, so employees, registers, menu, servings, reservations and floor plans are unavailable for it.'
+                  : 'Employees, registers, menu, servings, reservations and floor plans unlock once an administrator approves this branch.' }}
+              </p>
+            </div>
+          </div>
+
           <Transition name="fade-tab" mode="out-in">
             <!-- Branch Details Tab -->
             <div v-if="activeTab === 'details'" key="details" class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
@@ -313,7 +347,7 @@ onMounted(fetchBranch)
               </section>
 
               <!-- POS Registers (full width, under both cards) -->
-              <div class="cafe-card cafe-card-3 lg:col-span-2">
+              <div v-if="isOperational" class="cafe-card cafe-card-3 lg:col-span-2">
                 <PosDevicesCard :branch-uuid="branch.uuid" scope="owner" />
               </div>
             </div>
