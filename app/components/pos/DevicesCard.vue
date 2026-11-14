@@ -38,35 +38,6 @@ onMounted(load)
 
 const inUseCount = computed(() => devices.value.filter(d => d.active_staff).length)
 
-// ── POS QR Code ── (front-end only) Owner generates it, manager can only view it.
-const POS_URL = 'https://brewspotph.online/pos'
-const showQr = ref(false)
-const qrDataUrl = ref('')
-const qrBusy = ref(false)
-
-async function openQr() {
-  qrBusy.value = true
-  try {
-    const QRCode = (await import('qrcode')).default
-    qrDataUrl.value = await QRCode.toDataURL(POS_URL, { width: 600, margin: 2 })
-    showQr.value = true
-  } finally {
-    qrBusy.value = false
-  }
-}
-
-async function downloadQrPdf() {
-  const { jsPDF } = await import('jspdf')
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' })
-  const w = doc.internal.pageSize.getWidth()
-  doc.setFontSize(28)
-  doc.text('POS QR Code', w / 2, 90, { align: 'center' })
-  doc.addImage(qrDataUrl.value, 'PNG', (w - 360) / 2, 130, 360, 360)
-  doc.setFontSize(14)
-  doc.text(POS_URL, w / 2, 520, { align: 'center' })
-  doc.save('POS QR Code.pdf')
-}
-
 function timeAgo(iso: string | null) {
   if (!iso) return null
   const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
@@ -104,15 +75,6 @@ function formatDate(iso: string | null) {
       </div>
       <div v-if="!loading && !planLock" class="flex items-center gap-2">
         <CommonA2HSButton variant="card" label="Install POS App" data-walkthrough="pos-install-btn" />
-        <button
-          type="button"
-          :disabled="qrBusy"
-          class="inline-flex items-center gap-1.5 rounded-lg border border-[#7D5A50] px-3 py-2 text-[13px] font-semibold text-[#7D5A50] hover:bg-[#FFF5EA] transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
-          @click="openQr"
-        >
-          <Icon name="heroicons:qr-code" class="w-4 h-4" aria-hidden="true" />
-          {{ scope === 'owner' ? 'Generate QR Code' : 'View QR Code' }}
-        </button>
         <button
           type="button"
           class="inline-flex items-center gap-1.5 rounded-lg text-[13px] font-semibold text-[#7D5A50] hover:text-[#3D2B24] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
@@ -191,37 +153,6 @@ function formatDate(iso: string | null) {
         Set up a register
       </NuxtLink>
     </div>
-
-    <!-- POS QR Code modal -->
-    <Teleport to="body">
-      <div
-        v-if="showQr"
-        class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
-        @click.self="showQr = false"
-      >
-        <div class="bg-white rounded-2xl p-6 w-full max-w-sm text-center shadow-xl" role="dialog" aria-modal="true" aria-label="POS QR Code">
-          <h3 class="text-xl font-bold text-[#3D2B24]">POS QR Code</h3>
-          <img :src="qrDataUrl" alt="POS QR Code" class="mx-auto my-4 w-60 h-60" />
-          <p class="text-xs text-[#9E7060] break-all">{{ POS_URL }}</p>
-          <div class="mt-5 flex justify-center gap-2">
-            <button
-              type="button"
-              class="rounded-lg bg-[#7D5A50] px-4 py-2 text-sm font-semibold text-white hover:bg-[#65463D] transition-colors"
-              @click="downloadQrPdf"
-            >
-              Print PDF
-            </button>
-            <button
-              type="button"
-              class="rounded-lg border border-[#EDD8CC] px-4 py-2 text-sm font-semibold text-[#7D5A50] hover:bg-[#FFF0D1] transition-colors"
-              @click="showQr = false"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
   </section>
 </template>
 

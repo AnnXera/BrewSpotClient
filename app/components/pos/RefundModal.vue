@@ -12,13 +12,10 @@ interface ApprovingManager {
   is_locked: boolean
 }
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
   show: boolean
   transaction: PosTransactionDetail
-  mode?: 'refund' | 'void'
-}>(), {
-  mode: 'refund'
-})
+}>()
 
 const emit = defineEmits<{
   close: []
@@ -45,20 +42,11 @@ const successMessage = ref('')
 // Bumped on each rejected PIN so the boxes replay their shake.
 const rejectCount = ref(0)
 
-const refundQuickReasons = [
+const quickReasons = [
   'Wrong Item Charged',
   'Quality / Spoilage Issue',
   'Duplicate Charge',
 ]
-
-const voidQuickReasons = [
-  'Cashier Error / Mistake',
-  'Customer Cancelled Order',
-  'Duplicate Transaction',
-  'Test / Training Sale',
-]
-
-const quickReasons = computed(() => props.mode === 'void' ? voidQuickReasons : refundQuickReasons)
 
 const madeOptions = [
   { value: true, title: 'Yes, it was made', hint: 'Servings stay used up' },
@@ -98,7 +86,7 @@ const effectiveReason = computed(() => {
   if (selectedReasonChip.value && reason.value) {
     return `${selectedReasonChip.value} - ${reason.value}`
   }
-  return selectedReasonChip.value || reason.value || (props.mode === 'void' ? 'Transaction voided' : 'Customer refund')
+  return selectedReasonChip.value || reason.value || 'Customer refund'
 })
 
 async function fetchManagers() {
@@ -211,7 +199,7 @@ const canSubmit = computed(() => {
 const submitHint = computed(() => {
   if (successMessage.value) return ''
   if (!selectedManagerUuid.value) return 'Pick a manager to approve'
-  if (pin.value.length < 4) return props.mode === 'void' ? 'Enter PIN to void' : 'Enter PIN to refund'
+  if (pin.value.length < 4) return 'Enter PIN to refund'
   return ''
 })
 
@@ -223,35 +211,28 @@ async function submitRefund() {
   attemptsLeft.value = null
 
   try {
-    const res = props.mode === 'void'
-      ? await devicePosService.voidTransaction(
-          props.transaction.uuid,
-          selectedManagerUuid.value,
-          pin.value,
-          effectiveReason.value
-        )
-      : await devicePosService.refundTransaction(
-          props.transaction.uuid,
-          selectedManagerUuid.value,
-          pin.value,
-          effectiveReason.value,
-          !wasMade.value
-        )
+    const res = await devicePosService.refundTransaction(
+      props.transaction.uuid,
+      selectedManagerUuid.value,
+      pin.value,
+      effectiveReason.value,
+      !wasMade.value
+    )
 
     if (res.success) {
-      successMessage.value = res.message || (props.mode === 'void' ? 'Void approved.' : 'Refund processed.')
+      successMessage.value = res.message || 'Refund processed.'
       closeTimer = setTimeout(() => {
         emit('refunded', res.transaction)
         emit('close')
       }, 1200)
     } else {
-      errorMessage.value = res.message || (props.mode === 'void' ? 'Void was not approved.' : 'Refund was not approved.')
+      errorMessage.value = res.message || 'Refund was not approved.'
       pin.value = ''
       rejectCount.value++
     }
   } catch (err: any) {
     const data = err?.data
-    errorMessage.value = data?.message || (props.mode === 'void' ? 'Incorrect PIN, or this manager cannot approve voids.' : 'Incorrect PIN, or this manager cannot approve refunds.')
+    errorMessage.value = data?.message || 'Incorrect PIN, or this manager cannot approve refunds.'
     if (data?.attempts_left != null) {
       attemptsLeft.value = data.attempts_left
     }
@@ -276,31 +257,15 @@ async function submitRefund() {
       <!-- Header: which sale, how much goes back -->
       <header class="shrink-0 flex items-center gap-4 pl-6 pr-3 py-4 border-b border-[#EADFD3]">
         <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2">
-            <span
-              v-if="mode === 'void'"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200"
-            >
-              <Icon name="heroicons:no-symbol" class="w-3.5 h-3.5" />
-              Void Sale
-            </span>
-            <span
-              v-else
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-300"
-            >
-              <Icon name="heroicons:arrow-uturn-left" class="w-3.5 h-3.5" />
-              Refund Sale
-            </span>
-          </div>
-          <h3 id="refund-modal-title" class="font-display text-xl font-semibold text-[#2d201b] leading-tight mt-1">
-            {{ mode === 'void' ? 'Void sale' : 'Refund sale' }} {{ formattedReceipt }}
+          <h3 id="refund-modal-title" class="font-display text-xl font-semibold text-[#2d201b] leading-tight">
+            Refund sale {{ formattedReceipt }}
           </h3>
           <p class="text-sm text-[#6B5048] mt-0.5 truncate">
             Rung up by {{ transaction.staff_name }} &middot; {{ paymentLabel }}
           </p>
         </div>
         <div class="text-right shrink-0">
-          <p class="text-xs font-semibold text-[#8A6E64]">{{ mode === 'void' ? 'Void amount' : 'Back to customer' }}</p>
+          <p class="text-xs font-semibold text-[#8A6E64]">Back to customer</p>
           <p class="font-display text-[1.75rem] leading-none font-semibold tabular-nums tracking-tight text-[#2d201b]">
             {{ formatCurrency(transaction.total_amount) }}
           </p>
@@ -309,8 +274,8 @@ async function submitRefund() {
           type="button"
           @click="close"
           :disabled="loading"
-          class="ml-1 w-11 h-11 shrink-0 rounded-full text-[#8A6E64] hover:text-[#2d201b] hover:bg-[#F3EBE2] disabled:opacity-40 flex items-center justify-center transition-colors active:scale-95"
-          :aria-label="`Cancel ${mode === 'void' ? 'void' : 'refund'}`"
+          class="ml-1 w-11 h-11 shrink-0 rounded-full text-[#8A6E64] hover:text-[#2d201b] hover:bg-[#F3EBE2] disabled:opacity-40 flex items-center justify-center transition-colors"
+          aria-label="Cancel refund"
         >
           <Icon name="heroicons:x-mark" class="w-6 h-6" />
         </button>
@@ -323,9 +288,7 @@ async function submitRefund() {
 
           <section aria-labelledby="refund-items-heading" class="md:min-h-0 md:flex-1 flex flex-col">
             <div class="flex items-baseline justify-between mb-1">
-              <h4 id="refund-items-heading" class="text-sm font-semibold text-[#2d201b]">
-                What's being {{ mode === 'void' ? 'voided' : 'refunded' }}
-              </h4>
+              <h4 id="refund-items-heading" class="text-sm font-semibold text-[#2d201b]">What's being refunded</h4>
               <span class="text-sm text-[#8A6E64] tabular-nums">{{ itemCount }} {{ itemCount === 1 ? 'item' : 'items' }}</span>
             </div>
             <p v-if="!items.length" class="py-3 text-sm text-[#6B5048]">No items were recorded on this sale.</p>
@@ -351,13 +314,7 @@ async function submitRefund() {
             </dl>
           </section>
 
-          <!-- For void: Servings are automatically restocked -->
-          <div v-if="mode === 'void'" class="p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-start gap-2">
-            <Icon name="heroicons:information-circle" class="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-            <span>Voiding will cancel this ticket and immediately restore all {{ itemCount }} item servings back to inventory stock.</span>
-          </div>
-
-          <fieldset v-else :disabled="busy">
+          <fieldset :disabled="busy">
             <legend class="text-sm font-semibold text-[#2d201b] mb-2">Was the order already made?</legend>
             <div class="grid grid-cols-2 gap-2">
               <label
@@ -549,19 +506,17 @@ async function submitRefund() {
               type="button"
               @click="submitRefund"
               :disabled="!canSubmit"
-              class="w-full h-14 rounded-xl font-semibold text-base flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+              class="w-full h-14 rounded-xl font-semibold text-base flex items-center justify-center gap-2 transition-colors"
               :class="successMessage
                 ? 'bg-emerald-700 text-white'
-                : mode === 'void'
-                  ? 'bg-rose-700 hover:bg-rose-800 text-white disabled:bg-[#E2D5C8] disabled:text-[#6B5048] disabled:cursor-not-allowed shadow-sm'
-                  : 'bg-red-700 hover:bg-red-800 text-white disabled:bg-[#E2D5C8] disabled:text-[#6B5048] disabled:cursor-not-allowed shadow-sm'"
+                : 'bg-red-700 hover:bg-red-800 text-white disabled:bg-[#E2D5C8] disabled:text-[#6B5048] disabled:cursor-not-allowed'"
             >
               <Icon v-if="loading" name="heroicons:arrow-path" class="w-5 h-5 animate-spin" />
               <Icon v-else-if="successMessage" name="heroicons:check" class="w-5 h-5" />
-              <template v-if="successMessage">{{ mode === 'void' ? 'Voided' : 'Refunded' }}</template>
-              <template v-else-if="loading">{{ mode === 'void' ? 'Processing void...' : 'Processing refund...' }}</template>
+              <template v-if="successMessage">Refunded</template>
+              <template v-else-if="loading">Processing refund</template>
               <template v-else-if="submitHint">{{ submitHint }}</template>
-              <template v-else>{{ mode === 'void' ? 'Void' : 'Refund' }} {{ formatCurrency(transaction.total_amount) }}</template>
+              <template v-else>Refund {{ formatCurrency(transaction.total_amount) }}</template>
             </button>
           </div>
         </section>

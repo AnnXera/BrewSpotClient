@@ -4,34 +4,30 @@ withDefaults(
   defineProps<{
     value: number | string | null | undefined
     label: string
-    icon?: string
-    // Tint for the icon chip only. The number itself always uses one colour so the cards stay consistent.
-    accent?: string
+    color?: string
   }>(),
   {
-    icon: 'heroicons:users',
-    accent: '#7D5A50',
+    color: '#3B1F0E',
   }
 )
 </script>
 
 <template>
-  <div class="bg-white border border-[#EEDFC4] rounded-2xl p-4 shadow-[0_1px_2px_rgba(61,43,36,0.04)] cursor-default flex items-center gap-3.5
-              sm:p-5">
-    <span
-      class="flex size-10 shrink-0 items-center justify-center rounded-[12px]"
-      :style="{ backgroundColor: `${accent}1A`, color: accent }"
-      aria-hidden="true"
-    >
-      <Icon :name="icon" class="size-5" />
-    </span>
-    <div class="min-w-0">
-      <p class="font-display text-[28px] leading-none font-extrabold tracking-tight text-[#3D2B24] sm:text-[32px]">
-        {{ value ?? '—' }}
-      </p>
-      <p class="font-sans text-[13px] text-[#3B1F0E]/60 mt-1.5 truncate">
-        {{ label }}
-      </p>
-    </div>
+  <div class="bg-white border border-[#EEDFC4] rounded-2xl p-3.5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-[#D9C4B8] hover:-translate-y-1 cursor-default
+              min-[360px]:p-4
+              sm:p-5
+              md:p-6">
+    <p class="font-display text-2xl font-extrabold tracking-tight
+              min-[360px]:text-3xl
+              sm:text-4xl
+              md:text-4xl" :style="{ color }">
+      {{ value ?? '—' }}
+    </p>
+    <p class="font-sans text-[11px] text-[#3B1F0E]/60 mt-1
+              min-[360px]:text-xs
+              sm:text-sm
+              md:text-sm">
+      {{ label }}
+    </p>
   </div>
 </template>

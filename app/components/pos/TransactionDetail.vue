@@ -16,25 +16,14 @@ const emit = defineEmits<{
   refunded: [transaction: any]
 }>()
 
-const showAuthModal = ref(false)
-const authModalMode = ref<'refund' | 'void'>('refund')
+const showRefundModal = ref(false)
 const showReceiptModal = ref(false)
 
-function openRefund() {
-  authModalMode.value = 'refund'
-  showAuthModal.value = true
-}
-
-function openVoid() {
-  authModalMode.value = 'void'
-  showAuthModal.value = true
-}
-
-function onAuthSuccess(updated: any) {
+function onRefundSuccess(updated: any) {
   if (updated) {
     detail.value = updated
   } else if (detail.value) {
-    detail.value.status = authModalMode.value === 'void' ? 'voided' : 'refunded'
+    detail.value.status = 'refunded'
   }
   emit('refunded', detail.value)
 }
@@ -126,7 +115,6 @@ onUnmounted(() => clearTimeout(copiedTimer))
         </div>
         <div class="text-right shrink-0">
           <span v-if="status?.toLowerCase() === 'refunded'" class="inline-block mb-1 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300">REFUNDED</span>
-          <span v-else-if="status?.toLowerCase() === 'voided'" class="inline-block mb-1 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-300">VOIDED</span>
           <span v-else-if="!isSettled" class="inline-block mb-1 text-[11px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-50 text-red-800 border border-red-200">{{ status }}</span>
           <p class="font-display text-[1.75rem] leading-none font-semibold tabular-nums tracking-tight" :class="isSettled ? 'text-[#7B5A50]' : 'text-[#8A6E64] line-through'">
             {{ formatCurrency(detail?.total_amount ?? preview.total_amount) }}
@@ -254,51 +242,29 @@ onUnmounted(() => clearTimeout(copiedTimer))
         </dl>
       </section>
 
-      <!-- Actions: View Receipt, Void & Refund Buttons -->
+      <!-- Actions: View Receipt & Refund Buttons -->
       <section v-if="detail" class="mx-5 mt-2 mb-6 pt-3 border-t border-[#EADFD3] space-y-2.5">
         <button
           type="button"
           @click="showReceiptModal = true"
-          class="w-full h-12 rounded-xl bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold text-sm transition-all shadow-sm flex items-center justify-center gap-2 focus:ring-2 focus:ring-[#7B5A50]/30 active:scale-[0.98]"
+          class="w-full h-12 rounded-lg bg-[#7B5A50] hover:bg-[#65463D] text-white font-semibold text-sm transition-colors shadow-sm flex items-center justify-center gap-2 focus:ring-2 focus:ring-[#7B5A50]/30 active:scale-[0.99]"
         >
           <Icon name="heroicons:receipt-percent" class="w-5 h-5" />
           View Receipt
         </button>
 
-        <div v-if="isSettled" class="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            @click="openVoid"
-            class="h-11 rounded-xl border border-rose-300 bg-rose-50/80 hover:bg-rose-100 text-rose-800 font-semibold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 focus:ring-2 focus:ring-rose-600/30 active:scale-[0.98]"
-          >
-            <Icon name="heroicons:no-symbol" class="w-4 h-4 text-rose-700" />
-            Void Sale
-          </button>
-
-          <button
-            type="button"
-            @click="openRefund"
-            class="h-11 rounded-xl border border-amber-300 bg-amber-50/80 hover:bg-amber-100 text-amber-900 font-semibold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 focus:ring-2 focus:ring-amber-600/30 active:scale-[0.98]"
-          >
-            <Icon name="heroicons:arrow-uturn-left" class="w-4 h-4 text-amber-700" />
-            Refund Sale
-          </button>
-        </div>
+        <button
+          v-if="isSettled"
+          type="button"
+          @click="showRefundModal = true"
+          class="w-full h-11 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-sm transition-colors flex items-center justify-center gap-2 focus:ring-2 focus:ring-red-600/30 active:scale-[0.99]"
+        >
+          <Icon name="heroicons:arrow-uturn-left" class="w-4 h-4" />
+          Refund Sale (Requires Manager PIN)
+        </button>
       </section>
 
-      <!-- Voided / Refunded Notice Banner -->
-      <section v-if="detail && status?.toLowerCase() === 'voided'" class="mx-5 mt-0 mb-6 p-3.5 rounded-xl bg-rose-50 border border-rose-200">
-        <div class="flex items-start gap-2.5">
-          <Icon name="heroicons:no-symbol" class="w-5 h-5 text-rose-700 shrink-0 mt-0.5" />
-          <div>
-            <p class="text-xs font-bold text-rose-900 uppercase tracking-wide">Sale Voided</p>
-            <p v-if="detail.walk_in_note" class="text-xs text-rose-800 mt-0.5 break-words">{{ detail.walk_in_note }}</p>
-            <p v-else class="text-xs text-rose-800 mt-0.5">This transaction has been voided by a manager. Serving quantities were restored to inventory.</p>
-          </div>
-        </div>
-      </section>
-
-      <section v-else-if="detail && status?.toLowerCase() === 'refunded'" class="mx-5 mt-0 mb-6 p-3.5 rounded-xl bg-amber-50 border border-amber-200">
+      <section v-if="detail && status?.toLowerCase() === 'refunded'" class="mx-5 mt-0 mb-6 p-3.5 rounded-lg bg-amber-50 border border-amber-200">
         <div class="flex items-start gap-2.5">
           <Icon name="heroicons:information-circle" class="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
           <div>
@@ -319,14 +285,13 @@ onUnmounted(() => clearTimeout(copiedTimer))
       @close="showReceiptModal = false"
     />
 
-    <!-- Manager Authorization Modal (Refund or Void) -->
+    <!-- Refund Authorization Modal -->
     <PosRefundModal
-      v-if="showAuthModal && detail"
-      :show="showAuthModal"
+      v-if="showRefundModal && detail"
+      :show="showRefundModal"
       :transaction="detail"
-      :mode="authModalMode"
-      @close="showAuthModal = false"
-      @refunded="onAuthSuccess"
+      @close="showRefundModal = false"
+      @refunded="onRefundSuccess"
     />
   </div>
 </template>

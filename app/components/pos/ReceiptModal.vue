@@ -191,7 +191,7 @@ onUnmounted(() => clearTimeout(successTimer))
               </p>
               <div class="pt-1">
                 <span class="inline-block text-[10px] font-bold text-[#7B5A50] uppercase tracking-widest px-2 py-0.5 rounded bg-[#7B5A50]/10">
-                  Receipt
+                  Official Receipt
                 </span>
               </div>
             </div>
@@ -220,10 +220,6 @@ onUnmounted(() => clearTimeout(successTimer))
               <div v-if="receiptData.status?.toLowerCase() === 'refunded'" class="flex justify-between text-amber-800 font-bold bg-amber-50 px-1.5 py-0.5 rounded">
                 <dt>Status:</dt>
                 <dd>REFUNDED</dd>
-              </div>
-              <div v-else-if="receiptData.status?.toLowerCase() === 'voided'" class="flex justify-between text-rose-800 font-bold bg-rose-50 px-1.5 py-0.5 rounded">
-                <dt>Status:</dt>
-                <dd>VOIDED</dd>
               </div>
             </dl>
 

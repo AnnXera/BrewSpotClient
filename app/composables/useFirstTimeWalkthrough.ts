@@ -46,49 +46,187 @@ export interface SetupMission {
 // 1. THE 7 CORE OWNER SETUP MISSIONS (Starting with 1. Cafe Management)
 export const OWNER_SETUP_MISSIONS: SetupMission[] = [
   {
-    id: 'mission-dashboard',
-    title: '1. Executive Command Dashboard',
-    subtitle: 'Real-time KPIs, revenue trend chart, and transaction logs',
-    route: '/owner/dashboard',
+    id: 'mission-branch',
+    title: '1. Cafe Management & Branch Setup',
+    subtitle: 'Manage cafe branches, operating hours, and create new branches',
+    route: '/owner/cafes',
     badge: 'Essential',
     priority: 'Essential',
-    icon: 'heroicons:squares-2x2',
-    actionText: 'Open Dashboard',
-    description: 'Your central command center. Monitor real-time gross revenue, customer order volume, live branch rankings, and transaction audit logs across all stores.',
+    icon: 'heroicons:building-storefront',
+    actionText: 'Open Cafe Management',
+    description: 'Start in Cafe Management to set your daily opening and closing hours, review branch summary cards, and add/create new cafe branches (requires an active paid subscription with Multi-Branch access; Trial Plan is not allowed to add extra branches). Then open a branch to inspect its details, employees, and floor plans.',
     steps: [
-      'Monitor real-time gross revenue & order counts',
-      'Analyze peak rush hours on the revenue chart',
-      'Inspect trending beverages & best sellers',
-      'Search live customer transactions & receipts'
+      'Click Cafe Operating Hours to set weekly schedule',
+      'Review Branch KPI Summary Cards',
+      'Search branches & Filter status toolbar',
+      'Click "+ Add Branch" to create a branch (Paid Subscription required; Trial Plan not allowed)',
+      'Open a branch from the list',
+      'Branch Details tab: info, BIR document, POS registers',
+      'Employees tab: staff assigned to the branch',
+      'Floor Plans tab: dining layout built by the manager'
     ],
     detailedSteps: [
       {
-        title: 'Executive KPI Metric Cards',
-        instruction: 'Monitor gross revenue, order counts, and active branch terminals at a glance with zero screen reload latency. (Locked during demo; clickable once tour completes!)',
-        proTip: 'Figures update in real-time as sales are rung up across all counter terminals.',
+        title: 'Cafe Operating Hours Button',
+        instruction: 'Click here to open and customize your store\'s weekly schedule (Monday through Sunday) and mark rest days.',
+        proTip: 'Your live Open/Closed status in the top header is calculated directly from these hours.',
+        targetHint: 'Operating Hours Panel Button',
+        targetSelector: '[data-walkthrough="cafe-hours-btn"]'
+      },
+      {
+        title: 'Branch KPI Summary Cards',
+        instruction: 'Overview cards showing total branches, active cafe locations, and pending counter hardware registrations.',
+        proTip: 'Multi-store owners can track all locations from this single dashboard row.',
         targetHint: 'KPI Metrics Grid',
-        targetSelector: '[data-walkthrough="feat-totals"], .grid, main section, h1 + div'
+        targetSelector: '[data-walkthrough="cafe-kpis"]'
       },
       {
-        title: 'Interactive Revenue Trajectory Chart',
-        instruction: 'Track sales trajectory over Daily, Weekly, or Monthly periods to spot peak rush hours and high-volume days. (Locked during demo; clickable once tour completes!)',
-        proTip: 'Hovering over any individual bar displays exact pesos earned and completed order counts.',
-        targetHint: 'Revenue Chart',
-        targetSelector: '[data-walkthrough="feat-chart"], canvas, svg, .chart, .lg\\:col-span-12'
+        title: 'Branch Search & Status Filter Bar',
+        instruction: 'Search branches by name or filter by Active, Pending, or Inactive status.',
+        proTip: 'Store phone numbers and addresses entered here print on all POS customer receipts.',
+        targetHint: 'Filter & Search Bar',
+        targetSelector: '[data-walkthrough="cafe-filter-bar"]'
       },
       {
-        title: 'Transaction Audit Log Table',
-        instruction: 'Searchable ledger of all customer receipts, payment methods, cashier names, and approved manager overrides. (Locked during demo; clickable once tour completes!)',
-        proTip: 'Search receipt numbers directly to assist customer inquiries or audit cashier register shifts.',
-        targetHint: 'Transaction Log Table',
-        targetSelector: '[data-walkthrough="feat-transactions"], table, main .overflow-x-auto, .scroll-reveal:last-child'
+        title: 'Add Branch Button (Paid Subscription)',
+        instruction: 'Click "+ Add Branch" to create and register a new cafe branch. Note: Trial Plan accounts are not allowed to add extra branches—an active paid subscription with Multi-Branch access is required!',
+        proTip: 'Once this 1st mission finishes, we will guide you to create/add a branch right away if you have an active subscription.',
+        targetHint: 'Add Branch Button',
+        targetSelector: '[data-walkthrough="cafe-add-branch-btn"], [data-walkthrough="cafe-filter-bar"]'
+      },
+      {
+        title: 'Open a Branch',
+        instruction: 'Click any branch in this list to open its details page. Press Next Step and the tour will open your first branch for you.',
+        proTip: 'Each branch has its own details, employees, and floor plans.',
+        targetHint: 'Branch list',
+        targetSelector: '[data-walkthrough="cafe-branch-list"]'
+      },
+      {
+        title: 'Branch Details Tab',
+        instruction: 'The Branch Details tab shows the branch name, address, email, and phone number, the BIR document with its TIN and VAT type, and the POS Registers connected to this branch.',
+        proTip: 'The POS Registers card shows which counter devices are registered and who is signed in on each.',
+        targetHint: 'Branch Details tab',
+        targetSelector: '[data-walkthrough="branch-tab-details"]',
+        route: 'owner-first-branch?tab=details'
+      },
+      {
+        title: 'Employees Tab',
+        instruction: 'The Employees tab lists every manager and cashier assigned to this branch. Click an employee to see their full details.',
+        proTip: 'Check this list before a shift so every cashier on duty can sign in to the register.',
+        targetHint: 'Employees tab',
+        targetSelector: '[data-walkthrough="cafe-employees-tab"]',
+        route: 'owner-first-branch?tab=employees'
+      },
+      {
+        title: 'Floor Plans Tab',
+        instruction: 'The Floor Plans tab shows the dining layouts your branch manager has built: tables, seats, and fixtures. Owners can view them here; managers edit them in their Floor Plan page.',
+        proTip: 'Saved floor plans appear on the POS so cashiers can assign dine-in orders to tables.',
+        targetHint: 'Floor Plans tab',
+        targetSelector: '[data-walkthrough="branch-tab-floor-plans"]',
+        route: 'owner-first-branch?tab=floor-plans'
       }
     ],
-    proTip: 'Use the top-right refresh button during rush periods to pull the latest sales numbers instantly without refreshing the page.'
+    proTip: 'After completing this 1st mission, you can immediately create/add a branch if you have a paid subscription (Trial Plan is limited to 1 main branch).'
+  },
+  {
+    id: 'mission-menu',
+    title: '2. Menu Management & Pricing',
+    subtitle: 'Create food & drinks, sizes, and temperature pricing',
+    route: '/owner/menu-management',
+    badge: 'Essential',
+    priority: 'Essential',
+    icon: 'heroicons:book-open',
+    actionText: 'Open Menu Management',
+    description: 'Build your coffee and food catalog. Add categories (Espresso, Cold Brew, Pastries), define cup sizes (Small, Medium, Large), and set separate prices for hot vs. iced drinks so cashiers can ring up orders with 1 tap.',
+    steps: [
+      'Click "Add Category" or select an existing category',
+      'Use the Search Bar to find drinks or food items',
+      'Sort categories alphabetically or by popularity',
+      'Monitor live Cafe Operating Hours & status'
+    ],
+    detailedSteps: [
+      {
+        title: 'Add Category Button',
+        instruction: 'This "+ Add Category" button creates new drink & food categories (Espresso, Cold Brew, Pastries) to organize items for 1-tap POS filtering. (Locked during demo; clickable once tour completes!)',
+        proTip: 'Limit main categories to 6 or fewer to keep counter ordering fast on tablet registers.',
+        targetHint: 'Top toolbar "+ Add Category" button',
+        targetSelector: '[data-walkthrough="menu-add-btn"], button:has-text("Add Category")'
+      },
+      {
+        title: 'Menu Search Input',
+        instruction: 'Use this search bar to instantly find any beverage or food item in your catalog to update recipes, modify sizes, or edit descriptions.',
+        proTip: 'Search matches drink names, categories, and ingredients simultaneously.',
+        targetHint: 'Menu Search Bar',
+        targetSelector: '[data-walkthrough="menu-search"], input[placeholder*="Search"]'
+      },
+      {
+        title: 'Category Sort Dropdown',
+        instruction: 'Click here to sort categories alphabetically (A to Z or Z to A). This dictates the order cashiers and customers see categories.',
+        proTip: 'Sort by popular items first so baristas spend less time browsing during rush hour.',
+        targetHint: 'Sort Dropdown',
+        targetSelector: '[data-walkthrough="menu-sort"]'
+      },
+      {
+        title: 'Cafe Operating Hours Badge',
+        instruction: 'This live badge displays your cafe\'s daily operating schedule and indicates whether the branch is currently Open or Closed.',
+        proTip: 'Status updates live automatically based on your weekly hours in Cafe Management.',
+        targetHint: 'Operating Hours Status Badge',
+        targetSelector: '[data-walkthrough="menu-operating-hours"]'
+      }
+    ],
+    proTip: 'Items marked with hot & iced prices allow cashiers to seamlessly switch temperatures on the POS screen with automatic price adjustments.'
+  },
+  {
+    id: 'mission-ingredients',
+    title: '3. Raw Ingredients & Recipe Auto-Deductions',
+    subtitle: 'Set up stock units and link recipe consumption',
+    route: '/owner/menu-management/ingredients',
+    badge: 'Essential',
+    priority: 'Essential',
+    icon: 'heroicons:clipboard-document-list',
+    actionText: 'Open Ingredients & Recipes',
+    description: 'Define raw ingredients (coffee beans, whole milk, syrups, cups) with exact units (g, ml, pumps, shots). When linked to menu recipes, the POS automatically deducts inventory upon every checkout.',
+    steps: [
+      'Click "Add Ingredient" to create raw stock items',
+      'Use the Search Bar to locate stock materials',
+      'Sort ingredients by usage or alphabetically',
+      'Monitor stock levels on ingredient cards'
+    ],
+    detailedSteps: [
+      {
+        title: 'Add Ingredient Button',
+        instruction: 'This "+ Add Ingredient" button adds raw stock materials: Espresso Beans (g), Whole Milk (ml), and Syrups (pumps) for automatic inventory deduction. (Locked during demo; clickable once tour completes!)',
+        proTip: 'Using standard metric units (grams, milliliters) gives you exact recipe deduction tracking.',
+        targetHint: 'Top toolbar "+ Add Ingredient" button',
+        targetSelector: '[data-walkthrough="menu-add-btn"], button:has-text("Add Ingredient")'
+      },
+      {
+        title: 'Ingredient Search Bar',
+        instruction: 'Quickly filter raw materials by name to inspect current stock levels or check supplier reorder thresholds.',
+        proTip: 'Type "beans" or "milk" to jump directly to key coffee bar supplies.',
+        targetHint: 'Ingredient Search Input',
+        targetSelector: '[data-walkthrough="menu-search"], input[placeholder*="Search"]'
+      },
+      {
+        title: 'Sort Ingredients Dropdown',
+        instruction: 'Sort by "Most Used" or alphabetically to see which raw ingredients are consumed fastest during daily service.',
+        proTip: 'High-usage items like espresso beans and whole milk should be restocked daily.',
+        targetHint: 'Sort Dropdown',
+        targetSelector: '[data-walkthrough="menu-sort"]'
+      },
+      {
+        title: 'Ingredient Inventory Cards',
+        instruction: 'Each card shows your current stock on hand and minimum alert thresholds. Once linked to cup sizes, inventory deducts automatically upon checkout!',
+        proTip: 'Never count inventory by hand again—the POS deducts grams and milliliters automatically.',
+        targetHint: 'Ingredient cards grid',
+        targetSelector: '[data-walkthrough="ingredients-grid"], .grid, main'
+      }
+    ],
+    proTip: 'Linking recipes to cup sizes eliminates manual inventory counting and prevents running out of beans or syrups during peak morning rushes.'
   },
   {
     id: 'mission-analytics',
-    title: '2. Business Analytics & Performance',
+    title: '4. Business Analytics & Performance',
     subtitle: 'Revenue charts, top-selling drinks, and Excel export reports',
     route: '/owner/analytics',
     badge: 'Essential',
@@ -128,355 +266,8 @@ export const OWNER_SETUP_MISSIONS: SetupMission[] = [
     proTip: 'Export monthly Excel reports at the end of each cycle to simplify tax filings and accountant reconciliation.'
   },
   {
-    id: 'mission-activity',
-    title: '3. Activity Log',
-    subtitle: 'See who did what across your cafe',
-    route: '/owner/activity-log',
-    badge: 'Recommended',
-    priority: 'Recommended',
-    icon: 'heroicons:clipboard-document-list',
-    actionText: 'Open Activity Log',
-    description: 'Review a running history of actions taken in your cafe, such as menu changes and staff activity, so you always know who changed what.',
-    steps: [
-      'Open the Activity Log from the sidebar',
-      'Filter entries by date, category, or role',
-      'Search for a specific action or employee'
-    ],
-    detailedSteps: [
-      {
-        title: 'Activity Log Entries',
-        instruction: 'Every important action in your cafe is listed here with who did it and when. Use the filters to narrow the list by date, category, or role.',
-        proTip: 'Check this after a busy shift to confirm menu and price changes were made by the right person.',
-        targetHint: 'Activity log list',
-        targetSelector: '[data-walkthrough="activity-log"], main section, main'
-      }
-    ],
-    proTip: 'Owners see activity for all branches, so use the filters to focus on one branch at a time.'
-  },
-  {
-    id: 'mission-branch',
-    title: '4. Cafe Management, Branches & POS QR Code',
-    subtitle: 'Branches, hours, POS install, and the POS QR Code',
-    route: '/owner/cafes',
-    badge: 'Essential',
-    priority: 'Essential',
-    icon: 'heroicons:building-storefront',
-    actionText: 'Open Cafe Management',
-    description: 'This mission also covers installing the POS app and generating the POS QR Code from the POS Registers card. Start in Cafe Management to set your daily opening and closing hours, review branch summary cards, and add/create new cafe branches (requires an active paid subscription with Multi-Branch access; Trial Plan is not allowed to add extra branches). Then open a branch to inspect its details, employees, and floor plans.',
-    steps: [
-      'Click Cafe Operating Hours to set weekly schedule',
-      'Review Branch KPI Summary Cards',
-      'Search branches & Filter status toolbar',
-      'Click "+ Add Branch" to create a branch (Paid Subscription required; Trial Plan not allowed)',
-      'Open a branch from the list',
-      'Branch Details tab: info, BIR document, POS registers',
-      'Employees tab: staff assigned to the branch',
-      'Floor Plans tab: dining layout built by the manager',
-      'Click "Install POS App" in the POS Registers card',
-      'Install on Android, Windows, or Mac (Chrome / Edge / Brave)',
-      'Install on iPad or iPhone (Safari)',
-      'Launch the app and register the device',
-      'POS QR Code: owners click "Generate QR Code" (managers can only view it) to print the POS link as a PDF'
-    ],
-    detailedSteps: [
-      {
-        title: 'Cafe Operating Hours Button',
-        instruction: 'Click here to open and customize your store\'s weekly schedule (Monday through Sunday) and mark rest days.',
-        proTip: 'Your live Open/Closed status in the top header is calculated directly from these hours.',
-        targetHint: 'Operating Hours Panel Button',
-        targetSelector: '[data-walkthrough="cafe-hours-btn"]'
-      },
-      {
-        title: 'Branch KPI Summary Cards',
-        instruction: 'Overview cards showing total branches, active cafe locations, and pending counter hardware registrations.',
-        proTip: 'Multi-store owners can track all locations from this single dashboard row.',
-        targetHint: 'KPI Metrics Grid',
-        targetSelector: '[data-walkthrough="cafe-kpis"]'
-      },
-      {
-        title: 'Branch Search & Status Filter Bar',
-        instruction: 'Search branches by name or filter by Active, Pending, or Inactive status.',
-        proTip: 'Store phone numbers and addresses entered here print on all POS customer receipts.',
-        targetHint: 'Filter & Search Bar',
-        targetSelector: '[data-walkthrough="cafe-filter-bar"]'
-      },
-      {
-        title: 'Add Branch Button (Paid Subscription)',
-        instruction: 'Click "+ Add Branch" to create and register a new cafe branch. Note: Trial Plan accounts are not allowed to add extra branches—an active paid subscription with Multi-Branch access is required!',
-        proTip: 'Once this mission finishes, we will guide you to create/add a branch right away if you have an active subscription.',
-        targetHint: 'Add Branch Button',
-        targetSelector: '[data-walkthrough="cafe-add-branch-btn"], [data-walkthrough="cafe-filter-bar"]'
-      },
-      {
-        title: 'Open a Branch',
-        instruction: 'Click any branch in this list to open its details page. Press Next Step and the tour will open your first branch for you.',
-        proTip: 'Each branch has its own details, employees, and floor plans.',
-        targetHint: 'Branch list',
-        targetSelector: '[data-walkthrough="cafe-branch-list"]'
-      },
-      {
-        title: 'Branch Details Tab',
-        instruction: 'The Branch Details tab shows the branch name, address, email, and phone number, the BIR document with its TIN and VAT type, and the POS Registers connected to this branch.',
-        proTip: 'The POS Registers card shows which counter devices are registered and who is signed in on each.',
-        targetHint: 'Branch Details tab',
-        targetSelector: '[data-walkthrough="branch-tab-details"]',
-        route: 'owner-first-branch?tab=details'
-      },
-      {
-        title: 'Employees Tab',
-        instruction: 'The Employees tab lists every manager and cashier assigned to this branch. Click an employee to see their full details.',
-        proTip: 'Check this list before a shift so every cashier on duty can sign in to the register.',
-        targetHint: 'Employees tab',
-        targetSelector: '[data-walkthrough="cafe-employees-tab"]',
-        route: 'owner-first-branch?tab=employees'
-      },
-      {
-        title: 'Floor Plans Tab',
-        instruction: 'The Floor Plans tab shows the dining layouts your branch manager has built: tables, seats, and fixtures. Owners can view them here; managers edit them in their Floor Plan page.',
-        proTip: 'Saved floor plans appear on the POS so cashiers can assign dine-in orders to tables.',
-        targetHint: 'Floor Plans tab',
-        targetSelector: '[data-walkthrough="branch-tab-floor-plans"]',
-        route: 'owner-first-branch?tab=floor-plans'
-      },
-      {
-        title: 'Click "Install POS App"',
-        instruction: 'This "Install POS App" button in the POS Registers card is where you download BrewSpot POS. Every branch details page has one. You can also open /pos/setup on the device and click "Install POS to Home Screen (A2HS)".',
-        proTip: 'If the button says "POS App Ready", the app is already installed on this device.',
-        targetHint: 'POS Registers card > Install POS App button',
-        targetSelector: '[data-walkthrough="pos-install-btn"]',
-        route: 'owner-first-branch?tab=details'
-      },
-      {
-        title: 'Install on Android, Windows, or Mac',
-        instruction: 'In Chrome, Edge, or Brave, confirm the install prompt that appears. If no prompt shows, click the Install icon at the right end of the address bar, or open the browser menu (three dots) and choose "Install BrewSpot POS".',
-        proTip: 'Firefox does not support installing web apps. Use Chrome, Edge, or Brave.',
-        targetHint: 'Browser install prompt',
-        targetSelector: '[data-walkthrough="pos-install-btn"]',
-        route: 'owner-first-branch?tab=details'
-      },
-      {
-        title: 'Install on iPad or iPhone',
-        instruction: 'Open BrewSpot in Safari, tap the Share button in the toolbar, choose "Add to Home Screen", then tap "Add".',
-        proTip: 'On iOS, only Safari can add BrewSpot POS to the home screen.',
-        targetHint: 'Safari Share menu',
-        targetSelector: '[data-walkthrough="pos-install-btn"]',
-        route: 'owner-first-branch?tab=details'
-      },
-      {
-        title: 'Launch & Register the Device',
-        instruction: 'Open the new BrewSpot POS icon on the home screen or desktop. It opens straight to /pos. On first launch, pick the branch, name the register (e.g. Front Counter 1), and click "Register Device".',
-        proTip: 'Registering logs your account out on that device so cashiers can sign in with their PIN.',
-        targetHint: 'BrewSpot POS app icon',
-        targetSelector: '[data-walkthrough="pos-install-btn"]',
-        route: 'owner-first-branch?tab=details'
-      },
-      {
-        title: 'Generate the POS QR Code (Owner)',
-        instruction: 'Next to \"Install POS App\" in the POS Registers card, click \"Generate QR Code\". A \"POS QR Code\" window opens with a code that leads to brewspotph.online/pos. Click \"Print PDF\" to download it, then print it for your counter devices. As the Cafe Owner you have full access to every branch, register, and manager view.',
-        proTip: 'Only the owner can generate the QR code. Managers see a \"View QR Code\" button instead, so they can show or print the same code.',
-        targetHint: 'BrewSpot POS app icon',
-        targetSelector: '[data-walkthrough="pos-install-btn"]',
-        route: 'owner-first-branch?tab=details'
-      }
-    ],
-    proTip: 'After completing this mission, you can immediately create/add a branch if you have a paid subscription (Trial Plan is limited to 1 main branch).'
-  },
-  {
-    id: 'mission-menu',
-    title: '5. Menu Management, Pricing & Ingredients',
-    subtitle: 'Menu, pricing, raw ingredients, and recipe deductions',
-    route: '/owner/menu-management',
-    badge: 'Essential',
-    priority: 'Essential',
-    icon: 'heroicons:book-open',
-    actionText: 'Open Menu Management',
-    description: 'This mission also covers raw ingredients and recipe auto-deductions. Build your coffee and food catalog. Add categories (Espresso, Cold Brew, Pastries), define cup sizes (Small, Medium, Large), and set separate prices for hot vs. iced drinks so cashiers can ring up orders with 1 tap.',
-    steps: [
-      'Click "Add Category" or select an existing category',
-      'Use the Search Bar to find drinks or food items',
-      'Sort categories alphabetically or by popularity',
-      'Monitor live Cafe Operating Hours & status',
-      'Click "Add Ingredient" to create raw stock items',
-      'Use the Search Bar to locate stock materials',
-      'Sort ingredients by usage or alphabetically',
-      'Monitor stock levels on ingredient cards'
-    ],
-    detailedSteps: [
-      {
-        title: 'Add Category Button',
-        instruction: 'This "+ Add Category" button creates new drink & food categories (Espresso, Cold Brew, Pastries) to organize items for 1-tap POS filtering. (Locked during demo; clickable once tour completes!)',
-        proTip: 'Limit main categories to 6 or fewer to keep counter ordering fast on tablet registers.',
-        targetHint: 'Top toolbar "+ Add Category" button',
-        targetSelector: '[data-walkthrough="menu-add-btn"], button:has-text("Add Category")'
-      },
-      {
-        title: 'Menu Search Input',
-        instruction: 'Use this search bar to instantly find any beverage or food item in your catalog to update recipes, modify sizes, or edit descriptions.',
-        proTip: 'Search matches drink names, categories, and ingredients simultaneously.',
-        targetHint: 'Menu Search Bar',
-        targetSelector: '[data-walkthrough="menu-search"], input[placeholder*="Search"]'
-      },
-      {
-        title: 'Category Sort Dropdown',
-        instruction: 'Click here to sort categories alphabetically (A to Z or Z to A). This dictates the order cashiers and customers see categories.',
-        proTip: 'Sort by popular items first so baristas spend less time browsing during rush hour.',
-        targetHint: 'Sort Dropdown',
-        targetSelector: '[data-walkthrough="menu-sort"]'
-      },
-      {
-        title: 'Cafe Operating Hours Badge',
-        instruction: 'This live badge displays your cafe\'s daily operating schedule and indicates whether the branch is currently Open or Closed.',
-        proTip: 'Status updates live automatically based on your weekly hours in Cafe Management.',
-        targetHint: 'Operating Hours Status Badge',
-        targetSelector: '[data-walkthrough="menu-operating-hours"]'
-      },
-      {
-        title: 'Add Ingredient Button',
-        instruction: 'This "+ Add Ingredient" button adds raw stock materials: Espresso Beans (g), Whole Milk (ml), and Syrups (pumps) for automatic inventory deduction. (Locked during demo; clickable once tour completes!)',
-        proTip: 'Using standard metric units (grams, milliliters) gives you exact recipe deduction tracking.',
-        targetHint: 'Top toolbar "+ Add Ingredient" button',
-        targetSelector: '[data-walkthrough="menu-add-btn"], button:has-text("Add Ingredient")',
-        route: '/owner/menu-management/ingredients'
-      },
-      {
-        title: 'Ingredient Search Bar',
-        instruction: 'Quickly filter raw materials by name to inspect current stock levels or check supplier reorder thresholds.',
-        proTip: 'Type "beans" or "milk" to jump directly to key coffee bar supplies.',
-        targetHint: 'Ingredient Search Input',
-        targetSelector: '[data-walkthrough="menu-search"], input[placeholder*="Search"]',
-        route: '/owner/menu-management/ingredients'
-      },
-      {
-        title: 'Sort Ingredients Dropdown',
-        instruction: 'Sort by "Most Used" or alphabetically to see which raw ingredients are consumed fastest during daily service.',
-        proTip: 'High-usage items like espresso beans and whole milk should be restocked daily.',
-        targetHint: 'Sort Dropdown',
-        targetSelector: '[data-walkthrough="menu-sort"]',
-        route: '/owner/menu-management/ingredients'
-      },
-      {
-        title: 'Ingredient Inventory Cards',
-        instruction: 'Each card shows your current stock on hand and minimum alert thresholds. Once linked to cup sizes, inventory deducts automatically upon checkout!',
-        proTip: 'Never count inventory by hand again—the POS deducts grams and milliliters automatically.',
-        targetHint: 'Ingredient cards grid',
-        targetSelector: '[data-walkthrough="ingredients-grid"], .grid, main',
-        route: '/owner/menu-management/ingredients'
-      }
-    ],
-    proTip: 'Items marked with hot & iced prices allow cashiers to seamlessly switch temperatures on the POS screen with automatic price adjustments.'
-  },
-  {
-    id: 'mission-servings',
-    title: '6. Servings & Portion Limits',
-    subtitle: 'Set daily item limits and watch ingredient usage',
-    route: '/owner/servings',
-    badge: 'Essential',
-    priority: 'Essential',
-    icon: 'heroicons:cake',
-    actionText: 'Open Servings',
-    description: 'As the owner you have the same Servings screen as a branch manager. Pick a branch, then control how many portions can be sold today for each menu item and review live ingredient deductions.',
-    steps: [
-      'Open Servings from Daily Operations',
-      'Pick the branch you want to manage',
-      'Review category portion counters',
-      'Monitor live ingredient deductions'
-    ],
-    detailedSteps: [
-      {
-        title: 'Menu Category Portion Cards',
-        instruction: 'Inspect the portions left for each category. Cards warn when items are nearly sold out.',
-        proTip: 'Items that reach 0 portions are greyed out on the register automatically.',
-        targetHint: 'Category servings cards',
-        targetSelector: '[data-walkthrough="servings-categories"], main section'
-      },
-      {
-        title: 'Ingredients Usage Panel',
-        instruction: 'See exactly how much milk, beans, and syrup today sales have used for the selected branch.',
-        proTip: 'Use this to catch over-pouring or spillage early.',
-        targetHint: 'Ingredients usage panel',
-        targetSelector: '[data-walkthrough="servings-usage"], main section:last-child'
-      }
-    ],
-    proTip: 'Review portion limits at the start of every shift so kitchen prep matches expected customer volume.'
-  },
-  {
-    id: 'mission-reservations',
-    title: '7. Guest Reservations',
-    subtitle: 'Track table bookings and arrival times',
-    route: '/owner/reservations',
-    badge: 'Recommended',
-    priority: 'Recommended',
-    icon: 'heroicons:calendar-days',
-    actionText: 'Open Reservations',
-    description: 'Owners get the manager Reservations screen for whichever branch they pick. Check upcoming bookings, party sizes, and assign tables before guests arrive.',
-    steps: [
-      'Open Reservations from Daily Operations',
-      'Pick the branch',
-      'Select the booking date and arrival time',
-      'Manage the waitlist and table assignment'
-    ],
-    detailedSteps: [
-      {
-        title: 'Reservation Date & Time Selector',
-        instruction: 'Select a date and a 30-minute arrival slot to see which tables are available.',
-        proTip: 'Move forward in the date strip to plan for large weekend bookings.',
-        targetHint: 'Date and time strip',
-        targetSelector: '[data-walkthrough="reservations-date-strip"], section[aria-label="Reservation date and time"]'
-      },
-      {
-        title: 'Waitlist & Booking Panel',
-        instruction: 'Review party sizes, contact numbers, and special requests, then assign a table.',
-        proTip: 'Mark a booking as Seated when guests arrive so the floor plan stays accurate.',
-        targetHint: 'Waitlist button and booking panel',
-        targetSelector: '[data-walkthrough="reservations-waitlist-btn"], main header button'
-      }
-    ],
-    proTip: 'Check the day bookings before opening so you can pre-assign your larger tables.'
-  },
-  {
-    id: 'mission-floorplan',
-    title: '8. Dining Tables & Floor Plan',
-    subtitle: 'Build the seating layout for each branch',
-    route: '/owner/floor-plan',
-    badge: 'Essential',
-    priority: 'Essential',
-    icon: 'heroicons:map',
-    actionText: 'Open Floor Plan',
-    description: 'Owners can build and edit the dining layout of any branch, the same as a manager. Add tables and fixtures, set seat counts, then save so the layout appears on the POS register.',
-    steps: [
-      'Open Floor Plan from Daily Operations',
-      'Pick the branch',
-      'Add tables and fixtures from the library',
-      'Save the layout to publish it to the registers'
-    ],
-    detailedSteps: [
-      {
-        title: 'Floor Plan Workspace',
-        instruction: 'Create a floor plan such as Indoor or Patio and set the room size to match your real cafe.',
-        proTip: 'Accurate dimensions help you keep clear walkways for staff.',
-        targetHint: 'Floor plan workspace',
-        targetSelector: '[data-walkthrough="floorplan-workspace"]'
-      },
-      {
-        title: 'Tables & Fixtures Library',
-        instruction: 'Pick square, round, or long tables and fixtures, then give each table a number and seat count.',
-        proTip: 'Distinct table numbers let baristas deliver orders to the right guests.',
-        targetHint: 'Objects sidebar',
-        targetSelector: '[data-walkthrough="floorplan-objects"], #fp-panel-objects'
-      },
-      {
-        title: 'Save Layout',
-        instruction: 'Click Save layout. Active layouts appear on POS registers so cashiers can assign dine-in orders to tables.',
-        proTip: 'Saved tables can also be booked in Reservations.',
-        targetHint: 'Save layout button',
-        targetSelector: '[data-walkthrough="floorplan-save-btn"]'
-      }
-    ],
-    proTip: 'Leave clear walkways between tables so hot drinks can be carried safely.'
-  },
-  {
     id: 'mission-subscription',
-    title: '9. Plan Tiers & Billing Invoices',
+    title: '5. Plan Tiers & Billing Invoices',
     subtitle: 'Manage active plan, browse tier upgrades, and view receipts',
     route: '/owner/subscription',
     badge: 'Recommended',
@@ -514,6 +305,107 @@ export const OWNER_SETUP_MISSIONS: SetupMission[] = [
       }
     ],
     proTip: 'You can upgrade your subscription tier anytime—new features and terminal limits activate immediately upon confirmation.'
+  },
+  {
+    id: 'mission-dashboard',
+    title: '6. Executive Command Dashboard',
+    subtitle: 'Real-time KPIs, revenue trend chart, and transaction logs',
+    route: '/owner/dashboard',
+    badge: 'Essential',
+    priority: 'Essential',
+    icon: 'heroicons:squares-2x2',
+    actionText: 'Open Dashboard',
+    description: 'Your central command center. Monitor real-time gross revenue, customer order volume, live branch rankings, and transaction audit logs across all stores.',
+    steps: [
+      'Monitor real-time gross revenue & order counts',
+      'Analyze peak rush hours on the revenue chart',
+      'Inspect trending beverages & best sellers',
+      'Search live customer transactions & receipts'
+    ],
+    detailedSteps: [
+      {
+        title: 'Executive KPI Metric Cards',
+        instruction: 'Monitor gross revenue, order counts, and active branch terminals at a glance with zero screen reload latency. (Locked during demo; clickable once tour completes!)',
+        proTip: 'Figures update in real-time as sales are rung up across all counter terminals.',
+        targetHint: 'KPI Metrics Grid',
+        targetSelector: '[data-walkthrough="feat-totals"], .grid, main section, h1 + div'
+      },
+      {
+        title: 'Interactive Revenue Trajectory Chart',
+        instruction: 'Track sales trajectory over Daily, Weekly, or Monthly periods to spot peak rush hours and high-volume days. (Locked during demo; clickable once tour completes!)',
+        proTip: 'Hovering over any individual bar displays exact pesos earned and completed order counts.',
+        targetHint: 'Revenue Chart',
+        targetSelector: '[data-walkthrough="feat-chart"], canvas, svg, .chart, .lg\\:col-span-12'
+      },
+      {
+        title: 'Transaction Audit Log Table',
+        instruction: 'Searchable ledger of all customer receipts, payment methods, cashier names, and approved manager overrides. (Locked during demo; clickable once tour completes!)',
+        proTip: 'Search receipt numbers directly to assist customer inquiries or audit cashier register shifts.',
+        targetHint: 'Transaction Log Table',
+        targetSelector: '[data-walkthrough="feat-transactions"], table, main .overflow-x-auto, .scroll-reveal:last-child'
+      }
+    ],
+    proTip: 'Use the top-right refresh button during rush periods to pull the latest sales numbers instantly without refreshing the page.'
+  },
+  {
+    id: 'mission-pos-install',
+    title: '7. Download & Install BrewSpot POS (A2HS)',
+    subtitle: 'Where to get the POS app and how to add it to your device',
+    route: '/owner/cafes',
+    badge: 'Essential',
+    priority: 'Essential',
+    icon: 'heroicons:arrow-down-tray',
+    actionText: 'Open Branches',
+    description: 'BrewSpot POS is installed straight from your browser using Add to Home Screen (A2HS). There is no app store download. Open a branch from Cafe Management, find the POS Registers card, and click "Install POS App" on the counter device you want to use as a register.',
+    steps: [
+      'Open a branch from Cafe Management',
+      'Click "Install POS App" in the POS Registers card',
+      'Install on Android, Windows, or Mac (Chrome / Edge / Brave)',
+      'Install on iPad or iPhone (Safari)',
+      'Launch the app and register the device'
+    ],
+    detailedSteps: [
+      {
+        title: 'Where to Download: Open a Branch',
+        instruction: 'Click any branch in this list to open its details page. The POS Registers card on that page holds the "Install POS App" download button. Press Next Step and the tour will open your first branch for you.',
+        proTip: 'Do this on the actual counter tablet or computer you will use as a register, not on your personal phone.',
+        targetHint: 'Branch list in Cafe Management',
+        targetSelector: '[data-walkthrough="cafe-branch-list"]'
+      },
+      {
+        title: 'Click "Install POS App"',
+        instruction: 'This "Install POS App" button in the POS Registers card is where you download BrewSpot POS. Every branch details page has one. You can also open /pos/setup on the device and click "Install POS to Home Screen (A2HS)".',
+        proTip: 'If the button says "POS App Ready", the app is already installed on this device.',
+        targetHint: 'POS Registers card > Install POS App button',
+        targetSelector: '[data-walkthrough="pos-install-btn"]',
+        route: 'owner-first-branch?tab=details'
+      },
+      {
+        title: 'Install on Android, Windows, or Mac',
+        instruction: 'In Chrome, Edge, or Brave, confirm the install prompt that appears. If no prompt shows, click the Install icon at the right end of the address bar, or open the browser menu (three dots) and choose "Install BrewSpot POS".',
+        proTip: 'Firefox does not support installing web apps. Use Chrome, Edge, or Brave.',
+        targetHint: 'Browser install prompt',
+        targetSelector: '[data-walkthrough="pos-install-btn"]',
+        route: 'owner-first-branch?tab=details'
+      },
+      {
+        title: 'Install on iPad or iPhone',
+        instruction: 'Open BrewSpot in Safari, tap the Share button in the toolbar, choose "Add to Home Screen", then tap "Add".',
+        proTip: 'On iOS, only Safari can add BrewSpot POS to the home screen.',
+        targetHint: 'Safari Share menu',
+        targetSelector: '[data-walkthrough="pos-install-btn"]',
+        route: 'owner-first-branch?tab=details'
+      },
+      {
+        title: 'Launch & Register the Device',
+        instruction: 'Open the new BrewSpot POS icon on the home screen or desktop. It opens straight to /pos. On first launch, pick the branch, name the register (e.g. Front Counter 1), and click "Register Device".',
+        proTip: 'Registering logs your account out on that device so cashiers can sign in with their PIN.',
+        targetHint: 'BrewSpot POS app icon',
+        targetSelector: '[data-walkthrough="pos-install-btn"]',
+        route: 'owner-first-branch?tab=details'
+      }
+    ],
+    proTip: 'Install the POS on every counter device once. After that, staff open it from the home screen icon like a normal app.'
   }
 ]
 
@@ -700,7 +592,7 @@ export const MANAGER_SETUP_MISSIONS: SetupMission[] = [
   },
   {
     id: 'mgr-pos-install',
-    title: '6. Install BrewSpot POS & View POS QR Code',
+    title: '6. Download & Install BrewSpot POS (A2HS)',
     subtitle: 'Where to get the POS app and how to add it to your counter devices',
     route: '/manager/cafe',
     badge: 'Essential',
@@ -712,8 +604,7 @@ export const MANAGER_SETUP_MISSIONS: SetupMission[] = [
       'Click "Install POS App" in the POS Registers card',
       'Install on Android, Windows, or Mac (Chrome / Edge / Brave)',
       'Install on iPad or iPhone (Safari)',
-      'Launch the app and register the device',
-      'POS QR Code: owners click "Generate QR Code" (managers can only view it) to print the POS link as a PDF'
+      'Launch the app and register the device'
     ],
     detailedSteps: [
       {
@@ -741,13 +632,6 @@ export const MANAGER_SETUP_MISSIONS: SetupMission[] = [
         title: 'Launch & Register the Device',
         instruction: 'Open the new BrewSpot POS icon on the home screen or desktop. It opens straight to /pos. On first launch, pick your branch, name the register (e.g. Front Counter 1), and click "Register Device".',
         proTip: 'Registering logs your manager account out on that device so cashiers can sign in with their PIN.',
-        targetHint: 'BrewSpot POS app icon',
-        targetSelector: '[data-walkthrough="pos-install-btn"]'
-      },
-      {
-        title: 'View the POS QR Code (Manager)',
-        instruction: 'Next to \"Install POS App\" in the POS Registers card, click \"View QR Code\" to open the \"POS QR Code\" window the owner generated. It leads to brewspotph.online/pos, and you can click \"Print PDF\" to print it for your counter devices.',
-        proTip: 'Managers can view and print the QR code, but only the Cafe Owner can generate it.',
         targetHint: 'BrewSpot POS app icon',
         targetSelector: '[data-walkthrough="pos-install-btn"]'
       }
@@ -870,7 +754,7 @@ export const DASHBOARD_FEATURES: DashboardFeature[] = [
     badge: 'Store & Branch Setup',
     summary: 'Manage your cafe locations, configure weekly operating hours, inspect branch details, and add new branches.',
     details: 'Central hub for configuring cafe-wide opening hours, viewing active/inactive branches, inspecting BIR documents, managing branch employees, and creating new branches (requires a paid subscription with Multi-Branch access; Trial Plan is limited to 1 main branch).',
-    tips: 'Complete the Cafe Management setup mission—if you have a paid subscription, you can immediately add a new branch right after the mission!'
+    tips: 'Complete the 1st Setup Mission (Cafe Management) first—if you have a paid subscription, you can immediately add a new branch right after the mission!'
   },
   {
     id: 'feat-refresh',

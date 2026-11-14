@@ -1535,8 +1535,8 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- Right Form Section -->
-    <section class="flex items-center justify-center bg-[#FFF8EA] px-4 sm:px-8 py-10 sm:py-12 h-full overflow-y-auto">
-      <div class="w-full max-w-md sm:max-w-lg space-y-6 my-auto relative">
+    <section class="flex items-center justify-center bg-[#FFF8EA] px-8 py-12 h-full overflow-y-auto">
+      <div class="w-full max-w-md space-y-6 my-auto relative">
         <!-- Resubmitting a rejected application: what the admin flagged -->
         <div
           v-if="resubmitting && (currentStep === 3 || currentStep === 4)"
@@ -1737,140 +1737,107 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- STEP 3: Personal Details -->
-        <div v-else-if="currentStep === 3" key="step3" class="space-y-6">
-          <!-- Step Header Navigation -->
-          <div class="flex items-center justify-between">
-            <button
-              type="button"
-              class="inline-flex items-center gap-1.5 px-2.5 py-1 -ml-1 rounded-lg text-xs font-semibold text-[#7D5A50] hover:bg-[#7D5A50]/10 active:scale-[0.97] transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]"
-              @click="currentStep = 1"
-            >
-              <Icon name="heroicons:chevron-left" class="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Change Email Address</span>
-            </button>
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#7D5A50]/10 text-[#7D5A50] text-[11px] font-bold uppercase tracking-wider">
-              <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
-              Step 1 of 2: Personal Info
-            </span>
-          </div>
+        <div v-else-if="currentStep === 3" key="step3" class="space-y-5">
+          <button
+            type="button"
+            class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
+            @click="currentStep = 1"
+          >
+            <Icon name="heroicons:chevron-left" class="w-4 h-4" />
+            Change Email Address
+          </button>
 
           <div>
-            <h1 class="font-display text-2xl sm:text-[28px] font-extrabold text-[#3D2B24] tracking-tight leading-snug">Personal details</h1>
-            <p class="text-xs sm:text-sm text-[#7D5A50]/80 mt-1">Provide your legal identity information to verify your owner account.</p>
+            <span class="text-xs uppercase tracking-wider font-semibold text-[#7B5A50]">Step 1 of 2: Personal Info</span>
+            <h1 class="text-2xl font-bold text-[#2d201b] mt-0.5">Personal details</h1>
+            <p class="text-gray-600 text-sm mt-1">Provide your identity information to verify your account.</p>
           </div>
 
           <!-- Auth Error Banner -->
           <div
             v-if="error"
-            class="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs sm:text-sm flex items-start gap-2.5 shadow-sm"
+            class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
           >
-            <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-            <span class="font-medium leading-relaxed">{{ error }}</span>
+            <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
+            <span class="font-medium">{{ error }}</span>
           </div>
 
           <form @submit.prevent="handleNextToBusiness" class="space-y-5">
-            <!-- Basic Information Card -->
-            <div class="space-y-4 bg-white p-4.5 sm:p-5 rounded-2xl border border-[#EDD8CC] shadow-[0_1px_3px_rgba(61,43,36,0.04)]">
-              <div class="flex items-center gap-2.5 pb-2.5 border-b border-[#F5EBE1]">
-                <div class="w-7 h-7 rounded-lg bg-[#7D5A50]/10 text-[#7D5A50] flex items-center justify-center shrink-0">
-                  <Icon name="heroicons:user" class="w-4 h-4" />
-                </div>
+            <!-- Basic Information -->
+            <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+              <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                <Icon name="heroicons:user" class="w-4 h-4 text-[#7B5A50]" /> Basic Information
+              </h3>
+              <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <h3 class="font-display text-sm font-bold text-[#3D2B24] leading-none">Basic Information</h3>
-                  <p class="text-[11px] text-[#9E7060] mt-0.5">Your official legal name and account username</p>
-                </div>
-              </div>
-
-              <div class="grid grid-cols-2 gap-3.5">
-                <div>
-                  <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                    First Name <span class="text-[#C2410C] font-bold">*</span>
-                  </label>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">First Name</label>
                   <input
                     v-model="firstname"
                     type="text"
                     placeholder="John"
-                    class="w-full h-11 rounded-xl border border-[#E5D7CD] hover:border-[#C4A493] px-3.5 outline-none transition-[border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] bg-white text-sm text-[#3D2B24] font-medium placeholder:text-[#B49E93]/70 focus:border-[#7D5A50] focus:ring-2 focus:ring-[#7D5A50]/15 shadow-[0_1px_2px_rgba(61,43,36,0.02)]"
+                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                     required
                     @input="onFirstNameInput"
                   />
                 </div>
                 <div>
-                  <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                    Last Name <span class="text-[#C2410C] font-bold">*</span>
-                  </label>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Last Name</label>
                   <input
                     v-model="lastname"
                     type="text"
                     placeholder="Doe"
-                    class="w-full h-11 rounded-xl border border-[#E5D7CD] hover:border-[#C4A493] px-3.5 outline-none transition-[border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] bg-white text-sm text-[#3D2B24] font-medium placeholder:text-[#B49E93]/70 focus:border-[#7D5A50] focus:ring-2 focus:ring-[#7D5A50]/15 shadow-[0_1px_2px_rgba(61,43,36,0.02)]"
+                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                     required
                     @input="onLastNameInput"
                   />
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-3.5">
+              <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="flex items-center justify-between text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                    <span>Middle Name</span>
-                    <span class="text-[11px] font-normal text-[#9E7060]">Optional</span>
-                  </label>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Middle Name</label>
                   <input
                     v-model="middlename"
                     type="text"
                     placeholder="Optional"
-                    class="w-full h-11 rounded-xl border border-[#E5D7CD] hover:border-[#C4A493] px-3.5 outline-none transition-[border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] bg-white text-sm text-[#3D2B24] font-medium placeholder:text-[#B49E93]/70 focus:border-[#7D5A50] focus:ring-2 focus:ring-[#7D5A50]/15 shadow-[0_1px_2px_rgba(61,43,36,0.02)]"
+                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                     @input="onMiddleNameInput"
                   />
                 </div>
                 <div>
-                  <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                    Username <span class="text-[#C2410C] font-bold">*</span>
-                  </label>
+                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Username *</label>
                   <input
                     v-model="username"
                     type="text"
-                    placeholder="username"
+                    placeholder="Username"
                     :class="[
-                      'w-full h-11 rounded-xl border px-3.5 outline-none transition-[border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] bg-white text-sm text-[#3D2B24] font-medium placeholder:text-[#B49E93]/70 shadow-[0_1px_2px_rgba(61,43,36,0.02)]',
+                      'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
                       fieldErrors.username
-                        ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/15 bg-red-50/10'
-                        : 'border-[#E5D7CD] hover:border-[#C4A493] focus:border-[#7D5A50] focus:ring-2 focus:ring-[#7D5A50]/15'
+                        ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                        : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
                     ]"
                     required
                     @input="clearFieldError('username')"
                     @blur="checkUsernameAvailability"
                   />
-                  <p v-if="fieldErrors.username" class="text-[11px] text-red-600 mt-1 font-semibold">{{ fieldErrors.username }}</p>
+                  <p v-if="fieldErrors.username" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.username }}</p>
                 </div>
               </div>
             </div>
 
-            <!-- Contact & Location Card -->
-            <div class="space-y-4 bg-white p-4.5 sm:p-5 rounded-2xl border border-[#EDD8CC] shadow-[0_1px_3px_rgba(61,43,36,0.04)]">
-              <div class="flex items-center gap-2.5 pb-2.5 border-b border-[#F5EBE1]">
-                <div class="w-7 h-7 rounded-lg bg-[#7D5A50]/10 text-[#7D5A50] flex items-center justify-center shrink-0">
-                  <Icon name="heroicons:map-pin" class="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 class="font-display text-sm font-bold text-[#3D2B24] leading-none">Contact & Location</h3>
-                  <p class="text-[11px] text-[#9E7060] mt-0.5">Direct contact and registered personal residence</p>
-                </div>
-              </div>
-
+            <!-- Contact & Location -->
+            <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+              <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                <Icon name="heroicons:map-pin" class="w-4 h-4 text-[#7B5A50]" /> Contact & Location
+              </h3>
               <div class="space-y-1">
-                <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                  Contact No. <span class="text-[#C2410C] font-bold">*</span>
-                </label>
+                <label class="block text-sm font-medium text-[#2d201b]">Contact No. *</label>
                 <div
-                  class="flex items-center rounded-xl border bg-white h-11 transition-[border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] shadow-[0_1px_2px_rgba(61,43,36,0.02)]"
-                  :class="fieldErrors.phone_number
-                    ? 'border-red-400 focus-within:border-red-500 focus-within:ring-2 focus-within:ring-red-500/15'
-                    : 'border-[#E5D7CD] hover:border-[#C4A493] focus-within:border-[#7D5A50] focus-within:ring-2 focus-within:ring-[#7D5A50]/15'"
+                  class="flex items-center rounded-md border bg-white transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
+                  :class="fieldErrors.phone_number ? 'border-red-500' : 'border-gray-300'"
                 >
                   <!-- Box-type Type Selector beside input number -->
-                  <div class="bg-[#FBF4EB] border-r border-[#E5D7CD] rounded-l-xl shrink-0 h-full flex items-center px-3 text-[#3D2B24] font-semibold text-xs">
+                  <div class="bg-gray-100 border-r border-gray-300 rounded-l-md shrink-0 h-full flex items-center px-3 text-[#2d201b] font-semibold text-xs">
                     <DropdownList
                       v-model="phoneType"
                       :options="PHONE_TYPE_OPTIONS"
@@ -1888,7 +1855,7 @@ onBeforeUnmount(() => {
                     inputmode="numeric"
                     maxlength="10"
                     placeholder="9123456789"
-                    class="w-full h-full px-3.5 text-sm text-[#3D2B24] font-medium bg-transparent outline-none placeholder:text-[#B49E93]/70 tabular-nums"
+                    class="w-full h-full px-3 text-sm text-[#2d201b] bg-transparent outline-none"
                     required
                     @input="onMobileInput"
                     @blur="checkPhoneAvailability"
@@ -1901,45 +1868,35 @@ onBeforeUnmount(() => {
                     type="tel"
                     placeholder="082-299-1234 or 02-8123-4567"
                     maxlength="15"
-                    class="w-full h-full px-3.5 text-sm text-[#3D2B24] font-medium bg-transparent outline-none placeholder:text-[#B49E93]/70 tabular-nums"
+                    class="w-full h-full px-3 text-sm text-[#2d201b] bg-transparent outline-none"
                     required
                     @input="onLandlineInput"
                     @blur="checkPhoneAvailability"
                   />
                 </div>
-                <p v-if="fieldErrors.phone_number" class="text-[11px] text-red-600 mt-1 font-semibold">{{ fieldErrors.phone_number }}</p>
+                <p v-if="fieldErrors.phone_number" class="text-xs text-red-600 font-medium">{{ fieldErrors.phone_number }}</p>
               </div>
 
               <div>
-                <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                  Personal Address <span class="text-[#C2410C] font-bold">*</span>
-                </label>
+                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Personal Address *</label>
                 <input
                   v-model="ownerAddress"
                   type="text"
                   placeholder="Street, Barangay, District, Davao City"
-                  class="w-full h-11 rounded-xl border border-[#E5D7CD] hover:border-[#C4A493] px-3.5 outline-none transition-[border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] bg-white text-sm text-[#3D2B24] font-medium placeholder:text-[#B49E93]/70 focus:border-[#7D5A50] focus:ring-2 focus:ring-[#7D5A50]/15 shadow-[0_1px_2px_rgba(61,43,36,0.02)]"
+                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                   required
                 />
               </div>
             </div>
 
-            <!-- Identity Verification Card -->
-            <div class="space-y-4 bg-white p-4.5 sm:p-5 rounded-2xl border border-[#EDD8CC] shadow-[0_1px_3px_rgba(61,43,36,0.04)]">
-              <div class="flex items-center gap-2.5 pb-2.5 border-b border-[#F5EBE1]">
-                <div class="w-7 h-7 rounded-lg bg-[#7D5A50]/10 text-[#7D5A50] flex items-center justify-center shrink-0">
-                  <Icon name="heroicons:identification" class="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 class="font-display text-sm font-bold text-[#3D2B24] leading-none">Identity Verification</h3>
-                  <p class="text-[11px] text-[#9E7060] mt-0.5">Valid government ID for KYC regulatory verification</p>
-                </div>
-              </div>
+            <!-- Identity Verification -->
+            <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+              <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                <Icon name="heroicons:identification" class="w-4 h-4 text-[#7B5A50]" /> Identity Verification
+              </h3>
               
-              <div class="space-y-1 w-full sm:w-2/3">
-                <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                  ID Type <span class="text-[#C2410C] font-bold">*</span>
-                </label>
+              <div class="space-y-1 w-full sm:w-1/2">
+                <label class="block text-sm font-medium text-[#2d201b]">ID Type</label>
                 <DropdownList
                   v-model="idType"
                   :options="ID_TYPE_OPTIONS"
@@ -1947,204 +1904,135 @@ onBeforeUnmount(() => {
                   white
                   :invalid="!!fieldErrors.id_type"
                 />
-                <p v-if="fieldErrors.id_type" class="text-[11px] text-red-600 mt-1 font-semibold">{{ fieldErrors.id_type }}</p>
+                <p v-if="fieldErrors.id_type" class="text-xs text-red-600 font-medium">{{ fieldErrors.id_type }}</p>
               </div>
 
               <div>
-                <label class="block text-xs font-semibold text-[#3D2B24] mb-2 tracking-tight">
-                  {{ isBackIdRequired ? 'Government ID (Front & Back) *' : 'Passport (Photo / Bio-page) *' }}
-                </label>
-                <div :class="isBackIdRequired ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : ''">
-                  <!-- Front ID -->
-                  <div>
-                    <!-- Empty Upload Target -->
-                    <label
-                      v-if="!governmentIdFilePath"
-                      class="group relative flex items-center gap-3 p-3 rounded-xl border border-dashed border-[#D9C4B5] hover:border-[#7D5A50] bg-[#FFFBF7]/60 hover:bg-[#FFF8EA] transition-[border-color,background-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer"
-                    >
-                      <input
-                        type="file"
-                        @change="handleGovIdChange"
-                        accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                        class="sr-only"
-                        required
-                      />
-                      <div class="w-9 h-9 rounded-lg bg-white border border-[#EDD8CC] text-[#7D5A50] flex items-center justify-center shrink-0 group-hover:scale-105 group-active:scale-95 transition-transform duration-150 shadow-[0_1px_2px_rgba(61,43,36,0.04)]">
-                        <Icon name="heroicons:arrow-up-tray" class="w-4 h-4" />
-                      </div>
-                      <div class="min-w-0 flex-1">
-                        <p class="text-xs font-bold text-[#3D2B24] group-hover:text-[#7D5A50] transition-colors leading-tight">
-                          {{ isBackIdRequired ? 'Front ID File' : 'ID File' }} <span class="text-[#C2410C]">*</span>
-                        </p>
-                        <p class="text-[10px] text-[#9E7060] mt-0.5">JPG, PNG, or PDF</p>
-                      </div>
-                      <span class="px-2 py-1 rounded-md bg-white border border-[#EDD8CC] text-[11px] font-semibold text-[#7D5A50] group-hover:bg-[#7D5A50] group-hover:text-white transition-colors shrink-0 shadow-[0_1px_2px_rgba(61,43,36,0.03)]">
-                        Browse
-                      </span>
-                    </label>
-
-                    <!-- Uploaded State Card -->
-                    <div
-                      v-else
-                      class="flex items-center justify-between gap-2.5 p-2.5 sm:p-3 rounded-xl border border-emerald-300 bg-emerald-50/40 text-emerald-950 transition-all shadow-[0_1px_2px_rgba(16,185,129,0.06)]"
-                    >
-                      <div class="flex items-center gap-2.5 min-w-0">
-                        <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                          <Icon name="heroicons:check" class="w-4 h-4 stroke-[2.5]" />
-                        </div>
-                        <div class="min-w-0 flex-1">
-                          <p class="text-xs font-bold text-[#2D201B] truncate">{{ governmentIdFileName || 'Uploaded File' }}</p>
-                          <p class="text-[10px] text-emerald-700 font-semibold flex items-center gap-1 mt-0.5">
-                            <span>Ready for KYC</span>
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        @click="governmentIdFile = null; governmentIdFileName = ''; governmentIdFilePath = ''; saveDraft()"
-                        class="w-7 h-7 rounded-lg bg-white border border-emerald-200 text-emerald-800 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center shrink-0 transition-[transform,background-color,color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-90"
-                        title="Remove file"
-                      >
-                        <Icon name="heroicons:x-mark" class="w-4 h-4" />
-                      </button>
-                    </div>
+              <label class="block text-sm font-medium mb-1 text-[#2d201b]">
+                {{ isBackIdRequired ? 'Government ID (Front & Back) *' : 'Passport (Photo / Bio-page) *' }}
+              </label>
+              <div :class="isBackIdRequired ? 'grid grid-cols-2 gap-3' : ''">
+                <!-- Front ID -->
+                <div class="bg-white rounded-lg p-3 border transition shadow-sm" :class="governmentIdFilePath ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="font-semibold text-xs text-[#2d201b]">{{ isBackIdRequired ? 'Front ID' : 'ID File' }} <span class="text-red-500">*</span></label>
+                    <span v-if="governmentIdFilePath" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
                   </div>
-
-                  <!-- Back ID -->
-                  <div v-if="isBackIdRequired">
-                    <!-- Empty Upload Target -->
-                    <label
-                      v-if="!governmentIdFileBackPath"
-                      class="group relative flex items-center gap-3 p-3 rounded-xl border border-dashed border-[#D9C4B5] hover:border-[#7D5A50] bg-[#FFFBF7]/60 hover:bg-[#FFF8EA] transition-[border-color,background-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer"
-                    >
-                      <input
-                        type="file"
-                        @change="handleGovIdBackChange"
-                        accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                        class="sr-only"
-                        required
-                      />
-                      <div class="w-9 h-9 rounded-lg bg-white border border-[#EDD8CC] text-[#7D5A50] flex items-center justify-center shrink-0 group-hover:scale-105 group-active:scale-95 transition-transform duration-150 shadow-[0_1px_2px_rgba(61,43,36,0.04)]">
-                        <Icon name="heroicons:arrow-up-tray" class="w-4 h-4" />
-                      </div>
-                      <div class="min-w-0 flex-1">
-                        <p class="text-xs font-bold text-[#3D2B24] group-hover:text-[#7D5A50] transition-colors leading-tight">
-                          Back ID File <span class="text-[#C2410C]">*</span>
-                        </p>
-                        <p class="text-[10px] text-[#9E7060] mt-0.5">JPG, PNG, or PDF</p>
-                      </div>
-                      <span class="px-2 py-1 rounded-md bg-white border border-[#EDD8CC] text-[11px] font-semibold text-[#7D5A50] group-hover:bg-[#7D5A50] group-hover:text-white transition-colors shrink-0 shadow-[0_1px_2px_rgba(61,43,36,0.03)]">
-                        Browse
-                      </span>
-                    </label>
-
-                    <!-- Uploaded State Card -->
-                    <div
-                      v-else
-                      class="flex items-center justify-between gap-2.5 p-2.5 sm:p-3 rounded-xl border border-emerald-300 bg-emerald-50/40 text-emerald-950 transition-all shadow-[0_1px_2px_rgba(16,185,129,0.06)]"
-                    >
-                      <div class="flex items-center gap-2.5 min-w-0">
-                        <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                          <Icon name="heroicons:check" class="w-4 h-4 stroke-[2.5]" />
-                        </div>
-                        <div class="min-w-0 flex-1">
-                          <p class="text-xs font-bold text-[#2D201B] truncate">{{ governmentIdFileBackName || 'Uploaded File' }}</p>
-                          <p class="text-[10px] text-emerald-700 font-semibold flex items-center gap-1 mt-0.5">
-                            <span>Ready for KYC</span>
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        @click="governmentIdFileBack = null; governmentIdFileBackName = ''; governmentIdFileBackPath = ''; saveDraft()"
-                        class="w-7 h-7 rounded-lg bg-white border border-emerald-200 text-emerald-800 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center shrink-0 transition-[transform,background-color,color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-90"
-                        title="Remove file"
-                      >
-                        <Icon name="heroicons:x-mark" class="w-4 h-4" />
-                      </button>
-                    </div>
+                  <div v-if="!governmentIdFilePath">
+                    <input
+                      type="file"
+                      @change="handleGovIdChange"
+                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                      required
+                    />
                   </div>
+                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
+                    <div class="truncate mr-2">
+                      <p class="font-medium truncate text-xs">{{ governmentIdFileName || 'Uploaded File' }}</p>
+                    </div>
+                    <button
+                      type="button"
+                      @click="governmentIdFile = null; governmentIdFileName = ''; governmentIdFilePath = ''; saveDraft()"
+                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
+                      title="Remove file"
+                    >&times;</button>
+                  </div>
+                </div>
+
+                <!-- Back ID -->
+                <div v-if="isBackIdRequired" class="bg-white rounded-lg p-3 border transition shadow-sm" :class="governmentIdFileBackPath ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="font-semibold text-xs text-[#2d201b]">Back ID <span class="text-red-500">*</span></label>
+                    <span v-if="governmentIdFileBackPath" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
+                  </div>
+                  <div v-if="!governmentIdFileBackPath">
+                    <input
+                      type="file"
+                      @change="handleGovIdBackChange"
+                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                      required
+                    />
+                  </div>
+                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
+                    <div class="truncate mr-2">
+                      <p class="font-medium truncate text-xs">{{ governmentIdFileBackName || 'Uploaded File' }}</p>
+                    </div>
+                    <button
+                      type="button"
+                      @click="governmentIdFileBack = null; governmentIdFileBackName = ''; governmentIdFileBackPath = ''; saveDraft()"
+                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
+                      title="Remove file"
+                    >&times;</button>
+                  </div>
+                </div>
                 </div>
               </div>
             </div>
 
-            <!-- Submit Step 3 Action -->
             <div class="pt-2">
               <button
                 type="submit"
-                class="w-full h-12 rounded-xl bg-[#7D5A50] text-white font-semibold text-sm hover:bg-[#6A4B42] active:scale-[0.98] shadow-[0_2px_4px_rgba(61,43,36,0.12)] hover:shadow-[0_4px_10px_rgba(61,43,36,0.18)] transition-[transform,background-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center justify-center gap-2 cursor-pointer"
+                class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition flex items-center justify-center gap-2"
               >
-                <span>Next: Business Registration</span>
-                <Icon name="heroicons:arrow-right" class="w-4 h-4 stroke-[2.5]" />
+                Next: Business Registration
+                <Icon name="heroicons:chevron-right" class="w-4 h-4" />
               </button>
             </div>
           </form>
         </div>
 
         <!-- STEP 4: Business Details & Requirements -->
-        <div v-else-if="currentStep === 4" key="step4" class="space-y-6">
+        <div v-else-if="currentStep === 4" key="step4" class="space-y-5">
           <!-- Page 1: Business Information -->
-          <div v-if="businessSubPage === 1" class="space-y-6">
-            <!-- Navigation Header -->
-            <div class="flex items-center justify-between">
-              <button
-                type="button"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 -ml-1 rounded-lg text-xs font-semibold text-[#7D5A50] hover:bg-[#7D5A50]/10 active:scale-[0.97] transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]"
-                @click="currentStep = 3"
-              >
-                <Icon name="heroicons:chevron-left" class="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Back to Personal Info</span>
-              </button>
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#7D5A50]/10 text-[#7D5A50] text-[11px] font-bold uppercase tracking-wider">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
-                Step 2 of 2: Page 1 of 2
-              </span>
-            </div>
+          <div v-if="businessSubPage === 1" class="space-y-5">
+            <button
+              type="button"
+              class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
+              @click="currentStep = 3"
+            >
+              <Icon name="heroicons:chevron-left" class="w-4 h-4" />
+              Back to Personal Info
+            </button>
 
             <div>
-              <h1 class="font-display text-2xl sm:text-[28px] font-extrabold text-[#3D2B24] tracking-tight leading-snug">Business details</h1>
-              <p class="text-xs sm:text-sm text-[#7D5A50]/80 mt-1">Enter your registered café and primary branch information.</p>
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-semibold text-[#7B5A50]">Business Registration</span>
+                <span class="text-xs bg-[#7B5A50]/10 text-[#7B5A50] px-2.5 py-0.5 rounded-full font-semibold">Page 1 of 2</span>
+              </div>
+              <h1 class="text-2xl font-bold text-[#2d201b] mt-0.5">Business details</h1>
+              <p class="text-gray-600 text-sm mt-1">Enter your café and main branch information.</p>
             </div>
 
             <!-- Auth Error Banner -->
             <div
               v-if="error"
-              class="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs sm:text-sm flex items-start gap-2.5 shadow-sm"
+              class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
             >
-              <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-              <span class="font-medium leading-relaxed">{{ error }}</span>
+              <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
+              <span class="font-medium">{{ error }}</span>
             </div>
 
             <form @submit.prevent="nextBusinessSubPage" class="space-y-5">
-              <!-- General Info Card -->
-              <div class="space-y-4 bg-white p-4.5 sm:p-5 rounded-2xl border border-[#EDD8CC] shadow-[0_1px_3px_rgba(61,43,36,0.04)]">
-                <div class="flex items-center gap-2.5 pb-2.5 border-b border-[#F5EBE1]">
-                  <div class="w-7 h-7 rounded-lg bg-[#7D5A50]/10 text-[#7D5A50] flex items-center justify-center shrink-0">
-                    <Icon name="heroicons:building-storefront" class="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 class="font-display text-sm font-bold text-[#3D2B24] leading-none">General Info</h3>
-                    <p class="text-[11px] text-[#9E7060] mt-0.5">Business name and legal registration type</p>
-                  </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-3.5">
+              <!-- General Info -->
+              <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                  <Icon name="heroicons:building-storefront" class="w-4 h-4 text-[#7B5A50]" /> General Info
+                </h3>
+                <div class="grid grid-cols-2 gap-3">
                   <div class="col-span-2 sm:col-span-1">
-                    <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                      Business Name <span class="text-[#C2410C] font-bold">*</span>
-                    </label>
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Business Name</label>
                     <input
                       v-model="cafeName"
                       type="text"
                       placeholder="BrewSpot Davao"
-                      class="w-full h-11 rounded-xl border border-[#E5D7CD] hover:border-[#C4A493] px-3.5 outline-none transition-[border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] bg-white text-sm text-[#3D2B24] font-medium placeholder:text-[#B49E93]/70 focus:border-[#7D5A50] focus:ring-2 focus:ring-[#7D5A50]/15 shadow-[0_1px_2px_rgba(61,43,36,0.02)]"
+                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                       required
                     />
                   </div>
                   <div class="col-span-2 sm:col-span-1">
-                    <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                      Document Type <span class="text-[#C2410C] font-bold">*</span>
-                    </label>
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Document Type *</label>
                     <DropdownList
                       v-model="cafeDocType"
                       :options="CAFE_DOC_TYPE_OPTIONS"
@@ -2153,238 +2041,185 @@ onBeforeUnmount(() => {
                     />
                   </div>
                   <div class="col-span-2">
-                    <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                      Branch Name <span class="text-[#C2410C] font-bold">*</span>
-                    </label>
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Name</label>
                     <input
                       v-model="branchName"
                       type="text"
                       placeholder="Main Branch"
-                      class="w-full h-11 rounded-xl border border-[#E5D7CD] hover:border-[#C4A493] px-3.5 outline-none transition-[border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] bg-white text-sm text-[#3D2B24] font-medium placeholder:text-[#B49E93]/70 focus:border-[#7D5A50] focus:ring-2 focus:ring-[#7D5A50]/15 shadow-[0_1px_2px_rgba(61,43,36,0.02)]"
+                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                       required
                     />
                   </div>
                 </div>
               </div>
 
-              <!-- Café Picture (optional) Card -->
-              <div class="space-y-3.5 bg-white p-4.5 sm:p-5 rounded-2xl border border-[#EDD8CC] shadow-[0_1px_3px_rgba(61,43,36,0.04)]">
-                <div class="flex items-center gap-2.5 pb-2.5 border-b border-[#F5EBE1]">
-                  <div class="w-7 h-7 rounded-lg bg-[#7D5A50]/10 text-[#7D5A50] flex items-center justify-center shrink-0">
-                    <Icon name="heroicons:photo" class="w-4 h-4" />
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center justify-between">
-                      <h3 class="font-display text-sm font-bold text-[#3D2B24] leading-none">Café Picture</h3>
-                      <span class="text-[11px] font-normal text-[#9E7060]">Optional</span>
-                    </div>
-                    <p class="text-[11px] text-[#9E7060] mt-0.5">Photo of your storefront or interior (JPG/PNG, up to 2MB)</p>
-                  </div>
-                </div>
-
+              <!-- Café Picture (optional) -->
+              <div class="space-y-3 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                  <Icon name="heroicons:photo" class="w-4 h-4 text-[#7B5A50]" /> Café Picture
+                  <span class="text-xs font-normal text-gray-500">(optional)</span>
+                </h3>
                 <div v-if="!cafePicturePath">
-                  <label
-                    class="group relative flex items-center gap-3 p-3 rounded-xl border border-dashed border-[#D9C4B5] hover:border-[#7D5A50] bg-[#FFFBF7]/60 hover:bg-[#FFF8EA] transition-[border-color,background-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer"
-                  >
-                    <input
-                      type="file"
-                      @change="onCafePictureChange"
-                      accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                      class="sr-only"
-                    />
-                    <div class="w-9 h-9 rounded-lg bg-white border border-[#EDD8CC] text-[#7D5A50] flex items-center justify-center shrink-0 group-hover:scale-105 group-active:scale-95 transition-transform duration-150 shadow-[0_1px_2px_rgba(61,43,36,0.04)]">
-                      <Icon name="heroicons:camera" class="w-4 h-4" />
-                    </div>
-                    <div class="min-w-0 flex-1">
-                      <p class="text-xs font-bold text-[#3D2B24] group-hover:text-[#7D5A50] transition-colors leading-tight">
-                        Upload Café Photo
-                      </p>
-                      <p class="text-[10px] text-[#9E7060] mt-0.5">Storefront or dining area</p>
-                    </div>
-                    <span class="px-2 py-1 rounded-md bg-white border border-[#EDD8CC] text-[11px] font-semibold text-[#7D5A50] group-hover:bg-[#7D5A50] group-hover:text-white transition-colors shrink-0 shadow-[0_1px_2px_rgba(61,43,36,0.03)]">
-                      Browse
-                    </span>
-                  </label>
+                  <input
+                    type="file"
+                    @change="onCafePictureChange"
+                    accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                    class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
+                  />
+                  <p class="text-xs text-gray-500 mt-1.5">A photo of your café's storefront or interior. JPG or PNG, up to 2MB.</p>
                 </div>
-                <div v-else class="flex items-center gap-3 p-2.5 sm:p-3 rounded-xl border border-emerald-300 bg-emerald-50/40 text-emerald-950 transition-all shadow-[0_1px_2px_rgba(16,185,129,0.06)]">
+                <div v-else class="flex items-center gap-3 text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
                   <img
                     v-if="cafePicturePreview"
                     :src="cafePicturePreview"
                     alt="Café picture preview"
-                    class="w-12 h-12 rounded-xl object-cover shrink-0 border border-emerald-200"
+                    class="w-14 h-14 rounded-md object-cover shrink-0"
                   />
-                  <div class="min-w-0 flex-1">
-                    <p class="text-xs font-bold text-[#2D201B] truncate">{{ cafePictureName || 'Uploaded Picture' }}</p>
-                    <p class="text-[10px] text-emerald-700 font-semibold mt-0.5">Preview ready</p>
-                  </div>
+                  <p class="font-medium truncate flex-1">{{ cafePictureName || 'Uploaded Picture' }}</p>
                   <button
                     type="button"
                     @click="clearCafePicture"
-                    class="w-7 h-7 rounded-lg bg-white border border-emerald-200 text-emerald-800 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center shrink-0 transition-[transform,background-color,color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-90"
+                    class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
                     title="Remove picture"
-                  >
-                    <Icon name="heroicons:x-mark" class="w-4 h-4" />
-                  </button>
+                  >&times;</button>
                 </div>
-                <p v-if="fieldErrors.cafe_picture" class="text-[11px] text-red-600 font-semibold mt-1">{{ fieldErrors.cafe_picture }}</p>
+                <p v-if="fieldErrors.cafe_picture" class="text-xs text-red-600 font-medium">{{ fieldErrors.cafe_picture }}</p>
               </div>
 
-              <!-- Branch Contact Card -->
-              <div class="space-y-4 bg-white p-4.5 sm:p-5 rounded-2xl border border-[#EDD8CC] shadow-[0_1px_3px_rgba(61,43,36,0.04)]">
-                <div class="flex items-center gap-2.5 pb-2.5 border-b border-[#F5EBE1]">
-                  <div class="w-7 h-7 rounded-lg bg-[#7D5A50]/10 text-[#7D5A50] flex items-center justify-center shrink-0">
-                    <Icon name="heroicons:phone" class="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 class="font-display text-sm font-bold text-[#3D2B24] leading-none">Branch Contact</h3>
-                    <p class="text-[11px] text-[#9E7060] mt-0.5">Public contact channels for orders and inquiries</p>
-                  </div>
-                </div>
-
-                <div class="space-y-3.5">
+              <!-- Contact Info -->
+              <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
+                  <Icon name="heroicons:phone" class="w-4 h-4 text-[#7B5A50]" /> Branch Contact
+                </h3>
+                <div class="space-y-4">
                   <div class="space-y-1">
-                    <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                      Branch Phone <span class="text-[#C2410C] font-bold">*</span>
-                    </label>
-                    <div
-                      class="flex items-center rounded-xl border bg-white h-11 transition-[border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] shadow-[0_1px_2px_rgba(61,43,36,0.02)]"
-                      :class="fieldErrors.cafe_phonenumber
-                        ? 'border-red-400 focus-within:border-red-500 focus-within:ring-2 focus-within:ring-red-500/15'
-                        : 'border-[#E5D7CD] hover:border-[#C4A493] focus-within:border-[#7D5A50] focus-within:ring-2 focus-within:ring-[#7D5A50]/15'"
-                    >
-                      <!-- Box-type Type Selector beside input number -->
-                      <div class="bg-[#FBF4EB] border-r border-[#E5D7CD] rounded-l-xl shrink-0 h-full flex items-center px-3 text-[#3D2B24] font-semibold text-xs">
-                        <DropdownList
-                          v-model="cafePhoneType"
-                          :options="PHONE_TYPE_OPTIONS"
-                          bare
-                          aria-label="Branch phone type"
-                          @change="onCafePhoneTypeChange"
-                        />
-                      </div>
-
-                      <!-- Mobile Input (10 digits starting with 9) -->
-                      <input
-                        v-if="cafePhoneType === 'mobile'"
-                        v-model="cafeMobileDigits"
-                        type="tel"
-                        inputmode="numeric"
-                        maxlength="10"
-                        placeholder="9123456789"
-                        class="w-full h-full px-3.5 text-sm text-[#3D2B24] font-medium bg-transparent outline-none placeholder:text-[#B49E93]/70 tabular-nums"
-                        required
-                        @input="onCafeMobileInput"
-                        @blur="checkCafePhoneAvailability"
-                      />
-
-                      <!-- Landline Input -->
-                      <input
-                        v-else
-                        v-model="cafeLandlineDigits"
-                        type="tel"
-                        placeholder="082-299-1234 or 02-8123-4567"
-                        maxlength="15"
-                        class="w-full h-full px-3.5 text-sm text-[#3D2B24] font-medium bg-transparent outline-none placeholder:text-[#B49E93]/70 tabular-nums"
-                        required
-                        @input="onCafeLandlineInput"
-                        @blur="checkCafePhoneAvailability"
+                  <label class="block text-sm font-medium text-[#2d201b]">Branch Phone *</label>
+                  <div
+                    class="flex items-center rounded-md border bg-white transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
+                    :class="fieldErrors.cafe_phonenumber ? 'border-red-500' : 'border-gray-300'"
+                  >
+                    <!-- Box-type Type Selector beside input number -->
+                    <div class="bg-gray-100 border-r border-gray-300 rounded-l-md shrink-0 h-full flex items-center px-3 text-[#2d201b] font-semibold text-xs">
+                      <DropdownList
+                        v-model="cafePhoneType"
+                        :options="PHONE_TYPE_OPTIONS"
+                        bare
+                        aria-label="Branch phone type"
+                        @change="onCafePhoneTypeChange"
                       />
                     </div>
-                    <p v-if="fieldErrors.cafe_phonenumber" class="text-[11px] text-red-600 mt-1 font-semibold">{{ fieldErrors.cafe_phonenumber }}</p>
+
+                    <!-- Mobile Input (10 digits starting with 9) -->
+                    <input
+                      v-if="cafePhoneType === 'mobile'"
+                      v-model="cafeMobileDigits"
+                      type="tel"
+                      inputmode="numeric"
+                      maxlength="10"
+                      placeholder="9123456789"
+                      class="w-full h-full px-3 text-sm text-[#2d201b] bg-transparent outline-none"
+                      required
+                      @input="onCafeMobileInput"
+                      @blur="checkCafePhoneAvailability"
+                    />
+
+                    <!-- Landline Input -->
+                    <input
+                      v-else
+                      v-model="cafeLandlineDigits"
+                      type="tel"
+                      placeholder="082-299-1234 or 02-8123-4567"
+                      maxlength="15"
+                      class="w-full h-full px-3 text-sm text-[#2d201b] bg-transparent outline-none"
+                      required
+                      @input="onCafeLandlineInput"
+                      @blur="checkCafePhoneAvailability"
+                    />
+                  </div>
+                  <p v-if="fieldErrors.cafe_phonenumber" class="text-xs text-red-600 font-medium">{{ fieldErrors.cafe_phonenumber }}</p>
                   </div>
 
                   <div>
-                    <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                      Branch Address <span class="text-[#C2410C] font-bold">*</span>
-                    </label>
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Address</label>
                     <input
                       v-model="address"
                       type="text"
                       placeholder="Street, Barangay, District, Davao City"
-                      class="w-full h-11 rounded-xl border border-[#E5D7CD] hover:border-[#C4A493] px-3.5 outline-none transition-[border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] bg-white text-sm text-[#3D2B24] font-medium placeholder:text-[#B49E93]/70 focus:border-[#7D5A50] focus:ring-2 focus:ring-[#7D5A50]/15 shadow-[0_1px_2px_rgba(61,43,36,0.02)]"
+                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
                       required
                     />
                   </div>
 
                   <div>
-                    <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                      Café Email <span class="text-[#C2410C] font-bold">*</span>
-                    </label>
+                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Café Email *</label>
                     <input
                       v-model="cafeEmail"
                       type="email"
                       placeholder="contact@brewspot.com"
                       :class="[
-                        'w-full h-11 rounded-xl border px-3.5 outline-none transition-[border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] bg-white text-sm text-[#3D2B24] font-medium placeholder:text-[#B49E93]/70 shadow-[0_1px_2px_rgba(61,43,36,0.02)]',
+                        'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
                         fieldErrors.cafe_email
-                          ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/15 bg-red-50/10'
-                          : 'border-[#E5D7CD] hover:border-[#C4A493] focus:border-[#7D5A50] focus:ring-2 focus:ring-[#7D5A50]/15'
+                          ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                          : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
                       ]"
                       required
                       @input="clearFieldError('cafe_email')"
                       @blur="checkCafeEmailAvailability"
                     />
-                    <p v-if="fieldErrors.cafe_email" class="text-[11px] text-red-600 mt-1 font-semibold">{{ fieldErrors.cafe_email }}</p>
+                    <p v-if="fieldErrors.cafe_email" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.cafe_email }}</p>
                   </div>
                 </div>
               </div>
 
-              <!-- Next Action Button -->
               <div class="pt-2">
                 <button
                   type="submit"
-                  class="w-full h-12 rounded-xl bg-[#7D5A50] text-white font-semibold text-sm hover:bg-[#6A4B42] active:scale-[0.98] shadow-[0_2px_4px_rgba(61,43,36,0.12)] hover:shadow-[0_4px_10px_rgba(61,43,36,0.18)] transition-[transform,background-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center justify-center gap-2 cursor-pointer"
+                  class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition flex items-center justify-center gap-2"
                 >
-                  <span>Next: Upload Business Requirements</span>
-                  <Icon name="heroicons:arrow-right" class="w-4 h-4 stroke-[2.5]" />
+                  Next: Upload Business Requirements
+                  <Icon name="heroicons:chevron-right" class="w-4 h-4" />
                 </button>
               </div>
             </form>
           </div>
 
           <!-- Page 2: 2 Required Business Documents & BIR Details -->
-          <div v-else class="space-y-6">
-            <!-- Navigation Header -->
-            <div class="flex items-center justify-between">
-              <button
-                type="button"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 -ml-1 rounded-lg text-xs font-semibold text-[#7D5A50] hover:bg-[#7D5A50]/10 active:scale-[0.97] transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]"
-                @click="prevBusinessSubPage"
-              >
-                <Icon name="heroicons:chevron-left" class="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Back to Business Details</span>
-              </button>
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#7D5A50]/10 text-[#7D5A50] text-[11px] font-bold uppercase tracking-wider">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
-                Step 2 of 2: Page 2 of 2
-              </span>
-            </div>
+          <div v-else class="space-y-4">
+            <button
+              type="button"
+              class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
+              @click="prevBusinessSubPage"
+            >
+              <Icon name="heroicons:chevron-left" class="w-4 h-4" />
+              Back to Business Details
+            </button>
 
             <div>
-              <h1 class="font-display text-2xl sm:text-[28px] font-extrabold text-[#3D2B24] tracking-tight leading-snug">Required Requirements</h1>
-              <p class="text-xs sm:text-sm text-[#7D5A50]/80 mt-1">Upload the 2 required regulatory business documents below.</p>
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider font-semibold text-[#7B5A50]">Business Registration</span>
+                <span class="text-xs bg-[#7B5A50]/10 text-[#7B5A50] px-2.5 py-0.5 rounded-full font-semibold">Page 2 of 2</span>
+              </div>
+              <h1 class="text-2xl font-bold text-[#2d201b] mt-0.5">Required Requirements</h1>
+              <p class="text-gray-600 text-sm mt-1">Upload the 2 required business documents below.</p>
             </div>
 
             <!-- Upload Progress Card -->
-            <div class="bg-white border border-[#EDD8CC] rounded-2xl p-4 flex items-center justify-between shadow-[0_1px_3px_rgba(61,43,36,0.04)]">
-              <div class="flex items-center space-x-3">
+            <div class="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between shadow-sm">
+              <div class="flex items-center space-x-2.5">
                 <div
-                  class="w-8 h-8 rounded-xl text-white flex items-center justify-center text-xs font-bold transition-colors duration-150 shadow-sm"
-                  :class="uploadedCount === 2 ? 'bg-emerald-600' : 'bg-[#7D5A50]'"
+                  class="w-6 h-6 rounded-full text-white flex items-center justify-center text-xs font-bold transition-colors"
+                  :class="uploadedCount === 2 ? 'bg-emerald-600' : 'bg-[#7B5A50]'"
                 >
                   {{ uploadedCount }}
                 </div>
-                <div>
-                  <span class="text-xs sm:text-[13px] font-bold text-[#3D2B24] block">
-                    {{ uploadedCount === 2 ? 'All 2 requirements uploaded ✓' : `${uploadedCount} of 2 requirements uploaded` }}
-                  </span>
-                  <span class="text-[11px] text-[#9E7060]">BIR Certificate and {{ cafeDocType }} document</span>
-                </div>
+                <span class="text-xs font-semibold text-[#2d201b]">
+                  {{ uploadedCount === 2 ? 'All 2 requirements uploaded ✓' : `${uploadedCount} of 2 requirements uploaded` }}
+                </span>
               </div>
-              <div class="w-24 sm:w-28 bg-[#F5EBE1] rounded-full h-2 overflow-hidden border border-[#EDD8CC]/60">
+              <div class="w-24 bg-gray-200 rounded-full h-2 overflow-hidden">
                 <div
-                  class="h-full transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]"
-                  :class="uploadedCount === 2 ? 'bg-emerald-600' : 'bg-[#7D5A50]'"
+                  class="h-full transition-all duration-300"
+                  :class="uploadedCount === 2 ? 'bg-emerald-600' : 'bg-[#7B5A50]'"
                   :style="{ width: `${(uploadedCount / 2) * 100}%` }"
                 ></div>
               </div>
@@ -2393,235 +2228,177 @@ onBeforeUnmount(() => {
             <!-- Auth Error Banner -->
             <div
               v-if="error"
-              class="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs sm:text-sm flex items-start gap-2.5 shadow-sm"
+              class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
             >
-              <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-              <span class="font-medium leading-relaxed whitespace-pre-line">{{ error }}</span>
+              <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
+              <span class="font-medium whitespace-pre-line">{{ error }}</span>
             </div>
 
-            <form @submit.prevent="handleFinalSubmit" class="space-y-5">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+            <form @submit.prevent="handleFinalSubmit" class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 <!-- 1. BIR Certificate -->
-                <div>
-                  <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                    1. BIR Certificate <span class="text-[#C2410C] font-bold">*</span>
-                  </label>
-                  <label
-                    v-if="!birFile"
-                    class="group relative flex items-center gap-3 p-3 rounded-xl border border-dashed border-[#D9C4B5] hover:border-[#7D5A50] bg-[#FFFBF7]/60 hover:bg-[#FFF8EA] transition-[border-color,background-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer"
-                  >
+                <div
+                  class="bg-white rounded-lg p-3 border transition shadow-sm"
+                  :class="birFile ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'"
+                >
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="font-semibold text-xs text-[#2d201b]">1. BIR Certificate <span class="text-red-500">*</span></label>
+                    <span v-if="birFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
+                  </div>
+                  <div v-if="!birFile">
                     <input
                       type="file"
                       @change="onBirChange"
                       accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                      class="sr-only"
+                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
                       required
                     />
-                    <div class="w-9 h-9 rounded-lg bg-white border border-[#EDD8CC] text-[#7D5A50] flex items-center justify-center shrink-0 group-hover:scale-105 group-active:scale-95 transition-transform duration-150 shadow-[0_1px_2px_rgba(61,43,36,0.04)]">
-                      <Icon name="heroicons:document-text" class="w-4 h-4" />
-                    </div>
-                    <div class="min-w-0 flex-1">
-                      <p class="text-xs font-bold text-[#3D2B24] group-hover:text-[#7D5A50] transition-colors leading-tight">
-                        BIR Certificate
-                      </p>
-                      <p class="text-[10px] text-[#9E7060] mt-0.5">JPG, PNG, or PDF</p>
-                    </div>
-                    <span class="px-2 py-1 rounded-md bg-white border border-[#EDD8CC] text-[11px] font-semibold text-[#7D5A50] group-hover:bg-[#7D5A50] group-hover:text-white transition-colors shrink-0 shadow-[0_1px_2px_rgba(61,43,36,0.03)]">
-                      Browse
-                    </span>
-                  </label>
-                  <div
-                    v-else
-                    class="flex items-center justify-between gap-2.5 p-2.5 sm:p-3 rounded-xl border border-emerald-300 bg-emerald-50/40 text-emerald-950 transition-all shadow-[0_1px_2px_rgba(16,185,129,0.06)]"
-                  >
-                    <div class="flex items-center gap-2.5 min-w-0">
-                      <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                        <Icon name="heroicons:check" class="w-4 h-4 stroke-[2.5]" />
-                      </div>
-                      <div class="min-w-0 flex-1">
-                        <p class="text-xs font-bold text-[#2D201B] truncate">{{ birFileName }}</p>
-                        <p class="text-[10px] text-emerald-700 font-semibold flex items-center gap-1 mt-0.5">
-                          <span>{{ birFileSize || 'Uploaded' }}</span>
-                        </p>
-                      </div>
+                  </div>
+                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
+                    <div class="truncate mr-2">
+                      <p class="font-medium truncate text-xs">{{ birFileName }}</p>
+                      <p class="text-[0.65rem] text-emerald-700">{{ birFileSize }}</p>
                     </div>
                     <button
                       type="button"
                       @click="clearBirFile"
-                      class="w-7 h-7 rounded-lg bg-white border border-emerald-200 text-emerald-800 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center shrink-0 transition-[transform,background-color,color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-90"
+                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
                       title="Remove file"
-                    >
-                      <Icon name="heroicons:x-mark" class="w-4 h-4" />
-                    </button>
+                    >&times;</button>
                   </div>
                 </div>
 
                 <!-- 2. DTI or SEC Document -->
-                <div>
-                  <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                    2. {{ cafeDocType }} Document <span class="text-[#C2410C] font-bold">*</span>
-                  </label>
-                  <label
-                    v-if="!dtiSecFile"
-                    class="group relative flex items-center gap-3 p-3 rounded-xl border border-dashed border-[#D9C4B5] hover:border-[#7D5A50] bg-[#FFFBF7]/60 hover:bg-[#FFF8EA] transition-[border-color,background-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer"
-                  >
+                <div
+                  class="bg-white rounded-lg p-3 border transition shadow-sm"
+                  :class="dtiSecFile ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'"
+                >
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="font-semibold text-xs text-[#2d201b]">2. {{ cafeDocType }} Document <span class="text-red-500">*</span></label>
+                    <span v-if="dtiSecFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
+                  </div>
+                  <div v-if="!dtiSecFile">
                     <input
                       type="file"
                       @change="onDtiSecChange"
                       accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                      class="sr-only"
+                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
                       required
                     />
-                    <div class="w-9 h-9 rounded-lg bg-white border border-[#EDD8CC] text-[#7D5A50] flex items-center justify-center shrink-0 group-hover:scale-105 group-active:scale-95 transition-transform duration-150 shadow-[0_1px_2px_rgba(61,43,36,0.04)]">
-                      <Icon name="heroicons:document-duplicate" class="w-4 h-4" />
-                    </div>
-                    <div class="min-w-0 flex-1">
-                      <p class="text-xs font-bold text-[#3D2B24] group-hover:text-[#7D5A50] transition-colors leading-tight">
-                        {{ cafeDocType }} Certificate
-                      </p>
-                      <p class="text-[10px] text-[#9E7060] mt-0.5">JPG, PNG, or PDF</p>
-                    </div>
-                    <span class="px-2 py-1 rounded-md bg-white border border-[#EDD8CC] text-[11px] font-semibold text-[#7D5A50] group-hover:bg-[#7D5A50] group-hover:text-white transition-colors shrink-0 shadow-[0_1px_2px_rgba(61,43,36,0.03)]">
-                      Browse
-                    </span>
-                  </label>
-                  <div
-                    v-else
-                    class="flex items-center justify-between gap-2.5 p-2.5 sm:p-3 rounded-xl border border-emerald-300 bg-emerald-50/40 text-emerald-950 transition-all shadow-[0_1px_2px_rgba(16,185,129,0.06)]"
-                  >
-                    <div class="flex items-center gap-2.5 min-w-0">
-                      <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                        <Icon name="heroicons:check" class="w-4 h-4 stroke-[2.5]" />
-                      </div>
-                      <div class="min-w-0 flex-1">
-                        <p class="text-xs font-bold text-[#2D201B] truncate">{{ dtiSecFileName }}</p>
-                        <p class="text-[10px] text-emerald-700 font-semibold flex items-center gap-1 mt-0.5">
-                          <span>{{ dtiSecFileSize || 'Uploaded' }}</span>
-                        </p>
-                      </div>
+                  </div>
+                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
+                    <div class="truncate mr-2">
+                      <p class="font-medium truncate text-xs">{{ dtiSecFileName }}</p>
+                      <p class="text-[0.65rem] text-emerald-700">{{ dtiSecFileSize }}</p>
                     </div>
                     <button
                       type="button"
                       @click="clearDtiSecFile"
-                      class="w-7 h-7 rounded-lg bg-white border border-emerald-200 text-emerald-800 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center shrink-0 transition-[transform,background-color,color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-90"
+                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
                       title="Remove file"
-                    >
-                      <Icon name="heroicons:x-mark" class="w-4 h-4" />
-                    </button>
+                    >&times;</button>
                   </div>
                 </div>
               </div>
 
               <!-- BIR Registration Details Form (Visible once BIR File is uploaded) -->
-              <div v-if="birFile" class="bg-white border border-[#EDD8CC] rounded-2xl p-4.5 sm:p-5 space-y-4 shadow-[0_1px_3px_rgba(61,43,36,0.04)]">
-                <div class="flex items-center gap-2.5 pb-2.5 border-b border-[#F5EBE1]">
-                  <div class="w-7 h-7 rounded-lg bg-[#7D5A50]/10 text-[#7D5A50] flex items-center justify-center shrink-0">
-                    <Icon name="heroicons:clipboard-document-check" class="w-4 h-4" />
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center justify-between">
-                      <h3 class="font-display text-sm font-bold text-[#3D2B24] leading-none">BIR Registration Details</h3>
-                      <span class="text-[10px] bg-[#7D5A50]/10 text-[#7D5A50] font-bold px-2 py-0.5 rounded-full">
-                        Required
-                      </span>
-                    </div>
-                    <p class="text-[11px] text-[#9E7060] mt-0.5">Tax and registration certificate particulars</p>
-                  </div>
+              <div v-if="birFile" class="bg-white border border-[#7B5A50]/20 rounded-lg p-4 space-y-3.5 shadow-sm">
+                <div class="flex items-center gap-2 border-b border-gray-100 pb-2">
+                  <Icon name="heroicons:clipboard-document-check" class="w-5 h-5 text-[#7B5A50]" />
+                  <h3 class="text-sm font-bold text-[#2d201b]">BIR Registration Details</h3>
+                  <span class="text-[0.65rem] bg-[#7B5A50]/10 text-[#7B5A50] font-semibold px-2 py-0.5 rounded-full ml-auto">
+                    Required Information
+                  </span>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
                   <!-- TIN Number -->
                   <div class="space-y-1">
-                    <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                      Tax Identification Number (TIN) <span class="text-[#C2410C] font-bold">*</span>
-                    </label>
+                    <label class="block font-semibold text-[#2d201b]">TIN</label>
                     <input
                       v-model="tinNumber"
                       type="text"
                       placeholder="XXX-XXX-XXX-00000"
                       maxlength="17"
                       :class="[
-                        'w-full h-11 rounded-xl border px-3.5 outline-none transition-[border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] bg-white text-xs sm:text-sm text-[#3D2B24] font-mono tracking-wider shadow-[0_1px_2px_rgba(61,43,36,0.02)]',
+                        'w-full h-10 rounded-md border px-3 outline-none transition bg-white text-xs text-[#2d201b] font-mono tracking-wider',
                         fieldErrors.tin_number
-                          ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/15 bg-red-50/10'
-                          : 'border-[#E5D7CD] hover:border-[#C4A493] focus:border-[#7D5A50] focus:ring-2 focus:ring-[#7D5A50]/15'
+                          ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                          : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
                       ]"
                       required
                       @input="onTinInput"
                     />
-                    <p v-if="fieldErrors.tin_number" class="text-[11px] text-red-600 font-semibold mt-1">{{ fieldErrors.tin_number }}</p>
+                    <p v-if="fieldErrors.tin_number" class="text-[0.7rem] text-red-600 font-medium">{{ fieldErrors.tin_number }}</p>
                   </div>
 
-                  <!-- VAT Status Option Segmented Control -->
+                  <!-- VAT Status Option Buttons -->
                   <div class="space-y-1">
-                    <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                      VAT Registration Type <span class="text-[#C2410C] font-bold">*</span>
-                    </label>
-                    <div class="h-11 p-1 bg-[#F5EBE1] border border-[#EDD8CC] rounded-xl flex items-center gap-1">
+                    <label class="block font-semibold text-[#2d201b]">VAT Registration Type</label>
+                    <div class="grid grid-cols-2 gap-2 h-10">
                       <button
                         type="button"
                         @click="vat = 'vat-registered'; clearFieldError('vat')"
-                        class="flex-1 h-full rounded-[9px] text-xs font-bold transition-[transform,background-color,color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
-                        :class="vat === 'vat-registered'
-                          ? 'bg-[#7D5A50] text-white shadow-sm'
-                          : 'text-[#7D5A50] hover:text-[#3D2B24] hover:bg-white/50'"
+                        :class="[
+                          'rounded-md text-xs font-semibold transition flex items-center justify-center border',
+                          vat === 'vat-registered'
+                            ? 'bg-[#7B5A50] text-white border-[#7B5A50] shadow-sm'
+                            : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
+                        ]"
                       >
-                        VAT Registered
+                        VAT
                       </button>
                       <button
                         type="button"
                         @click="vat = 'non-vat'; clearFieldError('vat')"
-                        class="flex-1 h-full rounded-[9px] text-xs font-bold transition-[transform,background-color,color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
-                        :class="vat === 'non-vat'
-                          ? 'bg-[#7D5A50] text-white shadow-sm'
-                          : 'text-[#7D5A50] hover:text-[#3D2B24] hover:bg-white/50'"
+                        :class="[
+                          'rounded-md text-xs font-semibold transition flex items-center justify-center border',
+                          vat === 'non-vat'
+                            ? 'bg-[#7B5A50] text-white border-[#7B5A50] shadow-sm'
+                            : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
+                        ]"
                       >
                         Non-VAT
                       </button>
                     </div>
-                    <p v-if="fieldErrors.vat" class="text-[11px] text-red-600 font-semibold mt-1">{{ fieldErrors.vat }}</p>
+                    <p v-if="fieldErrors.vat" class="text-[0.7rem] text-red-600 font-medium">{{ fieldErrors.vat }}</p>
                   </div>
 
                   <!-- BIR Registered Date -->
-                  <div class="space-y-1 sm:col-span-2">
-                    <label class="block text-xs font-semibold text-[#3D2B24] mb-1.5 tracking-tight">
-                      BIR Registration Date <span class="text-[#C2410C] font-bold">*</span>
-                    </label>
+                  <div class="space-y-1">
+                    <label class="block font-semibold text-[#2d201b]">BIR Registration Date</label>
                     <input
                       v-model="birRegisteredAt"
                       type="date"
                       :class="[
-                        'w-full h-11 rounded-xl border px-3.5 outline-none transition-[border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] bg-white text-sm text-[#3D2B24] font-medium shadow-[0_1px_2px_rgba(61,43,36,0.02)] cursor-pointer',
+                        'w-full h-10 rounded-md border px-3 outline-none transition bg-white text-xs text-[#2d201b]',
                         fieldErrors.bir_registered_at
-                          ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/15 bg-red-50/10'
-                          : 'border-[#E5D7CD] hover:border-[#C4A493] focus:border-[#7D5A50] focus:ring-2 focus:ring-[#7D5A50]/15'
+                          ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                          : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
                       ]"
                       required
                       @change="clearFieldError('bir_registered_at')"
                     />
-                    <p v-if="fieldErrors.bir_registered_at" class="text-[11px] text-red-600 font-semibold mt-1">{{ fieldErrors.bir_registered_at }}</p>
+                    <p v-if="fieldErrors.bir_registered_at" class="text-[0.7rem] text-red-600 font-medium">{{ fieldErrors.bir_registered_at }}</p>
                   </div>
                 </div>
               </div>
 
-              <!-- Action Row Buttons -->
               <div class="flex items-center gap-3 pt-2">
                 <button
                   type="button"
-                  class="w-1/3 h-12 rounded-xl bg-white border border-[#D9C4B5] text-[#7D5A50] font-semibold text-sm hover:bg-[#FDF8F3] hover:border-[#B4846C] active:scale-[0.98] shadow-[0_1px_2px_rgba(61,43,36,0.04)] transition-[transform,background-color,border-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center justify-center gap-1.5 cursor-pointer"
+                  class="w-1/3 h-11 rounded-md border border-[#7B5A50] text-[#7B5A50] font-medium hover:bg-[#7B5A50]/10 transition"
                   @click="prevBusinessSubPage"
                 >
-                  <Icon name="heroicons:arrow-left" class="w-4 h-4 stroke-[2.5]" />
-                  <span>Back</span>
+                  Back
                 </button>
                 <button
                   type="submit"
                   :disabled="loading || uploadedCount < 2 || (!!birFile && (!tinNumber || !birRegisteredAt || !vat))"
-                  class="w-2/3 h-12 rounded-xl bg-[#7D5A50] text-white font-semibold text-sm hover:bg-[#6A4B42] active:scale-[0.98] shadow-[0_2px_4px_rgba(61,43,36,0.12)] hover:shadow-[0_4px_10px_rgba(61,43,36,0.18)] transition-[transform,background-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+                  class="w-2/3 h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <span v-if="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  <span>{{ loading ? 'Submitting...' : 'Submit Registration' }}</span>
-                  <Icon v-if="!loading" name="heroicons:check" class="w-4 h-4 stroke-[2.5]" />
+                  {{ loading ? 'Submitting...' : 'Submit Registration' }}
                 </button>
               </div>
             </form>
@@ -2707,14 +2484,14 @@ onBeforeUnmount(() => {
 <style scoped>
 .fade-slide-enter-active,
 .fade-slide-leave-active {
-  transition: opacity 220ms cubic-bezier(0.23, 1, 0.32, 1), transform 220ms cubic-bezier(0.23, 1, 0.32, 1);
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 .fade-slide-enter-from {
   opacity: 0;
-  transform: translateY(8px) scale(0.99);
+  transform: translateY(15px);
 }
 .fade-slide-leave-to {
   opacity: 0;
-  transform: translateY(-8px) scale(0.99);
+  transform: translateY(-15px);
 }
 </style>

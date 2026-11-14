@@ -48,8 +48,23 @@ function openDatePicker() {
       @update:model-value="emit('update:search', $event)"
     />
 
-    <!-- Date filter (status lives in the tabs above the table) -->
-    <div class="w-full md:w-auto">
+    <!-- Dropdowns Grid (Side-by-side on mobile, inline on desktop) -->
+    <div class="grid grid-cols-2 w-full
+                min-[360px]:gap-[12px]
+                md:flex md:w-auto md:items-center md:gap-[24px]">
+      <!-- Status Dropdown -->
+      <div class="w-full
+                  md:w-40">
+        <DropdownList
+          :model-value="status"
+          :options="statusOptions"
+          size="sm"
+          class="font-sans"
+          aria-label="Filter by status"
+          @update:model-value="emit('update:status', $event)"
+        />
+      </div>
+
       <!-- Date Dropdown -->
       <div class="relative w-full
                   md:w-auto">

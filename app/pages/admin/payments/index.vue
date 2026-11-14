@@ -15,14 +15,12 @@ const links = [
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row min-h-screen bg-[#FDF3E7] w-full overflow-x-hidden">
+  <div class="flex flex-col md:flex-row min-h-screen bg-[#FDF3E7]">
     <!-- Sidebar Navigation -->
     <NavBar :links="links" />
 
-    <main class="flex-1 min-w-0 overflow-x-hidden p-3.5 min-[360px]:p-4 sm:p-6 md:p-8 xl:p-10">
-      <div class="mx-auto max-w-[1360px] w-full min-w-0">
-        <AdminPaymentHistory />
-      </div>
+    <main class="flex-1 p-6 md:p-12">
+      <AdminPaymentHistory />
     </main>
   </div>
 </template>

@@ -324,9 +324,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown, true))
                           <span v-if="txn.status?.toLowerCase() === 'refunded'" class="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300">
                             REFUNDED
                           </span>
-                          <span v-else-if="txn.status?.toLowerCase() === 'voided'" class="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-300">
-                            VOIDED
-                          </span>
                           <span v-else-if="!isSettled(txn.status)" class="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-50 text-red-800 border border-red-200">
                             {{ txn.status }}
                           </span>
