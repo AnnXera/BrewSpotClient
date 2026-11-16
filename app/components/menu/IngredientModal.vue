@@ -1,5 +1,5 @@
 <!-- app/components/menu/IngredientModal.vue -->
-<!-- Add or edit an ingredient: rename, change unit (only while unused), retire/restore. -->
+<!-- Add or edit an ingredient: rename, change unit, retire/restore. -->
 <script setup lang="ts">
 import { INGREDIENT_UNITS, INGREDIENT_UNIT_OPTIONS } from '~/utils/constants'
 import type { Ingredient, IngredientPayload } from '~/services/MenuService'
@@ -36,8 +36,11 @@ const confirmModal = ref({
 
 const isEditMode = computed(() => !!props.ingredient)
 
-// Recipe amounts are stored in the ingredient's unit, so it's fixed while in use.
-const unitLocked = computed(() => (props.ingredient?.used_in ?? 0) > 0)
+// Recipe amounts are stored in the ingredient's unit and are not converted,
+// so warn when changing the unit of an ingredient that recipes already use.
+const unitChangedWhileUsed = computed(() =>
+  !!props.ingredient && props.ingredient.used_in > 0 && form.value.unit !== props.ingredient.unit
+)
 
 watch(() => props.show, (open) => {
   if (!open) return
@@ -78,7 +81,7 @@ function submit() {
     return
   }
 
-  save(unitLocked.value ? { name: form.value.name } : { name: form.value.name, unit: form.value.unit })
+  save({ name: form.value.name, unit: form.value.unit })
 }
 
 function toggleActive() {
@@ -162,13 +165,12 @@ function toggleActive() {
           <DropdownList
             v-model="form.unit"
             :options="INGREDIENT_UNIT_OPTIONS"
-            :disabled="unitLocked"
             :invalid="!!errors.unit"
           />
           <p v-if="errors.unit" class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.unit }}</p>
-          <p v-else-if="unitLocked" class="text-[#9E7060] text-xs mt-1 ml-1">
-            Used in {{ ingredient!.used_in }} {{ ingredient!.used_in === 1 ? 'item' : 'items' }}, so the unit can't change.
-            Remove it from those recipes first.
+          <p v-else-if="unitChangedWhileUsed" class="text-amber-700 text-xs font-medium mt-1 ml-1">
+            Used in {{ ingredient!.used_in }} {{ ingredient!.used_in === 1 ? 'item' : 'items' }}. Recipe amounts stay the same number
+            but will now read as {{ form.unit }}, so review those recipes after saving.
           </p>
         </div>
 
