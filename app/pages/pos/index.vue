@@ -641,6 +641,66 @@ const selectedPaymentMethod = ref('cash')
 const amountTendered = ref<number | string>('')
 const referenceNumber = ref('')
 const discountIdNumber = ref('')
+const discountIdImage = ref('')
+const isCameraModalOpen = ref(false)
+const discountFileInputRef = ref<HTMLInputElement | null>(null)
+const previewIdPhotoModalOpen = ref(false)
+
+function openCameraForDiscount() {
+  isCameraModalOpen.value = true
+}
+
+function onDiscountPhotoCaptured(dataUrl: string) {
+  discountIdImage.value = dataUrl
+}
+
+function triggerDiscountUpload() {
+  discountFileInputRef.value?.click()
+}
+
+function onDiscountFileSelected(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target?.files?.[0]
+  if (!file) return
+
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const raw = e.target?.result as string
+    if (!raw) return
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const maxDim = 1280
+      let { width, height } = img
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width)
+          width = maxDim
+        } else {
+          width = Math.round((width * maxDim) / height)
+          height = maxDim
+        }
+      }
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      ctx?.drawImage(img, 0, 0, width, height)
+      discountIdImage.value = canvas.toDataURL('image/jpeg', 0.85)
+    }
+    img.src = raw
+  }
+  reader.readAsDataURL(file)
+  target.value = ''
+}
+
+function removeDiscountPhoto() {
+  discountIdImage.value = ''
+}
+
+const isDiscountPhotoValid = computed(() => {
+  if (selectedDiscountType.value === 'none') return true
+  return !!discountIdImage.value
+})
 
 const changeAmount = computed(() => {
   if (selectedPaymentMethod.value !== 'cash') return 0
@@ -700,8 +760,10 @@ function formatDiscountId() {
 const canCheckout = computed(() => {
   if (cart.value.length === 0) return false
   if (!isOnline.value) return false
-  if (selectedDiscountType.value !== 'none' && !isDiscountIdValid.value) {
-    return false
+  if (selectedDiscountType.value !== 'none') {
+    if (!isDiscountIdValid.value || !isDiscountPhotoValid.value) {
+      return false
+    }
   }
   if (selectedPaymentMethod.value === 'cash') {
     return Number(amountTendered.value) >= total.value
@@ -713,7 +775,14 @@ const canCheckout = computed(() => {
 })
 
 
-watch([() => cart.value.length, total, selectedPaymentMethod, amountTendered, referenceNumber, discountIdNumber, selectedDiscountType], () => { checkoutError.value = '' })
+watch([() => cart.value.length, total, selectedPaymentMethod, amountTendered, referenceNumber, discountIdNumber, discountIdImage, selectedDiscountType], () => { checkoutError.value = '' })
+
+watch(selectedDiscountType, (newType) => {
+  if (newType === 'none') {
+    discountIdNumber.value = ''
+    discountIdImage.value = ''
+  }
+})
 
 const cartCount = computed(() => cart.value.reduce((n, i) => n + i.quantity, 0))
 
@@ -736,11 +805,13 @@ const shortBy = computed(() => {
 
 const checkoutHint = computed(() => {
   if (!isOnline.value) return 'Offline. Reconnect to record the sale.'
-  if (selectedDiscountType.value === 'PWD' && !isDiscountIdValid.value) {
-    return 'Enter complete PWD ID format: 03-5416-000-0000021 to continue.'
+  if (selectedDiscountType.value === 'PWD') {
+    if (!isDiscountIdValid.value) return 'Enter complete PWD ID format: 03-5416-000-0000021 to continue.'
+    if (!discountIdImage.value) return 'Upload or take a photo of the PWD ID for verification.'
   }
-  if (selectedDiscountType.value === 'Senior' && !isDiscountIdValid.value) {
-    return 'Enter complete Senior (OSCA) ID format (e.g. OSCA-1234567) to continue.'
+  if (selectedDiscountType.value === 'Senior') {
+    if (!isDiscountIdValid.value) return 'Enter complete Senior (OSCA) ID format (e.g. OSCA-1234567) to continue.'
+    if (!discountIdImage.value) return 'Upload or take a photo of the Senior Citizen ID for verification.'
   }
   if (selectedPaymentMethod.value === 'cash') {
     return Number(amountTendered.value) > 0 ? 'Amount tendered is less than the total.' : 'Enter the cash received to continue.'
@@ -775,8 +846,10 @@ watch([isPaymentModalOpen, selectedPaymentMethod], async ([open]) => {
   if (selectedDiscountType.value !== 'none' && !isDiscountIdValid.value) {
     if (selectedDiscountType.value === 'PWD') pwdIdInputRef.value?.focus()
     else if (selectedDiscountType.value === 'Senior') seniorIdInputRef.value?.focus()
+  } else if (selectedPaymentMethod.value === 'cash') {
+    tenderInput.value?.focus()
   } else {
-    ;(tenderInput.value ?? referenceInput.value)?.focus()
+    referenceInput.value?.focus()
   }
 })
 
@@ -814,7 +887,9 @@ async function completeOrder() {
       fullRef || referenceNumber.value,
       selectedDiscountType.value !== 'none' ? selectedDiscountType.value : undefined,
       discountAmount.value,
-      selectedOrderType.value
+      selectedOrderType.value,
+      discountIdNumber.value.trim() || undefined,
+      discountIdImage.value || undefined
     )
     if (res.success) {
       completedOrderDetails.value = {
@@ -826,6 +901,7 @@ async function completeOrder() {
         discountType: selectedDiscountType.value,
         discountAmount: discountAmount.value,
         discountIdNumber: discountIdNumber.value.trim(),
+        discountIdImage: discountIdImage.value,
         total: currentTotal,
         paymentMethod: currentMethod,
         change: currentChange,
@@ -839,6 +915,7 @@ async function completeOrder() {
       amountTendered.value = ''
       referenceNumber.value = ''
       discountIdNumber.value = ''
+      discountIdImage.value = ''
       selectedDiscountType.value = 'none'
       selectedOrderType.value = 'dine_in'
       // Servings left changed with this sale.
@@ -1364,12 +1441,12 @@ function formatCurrency(amount: number) {
                   class="flex-1 min-w-0 flex flex-col transition-opacity duration-200"
                   :class="item.description?.trim() ? 'group-hover:opacity-0 group-focus-visible:opacity-0' : ''"
                 >
-                  <h3 class="font-bold text-xs sm:text-sm text-[#2D201B] leading-snug break-words [overflow-wrap:anywhere]">
+                  <h3 class="font-bold text-xs sm:text-sm text-[#2D201B] leading-snug [overflow-wrap:anywhere]">
                     {{ item.menu_name }}
                   </h3>
 
                   <div class="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 mt-auto pt-2">
-                    <span class="min-w-0 text-[11px] text-[#8A6E64] capitalize break-words [overflow-wrap:anywhere]">
+                    <span class="min-w-0 text-[11px] text-[#8A6E64] capitalize [overflow-wrap:anywhere]">
                       {{ getCategoryName(item.category_uuid) }}
                     </span>
                     <span class="ml-auto font-bold text-xs sm:text-sm text-[#2D201B] tabular-nums whitespace-nowrap">
@@ -1387,10 +1464,10 @@ function formatCurrency(amount: number) {
                   v-if="item.description?.trim()"
                   class="desc-overlay absolute inset-0 z-10 rounded-2xl bg-white p-3 flex flex-col overflow-y-auto opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto group-focus-visible:opacity-100 group-focus-visible:translate-y-0"
                 >
-                  <p class="font-bold text-xs sm:text-sm text-[#2D201B] leading-snug break-words [overflow-wrap:anywhere]">
+                  <p class="font-bold text-xs sm:text-sm text-[#2D201B] leading-snug [overflow-wrap:anywhere]">
                     {{ item.menu_name }}
                   </p>
-                  <p class="mt-1.5 text-[11px] sm:text-xs leading-relaxed text-[#A4847A] whitespace-pre-line break-words [overflow-wrap:anywhere]">
+                  <p class="mt-1.5 text-[11px] sm:text-xs leading-relaxed text-[#A4847A] whitespace-pre-line [overflow-wrap:anywhere]">
                     {{ item.description.trim() }}
                   </p>
                   <p class="mt-auto pt-2 font-bold text-xs sm:text-sm text-[#2D201B] tabular-nums">
@@ -1599,17 +1676,24 @@ function formatCurrency(amount: number) {
         </aside>
       </main>
 
-      <!-- ── PAYMENT MODAL ────────────────────────────────────────────────── -->
-      <div v-if="isPaymentModalOpen" role="dialog" aria-modal="true" aria-labelledby="pay-title" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4 print:hidden" @click.self="closePayment">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden modal-pop max-h-[92vh] border border-[#EFECE6]">
+      <!-- ── PAYMENT MODAL (Extended Width, Non-Scrollable, Emil Kowalski Polish) ────────────────────────────────── -->
+      <div
+        v-if="isPaymentModalOpen"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pay-title"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-gray-900/40 backdrop-blur-sm print:hidden"
+        @click.self="closePayment"
+      >
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[720px] flex flex-col modal-pop my-auto border border-[#EFECE6] overflow-hidden">
           <!-- Modal Header -->
-          <div class="px-5 py-3.5 border-b border-[#EFECE6] flex items-center justify-between bg-[#FAF8F5] shrink-0">
-            <div class="flex items-center gap-2">
-              <div class="w-7 h-7 rounded-lg bg-[#7B5A50]/10 flex items-center justify-center text-[#7B5A50]">
-                <Icon name="heroicons:credit-card" class="w-4 h-4" />
+          <div class="px-6 py-3 border-b border-[#EFECE6] flex items-center justify-between bg-[#FAF8F5] shrink-0">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-xl bg-[#7B5A50]/10 flex items-center justify-center text-[#7B5A50]">
+                <Icon name="heroicons:credit-card" class="w-4.5 h-4.5" />
               </div>
               <h2 id="pay-title" class="text-base sm:text-lg font-bold text-[#2D201B]">Process Payment</h2>
-              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#F6EBDD] text-[#3D2B24] border border-[#D5BEAA]">
+              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#F6EBDD] text-[#3D2B24] border border-[#D5BEAA]">
                 <Icon
                   :name="selectedOrderType === 'delivery' ? 'heroicons:truck' : selectedOrderType === 'take_out' ? 'heroicons:shopping-bag' : 'heroicons:building-storefront'"
                   class="w-3 h-3 text-[#7B5A50]"
@@ -1617,252 +1701,333 @@ function formatCurrency(amount: number) {
                 {{ formatOrderType(selectedOrderType) }}
               </span>
             </div>
-            <button @click="closePayment" :disabled="isProcessingOrder" aria-label="Close payment" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-white rounded-lg border border-transparent hover:border-[#EFECE6] transition-all disabled:opacity-50">
+            <button
+              @click="closePayment"
+              :disabled="isProcessingOrder"
+              aria-label="Close payment"
+              class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-white rounded-lg border border-transparent hover:border-[#EFECE6] transition-all duration-150 disabled:opacity-50 cursor-pointer active:scale-95"
+            >
               <Icon name="heroicons:x-mark" class="w-4 h-4" />
             </button>
           </div>
 
-          <fieldset :disabled="isProcessingOrder" class="m-0 border-0 min-w-0 px-5 py-3.5 space-y-3 overflow-y-auto" :class="{ 'opacity-60': isProcessingOrder }">
-            <!-- Total Due Banner matching Image 3 -->
-            <div class="flex items-baseline justify-between pt-0.5">
-              <div>
-                <span class="text-xs font-bold text-[#8A6E64] uppercase tracking-wider block">Total due</span>
-                <span v-if="discountAmount > 0" class="text-[11px] font-semibold text-red-600">
-                  {{ selectedDiscountType }} (-{{ formatCurrency(discountAmount) }})
-                </span>
-              </div>
-              <span class="font-display text-3xl sm:text-4xl font-extrabold text-[#7B5A50] tabular-nums tracking-tight">{{ formatCurrency(total) }}</span>
-            </div>
-
-            <!-- Payment Method Buttons matching Image 2 & 3 (Banknote, Card, Smartphone) -->
-            <div role="radiogroup" aria-label="Payment method" class="grid grid-cols-3 gap-2">
-              <!-- Cash (Banknote icon) -->
-              <button
-                type="button"
-                role="radio"
-                :aria-checked="selectedPaymentMethod === 'cash'"
-                @click="selectedPaymentMethod = 'cash'"
-                class="h-14 rounded-xl border flex flex-col items-center justify-center gap-1 text-xs font-bold transition-all active:scale-95"
-                :class="selectedPaymentMethod === 'cash' ? 'border-[#7B5A50] bg-[#FAF8F5] text-[#7B5A50] ring-1 ring-[#7B5A50]' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'"
-              >
-                <svg class="w-5 h-4.5" viewBox="0 0 24 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="2" y="2" width="20" height="16" rx="2" />
-                  <circle cx="12" cy="10" r="3" />
-                  <line x1="5" y1="10" x2="5.01" y2="10" stroke-width="2" />
-                  <line x1="19" y1="10" x2="19.01" y2="10" stroke-width="2" />
-                </svg>
-                <span>Cash</span>
-              </button>
-
-              <!-- Card (Credit Card icon) -->
-              <button
-                type="button"
-                role="radio"
-                :aria-checked="selectedPaymentMethod === 'card'"
-                @click="selectedPaymentMethod = 'card'"
-                class="h-14 rounded-xl border flex flex-col items-center justify-center gap-1 text-xs font-bold transition-all active:scale-95"
-                :class="selectedPaymentMethod === 'card' ? 'border-[#7B5A50] bg-[#FAF8F5] text-[#7B5A50] ring-1 ring-[#7B5A50]' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'"
-              >
-                <svg class="w-5 h-4.5" viewBox="0 0 24 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="2" y="3" width="20" height="14" rx="2" />
-                  <line x1="2" y1="8" x2="22" y2="8" stroke-width="1.75" />
-                </svg>
-                <span>Card</span>
-              </button>
-
-              <!-- E-Wallet (Smartphone icon) -->
-              <button
-                type="button"
-                role="radio"
-                :aria-checked="selectedPaymentMethod === 'ewallet'"
-                @click="selectedPaymentMethod = 'ewallet'"
-                class="h-14 rounded-xl border flex flex-col items-center justify-center gap-1 text-xs font-bold transition-all active:scale-95"
-                :class="selectedPaymentMethod === 'ewallet' ? 'border-[#7B5A50] bg-[#FAF8F5] text-[#7B5A50] ring-1 ring-[#7B5A50]' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'"
-              >
-                <svg class="w-4.5 h-5.5" viewBox="0 0 20 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="4" y="2" width="12" height="20" rx="2.5" />
-                  <line x1="8.5" y1="5" x2="11.5" y2="5" stroke-width="1.5" stroke-linecap="round" />
-                  <circle cx="10" cy="18.5" r="1" fill="currentColor" />
-                </svg>
-                <span>E-Wallet</span>
-              </button>
-            </div>
-
-            <!-- PWD ID Requirement (Format: 03-5416-000-0000021, max 19 chars) -->
-            <div v-if="selectedDiscountType === 'PWD'" class="p-3 bg-[#FAF8F5] border border-[#EAE3D9] rounded-xl space-y-1.5">
-              <div class="flex items-center justify-between">
-                <label for="pwd-id-input" class="text-xs font-bold text-[#7B5A50] flex items-center gap-1.5 cursor-pointer">
-                  <Icon name="heroicons:identification" class="w-4 h-4 text-[#7B5A50]" />
-                  <span>PWD ID Number</span>
-                  <span class="text-red-500">*</span>
-                </label>
-                <span class="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">20% Discount</span>
-              </div>
-              <input
-                id="pwd-id-input"
-                ref="pwdIdInputRef"
-                v-model="discountIdNumber"
-                @input="formatDiscountId"
-                type="text"
-                maxlength="19"
-                placeholder="03-5416-000-0000021"
-                class="w-full h-10 bg-white border border-[#D8CEBE] focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] text-[#2D201B] placeholder:text-gray-400 rounded-lg px-3 text-xs sm:text-sm font-semibold tracking-wider font-mono outline-none transition-all"
-              />
-              <div class="flex items-center justify-between text-[11px]">
-                <p class="text-gray-500 flex items-center gap-1">
-                  <span>Format:</span>
-                  <span class="font-mono font-bold text-[#7B5A50] bg-white px-1.5 py-0.5 rounded border border-[#EAE3D9]">03-5416-000-0000021</span>
-                </p>
-                <span v-if="isDiscountIdValid" class="text-emerald-700 font-semibold flex items-center gap-1">
-                  <Icon name="heroicons:check-circle" class="w-3.5 h-3.5" /> Valid PWD ID
-                </span>
-                <span v-else-if="discountIdNumber" class="text-red-600 font-medium">
-                  Must follow format
-                </span>
-              </div>
-            </div>
-
-            <!-- Senior Citizen (OSCA) ID Requirement (Format: OSCA-XXXXXXX, max 12 chars) -->
-            <div v-else-if="selectedDiscountType === 'Senior'" class="p-3 bg-[#FAF8F5] border border-[#EAE3D9] rounded-xl space-y-1.5">
-              <div class="flex items-center justify-between">
-                <label for="senior-id-input" class="text-xs font-bold text-[#7B5A50] flex items-center gap-1.5 cursor-pointer">
-                  <Icon name="heroicons:identification" class="w-4 h-4 text-[#7B5A50]" />
-                  <span>Senior Citizen (OSCA) ID Number</span>
-                  <span class="text-red-500">*</span>
-                </label>
-                <span class="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">20% Discount</span>
-              </div>
-              <input
-                id="senior-id-input"
-                ref="seniorIdInputRef"
-                v-model="discountIdNumber"
-                @input="formatDiscountId"
-                type="text"
-                maxlength="12"
-                placeholder="OSCA-1234567"
-                class="w-full h-10 bg-white border border-[#D8CEBE] focus:border-[#7B5A50] focus:ring-1 focus:ring-[#7B5A50] text-[#2D201B] placeholder:text-gray-400 rounded-lg px-3 text-xs sm:text-sm font-semibold tracking-wider font-mono outline-none transition-all uppercase"
-              />
-              <div class="flex items-center justify-between text-[11px]">
-                <p class="text-gray-500 flex items-center gap-1">
-                  <span>Format:</span>
-                  <span class="font-mono font-bold text-[#7B5A50] bg-white px-1.5 py-0.5 rounded border border-[#EAE3D9]">OSCA-XXXXXXX</span>
-                </p>
-                <span v-if="isDiscountIdValid" class="text-emerald-700 font-semibold flex items-center gap-1">
-                  <Icon name="heroicons:check-circle" class="w-3.5 h-3.5" /> Valid OSCA ID
-                </span>
-                <span v-else-if="discountIdNumber" class="text-red-600 font-medium">
-                  Must follow OSCA-XXXXX
-                </span>
-              </div>
-            </div>
-
-            <!-- Cash Tendered Input -->
-            <div v-if="selectedPaymentMethod === 'cash'" class="space-y-2.5">
-              <label class="block">
-                <span class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">Amount tendered</span>
-                <div class="relative flex items-center">
-                  <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xl font-bold text-[#7B5A50] select-none pointer-events-none">&#8369;</span>
-                  <input
-                    ref="tenderInput"
-                    v-model="amountTendered"
-                    @keydown.enter="completeOrder"
-                    type="number"
-                    inputmode="decimal"
-                    min="0"
-                    step="0.01"
-                    class="w-full h-13 sm:h-14 bg-white border-2 border-gray-200 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/15 text-gray-900 rounded-xl pl-10 pr-10 text-2xl font-extrabold tabular-nums outline-none transition-all shadow-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    placeholder="0.00"
-                  />
-                  <button
-                    v-if="amountTendered"
-                    type="button"
-                    @click="amountTendered = ''; tenderInput?.focus()"
-                    title="Clear amount"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 flex items-center justify-center transition-colors active:scale-90"
-                  >
-                    <Icon name="heroicons:x-mark" class="w-4 h-4" />
-                  </button>
-                </div>
-              </label>
-
-              <!-- Quick cash amount buttons -->
-              <div class="flex items-center gap-1.5 flex-wrap">
-                <span class="text-xs font-semibold text-gray-400">Quick:</span>
-                <button
-                  type="button"
-                  @click="amountTendered = total"
-                  class="h-7.5 px-2.5 rounded-lg bg-[#FAF8F5] border border-[#EAE3D9] hover:bg-[#F2ECE4] text-xs font-bold text-[#7B5A50] transition-all shadow-xs active:scale-95"
-                >
-                  Exact ({{ formatCurrency(total) }})
-                </button>
-                <button
-                  v-if="total < 200"
-                  type="button"
-                  @click="amountTendered = 200"
-                  class="h-7.5 px-2.5 rounded-lg bg-[#FAF8F5] border border-[#EAE3D9] hover:bg-[#F2ECE4] text-xs font-bold text-[#7B5A50] transition-all shadow-xs active:scale-95"
-                >
-                  ₱200
-                </button>
-                <button
-                  v-if="total < 500"
-                  type="button"
-                  @click="amountTendered = 500"
-                  class="h-7.5 px-2.5 rounded-lg bg-[#FAF8F5] border border-[#EAE3D9] hover:bg-[#F2ECE4] text-xs font-bold text-[#7B5A50] transition-all shadow-xs active:scale-95"
-                >
-                  ₱500
-                </button>
-                <button
-                  v-if="total < 1000"
-                  type="button"
-                  @click="amountTendered = 1000"
-                  class="h-7.5 px-2.5 rounded-lg bg-[#FAF8F5] border border-[#EAE3D9] hover:bg-[#F2ECE4] text-xs font-bold text-[#7B5A50] transition-all shadow-xs active:scale-95"
-                >
-                  ₱1,000
-                </button>
-              </div>
-
-              <!-- Compact & Sleek Change Due / Still Needed Display Banner -->
-              <div
-                v-if="Number(amountTendered) > 0"
-                class="px-3.5 py-2.5 rounded-xl border flex justify-between items-center transition-all shadow-2xs"
-                :class="shortBy > 0 ? 'bg-red-50/90 border-red-200 text-red-700' : 'bg-emerald-50/90 border-emerald-300 text-emerald-800'"
-                aria-live="polite"
-              >
-                <div class="flex items-center gap-2">
-                  <span class="w-2.5 h-2.5 rounded-full shrink-0" :class="shortBy > 0 ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'"></span>
-                  <div>
-                    <span class="text-xs font-bold uppercase tracking-wider block leading-tight">
-                      {{ shortBy > 0 ? 'Still needed' : 'Change Due' }}
+          <!-- Modal Body (Generous non-scrollable layout) -->
+          <div class="px-6 py-3.5 space-y-3">
+            <fieldset :disabled="isProcessingOrder" class="m-0 border-0 p-0 min-w-0 space-y-3" :class="{ 'opacity-60': isProcessingOrder }">
+              <!-- Top Row: Total Due + Payment Methods -->
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-[#F0EBE3]">
+                <div>
+                  <span class="text-xs font-bold text-[#8A6E64] uppercase tracking-wider block">Total due</span>
+                  <div class="flex items-baseline gap-2">
+                    <span class="font-display text-2xl sm:text-3xl font-extrabold text-[#7B5A50] tabular-nums tracking-tight">{{ formatCurrency(total) }}</span>
+                    <span v-if="discountAmount > 0" class="text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                      {{ selectedDiscountType }} (-{{ formatCurrency(discountAmount) }})
                     </span>
-                    <span v-if="shortBy === 0 && changeAmount > 0" class="text-[10px] text-emerald-700 font-semibold block leading-tight">Return to customer</span>
                   </div>
                 </div>
-                <span class="text-xl sm:text-2xl font-black tabular-nums tracking-tight">
-                  {{ formatCurrency(shortBy > 0 ? shortBy : changeAmount) }}
-                </span>
+
+                <!-- Payment Method Buttons (Cash, Card, E-Wallet) -->
+                <div role="radiogroup" aria-label="Payment method" class="grid grid-cols-3 gap-2 sm:w-[320px]">
+                  <button
+                    v-for="pm in paymentMethods"
+                    :key="pm.value"
+                    type="button"
+                    role="radio"
+                    :aria-checked="selectedPaymentMethod === pm.value"
+                    @click="selectedPaymentMethod = pm.value as any"
+                    class="h-10 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all duration-150 active:scale-[0.97] cursor-pointer"
+                    :class="selectedPaymentMethod === pm.value ? 'border-[#7B5A50] bg-[#FAF8F5] text-[#7B5A50] ring-1 ring-[#7B5A50] shadow-xs' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'"
+                  >
+                    <Icon :name="pm.icon" class="w-4 h-4" />
+                    <span>{{ pm.label }}</span>
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <!-- Card / E-Wallet Reference Number Input -->
-            <label v-else class="block space-y-1.5">
-              <span class="block text-xs font-bold text-gray-600 uppercase tracking-wider">Reference number</span>
-              <input ref="referenceInput" v-model="referenceNumber" @keydown.enter="completeOrder" type="text" class="w-full h-12 bg-white border-2 border-gray-200 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/15 text-gray-900 rounded-xl px-4 text-base font-semibold outline-none transition-all shadow-xs" placeholder="From the terminal or app" />
-            </label>
-          </fieldset>
+              <!-- Main Content: Always Balanced Two-Column Layout (Emil Kowalski Craft) -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 items-stretch">
+                
+                <!-- ── Column 1 (Option A): Order Breakdown Card when Discount is None ── -->
+                <div v-if="selectedDiscountType === 'none'" class="p-3.5 bg-[#FAF8F5] border border-[#EAE3D9] rounded-2xl flex flex-col justify-between space-y-2.5 shadow-2xs">
+                  <div>
+                    <div class="flex items-center justify-between pb-2 border-b border-[#EAE3D9]">
+                      <span class="text-xs font-bold text-[#7B5A50] uppercase tracking-wider flex items-center gap-1.5">
+                        <Icon name="heroicons:receipt-percent" class="w-4 h-4 text-[#7B5A50]" />
+                        <span>Order Breakdown</span>
+                      </span>
+                      <span class="text-[10px] font-bold text-gray-500 bg-white border border-[#EAE3D9] px-2 py-0.5 rounded-full">
+                        Standard Rate
+                      </span>
+                    </div>
 
-          <div class="px-5 py-3 border-t border-[#EFECE6] bg-[#FAF8F5] shrink-0">
+                    <div class="space-y-2 pt-2 text-xs">
+                      <div class="flex items-center justify-between text-gray-600">
+                        <span>Items Count:</span>
+                        <span class="font-bold text-gray-800">{{ cartCount }} {{ cartCount === 1 ? 'item' : 'items' }}</span>
+                      </div>
+                      <div class="flex items-center justify-between text-gray-600">
+                        <span>Items Subtotal:</span>
+                        <span class="font-bold text-gray-800 tabular-nums">{{ formatCurrency(baseItemsTotal) }}</span>
+                      </div>
+                      <div class="flex items-center justify-between text-gray-600">
+                        <span>Customer Discount:</span>
+                        <span class="font-semibold text-gray-500">None (0%)</span>
+                      </div>
+                      <div class="flex items-center justify-between text-gray-600">
+                        <span>Order Mode:</span>
+                        <span class="font-bold text-[#7B5A50]">{{ formatOrderType(selectedOrderType) }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="p-2.5 rounded-xl bg-white border border-[#EAE3D9] text-[11px] text-[#7B5A50] flex items-center gap-2">
+                    <Icon name="heroicons:information-circle" class="w-4 h-4 shrink-0 text-[#7B5A50]" />
+                    <span>Senior / PWD 20% discount can be applied from the order cart before payment.</span>
+                  </div>
+                </div>
+
+                <!-- ── Column 1 (Option B): PWD / Senior Citizen ID Verification when Discount Active ── -->
+                <div v-else class="p-3.5 bg-[#FAF8F5] border border-[#EAE3D9] rounded-2xl flex flex-col justify-between space-y-2.5 shadow-2xs">
+                  <!-- ID Number Input -->
+                  <div class="space-y-1">
+                    <div class="flex items-center justify-between">
+                      <label :for="selectedDiscountType === 'PWD' ? 'pwd-id-input' : 'senior-id-input'" class="text-xs font-bold text-[#7B5A50] flex items-center gap-1.5 cursor-pointer">
+                        <Icon name="heroicons:identification" class="w-4 h-4 text-[#7B5A50]" />
+                        <span>{{ selectedDiscountType === 'PWD' ? 'PWD ID Number' : 'Senior (OSCA) ID Number' }}</span>
+                        <span class="text-red-500">*</span>
+                      </label>
+                      <span class="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">20% Discount</span>
+                    </div>
+                    <input
+                      :id="selectedDiscountType === 'PWD' ? 'pwd-id-input' : 'senior-id-input'"
+                      :ref="selectedDiscountType === 'PWD' ? 'pwdIdInputRef' : 'seniorIdInputRef'"
+                      v-model="discountIdNumber"
+                      @input="formatDiscountId"
+                      type="text"
+                      :maxlength="selectedDiscountType === 'PWD' ? 19 : 12"
+                      :placeholder="selectedDiscountType === 'PWD' ? '03-5416-000-0000021' : 'OSCA-1234567'"
+                      class="w-full h-10 bg-white border border-[#D8CEBE] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/15 text-[#2D201B] placeholder:text-gray-400 rounded-xl px-3 text-xs sm:text-sm font-semibold tracking-wider font-mono outline-none transition-all duration-150 uppercase shadow-2xs"
+                    />
+                    <div class="flex items-center justify-between text-[10px] pt-0.5">
+                      <span class="text-gray-500 font-mono">{{ selectedDiscountType === 'PWD' ? 'Format: 03-5416-000-0000021' : 'Format: OSCA-XXXXXXX' }}</span>
+                      <span v-if="isDiscountIdValid" class="text-emerald-700 font-semibold flex items-center gap-0.5">
+                        <Icon name="heroicons:check-circle" class="w-3.5 h-3.5" /> Valid
+                      </span>
+                      <span v-else-if="discountIdNumber" class="text-red-600 font-medium">Incomplete</span>
+                    </div>
+                  </div>
+
+                  <!-- Photo Verification -->
+                  <div class="pt-2 border-t border-[#EAE3D9] space-y-1.5">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold text-[#7B5A50] flex items-center gap-1.5">
+                        <Icon name="heroicons:camera" class="w-4 h-4 text-[#7B5A50]" />
+                        <span>ID Verification Photo</span>
+                        <span class="text-red-500">*</span>
+                      </span>
+                      <span v-if="discountIdImage" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                        <Icon name="heroicons:check" class="w-3 h-3" /> Attached
+                      </span>
+                      <span v-else class="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Required</span>
+                    </div>
+
+                    <!-- Not Attached: Take & Upload buttons -->
+                    <div v-if="!discountIdImage" class="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        @click="openCameraForDiscount"
+                        class="h-10 px-2.5 bg-white hover:bg-[#F3EBE2] border border-[#D8CEBE] rounded-xl text-xs font-bold text-[#7B5A50] flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-[0.97] shadow-xs cursor-pointer"
+                      >
+                        <Icon name="heroicons:camera" class="w-4 h-4 text-[#7B5A50]" />
+                        <span>Take Photo</span>
+                      </button>
+                      <button
+                        type="button"
+                        @click="triggerDiscountUpload"
+                        class="h-10 px-2.5 bg-white hover:bg-[#F3EBE2] border border-[#D8CEBE] rounded-xl text-xs font-bold text-[#7B5A50] flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-[0.97] shadow-xs cursor-pointer"
+                      >
+                        <Icon name="heroicons:arrow-up-tray" class="w-4 h-4 text-[#7B5A50]" />
+                        <span>Upload</span>
+                      </button>
+                    </div>
+
+                    <!-- Attached: Thumbnail Preview Card -->
+                    <div v-else class="flex items-center gap-2.5 p-1.5 bg-white rounded-xl border border-[#D8CEBE] shadow-2xs">
+                      <button
+                        type="button"
+                        @click="previewIdPhotoModalOpen = true"
+                        class="relative w-12 h-9 rounded-lg border border-gray-200 overflow-hidden shrink-0 group cursor-pointer"
+                        title="View photo enlarged"
+                      >
+                        <img :src="discountIdImage" alt="ID Preview" class="w-full h-full object-cover" />
+                        <div class="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                          <Icon name="heroicons:magnifying-glass-plus" class="w-3.5 h-3.5" />
+                        </div>
+                      </button>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-xs font-bold text-[#2D201B] truncate flex items-center gap-1">
+                          <Icon name="heroicons:check-circle" class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>ID Photo Attached</span>
+                        </p>
+                        <p class="text-[10px] text-gray-500">Tap to inspect</p>
+                      </div>
+                      <div class="flex items-center gap-0.5 shrink-0">
+                        <button type="button" @click="openCameraForDiscount" title="Retake" class="p-1.5 rounded-lg hover:bg-gray-100 text-[#7B5A50] active:scale-90">
+                          <Icon name="heroicons:camera" class="w-3.5 h-3.5" />
+                        </button>
+                        <button type="button" @click="triggerDiscountUpload" title="Upload new" class="p-1.5 rounded-lg hover:bg-gray-100 text-[#7B5A50] active:scale-90">
+                          <Icon name="heroicons:arrow-up-tray" class="w-3.5 h-3.5" />
+                        </button>
+                        <button type="button" @click="removeDiscountPhoto" title="Remove" class="p-1.5 rounded-lg hover:bg-red-50 text-red-600 active:scale-90">
+                          <Icon name="heroicons:trash" class="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── Column 2: Payment Details (Cash Tender OR Card/E-Wallet Reference) ── -->
+                <div class="p-3.5 bg-[#FAF8F5] border border-[#EAE3D9] rounded-2xl flex flex-col justify-between space-y-2.5 shadow-2xs">
+                  <!-- CASH TENDER -->
+                  <template v-if="selectedPaymentMethod === 'cash'">
+                    <div class="space-y-1">
+                      <label for="amount-tendered-input" class="block text-xs font-bold text-gray-600 uppercase tracking-wider cursor-pointer">
+                        Amount tendered
+                      </label>
+                      <div class="relative flex items-center">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-bold text-[#7B5A50] select-none pointer-events-none">&#8369;</span>
+                        <input
+                          id="amount-tendered-input"
+                          ref="tenderInput"
+                          v-model="amountTendered"
+                          @keydown.enter="completeOrder"
+                          type="number"
+                          inputmode="decimal"
+                          min="0"
+                          step="0.01"
+                          class="w-full h-10 bg-white border-2 border-gray-200 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/15 text-gray-900 rounded-xl pl-8 pr-9 text-lg font-bold tabular-nums outline-none transition-all duration-150 shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          placeholder="0.00"
+                        />
+                        <button
+                          v-if="amountTendered"
+                          type="button"
+                          @click="amountTendered = ''; tenderInput?.focus()"
+                          title="Clear amount"
+                          class="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 flex items-center justify-center transition-all duration-150 active:scale-90 cursor-pointer"
+                        >
+                          <Icon name="heroicons:x-mark" class="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Quick Cash Buttons -->
+                    <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
+                      <span class="text-[11px] font-semibold text-gray-400">Quick:</span>
+                      <button
+                        type="button"
+                        @click="amountTendered = total"
+                        class="h-7 px-2.5 rounded-lg bg-white border border-[#EAE3D9] hover:bg-[#F2ECE4] text-xs font-bold text-[#7B5A50] transition-all duration-150 shadow-2xs active:scale-[0.97] cursor-pointer"
+                      >
+                        Exact ({{ formatCurrency(total) }})
+                      </button>
+                      <button
+                        v-if="total < 200"
+                        type="button"
+                        @click="amountTendered = 200"
+                        class="h-7 px-2.5 rounded-lg bg-white border border-[#EAE3D9] hover:bg-[#F2ECE4] text-xs font-bold text-[#7B5A50] transition-all duration-150 shadow-2xs active:scale-[0.97] cursor-pointer"
+                      >
+                        ₱200
+                      </button>
+                      <button
+                        v-if="total < 500"
+                        type="button"
+                        @click="amountTendered = 500"
+                        class="h-7 px-2.5 rounded-lg bg-white border border-[#EAE3D9] hover:bg-[#F2ECE4] text-xs font-bold text-[#7B5A50] transition-all duration-150 shadow-2xs active:scale-[0.97] cursor-pointer"
+                      >
+                        ₱500
+                      </button>
+                      <button
+                        v-if="total < 1000"
+                        type="button"
+                        @click="amountTendered = 1000"
+                        class="h-7 px-2.5 rounded-lg bg-white border border-[#EAE3D9] hover:bg-[#F2ECE4] text-xs font-bold text-[#7B5A50] transition-all duration-150 shadow-2xs active:scale-[0.97] cursor-pointer"
+                      >
+                        ₱1,000
+                      </button>
+                    </div>
+
+                    <!-- Change Due / Still Needed Banner -->
+                    <div
+                      class="px-3 py-1.5 rounded-xl border flex justify-between items-center transition-all duration-150 shadow-2xs min-h-[38px]"
+                      :class="Number(amountTendered) > 0 ? (shortBy > 0 ? 'bg-red-50/90 border-red-200 text-red-700' : 'bg-emerald-50/90 border-emerald-300 text-emerald-800') : 'bg-white border-gray-200 text-gray-500'"
+                      aria-live="polite"
+                    >
+                      <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full shrink-0" :class="Number(amountTendered) > 0 ? (shortBy > 0 ? 'bg-red-500 animate-pulse' : 'bg-emerald-500') : 'bg-gray-300'"></span>
+                        <span class="text-xs font-bold uppercase tracking-wider">
+                          {{ Number(amountTendered) > 0 ? (shortBy > 0 ? 'Still needed' : 'Change Due') : 'Change' }}
+                        </span>
+                      </div>
+                      <span class="text-base sm:text-lg font-black tabular-nums tracking-tight">
+                        {{ formatCurrency(Number(amountTendered) > 0 ? (shortBy > 0 ? shortBy : changeAmount) : 0) }}
+                      </span>
+                    </div>
+                  </template>
+
+                  <!-- CARD / E-WALLET REFERENCE NUMBER -->
+                  <template v-else>
+                    <div class="space-y-1">
+                      <label for="reference-input" class="block text-xs font-bold text-gray-600 uppercase tracking-wider cursor-pointer">
+                        Reference number <span class="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="reference-input"
+                        ref="referenceInput"
+                        v-model="referenceNumber"
+                        @keydown.enter="completeOrder"
+                        type="text"
+                        class="w-full h-10 bg-white border-2 border-gray-200 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/15 text-gray-900 rounded-xl px-3 text-sm font-semibold outline-none transition-all duration-150 shadow-2xs"
+                        :placeholder="selectedPaymentMethod === 'ewallet' ? 'From GCash / Maya app' : 'From Card POS terminal'"
+                      />
+                    </div>
+                    <p class="text-[11px] text-gray-500 leading-tight">
+                      Enter the reference number from the payment terminal or mobile confirmation receipt to complete.
+                    </p>
+                    <div class="p-2 rounded-xl bg-white border border-[#EAE3D9] flex items-center justify-between text-xs">
+                      <span class="text-gray-600 font-semibold">Payment mode:</span>
+                      <span class="font-bold text-[#7B5A50] capitalize">{{ selectedPaymentMethod === 'ewallet' ? 'E-Wallet (GCash / Maya)' : 'Credit / Debit Card' }}</span>
+                    </div>
+                  </template>
+                </div>
+
+              </div>
+            </fieldset>
+          </div>
+
+          <!-- Modal Footer (Emil Kowalski Tactile Buttons & Spacing) -->
+          <div class="px-6 py-3 border-t border-[#EFECE6] bg-[#FAF8F5] shrink-0">
             <p v-if="checkoutError" role="alert" class="mb-2 p-2 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-800">{{ checkoutError }}</p>
-            <div class="flex gap-2.5">
-              <button @click="closePayment" :disabled="isProcessingOrder" class="px-5 h-11 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold rounded-xl text-sm transition-colors disabled:opacity-50">Cancel</button>
+            <div class="flex items-center gap-2.5">
+              <button
+                @click="closePayment"
+                :disabled="isProcessingOrder"
+                class="px-5 h-11 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold rounded-xl text-sm transition-all duration-150 disabled:opacity-50 cursor-pointer active:scale-[0.97]"
+              >
+                Cancel
+              </button>
               <button
                 @click="completeOrder"
-                class="flex-1 h-11 bg-[#7B5A50] hover:bg-[#65463D] text-white font-bold rounded-xl text-sm sm:text-base transition-all shadow-md active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+                class="flex-1 h-11 bg-[#7B5A50] hover:bg-[#65463D] text-white font-bold rounded-xl text-sm sm:text-base transition-all duration-150 shadow-md active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
                 :disabled="!canCheckout || isProcessingOrder"
               >
-                {{ isProcessingOrder ? 'Recording sale...' : `Charge ${formatCurrency(total)}` }}
+                <Icon v-if="isProcessingOrder" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
+                <span>{{ isProcessingOrder ? 'Recording sale...' : `Charge ${formatCurrency(total)}` }}</span>
               </button>
             </div>
-            <p v-if="!canCheckout && !isProcessingOrder" class="mt-1.5 text-[11px] sm:text-xs text-gray-500 text-center truncate">{{ checkoutHint }}</p>
+            <p v-if="!canCheckout && !isProcessingOrder" class="mt-2 text-xs text-amber-900 bg-amber-50/90 border border-amber-200/80 rounded-xl px-3 py-1.5 text-center font-medium leading-tight flex items-center justify-center gap-1.5">
+              <Icon name="heroicons:information-circle" class="w-3.5 h-3.5 text-amber-700 shrink-0" />
+              <span>{{ checkoutHint }}</span>
+            </p>
           </div>
         </div>
       </div>
@@ -2138,6 +2303,60 @@ function formatCurrency(amount: number) {
       
       <div class="text-center text-sm mt-8">
         <p>*** END OF REPORT ***</p>
+      </div>
+    </div>
+
+    <!-- Hidden file input for discount ID photo upload -->
+    <input
+      ref="discountFileInputRef"
+      type="file"
+      accept="image/*"
+      class="hidden"
+      @change="onDiscountFileSelected"
+    />
+
+    <!-- Camera capture modal for PWD / Senior ID -->
+    <PosCameraModal
+      :show="isCameraModalOpen"
+      :title="selectedDiscountType === 'PWD' ? 'Take PWD ID Photo' : 'Take Senior Citizen ID Photo'"
+      @close="isCameraModalOpen = false"
+      @captured="onDiscountPhotoCaptured"
+    />
+
+    <!-- Enlarged ID photo preview modal -->
+    <div
+      v-if="previewIdPhotoModalOpen && discountIdImage"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs"
+      @click.self="previewIdPhotoModalOpen = false"
+    >
+      <div class="relative max-w-lg w-full bg-white rounded-2xl overflow-hidden shadow-2xl p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <Icon name="heroicons:identification" class="w-5 h-5 text-[#7B5A50]" />
+            <h3 class="font-bold text-sm text-[#2D201B]">
+              {{ selectedDiscountType === 'PWD' ? 'PWD' : 'Senior Citizen' }} ID Verification Photo
+            </h3>
+          </div>
+          <button
+            type="button"
+            @click="previewIdPhotoModalOpen = false"
+            class="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 cursor-pointer"
+          >
+            <Icon name="heroicons:x-mark" class="w-5 h-5" />
+          </button>
+        </div>
+        <div class="max-h-[70vh] rounded-xl overflow-hidden bg-black/5 flex items-center justify-center border border-gray-200">
+          <img :src="discountIdImage" alt="ID Photo Full" class="w-full h-auto max-h-[70vh] object-contain" />
+        </div>
+        <div class="mt-3 flex justify-end">
+          <button
+            type="button"
+            @click="previewIdPhotoModalOpen = false"
+            class="px-4 py-2 bg-[#7B5A50] hover:bg-[#65463D] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
 

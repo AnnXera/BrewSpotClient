@@ -40,6 +40,8 @@ export interface PosTransactionDetail {
     subtotal: number
     discount_type: string | null
     discount_amount: number
+    discount_id_number?: string | null
+    discount_id_image?: string | null
     total_amount: number
     payment: { method: string; reference_number: string | null; amount_tendered: number; change: number } | null
     items: {
@@ -177,7 +179,17 @@ export class DevicePosService extends BaseService {
         })
     }
 
-    checkout(items: any[], paymentMethod: string, amountTendered: number, referenceNumber?: string, discountType?: string, discountAmount?: number, orderType: PosOrderType = 'dine_in') {
+    checkout(
+        items: any[],
+        paymentMethod: string,
+        amountTendered: number,
+        referenceNumber?: string,
+        discountType?: string,
+        discountAmount?: number,
+        orderType: PosOrderType = 'dine_in',
+        discountIdNumber?: string,
+        discountIdImage?: string
+    ) {
         return this.post<{ success: boolean; message: string; transaction_uuid: string; receipt_number?: string; order_type?: PosOrderType }>('/pos/device/checkout', {
             items,
             payment_method: paymentMethod,
@@ -185,7 +197,9 @@ export class DevicePosService extends BaseService {
             reference_number: referenceNumber,
             discount_type: discountType,
             discount_amount: discountAmount,
-            order_type: orderType
+            order_type: orderType,
+            discount_id_number: discountIdNumber,
+            discount_id_image: discountIdImage,
         })
     }
 
@@ -200,6 +214,15 @@ export class DevicePosService extends BaseService {
             pin,
             reason,
             restock,
+        })
+    }
+
+    // void a transaction completely: cancels the sale and restores servings to inventory.
+    voidTransaction(transactionUuid: string, managerUuid: string, pin: string, reason?: string) {
+        return this.post<{ success: boolean; message: string; transaction?: PosTransactionDetail }>('/pos/device/transactions/' + transactionUuid + '/void', {
+            manager_uuid: managerUuid,
+            pin,
+            reason,
         })
     }
 
