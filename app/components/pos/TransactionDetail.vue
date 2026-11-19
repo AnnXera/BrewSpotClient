@@ -17,13 +17,20 @@ const emit = defineEmits<{
 }>()
 
 const showRefundModal = ref(false)
+const refundMode = ref<'refund' | 'void'>('refund')
 const showReceiptModal = ref(false)
+const previewDetailPhoto = ref<string | null>(null)
+
+function openRefund(mode: 'refund' | 'void') {
+  refundMode.value = mode
+  showRefundModal.value = true
+}
 
 function onRefundSuccess(updated: any) {
   if (updated) {
     detail.value = updated
   } else if (detail.value) {
-    detail.value.status = 'refunded'
+    detail.value.status = refundMode.value === 'void' ? 'voided' : 'refunded'
   }
   emit('refunded', detail.value)
 }
@@ -115,6 +122,7 @@ onUnmounted(() => clearTimeout(copiedTimer))
         </div>
         <div class="text-right shrink-0">
           <span v-if="status?.toLowerCase() === 'refunded'" class="inline-block mb-1 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300">REFUNDED</span>
+          <span v-else-if="status?.toLowerCase() === 'voided'" class="inline-block mb-1 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-300">VOIDED</span>
           <span v-else-if="!isSettled" class="inline-block mb-1 text-[11px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-50 text-red-800 border border-red-200">{{ status }}</span>
           <p class="font-display text-[1.75rem] leading-none font-semibold tabular-nums tracking-tight" :class="isSettled ? 'text-[#7B5A50]' : 'text-[#8A6E64] line-through'">
             {{ formatCurrency(detail?.total_amount ?? preview.total_amount) }}
@@ -205,6 +213,43 @@ onUnmounted(() => clearTimeout(copiedTimer))
         </dl>
       </section>
 
+      <!-- Discount Verification (PWD / Senior) -->
+      <section v-if="detail.discount_type && (detail.discount_id_number || detail.discount_id_image)" class="mx-5 mt-2 py-3 border-t border-[#EADFD3]" aria-labelledby="txn-discount-verification-heading">
+        <div class="flex items-center justify-between mb-2">
+          <h4 id="txn-discount-verification-heading" class="text-xs font-semibold text-[#8A6E64] uppercase tracking-wide">Discount Verification</h4>
+          <span class="text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">{{ detail.discount_type }} 20%</span>
+        </div>
+        <dl class="space-y-2 text-sm">
+          <div v-if="detail.discount_id_number" class="flex justify-between items-center gap-4">
+            <dt class="text-[#6B5048] shrink-0">ID Number</dt>
+            <dd class="font-mono font-bold text-[#2d201b] text-right">{{ detail.discount_id_number }}</dd>
+          </div>
+          <div v-if="detail.discount_id_image" class="pt-1 flex items-center justify-between gap-3">
+            <dt class="text-[#6B5048] shrink-0">ID Photo</dt>
+            <dd class="flex items-center gap-2">
+              <button
+                type="button"
+                @click="previewDetailPhoto = detail.discount_id_image"
+                class="w-14 h-10 rounded-lg border border-[#D8CEBE] overflow-hidden shrink-0 hover:ring-2 hover:ring-[#7B5A50] transition-all group relative cursor-pointer"
+                title="View ID photo"
+              >
+                <img :src="detail.discount_id_image" alt="Verified ID" class="w-full h-full object-cover" />
+                <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                  <Icon name="heroicons:magnifying-glass-plus" class="w-4 h-4" />
+                </div>
+              </button>
+              <button
+                type="button"
+                @click="previewDetailPhoto = detail.discount_id_image"
+                class="text-xs font-semibold text-[#7B5A50] hover:underline"
+              >
+                View Photo
+              </button>
+            </dd>
+          </div>
+        </dl>
+      </section>
+
       <!-- Record -->
       <section class="mx-5 mt-2 mb-5 py-3 border-t border-[#EADFD3]" aria-labelledby="txn-record-heading">
         <h4 id="txn-record-heading" class="text-xs font-semibold text-[#8A6E64] uppercase tracking-wide mb-2">Record</h4>
@@ -242,7 +287,7 @@ onUnmounted(() => clearTimeout(copiedTimer))
         </dl>
       </section>
 
-      <!-- Actions: View Receipt & Refund Buttons -->
+      <!-- Actions: View Receipt & Void / Refund Buttons -->
       <section v-if="detail" class="mx-5 mt-2 mb-6 pt-3 border-t border-[#EADFD3] space-y-2.5">
         <button
           type="button"
@@ -253,15 +298,27 @@ onUnmounted(() => clearTimeout(copiedTimer))
           View Receipt
         </button>
 
-        <button
-          v-if="isSettled"
-          type="button"
-          @click="showRefundModal = true"
-          class="w-full h-11 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-sm transition-colors flex items-center justify-center gap-2 focus:ring-2 focus:ring-red-600/30 active:scale-[0.99]"
-        >
-          <Icon name="heroicons:arrow-uturn-left" class="w-4 h-4" />
-          Refund Sale (Requires Manager PIN)
-        </button>
+        <div v-if="isSettled" class="grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            @click="openRefund('void')"
+            class="w-full h-11 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5 focus:ring-2 focus:ring-amber-600/30 active:scale-[0.99]"
+            title="Void this sale (Requires Manager PIN)"
+          >
+            <Icon name="heroicons:no-symbol" class="w-4 h-4 text-amber-700" />
+            Void Order
+          </button>
+
+          <button
+            type="button"
+            @click="openRefund('refund')"
+            class="w-full h-11 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5 focus:ring-2 focus:ring-red-600/30 active:scale-[0.99]"
+            title="Refund this sale (Requires Manager PIN)"
+          >
+            <Icon name="heroicons:arrow-uturn-left" class="w-4 h-4 text-red-600" />
+            Refund Sale
+          </button>
+        </div>
       </section>
 
       <section v-if="detail && status?.toLowerCase() === 'refunded'" class="mx-5 mt-0 mb-6 p-3.5 rounded-lg bg-amber-50 border border-amber-200">
@@ -271,6 +328,17 @@ onUnmounted(() => clearTimeout(copiedTimer))
             <p class="text-xs font-bold text-amber-900 uppercase tracking-wide">Sale Refunded</p>
             <p v-if="detail.walk_in_note" class="text-xs text-amber-800 mt-0.5 break-words">{{ detail.walk_in_note }}</p>
             <p v-else class="text-xs text-amber-800 mt-0.5">This transaction has been refunded by a manager. Serving quantities were restored to inventory.</p>
+          </div>
+        </div>
+      </section>
+
+      <section v-if="detail && status?.toLowerCase() === 'voided'" class="mx-5 mt-0 mb-6 p-3.5 rounded-lg bg-rose-50 border border-rose-200">
+        <div class="flex items-start gap-2.5">
+          <Icon name="heroicons:no-symbol" class="w-5 h-5 text-rose-700 shrink-0 mt-0.5" />
+          <div>
+            <p class="text-xs font-bold text-rose-900 uppercase tracking-wide">Sale Voided</p>
+            <p v-if="detail.walk_in_note" class="text-xs text-rose-800 mt-0.5 break-words">{{ detail.walk_in_note }}</p>
+            <p v-else class="text-xs text-rose-800 mt-0.5">This transaction has been voided by a manager. Serving quantities were returned to inventory.</p>
           </div>
         </div>
       </section>
@@ -285,14 +353,56 @@ onUnmounted(() => clearTimeout(copiedTimer))
       @close="showReceiptModal = false"
     />
 
-    <!-- Refund Authorization Modal -->
+    <!-- Refund / Void Authorization Modal -->
     <PosRefundModal
       v-if="showRefundModal && detail"
       :show="showRefundModal"
       :transaction="detail"
+      :mode="refundMode"
       @close="showRefundModal = false"
       @refunded="onRefundSuccess"
     />
+
+    <!-- ID Photo Verification Lightbox -->
+    <div
+      v-if="previewDetailPhoto"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs"
+      @click.self="previewDetailPhoto = null"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="relative max-w-lg w-full bg-white rounded-2xl overflow-hidden shadow-2xl">
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <h4 class="text-sm font-bold text-[#2D201B]">
+            {{ detail?.discount_type }} ID Verification Photo
+          </h4>
+          <button
+            type="button"
+            @click="previewDetailPhoto = null"
+            class="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-500 flex items-center justify-center"
+            aria-label="Close photo preview"
+          >
+            <Icon name="heroicons:x-mark" class="w-5 h-5" />
+          </button>
+        </div>
+        <div class="p-3 bg-gray-50 flex items-center justify-center max-h-[70vh] overflow-hidden">
+          <img :src="previewDetailPhoto" alt="Verified ID Full Photo" class="max-h-[65vh] w-auto object-contain rounded-lg shadow-sm" />
+        </div>
+        <div class="p-3 border-t border-gray-100 flex justify-between items-center text-xs">
+          <span v-if="detail?.discount_id_number" class="font-mono font-bold text-[#7B5A50]">
+            ID: {{ detail.discount_id_number }}
+          </span>
+          <span v-else />
+          <button
+            type="button"
+            @click="previewDetailPhoto = null"
+            class="h-9 px-4 rounded-lg bg-[#7B5A50] text-white font-bold"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
