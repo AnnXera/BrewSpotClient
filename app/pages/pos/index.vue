@@ -2326,7 +2326,7 @@ function formatCurrency(amount: number) {
     <!-- Enlarged ID photo preview modal -->
     <div
       v-if="previewIdPhotoModalOpen && discountIdImage"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
       @click.self="previewIdPhotoModalOpen = false"
     >
       <div class="relative max-w-lg w-full bg-white rounded-2xl overflow-hidden shadow-2xl p-4">

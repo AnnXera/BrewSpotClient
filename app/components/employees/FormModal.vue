@@ -10,6 +10,7 @@ import type {
   UpdateStaffPayload,
 } from '~/services/StaffService'
 import DropdownList from '~/components/common/DropdownList.vue'
+import EmilCalendar from '~/components/common/EmilCalendar.vue'
 
 const props = defineProps<{
   show: boolean
@@ -499,14 +500,17 @@ const inputClass = 'flex-1 min-w-0 bg-transparent font-sans text-sm text-black p
               </div>
 
               <!-- Hired At -->
-              <label class="flex flex-col gap-1.5 flex-1 min-w-0">
+              <div class="flex flex-col gap-1.5 flex-1 min-w-0">
                 <span :class="labelClass">Hired At*</span>
-                <div :class="fieldClass('hired_at')">
-                  <Icon name="heroicons:calendar" class="w-4 h-4 shrink-0 text-[#7D5A50]" />
-                  <input v-model="form.hired_at" type="date" :class="inputClass" />
-                </div>
+                <EmilCalendar
+                  v-model="form.hired_at"
+                  placeholder="Select hired date"
+                  align="left"
+                  :invalid="!!errors.hired_at"
+                  button-class="w-full h-11"
+                />
                 <span v-if="errors.hired_at" class="font-sans text-xs text-red-600">{{ errors.hired_at }}</span>
-              </label>
+              </div>
 
               <!-- PIN (Cashier only) -->
               <label v-if="usesPin" class="flex flex-col gap-1.5 sm:w-[173px] sm:shrink-0">

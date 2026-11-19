@@ -2,38 +2,39 @@
 <template>
   <div>
     <!-- Main Payment History Card Container -->
-    <div :class="['bg-white border border-[#EEDFC4] overflow-hidden shadow-sm', filteredHistory.length > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
+    <div :class="['w-full max-w-full bg-white border border-[#EEDFC4] overflow-hidden shadow-sm', filteredHistory.length > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
       <!-- Top Feature Bar: Search, Filters & Export CSV -->
-      <div v-if="showControls" class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-6 border-b border-[#F3E7D2]">
+      <div v-if="showControls" class="p-4 sm:p-5 border-b border-[#F3E7D2] flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-3 sm:gap-4">
         <!-- Search Input -->
         <SearchInput
           v-model="searchQuery"
           placeholder="Search TXN ID, activity, amount..."
           clearable
-          class="sm:w-80"
+          class="w-full 2xl:w-80 shrink-0"
         />
 
         <!-- Action Buttons & Filters -->
-        <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3 w-full 2xl:w-auto justify-start sm:justify-end">
           
           <!-- Date Pickers -->
-          <div class="flex items-center gap-2 w-full sm:w-auto">
-            <input 
-              type="date" 
-              v-model="startDate" 
-              class="w-full sm:w-auto h-11 px-3 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl font-sans text-sm text-[#3D2B24] hover:border-[#D9C4B8] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-              title="Start Date"
+          <div class="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+            <EmilCalendar
+              v-model="startDate"
+              placeholder="Start Date"
+              align="left"
+              button-class="h-10 text-xs sm:text-sm w-full sm:w-32 md:w-36"
             />
-            <span class="text-[#8B6656] font-sans text-sm font-medium">to</span>
-            <input 
-              type="date" 
-              v-model="endDate" 
-              class="w-full sm:w-auto h-11 px-3 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl font-sans text-sm text-[#3D2B24] hover:border-[#D9C4B8] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-              title="End Date"
+            <span class="text-[#8B6656] font-sans text-xs sm:text-sm font-medium shrink-0">to</span>
+            <EmilCalendar
+              v-model="endDate"
+              placeholder="End Date"
+              :min="startDate || ''"
+              align="left"
+              button-class="h-10 text-xs sm:text-sm w-full sm:w-32 md:w-36"
             />
           </div>
 
-          <div class="w-full sm:w-56">
+          <div class="w-full sm:w-44 md:w-48">
             <DropdownList
               v-model="selectedStatus"
               :options="[
@@ -50,7 +51,7 @@
 
           <button
             type="button"
-            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-display text-sm font-semibold bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FDF3E7] hover:border-[#7D5A50] transition-all shadow-sm"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl font-display text-xs sm:text-sm font-semibold bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FDF3E7] hover:border-[#7D5A50] transition-all shadow-xs shrink-0 active:scale-[0.98] cursor-pointer h-10"
             title="Export records to formatted Excel spreadsheet"
             @click="handleExportExcel"
           >
@@ -60,8 +61,8 @@
         </div>
       </div>
 
-      <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
+      <div class="overflow-x-auto w-full">
+        <table class="w-full text-left border-collapse min-w-[680px]">
           <thead>
             <tr class="bg-[#FFF0D1] border-b border-[#F3E7D2]">
               <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
@@ -159,7 +160,7 @@
     </div>
 
     <!-- Pagination (Separate Frame) -->
-    <div v-if="filteredHistory.length > 0" class="bg-white rounded-b-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
+    <div v-if="filteredHistory.length > 0" class="w-full max-w-full bg-white rounded-b-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
       <CommonPagination
         :page="currentPage"
         :last-page="lastPage"
@@ -281,6 +282,7 @@
 <script setup lang="ts">
 import DropdownList from '~/components/common/DropdownList.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
+import EmilCalendar from '~/components/common/EmilCalendar.vue'
 
 export interface PaymentTransaction {
   transaction_id: string
