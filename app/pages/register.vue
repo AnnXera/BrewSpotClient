@@ -3,6 +3,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import logoFull from '~/assets/images/logo-with-tag.svg'
 import DropdownList, { type DropdownListOption } from '~/components/common/DropdownList.vue'
+import EmilCalendar from '~/components/common/EmilCalendar.vue'
 import { KEEP_FILE, type PreviousApplication } from '~/services/AuthService'
 
 const PHONE_TYPE_OPTIONS: DropdownListOption<'mobile' | 'telephone'>[] = [
@@ -1535,17 +1536,19 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- Right Form Section -->
-    <section class="flex items-center justify-center bg-[#FFF8EA] px-8 py-12 h-full overflow-y-auto">
-      <div class="w-full max-w-md space-y-6 my-auto relative">
+    <section class="flex flex-col items-center justify-start bg-[#FFF8EA] px-5 sm:px-8 py-8 sm:py-12 h-full overflow-y-auto nav-scroll">
+      <div class="w-full max-w-[560px] space-y-6 my-auto relative">
         <!-- Resubmitting a rejected application: what the admin flagged -->
         <div
           v-if="resubmitting && (currentStep === 3 || currentStep === 4)"
-          class="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-3"
+          class="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 flex items-start gap-3 shadow-sm"
         >
-          <Icon name="heroicons:pencil-square" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 shadow-xs">
+            <Icon name="heroicons:pencil-square" class="w-4 h-4" />
+          </div>
           <div class="text-sm">
-            <p class="font-semibold">Editing your rejected application</p>
-            <p v-if="resubmitReason" class="mt-1"><span class="font-medium">Reason:</span> {{ resubmitReason }}</p>
+            <p class="font-bold text-[#2D201B]">Editing your rejected application</p>
+            <p v-if="resubmitReason" class="mt-1 text-xs text-amber-900"><span class="font-bold">Reason:</span> {{ resubmitReason }}</p>
             <p class="text-xs text-amber-800/80 mt-1">
               Your previous details and documents are filled in. Change what was flagged, then resubmit for review.
             </p>
@@ -1557,55 +1560,62 @@ onBeforeUnmount(() => {
         <div v-if="currentStep === 1" key="step1" class="space-y-6">
           <NuxtLink
             to="/"
-            class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8B6656] hover:text-[#3B1F0E] transition-colors py-1 px-2.5 -ml-2.5 rounded-lg hover:bg-[#7B5A50]/8 active:scale-[0.97]"
           >
             <Icon name="heroicons:chevron-left" class="w-4 h-4" />
             Back to Home
           </NuxtLink>
 
           <div>
-            <h1 class="text-3xl font-bold text-[#2d201b]">{{ reapplyHint ? 'Resubmit your application' : 'Register your business' }}</h1>
-            <p class="text-gray-600 text-sm mt-1 mb-6">
+            <span class="text-xs uppercase tracking-wider font-bold text-[#7B5A50] block mb-1">Get Started</span>
+            <h1 class="font-display text-2xl sm:text-3xl font-extrabold text-[#2D201B] tracking-tight">
+              {{ reapplyHint ? 'Resubmit your application' : 'Register your business' }}
+            </h1>
+            <p class="text-xs sm:text-sm text-[#7D5A50]/80 mt-1.5">
               {{ reapplyHint || "Create your BrewSpot account. We'll need a few documents to verify your business." }}
             </p>
           </div>
 
-          <!-- Onboarding Checklist -->
-          <div class="bg-[#7B5A50]/5 border border-[#7B5A50]/20 rounded-lg p-5">
-            <h3 class="font-semibold text-[#2d201b] text-sm mb-3 flex items-center gap-2">
-              <Icon name="heroicons:document-text" class="w-5 h-5 text-[#7B5A50]" />
+          <!-- Onboarding Checklist (Parchment Card) -->
+          <div class="bg-white rounded-2xl border border-[#EEDFC4] p-5 shadow-[0_2px_12px_rgba(59,31,14,0.03)] space-y-3.5">
+            <h3 class="font-display font-bold text-[#2D201B] text-sm flex items-center gap-2 pb-2.5 border-b border-[#F5ECE0]">
+              <div class="w-6 h-6 rounded-lg bg-[#FFF8EA] text-[#7B5A50] border border-[#EEDFC4] flex items-center justify-center shrink-0">
+                <Icon name="heroicons:document-text" class="w-3.5 h-3.5" />
+              </div>
               What you'll need
             </h3>
-            <ul class="text-sm text-gray-700 space-y-2.5">
-              <li class="flex items-start gap-2">
-                <Icon name="heroicons:check-circle" class="w-4 h-4 text-[#7B5A50] mt-0.5 shrink-0" />
+            <ul class="text-xs sm:text-sm text-[#5C3E33] space-y-2.5">
+              <li class="flex items-start gap-2.5">
+                <div class="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mt-0.5 shrink-0">
+                  <Icon name="heroicons:check" class="w-3 h-3 stroke-[2.5]" />
+                </div>
                 <span>Valid Government ID (Front & Back required for some)</span>
               </li>
-              <li class="flex items-start gap-2">
-                <Icon name="heroicons:check-circle" class="w-4 h-4 text-[#7B5A50] mt-0.5 shrink-0" />
+              <li class="flex items-start gap-2.5">
+                <div class="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mt-0.5 shrink-0">
+                  <Icon name="heroicons:check" class="w-3 h-3 stroke-[2.5]" />
+                </div>
                 <span>BIR Certificate of Registration (Form 2303)</span>
               </li>
-              <li class="flex items-start gap-2">
-                <Icon name="heroicons:check-circle" class="w-4 h-4 text-[#7B5A50] mt-0.5 shrink-0" />
+              <li class="flex items-start gap-2.5">
+                <div class="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mt-0.5 shrink-0">
+                  <Icon name="heroicons:check" class="w-3 h-3 stroke-[2.5]" />
+                </div>
                 <span>DTI Business Name Registration or SEC Certificate</span>
               </li>
-              <li class="flex items-start gap-2">
-                <Icon name="heroicons:check-circle" class="w-4 h-4 text-[#7B5A50] mt-0.5 shrink-0" />
+              <li class="flex items-start gap-2.5">
+                <div class="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mt-0.5 shrink-0">
+                  <Icon name="heroicons:check" class="w-3 h-3 stroke-[2.5]" />
+                </div>
                 <span>Basic business details (TIN, address, contacts)</span>
               </li>
             </ul>
           </div>
 
-          <div class="pt-2 border-t border-gray-100">
-            <p class="text-gray-600 text-sm font-medium mb-4">
-              Please enter your email to receive a secure verification code.
-            </p>
-          </div>
-
           <!-- Auth Error Banner -->
           <div
             v-if="error"
-            class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
+            class="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm flex items-center gap-3 shadow-xs"
           >
             <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
             <span class="font-medium">{{ error }}</span>
@@ -1613,13 +1623,13 @@ onBeforeUnmount(() => {
 
           <form @submit.prevent="handleSendCode" class="space-y-4">
             <div>
-              <label class="block text-sm font-medium mb-1.5 text-[#2d201b]">Email Address</label>
+              <label class="block text-xs font-bold text-[#3B1F0E] uppercase tracking-wider mb-1.5">Email Address</label>
               <input
                 v-model="email"
                 type="email"
                 maxlength="255"
-                placeholder="Enter your email"
-                class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                placeholder="name@yourcafe.com"
+                class="w-full h-11 rounded-xl border border-[#D9C7B6] bg-[#FFFEFD] px-3.5 text-sm text-[#2D201B] placeholder:text-[#A8988B] outline-none transition-all duration-150 ease-out focus:border-[#7B5A50] focus:ring-4 focus:ring-[#7B5A50]/10 hover:border-[#B49A85]"
                 required
               />
             </div>
@@ -1628,18 +1638,19 @@ onBeforeUnmount(() => {
               <button
                 type="submit"
                 :disabled="loading"
-                class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition disabled:opacity-50 flex items-center justify-center gap-2"
+                class="w-full h-12 rounded-xl bg-[#3B1F0E] text-[#FFF8EA] font-display font-semibold tracking-wide hover:bg-[#2A150A] active:scale-[0.98] transition-all duration-160 ease-out flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(59,31,14,0.18)] hover:shadow-[0_6px_20px_rgba(59,31,14,0.24)] cursor-pointer disabled:opacity-50 group"
               >
                 <span v-if="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                {{ loading ? 'Sending Code...' : 'Continue with Email' }}
+                <span>{{ loading ? 'Sending Code...' : 'Continue with Email' }}</span>
+                <Icon v-if="!loading" name="heroicons:arrow-right" class="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-160" />
               </button>
             </div>
 
-            <p class="text-sm text-gray-600 text-center pt-2">
+            <p class="text-xs sm:text-sm text-[#8B6656] text-center pt-2">
               Already registered?
               <button
                 type="button"
-                class="font-semibold text-[#7B5A50] hover:underline ml-1"
+                class="font-bold text-[#3B1F0E] hover:underline ml-1 cursor-pointer"
                 @click="goLogin"
               >
                 Sign In
@@ -1649,20 +1660,21 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- STEP 2: OTP Verification -->
-        <div v-else-if="currentStep === 2" key="step2">
+        <div v-else-if="currentStep === 2" key="step2" class="space-y-6">
           <button
             type="button"
-            class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity mb-8"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8B6656] hover:text-[#3B1F0E] transition-colors py-1 px-2.5 -ml-2.5 rounded-lg hover:bg-[#7B5A50]/8 active:scale-[0.97]"
             @click="currentStep = 1"
           >
             <Icon name="heroicons:chevron-left" class="w-4 h-4" />
             Change Email
           </button>
 
-          <div class="mb-8">
-            <h1 class="text-3xl font-bold text-[#2d201b]">Check your inbox</h1>
-            <p class="text-gray-600 text-sm mt-1.5 leading-relaxed">
-              We sent a 6-digit code to <span class="font-semibold text-[#2d201b]">{{ email }}</span>.
+          <div>
+            <span class="text-xs uppercase tracking-wider font-bold text-[#7B5A50] block mb-1">Verification</span>
+            <h1 class="font-display text-2xl sm:text-3xl font-extrabold text-[#2D201B] tracking-tight">Check your inbox</h1>
+            <p class="text-xs sm:text-sm text-[#7D5A50]/80 mt-1.5 leading-relaxed">
+              We sent a 6-digit code to <span class="font-bold text-[#2D201B]">{{ email }}</span>.
               Enter it below to continue.
             </p>
           </div>
@@ -1671,7 +1683,7 @@ onBeforeUnmount(() => {
           <div
             v-if="error"
             role="alert"
-            class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3 mb-6"
+            class="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm flex items-center gap-3 shadow-xs"
           >
             <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
             <span class="font-medium">{{ error }}</span>
@@ -1681,15 +1693,15 @@ onBeforeUnmount(() => {
           <p
             v-if="notice && !error"
             role="status"
-            class="mb-6 flex items-center gap-2 text-sm font-medium text-[#1F8A4C]"
+            class="flex items-center gap-2 text-xs sm:text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 p-3 rounded-xl"
           >
-            <Icon name="heroicons:check-circle" class="w-5 h-5 shrink-0" />
+            <Icon name="heroicons:check-circle" class="w-4 h-4 shrink-0" />
             {{ notice }}
           </p>
 
           <form @submit.prevent="handleVerifyOTP" class="space-y-6">
             <!-- Digit Inputs -->
-            <div class="flex justify-between gap-2" role="group" aria-label="6-digit verification code">
+            <div class="flex justify-between gap-2 sm:gap-3" role="group" aria-label="6-digit verification code">
               <input
                 v-for="(digit, index) in digits"
                 :key="index"
@@ -1702,8 +1714,8 @@ onBeforeUnmount(() => {
                 :autocomplete="index === 0 ? 'one-time-code' : 'off'"
                 :aria-label="`Digit ${index + 1} of 6`"
                 :disabled="loading"
-                :class="digit ? 'border-[#7B5A50]' : 'border-gray-300'"
-                class="min-w-0 w-full h-14 text-center text-xl font-semibold tabular-nums rounded-md border bg-white text-[#2d201b] outline-none focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20 transition"
+                :class="digit ? 'border-[#7B5A50] ring-2 ring-[#7B5A50]/15 bg-[#FFFDF9]' : 'border-[#D9C7B6] hover:border-[#B49A85]'"
+                class="min-w-0 w-full h-14 text-center text-xl sm:text-2xl font-bold tabular-nums rounded-xl border bg-white text-[#2D201B] outline-none focus:border-[#7B5A50] focus:ring-4 focus:ring-[#7B5A50]/15 transition-all duration-150 active:scale-[0.98]"
                 @input="onDigitInput(index, $event)"
                 @keydown="onDigitKeydown(index, $event)"
                 @paste="onDigitPaste(index, $event)"
@@ -1715,19 +1727,20 @@ onBeforeUnmount(() => {
             <button
               type="submit"
               :disabled="loading || otpCode.length < 6"
-              class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition disabled:opacity-50 flex items-center justify-center gap-2"
+              class="w-full h-12 rounded-xl bg-[#3B1F0E] text-[#FFF8EA] font-display font-semibold tracking-wide hover:bg-[#2A150A] active:scale-[0.98] transition-all duration-160 ease-out flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(59,31,14,0.18)] hover:shadow-[0_6px_20px_rgba(59,31,14,0.24)] cursor-pointer disabled:opacity-50 group"
             >
               <span v-if="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              {{ loading ? 'Verifying...' : 'Verify and Continue' }}
+              <span>{{ loading ? 'Verifying...' : 'Verify and Continue' }}</span>
+              <Icon v-if="!loading" name="heroicons:arrow-right" class="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-160" />
             </button>
 
             <!-- Resend -->
-            <p class="text-sm text-gray-600 text-center">
+            <p class="text-xs sm:text-sm text-[#8B6656] text-center">
               Didn't receive it?
               <button
                 type="button"
                 :disabled="cooldown > 0 || resending"
-                class="font-semibold tabular-nums text-[#7B5A50] hover:underline disabled:opacity-50 disabled:no-underline"
+                class="font-bold tabular-nums text-[#3B1F0E] hover:underline disabled:opacity-50 disabled:no-underline ml-1 cursor-pointer"
                 @click="handleResendOTP"
               >
                 {{ cooldown > 0 ? `Resend code in ${cooldownLabel}` : resending ? 'Sending...' : 'Resend code' }}
@@ -1736,85 +1749,117 @@ onBeforeUnmount(() => {
           </form>
         </div>
 
-        <!-- STEP 3: Personal Details -->
-        <div v-else-if="currentStep === 3" key="step3" class="space-y-5">
+        <!-- STEP 3: Personal Details (Emil Kowalski Tactile Form Experience) -->
+        <div v-else-if="currentStep === 3" key="step3" class="space-y-6">
           <button
             type="button"
-            class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8B6656] hover:text-[#3B1F0E] transition-colors py-1 px-2.5 -ml-2.5 rounded-lg hover:bg-[#7B5A50]/8 active:scale-[0.97] cursor-pointer"
             @click="currentStep = 1"
           >
             <Icon name="heroicons:chevron-left" class="w-4 h-4" />
             Change Email Address
           </button>
 
-          <div>
-            <span class="text-xs uppercase tracking-wider font-semibold text-[#7B5A50]">Step 1 of 2: Personal Info</span>
-            <h1 class="text-2xl font-bold text-[#2d201b] mt-0.5">Personal details</h1>
-            <p class="text-gray-600 text-sm mt-1">Provide your identity information to verify your account.</p>
+          <!-- Emil Kowalski Segmented Stepper -->
+          <div class="space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#7B5A50]/10 text-[#7B5A50] border border-[#7B5A50]/20 tracking-wide">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#7B5A50] animate-pulse"></span>
+                Step 1 of 2 · Personal Info
+              </span>
+              <span class="text-xs font-semibold text-[#8B6656]">50% Complete</span>
+            </div>
+
+            <!-- Two-stage progress track -->
+            <div class="grid grid-cols-2 gap-2">
+              <div class="h-1.5 rounded-full bg-[#7B5A50] shadow-xs"></div>
+              <div class="h-1.5 rounded-full bg-[#E8DCD0]"></div>
+            </div>
+
+            <div class="pt-1">
+              <h1 class="font-display text-2xl sm:text-3xl font-extrabold text-[#2D201B] tracking-tight leading-tight">
+                Personal details
+              </h1>
+              <p class="text-xs sm:text-sm text-[#7D5A50]/80 mt-1">
+                Provide your identity information to verify your account.
+              </p>
+            </div>
           </div>
 
           <!-- Auth Error Banner -->
           <div
             v-if="error"
-            class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
+            role="alert"
+            class="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm flex items-center gap-3 shadow-xs"
           >
             <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
             <span class="font-medium">{{ error }}</span>
           </div>
 
           <form @submit.prevent="handleNextToBusiness" class="space-y-5">
-            <!-- Basic Information -->
-            <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-              <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
-                <Icon name="heroicons:user" class="w-4 h-4 text-[#7B5A50]" /> Basic Information
-              </h3>
-              <div class="grid grid-cols-2 gap-3">
+            <!-- 1. Basic Information Card -->
+            <div class="bg-white rounded-2xl border border-[#EEDFC4] p-5 sm:p-6 shadow-[0_2px_12px_rgba(59,31,14,0.03)] hover:shadow-[0_4px_16px_rgba(59,31,14,0.06)] transition-shadow duration-200 space-y-4">
+              <!-- Header with Icon Pill -->
+              <div class="flex items-center gap-2.5 pb-3 border-b border-[#F5ECE0]">
+                <div class="w-8 h-8 rounded-xl bg-[#FFF8EA] border border-[#EEDFC4] flex items-center justify-center text-[#7B5A50] shrink-0 shadow-xs">
+                  <Icon name="heroicons:user" class="w-4 h-4" />
+                </div>
                 <div>
-                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">First Name</label>
+                  <h3 class="font-display text-sm font-bold text-[#2D201B]">Basic Information</h3>
+                  <p class="text-[11px] text-[#8B6656]">Legal owner identity and platform handle</p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label class="block text-xs font-bold text-[#3B1F0E] uppercase tracking-wider mb-1.5">First Name <span class="text-red-500">*</span></label>
                   <input
                     v-model="firstname"
                     type="text"
-                    placeholder="John"
-                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    placeholder="e.g. John"
+                    class="w-full h-11 rounded-xl border border-[#D9C7B6] bg-[#FFFEFD] px-3.5 text-sm text-[#2D201B] placeholder:text-[#A8988B] outline-none transition-all duration-150 ease-out focus:border-[#7B5A50] focus:ring-4 focus:ring-[#7B5A50]/10 hover:border-[#B49A85]"
                     required
                     @input="onFirstNameInput"
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Last Name</label>
+                  <label class="block text-xs font-bold text-[#3B1F0E] uppercase tracking-wider mb-1.5">Last Name <span class="text-red-500">*</span></label>
                   <input
                     v-model="lastname"
                     type="text"
-                    placeholder="Doe"
-                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    placeholder="e.g. Doe"
+                    class="w-full h-11 rounded-xl border border-[#D9C7B6] bg-[#FFFEFD] px-3.5 text-sm text-[#2D201B] placeholder:text-[#A8988B] outline-none transition-all duration-150 ease-out focus:border-[#7B5A50] focus:ring-4 focus:ring-[#7B5A50]/10 hover:border-[#B49A85]"
                     required
                     @input="onLastNameInput"
                   />
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Middle Name</label>
+                  <label class="flex items-center justify-between text-xs font-bold text-[#3B1F0E] uppercase tracking-wider mb-1.5">
+                    <span>Middle Name</span>
+                    <span class="text-[10px] text-[#8B6656] font-normal normal-case italic">optional</span>
+                  </label>
                   <input
                     v-model="middlename"
                     type="text"
-                    placeholder="Optional"
-                    class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                    placeholder="e.g. Santos"
+                    class="w-full h-11 rounded-xl border border-[#D9C7B6] bg-[#FFFEFD] px-3.5 text-sm text-[#2D201B] placeholder:text-[#A8988B] outline-none transition-all duration-150 ease-out focus:border-[#7B5A50] focus:ring-4 focus:ring-[#7B5A50]/10 hover:border-[#B49A85]"
                     @input="onMiddleNameInput"
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium mb-1 text-[#2d201b]">Username *</label>
+                  <label class="block text-xs font-bold text-[#3B1F0E] uppercase tracking-wider mb-1.5">Username <span class="text-red-500">*</span></label>
                   <input
                     v-model="username"
                     type="text"
-                    placeholder="Username"
+                    placeholder="e.g. johndoe"
                     :class="[
-                      'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
+                      'w-full h-11 rounded-xl border px-3.5 outline-none transition-all duration-150 ease-out bg-[#FFFEFD] text-sm text-[#2D201B] placeholder:text-[#A8988B]',
                       fieldErrors.username
-                        ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
-                        : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
+                        ? 'border-red-500 focus:border-red-500 focus:ring-4 focus:ring-red-500/15'
+                        : 'border-[#D9C7B6] focus:border-[#7B5A50] focus:ring-4 focus:ring-[#7B5A50]/10 hover:border-[#B49A85]'
                     ]"
                     required
                     @input="clearFieldError('username')"
@@ -1825,19 +1870,27 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <!-- Contact & Location -->
-            <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-              <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
-                <Icon name="heroicons:map-pin" class="w-4 h-4 text-[#7B5A50]" /> Contact & Location
-              </h3>
+            <!-- 2. Contact & Location Card -->
+            <div class="bg-white rounded-2xl border border-[#EEDFC4] p-5 sm:p-6 shadow-[0_2px_12px_rgba(59,31,14,0.03)] hover:shadow-[0_4px_16px_rgba(59,31,14,0.06)] transition-shadow duration-200 space-y-4">
+              <!-- Header with Icon Pill -->
+              <div class="flex items-center gap-2.5 pb-3 border-b border-[#F5ECE0]">
+                <div class="w-8 h-8 rounded-xl bg-[#FFF8EA] border border-[#EEDFC4] flex items-center justify-center text-[#7B5A50] shrink-0 shadow-xs">
+                  <Icon name="heroicons:map-pin" class="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 class="font-display text-sm font-bold text-[#2D201B]">Contact & Location</h3>
+                  <p class="text-[11px] text-[#8B6656]">Primary phone and physical owner address</p>
+                </div>
+              </div>
+
               <div class="space-y-1">
-                <label class="block text-sm font-medium text-[#2d201b]">Contact No. *</label>
+                <label class="block text-xs font-bold text-[#3B1F0E] uppercase tracking-wider mb-1.5">Contact No. <span class="text-red-500">*</span></label>
                 <div
-                  class="flex items-center rounded-md border bg-white transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
-                  :class="fieldErrors.phone_number ? 'border-red-500' : 'border-gray-300'"
+                  class="flex items-stretch rounded-xl border bg-[#FFFEFD] transition-all duration-150 ease-out focus-within:border-[#7B5A50] focus-within:ring-4 focus-within:ring-[#7B5A50]/10 overflow-hidden h-11"
+                  :class="fieldErrors.phone_number ? 'border-red-500' : 'border-[#D9C7B6] hover:border-[#B49A85]'"
                 >
                   <!-- Box-type Type Selector beside input number -->
-                  <div class="bg-gray-100 border-r border-gray-300 rounded-l-md shrink-0 h-full flex items-center px-3 text-[#2d201b] font-semibold text-xs">
+                  <div class="bg-[#F8F4EE] border-r border-[#E8DCD0] flex items-center px-3 shrink-0">
                     <DropdownList
                       v-model="phoneType"
                       :options="PHONE_TYPE_OPTIONS"
@@ -1855,7 +1908,7 @@ onBeforeUnmount(() => {
                     inputmode="numeric"
                     maxlength="10"
                     placeholder="9123456789"
-                    class="w-full h-full px-3 text-sm text-[#2d201b] bg-transparent outline-none"
+                    class="w-full h-full px-3.5 text-sm text-[#2D201B] placeholder:text-[#A8988B] bg-transparent outline-none tabular-nums"
                     required
                     @input="onMobileInput"
                     @blur="checkPhoneAvailability"
@@ -1868,35 +1921,42 @@ onBeforeUnmount(() => {
                     type="tel"
                     placeholder="082-299-1234 or 02-8123-4567"
                     maxlength="15"
-                    class="w-full h-full px-3 text-sm text-[#2d201b] bg-transparent outline-none"
+                    class="w-full h-full px-3.5 text-sm text-[#2D201B] placeholder:text-[#A8988B] bg-transparent outline-none tabular-nums"
                     required
                     @input="onLandlineInput"
                     @blur="checkPhoneAvailability"
                   />
                 </div>
-                <p v-if="fieldErrors.phone_number" class="text-xs text-red-600 font-medium">{{ fieldErrors.phone_number }}</p>
+                <p v-if="fieldErrors.phone_number" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.phone_number }}</p>
               </div>
 
               <div>
-                <label class="block text-sm font-medium mb-1 text-[#2d201b]">Personal Address *</label>
+                <label class="block text-xs font-bold text-[#3B1F0E] uppercase tracking-wider mb-1.5">Personal Address <span class="text-red-500">*</span></label>
                 <input
                   v-model="ownerAddress"
                   type="text"
                   placeholder="Street, Barangay, District, Davao City"
-                  class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                  class="w-full h-11 rounded-xl border border-[#D9C7B6] bg-[#FFFEFD] px-3.5 text-sm text-[#2D201B] placeholder:text-[#A8988B] outline-none transition-all duration-150 ease-out focus:border-[#7B5A50] focus:ring-4 focus:ring-[#7B5A50]/10 hover:border-[#B49A85]"
                   required
                 />
               </div>
             </div>
 
-            <!-- Identity Verification -->
-            <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-              <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
-                <Icon name="heroicons:identification" class="w-4 h-4 text-[#7B5A50]" /> Identity Verification
-              </h3>
+            <!-- 3. Identity Verification Card -->
+            <div class="bg-white rounded-2xl border border-[#EEDFC4] p-5 sm:p-6 shadow-[0_2px_12px_rgba(59,31,14,0.03)] hover:shadow-[0_4px_16px_rgba(59,31,14,0.06)] transition-shadow duration-200 space-y-4">
+              <!-- Header with Icon Pill -->
+              <div class="flex items-center gap-2.5 pb-3 border-b border-[#F5ECE0]">
+                <div class="w-8 h-8 rounded-xl bg-[#FFF8EA] border border-[#EEDFC4] flex items-center justify-center text-[#7B5A50] shrink-0 shadow-xs">
+                  <Icon name="heroicons:identification" class="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 class="font-display text-sm font-bold text-[#2D201B]">Identity Verification</h3>
+                  <p class="text-[11px] text-[#8B6656]">Government-issued photo identification</p>
+                </div>
+              </div>
               
               <div class="space-y-1 w-full sm:w-1/2">
-                <label class="block text-sm font-medium text-[#2d201b]">ID Type</label>
+                <label class="block text-xs font-bold text-[#3B1F0E] uppercase tracking-wider mb-1">ID Type <span class="text-red-500">*</span></label>
                 <DropdownList
                   v-model="idType"
                   :options="ID_TYPE_OPTIONS"
@@ -1908,131 +1968,171 @@ onBeforeUnmount(() => {
               </div>
 
               <div>
-              <label class="block text-sm font-medium mb-1 text-[#2d201b]">
-                {{ isBackIdRequired ? 'Government ID (Front & Back) *' : 'Passport (Photo / Bio-page) *' }}
-              </label>
-              <div :class="isBackIdRequired ? 'grid grid-cols-2 gap-3' : ''">
-                <!-- Front ID -->
-                <div class="bg-white rounded-lg p-3 border transition shadow-sm" :class="governmentIdFilePath ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'">
-                  <div class="flex items-center justify-between mb-1.5">
-                    <label class="font-semibold text-xs text-[#2d201b]">{{ isBackIdRequired ? 'Front ID' : 'ID File' }} <span class="text-red-500">*</span></label>
-                    <span v-if="governmentIdFilePath" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
-                  </div>
-                  <div v-if="!governmentIdFilePath">
-                    <input
-                      type="file"
-                      @change="handleGovIdChange"
-                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
-                      required
-                    />
-                  </div>
-                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
-                    <div class="truncate mr-2">
-                      <p class="font-medium truncate text-xs">{{ governmentIdFileName || 'Uploaded File' }}</p>
+                <label class="block text-xs font-bold text-[#3B1F0E] uppercase tracking-wider mb-2">
+                  {{ isBackIdRequired ? 'Government ID (Front & Back) *' : 'Passport (Photo / Bio-page) *' }}
+                </label>
+                <div :class="isBackIdRequired ? 'grid grid-cols-1 sm:grid-cols-2 gap-3.5' : ''">
+                  <!-- Front ID Dropzone -->
+                  <div>
+                    <label
+                      v-if="!governmentIdFilePath"
+                      for="gov-id-front"
+                      class="border-2 border-dashed border-[#D9C7B6] hover:border-[#7B5A50] bg-[#FAF6F0]/60 hover:bg-[#FAF4ED] rounded-xl p-4 text-center cursor-pointer transition-all duration-150 active:scale-[0.98] block group shadow-xs"
+                    >
+                      <div class="w-9 h-9 rounded-xl bg-white border border-[#E8DCD0] text-[#7B5A50] flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform shadow-xs">
+                        <Icon name="heroicons:arrow-up-tray" class="w-4 h-4" />
+                      </div>
+                      <p class="font-display text-xs font-bold text-[#2D201B]">{{ isBackIdRequired ? 'Upload Front ID' : 'Upload Passport' }} <span class="text-red-500">*</span></p>
+                      <p class="text-[11px] text-[#8B6656] mt-0.5">Click or drop JPG, PNG, or PDF</p>
+                      <input
+                        id="gov-id-front"
+                        type="file"
+                        @change="handleGovIdChange"
+                        accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                        class="sr-only"
+                        required
+                      />
+                    </label>
+                    <div v-else class="flex items-center justify-between text-xs bg-emerald-50/80 border border-emerald-300 p-3 rounded-xl text-emerald-950 shadow-xs transition-all">
+                      <div class="flex items-center gap-2.5 truncate mr-2">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <Icon name="heroicons:check" class="w-4 h-4" />
+                        </div>
+                        <div class="truncate">
+                          <p class="font-bold truncate text-xs text-emerald-950">{{ governmentIdFileName || 'Uploaded File' }}</p>
+                          <p class="text-[10px] text-emerald-700 font-semibold">{{ isBackIdRequired ? 'Front ID Ready' : 'Passport Ready' }}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        @click="governmentIdFile = null; governmentIdFileName = ''; governmentIdFilePath = ''; saveDraft()"
+                        class="w-7 h-7 rounded-lg text-emerald-800 hover:text-red-600 hover:bg-red-50 flex items-center justify-center active:scale-90 transition-all font-bold text-base cursor-pointer"
+                        title="Remove file"
+                      >&times;</button>
                     </div>
-                    <button
-                      type="button"
-                      @click="governmentIdFile = null; governmentIdFileName = ''; governmentIdFilePath = ''; saveDraft()"
-                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
-                      title="Remove file"
-                    >&times;</button>
                   </div>
-                </div>
 
-                <!-- Back ID -->
-                <div v-if="isBackIdRequired" class="bg-white rounded-lg p-3 border transition shadow-sm" :class="governmentIdFileBackPath ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'">
-                  <div class="flex items-center justify-between mb-1.5">
-                    <label class="font-semibold text-xs text-[#2d201b]">Back ID <span class="text-red-500">*</span></label>
-                    <span v-if="governmentIdFileBackPath" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
-                  </div>
-                  <div v-if="!governmentIdFileBackPath">
-                    <input
-                      type="file"
-                      @change="handleGovIdBackChange"
-                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
-                      required
-                    />
-                  </div>
-                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
-                    <div class="truncate mr-2">
-                      <p class="font-medium truncate text-xs">{{ governmentIdFileBackName || 'Uploaded File' }}</p>
+                  <!-- Back ID Dropzone -->
+                  <div v-if="isBackIdRequired">
+                    <label
+                      v-if="!governmentIdFileBackPath"
+                      for="gov-id-back"
+                      class="border-2 border-dashed border-[#D9C7B6] hover:border-[#7B5A50] bg-[#FAF6F0]/60 hover:bg-[#FAF4ED] rounded-xl p-4 text-center cursor-pointer transition-all duration-150 active:scale-[0.98] block group shadow-xs"
+                    >
+                      <div class="w-9 h-9 rounded-xl bg-white border border-[#E8DCD0] text-[#7B5A50] flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform shadow-xs">
+                        <Icon name="heroicons:arrow-up-tray" class="w-4 h-4" />
+                      </div>
+                      <p class="font-display text-xs font-bold text-[#2D201B]">Upload Back ID <span class="text-red-500">*</span></p>
+                      <p class="text-[11px] text-[#8B6656] mt-0.5">Click or drop JPG, PNG, or PDF</p>
+                      <input
+                        id="gov-id-back"
+                        type="file"
+                        @change="handleGovIdBackChange"
+                        accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                        class="sr-only"
+                        required
+                      />
+                    </label>
+                    <div v-else class="flex items-center justify-between text-xs bg-emerald-50/80 border border-emerald-300 p-3 rounded-xl text-emerald-950 shadow-xs transition-all">
+                      <div class="flex items-center gap-2.5 truncate mr-2">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <Icon name="heroicons:check" class="w-4 h-4" />
+                        </div>
+                        <div class="truncate">
+                          <p class="font-bold truncate text-xs text-emerald-950">{{ governmentIdFileBackName || 'Uploaded File' }}</p>
+                          <p class="text-[10px] text-emerald-700 font-semibold">Back ID Ready</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        @click="governmentIdFileBack = null; governmentIdFileBackName = ''; governmentIdFileBackPath = ''; saveDraft()"
+                        class="w-7 h-7 rounded-lg text-emerald-800 hover:text-red-600 hover:bg-red-50 flex items-center justify-center active:scale-90 transition-all font-bold text-base cursor-pointer"
+                        title="Remove file"
+                      >&times;</button>
                     </div>
-                    <button
-                      type="button"
-                      @click="governmentIdFileBack = null; governmentIdFileBackName = ''; governmentIdFileBackPath = ''; saveDraft()"
-                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
-                      title="Remove file"
-                    >&times;</button>
                   </div>
-                </div>
                 </div>
               </div>
             </div>
 
+            <!-- Primary Action Button -->
             <div class="pt-2">
               <button
                 type="submit"
-                class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition flex items-center justify-center gap-2"
+                class="w-full h-12 rounded-xl bg-[#3B1F0E] text-[#FFF8EA] font-display font-semibold tracking-wide hover:bg-[#2A150A] active:scale-[0.98] transition-all duration-160 ease-out flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(59,31,14,0.18)] hover:shadow-[0_6px_20px_rgba(59,31,14,0.24)] cursor-pointer group"
               >
-                Next: Business Registration
-                <Icon name="heroicons:chevron-right" class="w-4 h-4" />
+                <span>Next: Business Registration</span>
+                <Icon name="heroicons:arrow-right" class="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-160" />
               </button>
             </div>
           </form>
         </div>
 
         <!-- STEP 4: Business Details & Requirements -->
-        <div v-else-if="currentStep === 4" key="step4" class="space-y-5">
+        <div v-else-if="currentStep === 4" key="step4" class="space-y-6">
           <!-- Page 1: Business Information -->
-          <div v-if="businessSubPage === 1" class="space-y-5">
+          <div v-if="businessSubPage === 1" class="space-y-6">
             <button
               type="button"
-              class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
+              class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8A6E64] hover:text-[#2D201B] active:scale-95 transition-all group cursor-pointer"
               @click="currentStep = 3"
             >
-              <Icon name="heroicons:chevron-left" class="w-4 h-4" />
-              Back to Personal Info
+              <Icon name="heroicons:arrow-left" class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-160" />
+              <span>Back to Personal Info</span>
             </button>
 
-            <div>
-              <div class="flex items-center justify-between">
-                <span class="text-xs uppercase tracking-wider font-semibold text-[#7B5A50]">Business Registration</span>
-                <span class="text-xs bg-[#7B5A50]/10 text-[#7B5A50] px-2.5 py-0.5 rounded-full font-semibold">Page 1 of 2</span>
+            <!-- Emil Kowalski Segmented Progress Stepper -->
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF4ED] text-[#7B5A50] font-bold tracking-wide border border-[#EEDFC4] shadow-xs">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#7B5A50] animate-pulse"></span>
+                  Step 2 of 2 · Business Info
+                </span>
+                <span class="text-[#8A6E64] font-semibold text-xs tabular-nums">Page 1 of 2 · 75%</span>
               </div>
-              <h1 class="text-2xl font-bold text-[#2d201b] mt-0.5">Business details</h1>
-              <p class="text-gray-600 text-sm mt-1">Enter your café and main branch information.</p>
+              <!-- Segmented Progress Bar -->
+              <div class="grid grid-cols-2 gap-1.5 h-2 w-full bg-[#EFEAE2] rounded-full overflow-hidden p-0.5 shadow-inner">
+                <div class="h-full rounded-full bg-[#7B5A50] transition-all duration-300"></div>
+                <div class="h-full rounded-full bg-[#7B5A50]/35 transition-all duration-300"></div>
+              </div>
+            </div>
+
+            <div>
+              <h1 class="text-2xl sm:text-3xl font-display font-bold text-[#2D201B] tracking-tight">Business details</h1>
+              <p class="text-[#8A6E64] text-xs sm:text-sm mt-1 leading-relaxed">Enter your café and main branch information.</p>
             </div>
 
             <!-- Auth Error Banner -->
             <div
               v-if="error"
-              class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
+              class="p-4 rounded-xl bg-rose-50/90 border border-rose-200 text-rose-800 text-xs sm:text-sm flex items-center gap-3 shadow-xs"
             >
-              <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
+              <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-rose-600 shrink-0" />
               <span class="font-medium">{{ error }}</span>
             </div>
 
             <form @submit.prevent="nextBusinessSubPage" class="space-y-5">
-              <!-- General Info -->
-              <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-                <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
-                  <Icon name="heroicons:building-storefront" class="w-4 h-4 text-[#7B5A50]" /> General Info
-                </h3>
-                <div class="grid grid-cols-2 gap-3">
-                  <div class="col-span-2 sm:col-span-1">
-                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Business Name</label>
+              <!-- General Info Card -->
+              <div class="bg-white rounded-2xl border border-[#EEDFC4] p-5 sm:p-6 shadow-[0_2px_12px_rgba(59,31,14,0.03)] space-y-4">
+                <div class="flex items-center gap-2 pb-3 border-b border-[#FAF4ED]">
+                  <div class="w-7 h-7 rounded-lg bg-[#FAF4ED] text-[#7B5A50] flex items-center justify-center">
+                    <Icon name="heroicons:building-storefront" class="w-4 h-4" />
+                  </div>
+                  <h3 class="text-xs uppercase tracking-wider font-bold text-[#482D25]">General Info</h3>
+                </div>
+                <div class="grid grid-cols-2 gap-3.5">
+                  <div class="col-span-2 sm:col-span-1 space-y-1.5">
+                    <label class="block text-xs font-bold text-[#5C3C32] uppercase tracking-wider">Business Name *</label>
                     <input
                       v-model="cafeName"
                       type="text"
                       placeholder="BrewSpot Davao"
-                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                      class="w-full h-11 rounded-xl border border-[#D9C7B6] px-3.5 outline-none transition bg-[#FFFEFD] text-sm text-[#2D201B] placeholder-[#B5A196] focus:border-[#7B5A50] focus:ring-4 focus:ring-[#7B5A50]/10"
                       required
                     />
                   </div>
-                  <div class="col-span-2 sm:col-span-1">
-                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Document Type *</label>
+                  <div class="col-span-2 sm:col-span-1 space-y-1.5">
+                    <label class="block text-xs font-bold text-[#5C3C32] uppercase tracking-wider">Document Type *</label>
                     <DropdownList
                       v-model="cafeDocType"
                       :options="CAFE_DOC_TYPE_OPTIONS"
@@ -2040,13 +2140,13 @@ onBeforeUnmount(() => {
                       white
                     />
                   </div>
-                  <div class="col-span-2">
-                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Name</label>
+                  <div class="col-span-2 space-y-1.5">
+                    <label class="block text-xs font-bold text-[#5C3C32] uppercase tracking-wider">Branch Name *</label>
                     <input
                       v-model="branchName"
                       type="text"
                       placeholder="Main Branch"
-                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                      class="w-full h-11 rounded-xl border border-[#D9C7B6] px-3.5 outline-none transition bg-[#FFFEFD] text-sm text-[#2D201B] placeholder-[#B5A196] focus:border-[#7B5A50] focus:ring-4 focus:ring-[#7B5A50]/10"
                       required
                     />
                   </div>
@@ -2054,171 +2154,209 @@ onBeforeUnmount(() => {
               </div>
 
               <!-- Café Picture (optional) -->
-              <div class="space-y-3 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-                <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
-                  <Icon name="heroicons:photo" class="w-4 h-4 text-[#7B5A50]" /> Café Picture
-                  <span class="text-xs font-normal text-gray-500">(optional)</span>
-                </h3>
-                <div v-if="!cafePicturePath">
-                  <input
-                    type="file"
-                    @change="onCafePictureChange"
-                    accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                    class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
-                  />
-                  <p class="text-xs text-gray-500 mt-1.5">A photo of your café's storefront or interior. JPG or PNG, up to 2MB.</p>
+              <div class="bg-white rounded-2xl border border-[#EEDFC4] p-5 sm:p-6 shadow-[0_2px_12px_rgba(59,31,14,0.03)] space-y-3.5">
+                <div class="flex items-center justify-between pb-3 border-b border-[#FAF4ED]">
+                  <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-[#FAF4ED] text-[#7B5A50] flex items-center justify-center">
+                      <Icon name="heroicons:photo" class="w-4 h-4" />
+                    </div>
+                    <h3 class="text-xs uppercase tracking-wider font-bold text-[#482D25]">Café Picture</h3>
+                  </div>
+                  <span class="text-[11px] font-medium text-[#8A6E64] bg-[#FAF4ED] px-2.5 py-0.5 rounded-full border border-[#EEDFC4]">Optional</span>
                 </div>
-                <div v-else class="flex items-center gap-3 text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
-                  <img
-                    v-if="cafePicturePreview"
-                    :src="cafePicturePreview"
-                    alt="Café picture preview"
-                    class="w-14 h-14 rounded-md object-cover shrink-0"
-                  />
-                  <p class="font-medium truncate flex-1">{{ cafePictureName || 'Uploaded Picture' }}</p>
+
+                <div v-if="!cafePicturePath">
+                  <label
+                    for="cafe-picture-input"
+                    class="border-2 border-dashed border-[#D9C7B6] hover:border-[#7B5A50] bg-[#FAF6F0]/60 hover:bg-[#FAF4ED] active:scale-[0.99] rounded-xl p-4 sm:p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-160 group select-none"
+                  >
+                    <div class="w-10 h-10 rounded-xl bg-white text-[#7B5A50] shadow-xs flex items-center justify-center mb-2 group-hover:scale-105 transition-transform duration-160">
+                      <Icon name="heroicons:arrow-up-tray" class="w-5 h-5" />
+                    </div>
+                    <p class="text-xs font-bold text-[#2D201B]">Upload Storefront or Interior Photo</p>
+                    <p class="text-[11px] text-[#8A6E64] mt-0.5">JPG, JPEG or PNG · Max 2MB</p>
+                    <input
+                      id="cafe-picture-input"
+                      type="file"
+                      class="sr-only"
+                      @change="onCafePictureChange"
+                      accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                    />
+                  </label>
+                </div>
+                <div v-else class="flex items-center justify-between p-3 rounded-xl bg-emerald-50/80 border border-emerald-300">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <img
+                      v-if="cafePicturePreview"
+                      :src="cafePicturePreview"
+                      alt="Café picture preview"
+                      class="w-12 h-12 rounded-lg object-cover ring-2 ring-emerald-400 shrink-0"
+                    />
+                    <div class="truncate">
+                      <p class="font-bold truncate text-xs text-emerald-950">{{ cafePictureName || 'Uploaded Picture' }}</p>
+                      <p class="text-[10px] text-emerald-700 font-semibold">Storefront Photo Ready</p>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     @click="clearCafePicture"
-                    class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
+                    class="w-7 h-7 rounded-lg text-emerald-800 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center active:scale-90 transition-all font-bold text-base cursor-pointer shrink-0"
                     title="Remove picture"
                   >&times;</button>
                 </div>
-                <p v-if="fieldErrors.cafe_picture" class="text-xs text-red-600 font-medium">{{ fieldErrors.cafe_picture }}</p>
+                <p v-if="fieldErrors.cafe_picture" class="text-xs text-rose-600 font-medium">{{ fieldErrors.cafe_picture }}</p>
               </div>
 
-              <!-- Contact Info -->
-              <div class="space-y-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-                <h3 class="text-sm font-bold text-[#2d201b] flex items-center gap-2 border-b border-gray-50 pb-2 mb-1">
-                  <Icon name="heroicons:phone" class="w-4 h-4 text-[#7B5A50]" /> Branch Contact
-                </h3>
+              <!-- Contact Info Card -->
+              <div class="bg-white rounded-2xl border border-[#EEDFC4] p-5 sm:p-6 shadow-[0_2px_12px_rgba(59,31,14,0.03)] space-y-4">
+                <div class="flex items-center gap-2 pb-3 border-b border-[#FAF4ED]">
+                  <div class="w-7 h-7 rounded-lg bg-[#FAF4ED] text-[#7B5A50] flex items-center justify-center">
+                    <Icon name="heroicons:phone" class="w-4 h-4" />
+                  </div>
+                  <h3 class="text-xs uppercase tracking-wider font-bold text-[#482D25]">Branch Contact</h3>
+                </div>
                 <div class="space-y-4">
-                  <div class="space-y-1">
-                  <label class="block text-sm font-medium text-[#2d201b]">Branch Phone *</label>
-                  <div
-                    class="flex items-center rounded-md border bg-white transition focus-within:border-[#7B5A50] focus-within:ring-2 focus-within:ring-[#7B5A50]/20 h-11"
-                    :class="fieldErrors.cafe_phonenumber ? 'border-red-500' : 'border-gray-300'"
-                  >
-                    <!-- Box-type Type Selector beside input number -->
-                    <div class="bg-gray-100 border-r border-gray-300 rounded-l-md shrink-0 h-full flex items-center px-3 text-[#2d201b] font-semibold text-xs">
-                      <DropdownList
-                        v-model="cafePhoneType"
-                        :options="PHONE_TYPE_OPTIONS"
-                        bare
-                        aria-label="Branch phone type"
-                        @change="onCafePhoneTypeChange"
+                  <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-[#5C3C32] uppercase tracking-wider">Branch Phone *</label>
+                    <div
+                      class="flex items-center rounded-xl border bg-[#FFFEFD] transition focus-within:border-[#7B5A50] focus-within:ring-4 focus-within:ring-[#7B5A50]/10 h-11 overflow-hidden"
+                      :class="fieldErrors.cafe_phonenumber ? 'border-rose-400 ring-2 ring-rose-400/20' : 'border-[#D9C7B6]'"
+                    >
+                      <!-- Box-type Type Selector beside input number -->
+                      <div class="bg-[#FAF6F0] border-r border-[#D9C7B6] shrink-0 h-full flex items-center px-3 text-[#2D201B] font-semibold text-xs">
+                        <DropdownList
+                          v-model="cafePhoneType"
+                          :options="PHONE_TYPE_OPTIONS"
+                          bare
+                          aria-label="Branch phone type"
+                          @change="onCafePhoneTypeChange"
+                        />
+                      </div>
+
+                      <!-- Mobile Input (10 digits starting with 9) -->
+                      <input
+                        v-if="cafePhoneType === 'mobile'"
+                        v-model="cafeMobileDigits"
+                        type="tel"
+                        inputmode="numeric"
+                        maxlength="10"
+                        placeholder="9123456789"
+                        class="w-full h-full px-3 text-sm text-[#2D201B] placeholder-[#B5A196] bg-transparent outline-none"
+                        required
+                        @input="onCafeMobileInput"
+                        @blur="checkCafePhoneAvailability"
+                      />
+
+                      <!-- Landline Input -->
+                      <input
+                        v-else
+                        v-model="cafeLandlineDigits"
+                        type="tel"
+                        placeholder="082-299-1234 or 02-8123-4567"
+                        maxlength="15"
+                        class="w-full h-full px-3 text-sm text-[#2D201B] placeholder-[#B5A196] bg-transparent outline-none"
+                        required
+                        @input="onCafeLandlineInput"
+                        @blur="checkCafePhoneAvailability"
                       />
                     </div>
-
-                    <!-- Mobile Input (10 digits starting with 9) -->
-                    <input
-                      v-if="cafePhoneType === 'mobile'"
-                      v-model="cafeMobileDigits"
-                      type="tel"
-                      inputmode="numeric"
-                      maxlength="10"
-                      placeholder="9123456789"
-                      class="w-full h-full px-3 text-sm text-[#2d201b] bg-transparent outline-none"
-                      required
-                      @input="onCafeMobileInput"
-                      @blur="checkCafePhoneAvailability"
-                    />
-
-                    <!-- Landline Input -->
-                    <input
-                      v-else
-                      v-model="cafeLandlineDigits"
-                      type="tel"
-                      placeholder="082-299-1234 or 02-8123-4567"
-                      maxlength="15"
-                      class="w-full h-full px-3 text-sm text-[#2d201b] bg-transparent outline-none"
-                      required
-                      @input="onCafeLandlineInput"
-                      @blur="checkCafePhoneAvailability"
-                    />
-                  </div>
-                  <p v-if="fieldErrors.cafe_phonenumber" class="text-xs text-red-600 font-medium">{{ fieldErrors.cafe_phonenumber }}</p>
+                    <p v-if="fieldErrors.cafe_phonenumber" class="text-xs text-rose-600 font-medium">{{ fieldErrors.cafe_phonenumber }}</p>
                   </div>
 
-                  <div>
-                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Branch Address</label>
+                  <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-[#5C3C32] uppercase tracking-wider">Branch Address *</label>
                     <input
                       v-model="address"
                       type="text"
                       placeholder="Street, Barangay, District, Davao City"
-                      class="w-full h-11 rounded-md border border-gray-300 px-3 outline-none transition bg-white text-sm text-[#2d201b] focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20"
+                      class="w-full h-11 rounded-xl border border-[#D9C7B6] px-3.5 outline-none transition bg-[#FFFEFD] text-sm text-[#2D201B] placeholder-[#B5A196] focus:border-[#7B5A50] focus:ring-4 focus:ring-[#7B5A50]/10"
                       required
                     />
                   </div>
 
-                  <div>
-                    <label class="block text-sm font-medium mb-1 text-[#2d201b]">Café Email *</label>
+                  <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-[#5C3C32] uppercase tracking-wider">Café Email *</label>
                     <input
                       v-model="cafeEmail"
                       type="email"
                       placeholder="contact@brewspot.com"
                       :class="[
-                        'w-full h-11 rounded-md border px-3 outline-none transition bg-white text-sm text-[#2d201b]',
+                        'w-full h-11 rounded-xl border px-3.5 outline-none transition bg-[#FFFEFD] text-sm text-[#2D201B] placeholder-[#B5A196]',
                         fieldErrors.cafe_email
-                          ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
-                          : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
+                          ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/20'
+                          : 'border-[#D9C7B6] focus:border-[#7B5A50] focus:ring-4 focus:ring-[#7B5A50]/10'
                       ]"
                       required
                       @input="clearFieldError('cafe_email')"
                       @blur="checkCafeEmailAvailability"
                     />
-                    <p v-if="fieldErrors.cafe_email" class="text-xs text-red-600 mt-1 font-medium">{{ fieldErrors.cafe_email }}</p>
+                    <p v-if="fieldErrors.cafe_email" class="text-xs text-rose-600 font-medium">{{ fieldErrors.cafe_email }}</p>
                   </div>
                 </div>
               </div>
 
+              <!-- Page 1 Submit Button -->
               <div class="pt-2">
                 <button
                   type="submit"
-                  class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition flex items-center justify-center gap-2"
+                  class="w-full h-12 rounded-xl bg-[#3B1F0E] text-[#FFF8EA] font-display font-semibold tracking-wide hover:bg-[#2A150A] active:scale-[0.98] transition-all duration-160 ease-out flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(59,31,14,0.18)] hover:shadow-[0_6px_20px_rgba(59,31,14,0.24)] cursor-pointer group"
                 >
-                  Next: Upload Business Requirements
-                  <Icon name="heroicons:chevron-right" class="w-4 h-4" />
+                  <span>Next: Upload Business Requirements</span>
+                  <Icon name="heroicons:arrow-right" class="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-160" />
                 </button>
               </div>
             </form>
           </div>
 
           <!-- Page 2: 2 Required Business Documents & BIR Details -->
-          <div v-else class="space-y-4">
+          <div v-else class="space-y-6">
             <button
               type="button"
-              class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity"
+              class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8A6E64] hover:text-[#2D201B] active:scale-95 transition-all group cursor-pointer"
               @click="prevBusinessSubPage"
             >
-              <Icon name="heroicons:chevron-left" class="w-4 h-4" />
-              Back to Business Details
+              <Icon name="heroicons:arrow-left" class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-160" />
+              <span>Back to Business Details</span>
             </button>
 
-            <div>
-              <div class="flex items-center justify-between">
-                <span class="text-xs uppercase tracking-wider font-semibold text-[#7B5A50]">Business Registration</span>
-                <span class="text-xs bg-[#7B5A50]/10 text-[#7B5A50] px-2.5 py-0.5 rounded-full font-semibold">Page 2 of 2</span>
+            <!-- Emil Kowalski Segmented Progress Stepper -->
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF4ED] text-[#7B5A50] font-bold tracking-wide border border-[#EEDFC4] shadow-xs">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                  Step 2 of 2 · Documents & BIR
+                </span>
+                <span class="text-emerald-700 font-semibold text-xs tabular-nums">Page 2 of 2 · 100%</span>
               </div>
-              <h1 class="text-2xl font-bold text-[#2d201b] mt-0.5">Required Requirements</h1>
-              <p class="text-gray-600 text-sm mt-1">Upload the 2 required business documents below.</p>
+              <!-- Segmented Progress Bar -->
+              <div class="grid grid-cols-2 gap-1.5 h-2 w-full bg-[#EFEAE2] rounded-full overflow-hidden p-0.5 shadow-inner">
+                <div class="h-full rounded-full bg-[#7B5A50] transition-all duration-300"></div>
+                <div class="h-full rounded-full bg-[#7B5A50] transition-all duration-300"></div>
+              </div>
+            </div>
+
+            <div>
+              <h1 class="text-2xl sm:text-3xl font-display font-bold text-[#2D201B] tracking-tight">Required Requirements</h1>
+              <p class="text-[#8A6E64] text-xs sm:text-sm mt-1 leading-relaxed">Upload the 2 required business documents below.</p>
             </div>
 
             <!-- Upload Progress Card -->
-            <div class="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between shadow-sm">
-              <div class="flex items-center space-x-2.5">
+            <div class="bg-white rounded-2xl border border-[#EEDFC4] p-4 flex items-center justify-between shadow-[0_2px_12px_rgba(59,31,14,0.03)]">
+              <div class="flex items-center space-x-3">
                 <div
-                  class="w-6 h-6 rounded-full text-white flex items-center justify-center text-xs font-bold transition-colors"
-                  :class="uploadedCount === 2 ? 'bg-emerald-600' : 'bg-[#7B5A50]'"
+                  class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 shadow-xs"
+                  :class="uploadedCount === 2 ? 'bg-emerald-600 text-white' : 'bg-[#7B5A50] text-[#FFF8EA]'"
                 >
-                  {{ uploadedCount }}
+                  <Icon v-if="uploadedCount === 2" name="heroicons:check" class="w-4 h-4" />
+                  <span v-else>{{ uploadedCount }}</span>
                 </div>
-                <span class="text-xs font-semibold text-[#2d201b]">
+                <span class="text-xs font-bold text-[#2D201B]">
                   {{ uploadedCount === 2 ? 'All 2 requirements uploaded ✓' : `${uploadedCount} of 2 requirements uploaded` }}
                 </span>
               </div>
-              <div class="w-24 bg-gray-200 rounded-full h-2 overflow-hidden">
+              <div class="w-28 bg-[#FAF4ED] rounded-full h-2 p-0.5 border border-[#EEDFC4] overflow-hidden">
                 <div
-                  class="h-full transition-all duration-300"
+                  class="h-full rounded-full transition-all duration-300"
                   :class="uploadedCount === 2 ? 'bg-emerald-600' : 'bg-[#7B5A50]'"
                   :style="{ width: `${(uploadedCount / 2) * 100}%` }"
                 ></div>
@@ -2228,73 +2366,105 @@ onBeforeUnmount(() => {
             <!-- Auth Error Banner -->
             <div
               v-if="error"
-              class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3"
+              class="p-4 rounded-xl bg-rose-50/90 border border-rose-200 text-rose-800 text-xs sm:text-sm flex items-center gap-3 shadow-xs"
             >
-              <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
+              <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-rose-600 shrink-0" />
               <span class="font-medium whitespace-pre-line">{{ error }}</span>
             </div>
 
-            <form @submit.prevent="handleFinalSubmit" class="space-y-4">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                <!-- 1. BIR Certificate -->
-                <div
-                  class="bg-white rounded-lg p-3 border transition shadow-sm"
-                  :class="birFile ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'"
-                >
-                  <div class="flex items-center justify-between mb-1.5">
-                    <label class="font-semibold text-xs text-[#2d201b]">1. BIR Certificate <span class="text-red-500">*</span></label>
-                    <span v-if="birFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
+            <form @submit.prevent="handleFinalSubmit" class="space-y-5">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                <!-- 1. BIR Certificate Dropzone Card -->
+                <div class="bg-white rounded-2xl border border-[#EEDFC4] p-4 sm:p-5 shadow-[0_2px_12px_rgba(59,31,14,0.03)] space-y-3">
+                  <div class="flex items-center justify-between">
+                    <label class="font-bold text-xs text-[#2D201B] uppercase tracking-wider">1. BIR Certificate <span class="text-rose-500">*</span></label>
+                    <span v-if="birFile" class="text-[11px] text-emerald-700 font-bold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <Icon name="heroicons:check" class="w-3.5 h-3.5" /> Ready
+                    </span>
                   </div>
+
                   <div v-if="!birFile">
-                    <input
-                      type="file"
-                      @change="onBirChange"
-                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
-                      required
-                    />
+                    <label
+                      for="bir-cert-input"
+                      class="border-2 border-dashed border-[#D9C7B6] hover:border-[#7B5A50] bg-[#FAF6F0]/60 hover:bg-[#FAF4ED] active:scale-[0.98] rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-160 group select-none min-h-[110px]"
+                    >
+                      <div class="w-8 h-8 rounded-lg bg-white text-[#7B5A50] shadow-xs flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform duration-160">
+                        <Icon name="heroicons:document-text" class="w-4 h-4" />
+                      </div>
+                      <p class="text-xs font-bold text-[#2D201B]">Upload BIR Certificate</p>
+                      <p class="text-[10px] text-[#8A6E64] mt-0.5">PDF, JPG, PNG · Max 5MB</p>
+                      <input
+                        id="bir-cert-input"
+                        type="file"
+                        class="sr-only"
+                        @change="onBirChange"
+                        accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                        required
+                      />
+                    </label>
                   </div>
-                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
-                    <div class="truncate mr-2">
-                      <p class="font-medium truncate text-xs">{{ birFileName }}</p>
-                      <p class="text-[0.65rem] text-emerald-700">{{ birFileSize }}</p>
+                  <div v-else class="flex items-center justify-between p-3 rounded-xl bg-emerald-50/80 border border-emerald-300">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                        <Icon name="heroicons:check" class="w-4 h-4" />
+                      </div>
+                      <div class="truncate">
+                        <p class="font-bold truncate text-xs text-emerald-950">{{ birFileName }}</p>
+                        <p class="text-[10px] text-emerald-700 font-semibold">{{ birFileSize }}</p>
+                      </div>
                     </div>
                     <button
                       type="button"
                       @click="clearBirFile"
-                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
+                      class="w-7 h-7 rounded-lg text-emerald-800 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center active:scale-90 transition-all font-bold text-base cursor-pointer shrink-0"
                       title="Remove file"
                     >&times;</button>
                   </div>
                 </div>
 
-                <!-- 2. DTI or SEC Document -->
-                <div
-                  class="bg-white rounded-lg p-3 border transition shadow-sm"
-                  :class="dtiSecFile ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300 hover:border-[#7B5A50]'"
-                >
-                  <div class="flex items-center justify-between mb-1.5">
-                    <label class="font-semibold text-xs text-[#2d201b]">2. {{ cafeDocType }} Document <span class="text-red-500">*</span></label>
-                    <span v-if="dtiSecFile" class="text-[0.65rem] text-emerald-700 font-bold flex items-center gap-0.5">✓ Uploaded</span>
+                <!-- 2. DTI or SEC Document Dropzone Card -->
+                <div class="bg-white rounded-2xl border border-[#EEDFC4] p-4 sm:p-5 shadow-[0_2px_12px_rgba(59,31,14,0.03)] space-y-3">
+                  <div class="flex items-center justify-between">
+                    <label class="font-bold text-xs text-[#2D201B] uppercase tracking-wider">2. {{ cafeDocType }} Document <span class="text-rose-500">*</span></label>
+                    <span v-if="dtiSecFile" class="text-[11px] text-emerald-700 font-bold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <Icon name="heroicons:check" class="w-3.5 h-3.5" /> Ready
+                    </span>
                   </div>
+
                   <div v-if="!dtiSecFile">
-                    <input
-                      type="file"
-                      @change="onDtiSecChange"
-                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                      class="w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#7B5A50] file:text-white hover:file:bg-[#65463d] cursor-pointer"
-                      required
-                    />
+                    <label
+                      for="dti-sec-input"
+                      class="border-2 border-dashed border-[#D9C7B6] hover:border-[#7B5A50] bg-[#FAF6F0]/60 hover:bg-[#FAF4ED] active:scale-[0.98] rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-160 group select-none min-h-[110px]"
+                    >
+                      <div class="w-8 h-8 rounded-lg bg-white text-[#7B5A50] shadow-xs flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform duration-160">
+                        <Icon name="heroicons:document-text" class="w-4 h-4" />
+                      </div>
+                      <p class="text-xs font-bold text-[#2D201B]">Upload {{ cafeDocType }} Document</p>
+                      <p class="text-[10px] text-[#8A6E64] mt-0.5">PDF, JPG, PNG · Max 5MB</p>
+                      <input
+                        id="dti-sec-input"
+                        type="file"
+                        class="sr-only"
+                        @change="onDtiSecChange"
+                        accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                        required
+                      />
+                    </label>
                   </div>
-                  <div v-else class="flex items-center justify-between text-xs bg-emerald-100/70 p-2 rounded-md text-emerald-900">
-                    <div class="truncate mr-2">
-                      <p class="font-medium truncate text-xs">{{ dtiSecFileName }}</p>
-                      <p class="text-[0.65rem] text-emerald-700">{{ dtiSecFileSize }}</p>
+                  <div v-else class="flex items-center justify-between p-3 rounded-xl bg-emerald-50/80 border border-emerald-300">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                        <Icon name="heroicons:check" class="w-4 h-4" />
+                      </div>
+                      <div class="truncate">
+                        <p class="font-bold truncate text-xs text-emerald-950">{{ dtiSecFileName }}</p>
+                        <p class="text-[10px] text-emerald-700 font-semibold">{{ dtiSecFileSize }}</p>
+                      </div>
                     </div>
                     <button
                       type="button"
                       @click="clearDtiSecFile"
-                      class="text-emerald-800 hover:text-red-600 font-bold text-sm px-1 rounded focus:outline-none"
+                      class="w-7 h-7 rounded-lg text-emerald-800 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center active:scale-90 transition-all font-bold text-base cursor-pointer shrink-0"
                       title="Remove file"
                     >&times;</button>
                   </div>
@@ -2302,48 +2472,52 @@ onBeforeUnmount(() => {
               </div>
 
               <!-- BIR Registration Details Form (Visible once BIR File is uploaded) -->
-              <div v-if="birFile" class="bg-white border border-[#7B5A50]/20 rounded-lg p-4 space-y-3.5 shadow-sm">
-                <div class="flex items-center gap-2 border-b border-gray-100 pb-2">
-                  <Icon name="heroicons:clipboard-document-check" class="w-5 h-5 text-[#7B5A50]" />
-                  <h3 class="text-sm font-bold text-[#2d201b]">BIR Registration Details</h3>
-                  <span class="text-[0.65rem] bg-[#7B5A50]/10 text-[#7B5A50] font-semibold px-2 py-0.5 rounded-full ml-auto">
-                    Required Information
+              <div v-if="birFile" class="bg-white rounded-2xl border border-[#EEDFC4] p-5 sm:p-6 shadow-[0_2px_12px_rgba(59,31,14,0.03)] space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-[#FAF4ED]">
+                  <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-[#FAF4ED] text-[#7B5A50] flex items-center justify-center">
+                      <Icon name="heroicons:clipboard-document-check" class="w-4 h-4" />
+                    </div>
+                    <h3 class="text-xs uppercase tracking-wider font-bold text-[#482D25]">BIR Registration Details</h3>
+                  </div>
+                  <span class="text-[11px] bg-[#FAF4ED] text-[#7B5A50] font-bold px-2.5 py-0.5 rounded-full border border-[#EEDFC4]">
+                    Required Details
                   </span>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <!-- TIN Number -->
-                  <div class="space-y-1">
-                    <label class="block font-semibold text-[#2d201b]">TIN</label>
+                  <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-[#5C3C32] uppercase tracking-wider">TIN *</label>
                     <input
                       v-model="tinNumber"
                       type="text"
                       placeholder="XXX-XXX-XXX-00000"
                       maxlength="17"
                       :class="[
-                        'w-full h-10 rounded-md border px-3 outline-none transition bg-white text-xs text-[#2d201b] font-mono tracking-wider',
+                        'w-full h-11 rounded-xl border px-3.5 outline-none transition bg-[#FFFEFD] text-xs font-mono tracking-wider text-[#2D201B] placeholder-[#B5A196]',
                         fieldErrors.tin_number
-                          ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
-                          : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
+                          ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/20'
+                          : 'border-[#D9C7B6] focus:border-[#7B5A50] focus:ring-4 focus:ring-[#7B5A50]/10'
                       ]"
                       required
                       @input="onTinInput"
                     />
-                    <p v-if="fieldErrors.tin_number" class="text-[0.7rem] text-red-600 font-medium">{{ fieldErrors.tin_number }}</p>
+                    <p v-if="fieldErrors.tin_number" class="text-xs text-rose-600 font-medium">{{ fieldErrors.tin_number }}</p>
                   </div>
 
                   <!-- VAT Status Option Buttons -->
-                  <div class="space-y-1">
-                    <label class="block font-semibold text-[#2d201b]">VAT Registration Type</label>
-                    <div class="grid grid-cols-2 gap-2 h-10">
+                  <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-[#5C3C32] uppercase tracking-wider">VAT Registration Type *</label>
+                    <div class="grid grid-cols-2 gap-2 h-11">
                       <button
                         type="button"
                         @click="vat = 'vat-registered'; clearFieldError('vat')"
                         :class="[
-                          'rounded-md text-xs font-semibold transition flex items-center justify-center border',
+                          'rounded-xl text-xs font-bold transition-all duration-160 ease-out flex items-center justify-center cursor-pointer active:scale-[0.98]',
                           vat === 'vat-registered'
-                            ? 'bg-[#7B5A50] text-white border-[#7B5A50] shadow-sm'
-                            : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
+                            ? 'bg-[#3B1F0E] text-[#FFF8EA] shadow-[0_2px_8px_rgba(59,31,14,0.18)]'
+                            : 'bg-[#FAF6F0] text-[#5C3C32] border border-[#D9C7B6] hover:bg-[#F3ECE0]'
                         ]"
                       >
                         VAT
@@ -2352,42 +2526,39 @@ onBeforeUnmount(() => {
                         type="button"
                         @click="vat = 'non-vat'; clearFieldError('vat')"
                         :class="[
-                          'rounded-md text-xs font-semibold transition flex items-center justify-center border',
+                          'rounded-xl text-xs font-bold transition-all duration-160 ease-out flex items-center justify-center cursor-pointer active:scale-[0.98]',
                           vat === 'non-vat'
-                            ? 'bg-[#7B5A50] text-white border-[#7B5A50] shadow-sm'
-                            : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
+                            ? 'bg-[#3B1F0E] text-[#FFF8EA] shadow-[0_2px_8px_rgba(59,31,14,0.18)]'
+                            : 'bg-[#FAF6F0] text-[#5C3C32] border border-[#D9C7B6] hover:bg-[#F3ECE0]'
                         ]"
                       >
                         Non-VAT
                       </button>
                     </div>
-                    <p v-if="fieldErrors.vat" class="text-[0.7rem] text-red-600 font-medium">{{ fieldErrors.vat }}</p>
+                    <p v-if="fieldErrors.vat" class="text-xs text-rose-600 font-medium">{{ fieldErrors.vat }}</p>
                   </div>
 
-                  <!-- BIR Registered Date -->
-                  <div class="space-y-1">
-                    <label class="block font-semibold text-[#2d201b]">BIR Registration Date</label>
-                    <input
+                  <!-- BIR Registered Date with EmilCalendar -->
+                  <div class="space-y-1.5 sm:col-span-2">
+                    <label class="block text-xs font-bold text-[#5C3C32] uppercase tracking-wider">BIR Registration Date *</label>
+                    <EmilCalendar
                       v-model="birRegisteredAt"
-                      type="date"
-                      :class="[
-                        'w-full h-10 rounded-md border px-3 outline-none transition bg-white text-xs text-[#2d201b]',
-                        fieldErrors.bir_registered_at
-                          ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
-                          : 'border-gray-300 focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20'
-                      ]"
-                      required
-                      @change="clearFieldError('bir_registered_at')"
+                      placeholder="Select BIR registration date"
+                      align="left"
+                      :invalid="!!fieldErrors.bir_registered_at"
+                      button-class="w-full h-11 rounded-xl border border-[#D9C7B6] px-3.5 text-xs sm:text-sm text-[#2D201B] bg-[#FFFEFD] hover:border-[#7B5A50] focus:border-[#7B5A50] focus:ring-4 focus:ring-[#7B5A50]/10"
+                      @update:model-value="clearFieldError('bir_registered_at')"
                     />
-                    <p v-if="fieldErrors.bir_registered_at" class="text-[0.7rem] text-red-600 font-medium">{{ fieldErrors.bir_registered_at }}</p>
+                    <p v-if="fieldErrors.bir_registered_at" class="text-xs text-rose-600 font-medium">{{ fieldErrors.bir_registered_at }}</p>
                   </div>
                 </div>
               </div>
 
+              <!-- Page 2 Action Buttons -->
               <div class="flex items-center gap-3 pt-2">
                 <button
                   type="button"
-                  class="w-1/3 h-11 rounded-md border border-[#7B5A50] text-[#7B5A50] font-medium hover:bg-[#7B5A50]/10 transition"
+                  class="w-1/3 h-12 rounded-xl border border-[#D9C7B6] bg-white text-[#5C3C32] font-semibold hover:bg-[#FAF6F0] active:scale-[0.98] transition-all duration-160 ease-out flex items-center justify-center cursor-pointer"
                   @click="prevBusinessSubPage"
                 >
                   Back
@@ -2395,10 +2566,11 @@ onBeforeUnmount(() => {
                 <button
                   type="submit"
                   :disabled="loading || uploadedCount < 2 || (!!birFile && (!tinNumber || !birRegisteredAt || !vat))"
-                  class="w-2/3 h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  class="w-2/3 h-12 rounded-xl bg-[#3B1F0E] text-[#FFF8EA] font-display font-semibold tracking-wide hover:bg-[#2A150A] active:scale-[0.98] transition-all duration-160 ease-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(59,31,14,0.18)] hover:shadow-[0_6px_20px_rgba(59,31,14,0.24)] cursor-pointer group"
                 >
-                  <span v-if="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  {{ loading ? 'Submitting...' : 'Submit Registration' }}
+                  <span v-if="loading" class="w-4 h-4 border-2 border-[#FFF8EA] border-t-transparent rounded-full animate-spin"></span>
+                  <span>{{ loading ? 'Submitting Application...' : 'Submit Registration' }}</span>
+                  <Icon v-if="!loading" name="heroicons:arrow-right" class="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-160" />
                 </button>
               </div>
             </form>
@@ -2407,23 +2579,26 @@ onBeforeUnmount(() => {
 
         <!-- STEP 5: Review / Submitted Screen -->
         <div v-else-if="currentStep === 5" key="step5" class="space-y-6">
-          <div>
-            <span class="text-xs uppercase tracking-wider font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">Registration Submitted ✓</span>
-            <h1 class="text-2xl font-bold text-[#2d201b] mt-2">Application Received!</h1>
-            <p class="text-gray-600 text-sm mt-2 leading-relaxed">
-              We've sent a confirmation email to <span class="font-semibold text-[#2d201b]">{{ email }}</span> with a direct link to view your submitted details and track review progress.
+          <div class="space-y-2">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">
+              <Icon name="heroicons:check-circle" class="w-4 h-4 text-emerald-600" />
+              Registration Submitted Successfully
+            </span>
+            <h1 class="text-2xl sm:text-3xl font-display font-bold text-[#2D201B] tracking-tight mt-1">Application Received!</h1>
+            <p class="text-[#8A6E64] text-xs sm:text-sm leading-relaxed">
+              We've sent a confirmation email to <span class="font-bold text-[#2D201B]">{{ email }}</span> with a direct link to view your submitted details and track review progress.
             </p>
           </div>
 
           <!-- Direct View Details CTA Card -->
-          <div class="rounded-xl border border-[#7B5A50]/20 bg-white p-5 space-y-4 shadow-sm">
+          <div class="bg-white rounded-2xl border border-[#EEDFC4] p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(59,31,14,0.03)]">
             <div class="flex items-start gap-3">
-              <div class="w-9 h-9 rounded-lg bg-[#7B5A50]/10 text-[#7B5A50] flex items-center justify-center shrink-0">
+              <div class="w-10 h-10 rounded-xl bg-[#FAF4ED] text-[#7B5A50] flex items-center justify-center shrink-0 shadow-xs">
                 <Icon name="heroicons:document-text" class="w-5 h-5" />
               </div>
               <div>
-                <p class="text-sm font-bold text-[#2d201b]">View Your Submitted Application</p>
-                <p class="text-xs text-gray-500 mt-0.5">
+                <p class="text-sm font-bold text-[#2D201B]">View Your Submitted Application</p>
+                <p class="text-xs text-[#8A6E64] mt-0.5">
                   Check all the information and uploaded documents you entered anytime.
                 </p>
               </div>
@@ -2432,42 +2607,50 @@ onBeforeUnmount(() => {
             <NuxtLink
               v-if="userUuid"
               :to="`/application/${userUuid}`"
-              class="w-full h-10 rounded-lg bg-[#7B5A50] text-white text-xs font-bold hover:bg-[#65463d] transition flex items-center justify-center gap-2 shadow-sm"
+              class="w-full h-12 rounded-xl bg-[#3B1F0E] text-[#FFF8EA] text-xs sm:text-sm font-semibold hover:bg-[#2A150A] active:scale-[0.98] transition-all duration-160 ease-out flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(59,31,14,0.18)]"
             >
               <Icon name="heroicons:eye" class="w-4 h-4" />
               View Application Details
             </NuxtLink>
           </div>
 
-          <div class="rounded-lg border border-[#7B5A50]/15 bg-[#FFF8EA]/60 p-4 space-y-2.5">
-            <p class="text-xs font-bold text-[#2d201b] uppercase tracking-wide">What happens next?</p>
-            <ul class="space-y-2 text-xs text-gray-600">
-              <li class="flex items-center gap-2">
-                <Icon name="heroicons:check-circle" class="w-4 h-4 text-[#7B5A50]" />
-                1. Document Verification & Compliance Review (1–3 business days)
+          <!-- What happens next? Card -->
+          <div class="rounded-2xl border border-[#EEDFC4] bg-[#FAF6F0] p-5 space-y-3">
+            <p class="text-xs font-bold text-[#482D25] uppercase tracking-wider">What happens next?</p>
+            <ul class="space-y-2.5 text-xs text-[#5C3C32]">
+              <li class="flex items-center gap-2.5">
+                <div class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                  <Icon name="heroicons:check" class="w-3.5 h-3.5" />
+                </div>
+                <span>1. Document Verification & Compliance Review (1–3 business days)</span>
               </li>
-              <li class="flex items-center gap-2">
-                <Icon name="heroicons:check-circle" class="w-4 h-4 text-[#7B5A50]" />
-                2. Email Notification upon Admin Approval
+              <li class="flex items-center gap-2.5">
+                <div class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                  <Icon name="heroicons:check" class="w-3.5 h-3.5" />
+                </div>
+                <span>2. Email Notification upon Admin Approval</span>
               </li>
-              <li class="flex items-center gap-2">
-                <Icon name="heroicons:check-circle" class="w-4 h-4 text-[#7B5A50]" />
-                3. Password Setup & Immediate Dashboard Access
+              <li class="flex items-center gap-2.5">
+                <div class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                  <Icon name="heroicons:check" class="w-3.5 h-3.5" />
+                </div>
+                <span>3. Password Setup & Immediate Dashboard Access</span>
               </li>
             </ul>
           </div>
 
+          <!-- Bottom Navigation Actions -->
           <div class="flex items-center gap-3 pt-2">
             <NuxtLink
               to="/"
-              class="w-1/2 h-10 rounded-md border border-[#7B5A50] text-[#7B5A50] font-medium hover:bg-[#7B5A50]/10 transition flex items-center justify-center gap-1.5 text-xs"
+              class="w-1/2 h-11 rounded-xl border border-[#D9C7B6] bg-white text-[#5C3C32] font-semibold hover:bg-[#FAF6F0] active:scale-[0.98] transition-all duration-160 ease-out flex items-center justify-center gap-1.5 text-xs"
             >
               <Icon name="heroicons:home" class="w-4 h-4" />
               Back to Home
             </NuxtLink>
             <button
               type="button"
-              class="w-1/2 h-10 rounded-md border border-gray-300 text-gray-700 font-medium hover:bg-gray-100 transition flex items-center justify-center gap-1.5 text-xs"
+              class="w-1/2 h-11 rounded-xl bg-[#3B1F0E] text-[#FFF8EA] font-semibold hover:bg-[#2A150A] active:scale-[0.98] transition-all duration-160 ease-out flex items-center justify-center gap-1.5 text-xs shadow-xs"
               @click="goLogin"
             >
               Go to Sign In
@@ -2482,16 +2665,26 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.fade-slide-enter-active,
+.fade-slide-enter-active {
+  transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
 .fade-slide-leave-active {
-  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: opacity 150ms ease-in, transform 150ms ease-in;
 }
 .fade-slide-enter-from {
   opacity: 0;
-  transform: translateY(15px);
+  transform: translateY(10px);
 }
 .fade-slide-leave-to {
   opacity: 0;
-  transform: translateY(-15px);
+  transform: translateY(-10px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-slide-enter-active,
+  .fade-slide-leave-active {
+    transition: opacity 100ms ease;
+    transform: none !important;
+  }
 }
 </style>

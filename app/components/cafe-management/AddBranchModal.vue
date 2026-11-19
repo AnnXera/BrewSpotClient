@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import DropdownList from '~/components/common/DropdownList.vue'
+import EmilCalendar from '~/components/common/EmilCalendar.vue'
 
 const props = defineProps<{
   show: boolean
@@ -330,7 +331,13 @@ function handleSubmit() {
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#3D2B24] mb-1">BIR Registered Date *</label>
-                <input type="date" v-model="form.bir_registered_at" class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24] focus:outline-none focus:border-[#7D5A50]" />
+                <EmilCalendar
+                  v-model="form.bir_registered_at"
+                  placeholder="Select BIR registration date"
+                  align="left"
+                  :invalid="!!fieldError('bir_registered_at')"
+                  button-class="w-full px-4 py-2.5 rounded-xl border border-[#EEDFC4] bg-[#FDF8F3] text-sm text-[#3D2B24]"
+                />
                 <p v-if="fieldError('bir_registered_at')" class="text-xs text-red-600 mt-1 font-medium">{{ fieldError('bir_registered_at') }}</p>
               </div>
               <div>

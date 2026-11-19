@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import DropdownList from '~/components/common/DropdownList.vue'
+import EmilCalendar from '~/components/common/EmilCalendar.vue'
 import { toDay } from '~/utils/dashboardFormat'
 import { ANALYTICS_PRESETS, rangeFor, type AnalyticsFilterState, type AnalyticsPreset } from '~/utils/analyticsRange'
 
@@ -93,25 +94,28 @@ function setBranch(branch: string | null) {
     novalidate
     @submit.prevent="applyCustom"
   >
-    <label class="flex flex-col gap-1 text-[12px] font-medium text-[#8B6656]">
-      From
-      <input
+    <div class="flex flex-col gap-1 text-[12px] font-medium text-[#8B6656]">
+      <span>From</span>
+      <EmilCalendar
         v-model="customFrom"
-        type="date"
         :min="oneYearAgo"
         :max="today"
-        class="h-10 rounded-xl border border-[#E3CFB4] bg-[#FFFDF9] px-3 text-sm text-[#3B1F0E] focus:border-[#7D5A50] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
-      >
-    </label>
-    <label class="flex flex-col gap-1 text-[12px] font-medium text-[#8B6656]">
-      To
-      <input
+        align="left"
+        placeholder="Start date"
+        button-class="h-10 min-w-[145px] rounded-xl border border-[#E3CFB4] bg-[#FFFDF9] px-3 text-sm text-[#3B1F0E] hover:border-[#7D5A50] hover:bg-[#F8EFE7]"
+      />
+    </div>
+    <div class="flex flex-col gap-1 text-[12px] font-medium text-[#8B6656]">
+      <span>To</span>
+      <EmilCalendar
         v-model="customTo"
-        type="date"
+        :min="customFrom || oneYearAgo"
         :max="today"
-        class="h-10 rounded-xl border border-[#E3CFB4] bg-[#FFFDF9] px-3 text-sm text-[#3B1F0E] focus:border-[#7D5A50] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
-      >
-    </label>
+        align="left"
+        placeholder="End date"
+        button-class="h-10 min-w-[145px] rounded-xl border border-[#E3CFB4] bg-[#FFFDF9] px-3 text-sm text-[#3B1F0E] hover:border-[#7D5A50] hover:bg-[#F8EFE7]"
+      />
+    </div>
     <button
       type="submit"
       :disabled="!!customError"

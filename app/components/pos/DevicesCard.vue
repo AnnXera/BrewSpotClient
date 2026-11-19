@@ -62,6 +62,8 @@ function formatDate(iso: string | null) {
   if (!iso) return null
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
+
+const isQrModalOpen = ref(false)
 </script>
 
 <template>
@@ -73,7 +75,16 @@ function formatDate(iso: string | null) {
           {{ devices.length }} {{ devices.length === 1 ? 'register' : 'registers' }}<template v-if="inUseCount"> · {{ inUseCount }} in use</template>
         </span>
       </div>
-      <div v-if="!loading && !planLock" class="flex items-center gap-2">
+      <div v-if="!loading && !planLock" class="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] hover:bg-[#F3E5D4] px-3.5 py-1.5 text-xs font-bold text-[#7D5A50] transition-all shadow-xs active:scale-[0.97] cursor-pointer"
+          @click="isQrModalOpen = true"
+          :title="scope === 'owner' ? 'Generate & Print POS QR Code' : 'View & Print POS QR Code'"
+        >
+          <Icon name="heroicons:qr-code" class="w-4 h-4 text-[#7D5A50]" />
+          <span>{{ scope === 'owner' ? 'Generate POS QR' : 'View POS QR' }}</span>
+        </button>
         <CommonA2HSButton variant="card" label="Install POS App" data-walkthrough="pos-install-btn" />
         <button
           type="button"
@@ -145,14 +156,32 @@ function formatDate(iso: string | null) {
       <Icon name="heroicons:computer-desktop" class="mx-auto w-7 h-7 text-[#C2A592]" />
       <p class="mt-2 text-[15px] font-semibold text-[#3D2B24]">No registers set up yet</p>
       <p class="mt-1 text-sm text-[#9E7060]">Open the setup page on the device you want to use as this branch's register.</p>
-      <NuxtLink
-        to="/pos/setup"
-        class="mt-3 inline-flex items-center gap-1.5 border border-[#EDD8CC] bg-white rounded-[10px] px-4 py-2 text-[13px] font-semibold text-[#7D5A50] hover:bg-[#FFF0D1] transition-colors"
-      >
-        <Icon name="heroicons:plus-20-solid" class="w-4 h-4" aria-hidden="true" />
-        Set up a register
-      </NuxtLink>
+      <div class="mt-3 flex flex-wrap items-center justify-center gap-2">
+        <NuxtLink
+          to="/pos/setup"
+          class="inline-flex items-center gap-1.5 border border-[#EDD8CC] bg-white rounded-[10px] px-4 py-2 text-[13px] font-semibold text-[#7D5A50] hover:bg-[#FFF0D1] transition-colors"
+        >
+          <Icon name="heroicons:plus-20-solid" class="w-4 h-4" aria-hidden="true" />
+          Set up a register
+        </NuxtLink>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 border border-[#EDD8CC] bg-white rounded-[10px] px-4 py-2 text-[13px] font-semibold text-[#7D5A50] hover:bg-[#FFF0D1] transition-colors"
+          @click="isQrModalOpen = true"
+        >
+          <Icon name="heroicons:qr-code" class="w-4 h-4 text-[#7D5A50]" />
+          {{ scope === 'owner' ? 'Generate QR Code' : 'View QR Code' }}
+        </button>
+      </div>
     </div>
+
+    <!-- POS QR Modal (Generator for Owner, View for Manager, PDF Print for Both) -->
+    <PosQrModal
+      :show="isQrModalOpen"
+      :scope="props.scope"
+      :branch-uuid="props.branchUuid"
+      @close="isQrModalOpen = false"
+    />
   </section>
 </template>
 

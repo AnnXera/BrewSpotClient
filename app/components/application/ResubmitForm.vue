@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { reactive, ref, computed, watch } from 'vue'
 import { KEEP_FILE, type PreviousApplication } from '~/services/AuthService'
+import EmilCalendar from '~/components/common/EmilCalendar.vue'
 
 const props = defineProps<{
   uuid: string
@@ -323,11 +324,17 @@ const inputClass = (field: string) =>
             />
             <span v-if="errors.tin_number" class="text-red-600">{{ errors.tin_number }}</span>
           </label>
-          <label class="block">
-            <span class="text-gray-500 font-medium">BIR Registration Date</span>
-            <input v-model="form.bir_registered_at" type="date" :class="inputClass('bir_registered_at')" />
-            <span v-if="errors.bir_registered_at" class="text-red-600">{{ errors.bir_registered_at }}</span>
-          </label>
+          <div class="block">
+            <span class="text-gray-500 font-medium text-sm block mb-1">BIR Registration Date</span>
+            <EmilCalendar
+              v-model="form.bir_registered_at"
+              placeholder="Select BIR registration date"
+              align="left"
+              :invalid="!!errors.bir_registered_at"
+              button-class="mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm text-[#2d201b]"
+            />
+            <span v-if="errors.bir_registered_at" class="text-red-600 text-xs mt-1 block">{{ errors.bir_registered_at }}</span>
+          </div>
           <label class="block sm:col-span-2">
             <span class="text-gray-500 font-medium">VAT Registration</span>
             <select v-model="form.vat" :class="inputClass('vat')">
