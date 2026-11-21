@@ -19,7 +19,8 @@ const ownerService = useOwnerManagementService()
 const route = useRoute()
 
 type RegistrationTab = 'owner' | 'branch'
-type StatusTab = 'general' | 'pending_approval' | 'approved' | 'rejected'
+// 'pending' and 'resubmitted' split what awaits review (the API's 'pending_approval')
+type StatusTab = 'general' | 'pending' | 'resubmitted' | 'approved' | 'rejected'
 
 const registrationTab = ref<RegistrationTab>('owner')
 const statusTab = ref<StatusTab>('general')
@@ -339,14 +340,29 @@ watch(() => route.query.uuid, async (uuid) => {
             <button
               type="button"
               class="flex items-center gap-2 px-[20px] py-[8px] rounded-[8px] transition-colors"
-              :class="statusTab === 'pending_approval' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
-              @click="switchStatusTab('pending_approval')"
+              :class="statusTab === 'pending' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
+              @click="switchStatusTab('pending')"
             >
               Pending
               <span
                 class="rounded-full px-2 py-0.5 text-[11px] font-bold"
-                :class="statusTab === 'pending_approval' ? 'bg-[#FDF3E7]/20 text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
-              >{{ stats?.pending_approval ?? 0 }}</span>
+                :class="statusTab === 'pending' ? 'bg-[#FDF3E7]/20 text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+              >{{ stats?.pending ?? stats?.pending_approval ?? 0 }}</span>
+            </button>
+
+            <!-- Owners correcting a rejected application (side branches are never resubmitted) -->
+            <button
+              v-if="registrationTab === 'owner'"
+              type="button"
+              class="flex items-center gap-2 px-[20px] py-[8px] rounded-[8px] transition-colors"
+              :class="statusTab === 'resubmitted' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
+              @click="switchStatusTab('resubmitted')"
+            >
+              Resubmitted
+              <span
+                class="rounded-full px-2 py-0.5 text-[11px] font-bold"
+                :class="statusTab === 'resubmitted' ? 'bg-[#FDF3E7]/20 text-[#FDF3E7]' : 'bg-[#E3EEFB] text-[#2F6DB5]'"
+              >{{ stats?.resubmitted ?? 0 }}</span>
             </button>
 
             <button

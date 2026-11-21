@@ -85,7 +85,12 @@ export interface ApprovalListItem {
 }
 
 export interface ApprovalStats {
+    /** Everything awaiting review, resubmissions included */
     pending_approval: number
+    /** Awaiting review, first-time applications and branch submissions only */
+    pending?: number
+    /** Awaiting review, owners correcting a rejected application */
+    resubmitted?: number
     approved: number
     rejected: number
 }
