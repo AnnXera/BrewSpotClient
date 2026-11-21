@@ -155,6 +155,8 @@ const ACTIONS: Record<string, { label: string; icon: string; tone: string }> = {
   'auth.logout': { label: 'Signed out', icon: 'heroicons:arrow-left-start-on-rectangle', tone: OFF },
   'pos.unlock': { label: 'Register in', icon: 'heroicons:lock-open', tone: ON },
   'pos.lock': { label: 'Register out', icon: 'heroicons:lock-closed', tone: OFF },
+  'pos.device_registered': { label: 'Register set up', icon: 'heroicons:computer-desktop', tone: ADD },
+  'pos.device_removed': { label: 'Register removed', icon: 'heroicons:computer-desktop', tone: REMOVE },
   'serving.created': { label: 'Serving added', icon: 'heroicons:plus-circle', tone: ADD },
   'serving.updated': { label: 'Serving edited', icon: 'heroicons:pencil-square', tone: EDIT },
   'serving.category_saved': { label: 'Servings saved', icon: 'heroicons:pencil-square', tone: EDIT },
