@@ -96,6 +96,8 @@ export interface ApplicationDetails {
     }
     approval: {
         status: string
+        /** 'resubmitted' while a corrected application waits for review */
+        display_status?: string
         reason?: string | null
         /** Rejected and the admin allowed the applicant to edit and resubmit */
         can_resubmit?: boolean

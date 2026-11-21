@@ -227,6 +227,7 @@ async function openFromQuery(uuid: string) {
       modalApproval.value = {
         uuid,
         status: res.approval?.status ?? 'pending_approval',
+        display_status: res.approval?.display_status,
         reason: res.approval?.reason ?? null,
         reviewed_at: res.approval?.reviewed_at ?? null,
         user: res.owner,
