@@ -14,6 +14,10 @@ interface Props {
   min?: string // YYYY-MM-DD
   max?: string // YYYY-MM-DD
   align?: 'left' | 'right'
+  placeholder?: string
+  buttonClass?: string
+  disabled?: boolean
+  invalid?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -23,6 +27,10 @@ const props = withDefaults(defineProps<Props>(), {
   min: '',
   max: '',
   align: 'right',
+  placeholder: 'Select date',
+  buttonClass: '',
+  disabled: false,
+  invalid: false,
 })
 
 const emit = defineEmits<{
@@ -451,9 +459,16 @@ function applyRangeAndClose() {
 }
 
 function clearSelection() {
-  internalRangeStart.value = null
-  internalRangeEnd.value = null
-  emit('clear')
+  if (effectiveMode.value === 'single') {
+    emit('update:modelValue', '')
+    emit('select', '')
+    emit('clear')
+    isOpen.value = false
+  } else {
+    internalRangeStart.value = null
+    internalRangeEnd.value = null
+    emit('clear')
+  }
 }
 
 function toggle() {
@@ -525,11 +540,10 @@ const selectedFormatted = computed(() => {
     return 'Select date range'
   }
 
-  if (!props.modelValue) return 'Select date'
+  if (!props.modelValue) return props.placeholder || 'Select date'
   try {
     const d = new Date(`${props.modelValue}T00:00:00`)
     return new Intl.DateTimeFormat('en-US', {
-      weekday: 'short',
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -541,18 +555,25 @@ const selectedFormatted = computed(() => {
 </script>
 
 <template>
-  <div class="relative inline-block text-left">
+  <div class="relative inline-block text-left w-full sm:w-auto">
     <!-- Trigger Slot or Default Trigger -->
-    <div ref="triggerRef" class="inline-flex">
-      <slot name="trigger" :open="isOpen" :toggle="toggle" :formatted="selectedFormatted">
+    <div ref="triggerRef" class="w-full inline-flex">
+      <slot name="trigger" :open="isOpen" :toggle="toggle" :formatted="selectedFormatted" :value="modelValue">
         <button
           type="button"
-          class="inline-flex h-9 items-center gap-2 rounded-lg border border-[#DCC8B8] bg-white px-3 text-sm font-medium text-[#5B463C] shadow-2xs hover:border-[#7D5A50] hover:bg-[#F8EFE7] active:scale-[0.97] transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
-          :class="{ 'border-[#7D5A50] bg-[#F8EFE7] ring-2 ring-[#7D5A50]/20': isOpen }"
+          :disabled="disabled"
+          class="inline-flex h-10 w-full items-center justify-between gap-2.5 rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] px-3.5 text-sm font-medium text-[#3D2B24] shadow-2xs hover:border-[#D9C4B8] hover:bg-[#F8EFE7] active:scale-[0.98] transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:opacity-50 disabled:cursor-not-allowed"
+          :class="[
+            buttonClass,
+            isOpen ? 'border-[#7D5A50] ring-2 ring-[#7D5A50]/20 bg-[#F8EFE7]' : '',
+            invalid ? 'border-red-500 ring-2 ring-red-500/20' : ''
+          ]"
           @click="toggle"
         >
-          <Icon name="heroicons:calendar-days" class="size-4 text-[#7D5A50]" />
-          <span>{{ selectedFormatted }}</span>
+          <span class="tabular-nums truncate font-normal" :class="modelValue || (effectiveMode === 'range' && rangeValue) ? 'text-[#3D2B24] font-medium' : 'text-[#9E7060]/70'">
+            {{ selectedFormatted }}
+          </span>
+          <Icon name="heroicons:calendar-days" class="size-4.5 text-[#7D5A50] shrink-0" />
         </button>
       </slot>
     </div>
@@ -824,7 +845,7 @@ const selectedFormatted = computed(() => {
                 Today
               </button>
               <button
-                v-if="effectiveMode === 'range' && (internalRangeStart || internalRangeEnd)"
+                v-if="(effectiveMode === 'range' && (internalRangeStart || internalRangeEnd)) || (effectiveMode === 'single' && modelValue)"
                 type="button"
                 class="font-semibold text-[#A88879] hover:text-[#803328] active:scale-[0.95] transition-all cursor-pointer focus-visible:outline-none"
                 @click="clearSelection"

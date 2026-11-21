@@ -602,11 +602,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row min-h-screen bg-[#FDF3E7]">
+  <div class="flex flex-col md:flex-row min-h-screen bg-[#FDF3E7] w-full">
     <!-- Desktop & Mobile Sidebar Navigation -->
     <NavBar :links="links" />
 
-    <main class="flex-1 p-4 sm:p-6 md:p-12">
+    <main class="flex-1 min-w-0 overflow-y-auto overflow-x-auto px-4 py-6 sm:px-6 md:px-10 md:py-10 xl:px-12">
+      <div class="mx-auto max-w-[1360px] w-full">
       <!-- Title -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
@@ -619,7 +620,7 @@ onMounted(async () => {
                : 'Select a premium plan below to unlock powerful features for your cafe.' }}
           </p>
         </div>
-        <div>
+        <div class="shrink-0">
           <button
             v-if="viewMode === 'current'"
             @click="viewMode = 'browse'"
@@ -1204,7 +1205,7 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-
+      </div>
     </main>
 
     <ConfirmDialog
