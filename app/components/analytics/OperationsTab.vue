@@ -16,12 +16,21 @@ const { data, loading, refreshing, error, lock, reload } = useAnalyticsTab(toRef
 
 const staffMax = computed(() => Math.max(1, ...(data.value?.staff ?? []).map(s => s.revenue)))
 
+// "2 more refunded after serving, 1 voided": servings used up but not counted as sold
+function usedAfterSale(refunded: number, voided?: number): string | undefined {
+  const parts = [
+    refunded ? `${formatCount(refunded)} more refunded after serving` : '',
+    voided ? `${formatCount(voided)} voided` : '',
+  ].filter(Boolean)
+  return parts.length ? parts.join(', ') : undefined
+}
+
 const wasteStats = computed(() => {
   const w = data.value?.waste.summary
   if (!w) return []
   return [
     { label: 'Planned', value: formatCount(w.expected) },
-    { label: 'Sold', value: formatCount(w.sold), sub: w.refunded ? `${formatCount(w.refunded)} more refunded after serving` : undefined },
+    { label: 'Sold', value: formatCount(w.sold), sub: usedAfterSale(w.refunded, w.voided_sales) },
     { label: 'Sell-through', value: w.sell_through === null ? '—' : `${w.sell_through}%` },
     {
       label: 'Spoiled',
@@ -363,6 +372,7 @@ defineExpose({ excelReport, exportReady: computed(() => !!data.value) })
                   {{ formatCount(w.sold) }} / {{ formatCount(w.expected) }}
                   <span v-if="w.sell_through !== null" class="block text-[11px] text-[#9E7060]">{{ w.sell_through }}%</span>
                   <span v-if="w.refunded" class="block text-[11px] text-[#9E7060]">+{{ formatCount(w.refunded) }} refunded</span>
+                  <span v-if="w.voided_sales" class="block text-[11px] text-[#9E7060]">+{{ formatCount(w.voided_sales) }} voided</span>
                 </td>
                 <td class="px-2 py-2.5 text-right tabular-nums" :class="w.spoilage ? 'font-semibold text-[#A2352A]' : 'text-[#9E7060]'">
                   {{ formatCount(w.spoilage) }}

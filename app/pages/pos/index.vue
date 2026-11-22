@@ -589,8 +589,14 @@ function closeOptions() {
   optionsItem.value = null
 }
 
+// Most of an add-on one drink can have: its own limit, or the register's cap when it has none.
+// quantity_cap comes from the API; the fallback matches MenuAddon::MAX_QUANTITY_LIMIT.
+function addonCap(addon: any): number {
+  return addon.quantity_cap ?? addon.max_quantity ?? 10
+}
+
 function setAddonQty(addon: any, qty: number) {
-  optionsAddonQty.value = { ...optionsAddonQty.value, [addon.uuid]: Math.max(0, Math.min(addon.max_quantity, qty)) }
+  optionsAddonQty.value = { ...optionsAddonQty.value, [addon.uuid]: Math.max(0, Math.min(addonCap(addon), qty)) }
 }
 
 const optionsSize = computed(() => optionsItem.value?.sizes?.find((s: any) => s.uuid === optionsSizeUuid.value) ?? null)
@@ -1831,23 +1837,15 @@ function formatCurrency(amount: number) {
                       <span v-else class="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Required</span>
                     </div>
 
-                    <!-- Not Attached: Take & Upload buttons -->
-                    <div v-if="!discountIdImage" class="grid grid-cols-2 gap-2">
+                    <!-- Not Attached: Take Photo Only -->
+                    <div v-if="!discountIdImage">
                       <button
                         type="button"
                         @click="openCameraForDiscount"
-                        class="h-10 px-2.5 bg-white hover:bg-[#F3EBE2] border border-[#D8CEBE] rounded-xl text-xs font-bold text-[#7B5A50] flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-[0.97] shadow-xs cursor-pointer"
+                        class="w-full h-10 px-3 bg-white hover:bg-[#F3EBE2] border border-[#D8CEBE] rounded-xl text-xs sm:text-sm font-bold text-[#7B5A50] flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.97] shadow-xs cursor-pointer"
                       >
-                        <Icon name="heroicons:camera" class="w-4 h-4 text-[#7B5A50]" />
+                        <Icon name="heroicons:camera" class="w-4.5 h-4.5 text-[#7B5A50]" />
                         <span>Take Photo</span>
-                      </button>
-                      <button
-                        type="button"
-                        @click="triggerDiscountUpload"
-                        class="h-10 px-2.5 bg-white hover:bg-[#F3EBE2] border border-[#D8CEBE] rounded-xl text-xs font-bold text-[#7B5A50] flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-[0.97] shadow-xs cursor-pointer"
-                      >
-                        <Icon name="heroicons:arrow-up-tray" class="w-4 h-4 text-[#7B5A50]" />
-                        <span>Upload</span>
                       </button>
                     </div>
 
@@ -1871,14 +1869,12 @@ function formatCurrency(amount: number) {
                         </p>
                         <p class="text-[10px] text-gray-500">Tap to inspect</p>
                       </div>
-                      <div class="flex items-center gap-0.5 shrink-0">
-                        <button type="button" @click="openCameraForDiscount" title="Retake" class="p-1.5 rounded-lg hover:bg-gray-100 text-[#7B5A50] active:scale-90">
+                      <div class="flex items-center gap-1 shrink-0">
+                        <button type="button" @click="openCameraForDiscount" title="Retake" class="h-8 px-2 rounded-lg hover:bg-gray-100 text-[#7B5A50] text-xs font-semibold flex items-center gap-1 active:scale-90 cursor-pointer">
                           <Icon name="heroicons:camera" class="w-3.5 h-3.5" />
+                          <span>Retake</span>
                         </button>
-                        <button type="button" @click="triggerDiscountUpload" title="Upload new" class="p-1.5 rounded-lg hover:bg-gray-100 text-[#7B5A50] active:scale-90">
-                          <Icon name="heroicons:arrow-up-tray" class="w-3.5 h-3.5" />
-                        </button>
-                        <button type="button" @click="removeDiscountPhoto" title="Remove" class="p-1.5 rounded-lg hover:bg-red-50 text-red-600 active:scale-90">
+                        <button type="button" @click="removeDiscountPhoto" title="Remove" class="p-1.5 rounded-lg hover:bg-red-50 text-red-600 active:scale-90 cursor-pointer">
                           <Icon name="heroicons:trash" class="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -2119,7 +2115,7 @@ function formatCurrency(amount: number) {
                 <li v-for="addon in optionsItem.addons" :key="addon.uuid" class="flex items-center gap-3 px-3 py-1.5">
                   <div class="flex-1 min-w-0">
                     <p class="font-semibold text-gray-800 text-sm break-words">{{ addon.name }}</p>
-                    <p class="text-xs text-gray-500 tabular-nums">+{{ formatCurrency(addon.price) }}<template v-if="addon.max_quantity > 1"> each, up to {{ addon.max_quantity }}</template></p>
+                    <p class="text-xs text-gray-500 tabular-nums">+{{ formatCurrency(addon.price) }}<template v-if="addon.max_quantity > 1"> each, up to {{ addon.max_quantity }}</template><template v-else-if="!addon.max_quantity"> each</template></p>
                   </div>
                   <div class="flex items-center">
                     <button
@@ -2133,7 +2129,7 @@ function formatCurrency(amount: number) {
                     <span class="w-6 text-center font-semibold text-gray-800 text-base tabular-nums">{{ optionsAddonQty[addon.uuid] ?? 0 }}</span>
                     <button
                       @click="setAddonQty(addon, (optionsAddonQty[addon.uuid] ?? 0) + 1)"
-                      :disabled="(optionsAddonQty[addon.uuid] ?? 0) >= addon.max_quantity"
+                      :disabled="(optionsAddonQty[addon.uuid] ?? 0) >= addonCap(addon)"
                       :aria-label="`Add one ${addon.name}`"
                       class="w-11 h-11 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-md disabled:opacity-30"
                     >

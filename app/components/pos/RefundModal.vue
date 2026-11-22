@@ -362,7 +362,7 @@ async function submitRefund() {
             <Icon name="heroicons:information-circle" class="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
             <div>
               <p class="font-bold uppercase tracking-wide text-[11px] text-amber-950">Immediate inventory restock</p>
-              <p class="text-amber-800 mt-0.5">Voiding cancels this transaction completely. All item servings are returned directly to available stock.</p>
+              <p class="text-amber-800 mt-0.5">Voiding cancels this transaction completely. Its servings are not put back on sale, so the remaining servings stay the same.</p>
             </div>
           </div>
 
