@@ -90,7 +90,7 @@ function viewCafePicture() {
                                         {{ ownerDetails.owner.lastname }}
                                     </p>
 
-                                    <StatusBadge :status="approval.status" />
+                                    <StatusBadge :status="approval.display_status ?? approval.status" />
                                 </div>
 
                                 <p class="font-display text-[12px] text-[#9E7060]">

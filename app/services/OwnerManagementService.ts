@@ -72,6 +72,8 @@ export interface ApprovalListItem {
     uuid: string
     status: string
     reason: string | null
+    /** 'resubmitted' for an owner resubmission awaiting review; otherwise equals status */
+    display_status?: string
     /** False when the rejection is final and the applicant cannot resubmit */
     can_resubmit?: boolean
     reviewed_at: string | null
@@ -83,7 +85,12 @@ export interface ApprovalListItem {
 }
 
 export interface ApprovalStats {
+    /** Everything awaiting review, resubmissions included */
     pending_approval: number
+    /** Awaiting review, first-time applications and branch submissions only */
+    pending?: number
+    /** Awaiting review, owners correcting a rejected application */
+    resubmitted?: number
     approved: number
     rejected: number
 }
@@ -121,6 +128,7 @@ export interface ApprovalSnapshotResponse {
     approval: {
         uuid: string
         status: string
+        display_status?: string
         reason: string | null
         reviewed_at: string | null
         reviewer: string | null

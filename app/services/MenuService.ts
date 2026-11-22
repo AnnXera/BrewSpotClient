@@ -55,7 +55,7 @@ export interface MenuAddon {
     uuid: string
     name: string
     price: string
-    max_quantity: number // most one drink can have
+    max_quantity: number | null // most one drink can have; null = no limit of its own
     is_available: boolean
     recipes: AddonRecipe[]
     items: Array<{ uuid: string; menu_name: string }>
@@ -64,7 +64,7 @@ export interface MenuAddon {
 export interface MenuAddonPayload {
     name?: string
     price?: number
-    max_quantity?: number
+    max_quantity?: number | null
     is_available?: boolean
     recipes?: Array<{ ingredient_uuid?: string; ingredient_name?: string; quantity: number; unit: string }>
     item_uuids?: string[]

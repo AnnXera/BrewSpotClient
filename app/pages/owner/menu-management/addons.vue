@@ -148,7 +148,7 @@ const links = OWNER_NAV_LINKS
                 </div>
 
                 <p class="mt-3 text-xs text-[#7D5A50]">
-                  Up to {{ addon.max_quantity }} per drink
+                  {{ addon.max_quantity ? `Up to ${addon.max_quantity} per drink` : 'No limit per drink' }}
                   <template v-if="addon.recipes.length">
                     · {{ addon.recipes.map(r => r.ingredient_name).join(', ') }}
                   </template>

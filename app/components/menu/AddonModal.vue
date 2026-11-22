@@ -39,7 +39,7 @@ const { confirmDialog, alertDialog, askConfirm, runConfirm, showAlert } = useDia
 const form = ref({
   name: '',
   price: '',
-  max_quantity: 1,
+  max_quantity: '' as number | '', // empty = no limit
   is_available: true,
   recipes: [] as RecipeRow[],
   item_uuids: [] as string[]
@@ -121,7 +121,7 @@ watch(() => props.show, (open) => {
   form.value = {
     name: a?.name ?? '',
     price: a ? String(a.price) : '',
-    max_quantity: a?.max_quantity ?? 1,
+    max_quantity: a?.max_quantity ?? '',
     is_available: a?.is_available ?? true,
     recipes: a?.recipes?.length
       ? a.recipes.map(r => ({
@@ -200,9 +200,11 @@ async function save() {
     errors.value.price = 'Price is required.'
     hasError = true
   }
-  const max = Number(form.value.max_quantity)
-  if (!Number.isInteger(max) || max < 1 || max > MAX_PER_DRINK) {
-    errors.value.max_quantity = `Between 1 and ${MAX_PER_DRINK}.`
+  // Optional: left empty, the add-on has no limit of its own
+  const maxRaw = form.value.max_quantity
+  const max = maxRaw === '' || maxRaw === null ? null : Number(maxRaw)
+  if (max !== null && (!Number.isInteger(max) || max < 1 || max > MAX_PER_DRINK)) {
+    errors.value.max_quantity = `Between 1 and ${MAX_PER_DRINK}, or leave it empty for no limit.`
     hasError = true
   }
   if (Object.keys(rowErrors.value).length) hasError = true
@@ -331,9 +333,11 @@ const inputClass = (invalid: boolean) => [
             <p v-if="errors.price" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.price }}</p>
           </div>
           <div>
-            <label class="block text-sm font-bold text-[#B4846C] uppercase tracking-wider mb-2">Max per drink</label>
-            <input v-model.number="form.max_quantity" type="number" min="1" :max="MAX_PER_DRINK" step="1" :class="inputClass(!!errors.max_quantity)" />
+            <!-- One-line label like Name and Price, so all three inputs line up -->
+            <label class="block text-sm font-bold text-[#B4846C] uppercase tracking-wider mb-2 whitespace-nowrap">Max per drink</label>
+            <input v-model.number="form.max_quantity" type="number" min="1" :max="MAX_PER_DRINK" step="1" placeholder="No limit" :class="inputClass(!!errors.max_quantity)" />
             <p v-if="errors.max_quantity" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.max_quantity }}</p>
+            <p v-else class="text-xs text-[#B4846C] mt-1 ml-1">Optional</p>
           </div>
         </div>
 

@@ -38,7 +38,7 @@ function formatDate(value: string | null) {
     </td>
 
     <td class="px-[20px] py-[14px]">
-      <StatusBadge :status="approval.status" />
+      <StatusBadge :status="approval.display_status ?? approval.status" />
     </td>
 
     <td class="px-[20px] py-[14px] text-base text-[#3B1F0E]">{{ formatDate(approval.created_at) }}</td>

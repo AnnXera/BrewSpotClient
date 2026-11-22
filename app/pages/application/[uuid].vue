@@ -56,8 +56,17 @@ function formatDate(dateStr?: string | null): string {
 }
 
 const statusConfig = computed(() => {
-  const st = application.value?.user?.status || 'pending_approval'
+  const st = application.value?.approval?.display_status === 'resubmitted'
+    ? 'resubmitted'
+    : application.value?.user?.status || 'pending_approval'
   switch (st) {
+    case 'resubmitted':
+      return {
+        label: 'Resubmitted',
+        bg: 'bg-blue-100 text-blue-800 border-blue-300',
+        dot: 'bg-blue-500 animate-pulse',
+        description: 'Your corrected application is back with our team for review. This typically takes 1–3 business days.',
+      }
     case 'approved':
       return {
         label: 'Approved',

@@ -589,8 +589,14 @@ function closeOptions() {
   optionsItem.value = null
 }
 
+// Most of an add-on one drink can have: its own limit, or the register's cap when it has none.
+// quantity_cap comes from the API; the fallback matches MenuAddon::MAX_QUANTITY_LIMIT.
+function addonCap(addon: any): number {
+  return addon.quantity_cap ?? addon.max_quantity ?? 10
+}
+
 function setAddonQty(addon: any, qty: number) {
-  optionsAddonQty.value = { ...optionsAddonQty.value, [addon.uuid]: Math.max(0, Math.min(addon.max_quantity, qty)) }
+  optionsAddonQty.value = { ...optionsAddonQty.value, [addon.uuid]: Math.max(0, Math.min(addonCap(addon), qty)) }
 }
 
 const optionsSize = computed(() => optionsItem.value?.sizes?.find((s: any) => s.uuid === optionsSizeUuid.value) ?? null)
@@ -2109,7 +2115,7 @@ function formatCurrency(amount: number) {
                 <li v-for="addon in optionsItem.addons" :key="addon.uuid" class="flex items-center gap-3 px-3 py-1.5">
                   <div class="flex-1 min-w-0">
                     <p class="font-semibold text-gray-800 text-sm break-words">{{ addon.name }}</p>
-                    <p class="text-xs text-gray-500 tabular-nums">+{{ formatCurrency(addon.price) }}<template v-if="addon.max_quantity > 1"> each, up to {{ addon.max_quantity }}</template></p>
+                    <p class="text-xs text-gray-500 tabular-nums">+{{ formatCurrency(addon.price) }}<template v-if="addon.max_quantity > 1"> each, up to {{ addon.max_quantity }}</template><template v-else-if="!addon.max_quantity"> each</template></p>
                   </div>
                   <div class="flex items-center">
                     <button
@@ -2123,7 +2129,7 @@ function formatCurrency(amount: number) {
                     <span class="w-6 text-center font-semibold text-gray-800 text-base tabular-nums">{{ optionsAddonQty[addon.uuid] ?? 0 }}</span>
                     <button
                       @click="setAddonQty(addon, (optionsAddonQty[addon.uuid] ?? 0) + 1)"
-                      :disabled="(optionsAddonQty[addon.uuid] ?? 0) >= addon.max_quantity"
+                      :disabled="(optionsAddonQty[addon.uuid] ?? 0) >= addonCap(addon)"
                       :aria-label="`Add one ${addon.name}`"
                       class="w-11 h-11 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-md disabled:opacity-30"
                     >

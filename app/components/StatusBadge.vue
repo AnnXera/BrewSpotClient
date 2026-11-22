@@ -35,6 +35,8 @@ const classes = computed(() => {
     case 'pending_approval':
     case 'pending':
       return 'bg-[#F0E8E5] text-[#B4846C]'
+    case 'resubmitted': // owner corrected a rejected application; still awaiting review
+      return 'bg-[#E3EEFB] text-[#2F6DB5]'
     default: // inactive, expired, and anything else
       return 'bg-[#F0E3CE] text-[#8B6656]'
   }
