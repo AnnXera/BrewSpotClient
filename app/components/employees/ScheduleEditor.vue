@@ -36,69 +36,138 @@ function setHours(index: number) {
     end_time: day?.end_time || DEFAULT_END,
   })
 }
+
+function applyPreset(preset: 'weekdays' | 'daily' | 'off') {
+  if (preset === 'weekdays') {
+    const next = props.modelValue.map(day => ({
+      ...day,
+      is_day_off: day.day_of_week === 0 || day.day_of_week === 6,
+      start_time: '09:00',
+      end_time: '17:00',
+    }))
+    emit('update:modelValue', next)
+  } else if (preset === 'daily') {
+    const next = props.modelValue.map(day => ({
+      ...day,
+      is_day_off: false,
+      start_time: '08:00',
+      end_time: '17:00',
+    }))
+    emit('update:modelValue', next)
+  } else if (preset === 'off') {
+    const next = props.modelValue.map(day => ({
+      ...day,
+      is_day_off: true,
+    }))
+    emit('update:modelValue', next)
+  }
+}
 </script>
 
 <template>
-  <div class="bg-white border border-[#EDD8CC] rounded-2xl overflow-hidden">
-    <div
-      v-for="(day, index) in modelValue"
-      :key="day.day_of_week"
-      class="px-4 py-3 flex flex-col gap-2.5 sm:px-[22px] sm:flex-row sm:items-center sm:justify-between"
-      :class="day.is_day_off ? 'bg-[#E3E3E3]' : 'bg-white'"
-    >
-      <div class="flex flex-col">
-        <p
-          class="font-sans font-semibold text-base leading-[26px]"
-          :class="day.is_day_off ? 'text-[#5A5A5A]' : 'text-[#3D2B24]'"
-        >
-          {{ DAY_NAMES[day.day_of_week] }}
-        </p>
-        <p v-if="errors?.[day.day_of_week]" class="font-sans text-xs text-red-600">{{ errors[day.day_of_week] }}</p>
+  <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden shadow-2xs">
+    <!-- Quick Presets Toolbar -->
+    <div class="px-4 py-2.5 bg-[#FAF7F2] border-b border-[#F0E4D3] flex items-center justify-between gap-2 flex-wrap">
+      <div class="flex items-center gap-1.5 text-xs font-bold text-[#8A6E64]">
+        <Icon name="heroicons:sparkles" class="w-3.5 h-3.5 text-[#B4846C]" />
+        <span>Quick fill:</span>
       </div>
-
-      <div class="flex items-center justify-between gap-6 sm:justify-end sm:gap-10">
-        <!-- Both states share one fixed-width slot so "Day Off" lines up with the time inputs. -->
-        <div class="flex-1 min-w-0 sm:flex-none sm:w-[250px]">
-          <!-- Day off -->
-          <div
-            v-if="day.is_day_off"
-            class="w-full flex items-center justify-center px-4 py-1.5 rounded-lg bg-[#DDDDDD] border border-[#5A5A5A] font-display font-semibold text-base leading-[26px] text-[#5A5A5A]"
-          >
-            Day Off
-          </div>
-
-          <!-- Shift hours -->
-          <div v-else class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-            <input
-              :value="day.start_time"
-              type="time"
-              :aria-label="`${DAY_NAMES[day.day_of_week]} start time`"
-              :disabled="disabled"
-              class="w-full min-w-0 bg-white border-[0.5px] rounded-lg px-2.5 py-2 font-display font-medium text-sm text-black focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-              :class="errors?.[day.day_of_week] ? 'border-red-500' : 'border-[#5A5A5A]'"
-              @input="update(index, { start_time: ($event.target as HTMLInputElement).value })"
-            />
-            <span class="font-sans font-medium text-sm text-black">-</span>
-            <input
-              :value="day.end_time"
-              type="time"
-              :aria-label="`${DAY_NAMES[day.day_of_week]} end time`"
-              :disabled="disabled"
-              class="w-full min-w-0 bg-white border-[0.5px] rounded-lg px-2.5 py-2 font-display font-medium text-sm text-black focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-              :class="errors?.[day.day_of_week] ? 'border-red-500' : 'border-[#5A5A5A]'"
-              @input="update(index, { end_time: ($event.target as HTMLInputElement).value })"
-            />
-          </div>
-        </div>
-
+      <div class="flex items-center gap-1.5">
         <button
           type="button"
           :disabled="disabled"
-          class="shrink-0 w-[102px] flex items-center justify-center px-4 py-1.5 rounded-lg bg-[#3D2B24] font-display font-semibold text-base leading-[26px] text-[#FFF0D1] whitespace-nowrap hover:bg-[#2C1609] transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-          @click="day.is_day_off ? setHours(index) : setDayOff(index)"
+          @click="applyPreset('weekdays')"
+          class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-[#E0D0BE] text-[#5C4037] hover:bg-[#FAF4ED] hover:border-[#7D5A50] active:scale-95 transition-all cursor-pointer shadow-2xs disabled:opacity-40"
         >
-          {{ day.is_day_off ? 'Set Hours' : 'Day Off' }}
+          Mon–Fri 9am–5pm
         </button>
+        <button
+          type="button"
+          :disabled="disabled"
+          @click="applyPreset('daily')"
+          class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-[#E0D0BE] text-[#5C4037] hover:bg-[#FAF4ED] hover:border-[#7D5A50] active:scale-95 transition-all cursor-pointer shadow-2xs disabled:opacity-40"
+        >
+          Daily 8am–5pm
+        </button>
+        <button
+          type="button"
+          :disabled="disabled"
+          @click="applyPreset('off')"
+          class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-[#E0D0BE] text-[#8A6E64] hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer shadow-2xs disabled:opacity-40"
+        >
+          Clear all
+        </button>
+      </div>
+    </div>
+
+    <!-- Day Rows -->
+    <div class="divide-y divide-[#F0E4D3]">
+      <div
+        v-for="(day, index) in modelValue"
+        :key="day.day_of_week"
+        class="px-4 py-2.5 flex flex-col gap-2 sm:px-5 sm:flex-row sm:items-center sm:justify-between transition-colors duration-150"
+        :class="day.is_day_off ? 'bg-[#FCFAF7]/80' : 'bg-white hover:bg-[#FCFBF8]'"
+      >
+        <div class="flex items-center gap-2">
+          <span
+            class="font-display font-bold text-sm min-w-[85px]"
+            :class="day.is_day_off ? 'text-[#8A6E64]' : 'text-[#3B1F0E]'"
+          >
+            {{ DAY_NAMES[day.day_of_week] }}
+          </span>
+          <span v-if="errors?.[day.day_of_week]" class="text-xs font-bold text-red-600">
+            {{ errors[day.day_of_week] }}
+          </span>
+        </div>
+
+        <div class="flex items-center justify-between gap-4 sm:justify-end sm:gap-6">
+          <div class="flex-1 min-w-0 sm:flex-none sm:w-[260px]">
+            <!-- Day off badge -->
+            <div
+              v-if="day.is_day_off"
+              class="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FAF4ED] border border-[#EEDFC4] text-xs font-bold text-[#8A6E64] select-none"
+            >
+              <span class="w-1.5 h-1.5 rounded-full bg-[#A8988B]"></span>
+              <span>Day Off</span>
+            </div>
+
+            <!-- Shift hours picker -->
+            <div v-else class="flex items-center gap-2 tabular-nums">
+              <input
+                :value="day.start_time"
+                type="time"
+                :aria-label="`${DAY_NAMES[day.day_of_week]} start time`"
+                :disabled="disabled"
+                class="w-full min-w-0 bg-[#FCFAF8] border rounded-xl px-2.5 py-1.5 font-bold text-xs sm:text-sm text-[#2D201B] shadow-2xs focus:outline-none focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 transition-all cursor-pointer disabled:opacity-50"
+                :class="errors?.[day.day_of_week] ? 'border-red-400 bg-red-50/50' : 'border-[#D8C7B5] hover:border-[#B4846C]'"
+                @input="update(index, { start_time: ($event.target as HTMLInputElement).value })"
+              />
+              <span class="text-xs font-bold text-[#A8988B] uppercase shrink-0">to</span>
+              <input
+                :value="day.end_time"
+                type="time"
+                :aria-label="`${DAY_NAMES[day.day_of_week]} end time`"
+                :disabled="disabled"
+                class="w-full min-w-0 bg-[#FCFAF8] border rounded-xl px-2.5 py-1.5 font-bold text-xs sm:text-sm text-[#2D201B] shadow-2xs focus:outline-none focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 transition-all cursor-pointer disabled:opacity-50"
+                :class="errors?.[day.day_of_week] ? 'border-red-400 bg-red-50/50' : 'border-[#D8C7B5] hover:border-[#B4846C]'"
+                @input="update(index, { end_time: ($event.target as HTMLInputElement).value })"
+              />
+            </div>
+          </div>
+
+          <!-- Action Button: Set Hours / Set Day Off -->
+          <button
+            type="button"
+            :disabled="disabled"
+            class="shrink-0 w-[100px] flex items-center justify-center px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 active:scale-95 disabled:opacity-50 cursor-pointer shadow-2xs outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+            :class="day.is_day_off
+              ? 'bg-[#3B1F0E] hover:bg-[#2A150A] text-[#FFF8EA]'
+              : 'bg-white border border-[#D8C7B5] text-[#7D5A50] hover:bg-[#FAF4ED] hover:border-[#B4846C]'"
+            @click="day.is_day_off ? setHours(index) : setDayOff(index)"
+          >
+            {{ day.is_day_off ? 'Set Hours' : 'Set Day Off' }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
