@@ -1,5 +1,6 @@
 <!-- pages/admin/ownermanagement.vue -->
 <script setup lang="ts">
+import { ref, computed, watch, onMounted } from 'vue'
 import type { OwnerListItem, OwnerStats } from '~/services/OwnerManagementService'
 import { mockOwners, mockOwnerStats } from '~/mocks/mockOwners'
 
@@ -36,11 +37,23 @@ const status = ref('')
 const date = ref('')
 
 const statusOptions = [
-  { value: '', label: 'Status' },
+  { value: '', label: 'All Statuses' },
   { value: 'active', label: 'Active' },
   { value: 'suspended', label: 'Suspended' },
   { value: 'inactive', label: 'Inactive' },
 ]
+
+const hasActiveFilters = computed(() => Boolean(search.value || status.value || date.value))
+
+const paginationFrom = computed(() => {
+  if (total.value === 0) return 0
+  return (currentPage.value - 1) * perPage + 1
+})
+
+const paginationTo = computed(() => {
+  if (total.value === 0) return 0
+  return Math.min(currentPage.value * perPage, total.value)
+})
 
 async function fetchStats() {
   if (USE_MOCK_DATA) {
@@ -82,7 +95,7 @@ async function fetchOwners() {
 
   if (USE_MOCK_DATA) {
     // small artificial delay so the loading state is visible, same as a real request
-    await new Promise((resolve) => setTimeout(resolve, 250))
+    await new Promise((resolve) => setTimeout(resolve, 200))
 
     const filtered = getFilteredMockOwners()
     total.value = filtered.length
@@ -121,13 +134,19 @@ async function refreshData() {
   await Promise.all([fetchStats(), fetchOwners()])
 }
 
+function resetFilters() {
+  search.value = ''
+  status.value = ''
+  date.value = ''
+}
+
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 watch(search, () => {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
     currentPage.value = 1
     fetchOwners()
-  }, 400)
+  }, 350)
 })
 
 watch([status, date], () => {
@@ -215,75 +234,81 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col min-h-screen bg-[#FDF3E7]
-              md:flex-row">
+  <div class="flex flex-col min-h-screen bg-[#FDF3E7] md:flex-row">
     <NavBar :links="links" />
 
-    <main class="flex-1 p-3.5
-                min-[360px]:p-4
-                sm:p-6
-                md:p-12">
+    <main class="flex-1 p-3.5 min-[360px]:p-4 sm:p-6 md:p-10 max-w-[1400px]">
       <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4
-                  min-[360px]:mb-5
-                  sm:mb-6
-                  md:mb-8">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 md:mb-8">
         <div>
-          <h1 class="font-display text-2xl font-extrabold text-[#3D2B24] tracking-tight
-                     min-[360px]:text-3xl
-                     sm:text-[32px] sm:leading-[40px]">
-            Owner Management
-          </h1>
-          <p class="font-sans text-[13px] text-[#9E7060] mt-1
-                    min-[360px]:text-sm
-                    sm:text-[15px]">
-            Manage all registered cafe owners.
+          <div class="flex items-center gap-2.5">
+            <h1 class="font-display text-2xl font-black text-[#3D2B24] tracking-tight min-[360px]:text-3xl sm:text-[32px] sm:leading-tight">
+              Owner Management
+            </h1>
+            <span v-if="stats" class="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FAF4ED] text-[#7D5A50] border border-[#EEDFC4]">
+              {{ stats.total_owners }} registered
+            </span>
+          </div>
+          <p class="font-sans text-xs sm:text-sm text-[#9E7060] mt-1">
+            Manage, verify, and monitor all registered cafe owners across the platform.
           </p>
         </div>
 
         <button
           type="button"
-          class="inline-flex items-center gap-2 px-[16px] py-[8px] rounded-lg bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-medium text-[14px] hover:bg-[#FDF3E7] hover:border-[#D9C4B8] hover:shadow-md hover:-translate-y-[1px] active:translate-y-[1px] active:shadow-sm transition-all shadow-sm self-start sm:self-auto cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
+          class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-semibold text-sm hover:bg-[#FDF3E7] hover:border-[#D9C4B8] hover:text-[#3D2B24] active:scale-95 transition-[transform,background-color,border-color] duration-160 ease-out shadow-xs self-start sm:self-auto cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
           :disabled="loading"
           @click="refreshData"
         >
-          <Icon name="heroicons:arrow-path" class="w-4 h-4" :class="{ 'animate-spin': loading }" />
+          <Icon name="heroicons:arrow-path" class="w-4 h-4 text-[#7D5A50]" :class="{ 'animate-spin': loading }" />
           <span>Refresh</span>
         </button>
       </div>
 
       <!-- Stat cards -->
-      <div class="grid grid-cols-2 gap-2.5 mb-4
-                  min-[360px]:gap-3 min-[360px]:mb-5
-                  sm:gap-4
-                  md:grid-cols-3 md:gap-6 md:mb-8">
-        <div class="col-span-2
-                    md:col-span-1">
+      <div class="grid grid-cols-2 gap-3 mb-6 sm:gap-4 md:grid-cols-3 md:gap-5 md:mb-8">
+        <div class="col-span-2 md:col-span-1">
           <OwnerManagementStatCard :value="stats?.total_owners" label="Total Owners" />
         </div>
-        <OwnerManagementStatCard :value="stats?.active" label="Active" color="#2E9E5B" />
+        <OwnerManagementStatCard :value="stats?.active" label="Active" color="#28A745" />
         <OwnerManagementStatCard :value="stats?.inactive_or_suspended" label="Suspended/ Inactive" color="#D9622B" />
       </div>
 
       <!-- Main Content Card -->
-      <div :class="['bg-white border border-[#EEDFC4] overflow-hidden shadow-sm transition-shadow hover:shadow-md', owners.length > 0 ? 'rounded-t-[20px] border-b-0' : 'rounded-[20px]']">
+      <div class="bg-white border border-[#EEDFC4] rounded-[20px] shadow-sm overflow-hidden transition-[box-shadow,border-color] duration-200">
+        <!-- Filter Toolbar -->
         <OwnerManagementFilterBar
           v-model:search="search"
           v-model:status="status"
           v-model:date="date"
           :status-options="statusOptions"
           :total="total"
+          @reset="resetFilters"
         />
 
         <!-- Mobile Card List View (visible on small screens) -->
-        <div class="block
-                    md:hidden">
-          <div v-if="loading" class="p-8 flex flex-col items-center justify-center gap-2 text-[#3B1F0E]/50">
-            <Icon name="heroicons:arrow-path" class="w-5 h-5 animate-spin text-[#B4846C]" />
-            <span class="font-sans text-sm">Loading owners…</span>
+        <div class="block md:hidden">
+          <div v-if="loading" class="p-12 flex flex-col items-center justify-center gap-3 text-[#7D5A50]">
+            <div class="w-8 h-8 rounded-full border-2 border-[#EEDFC4] border-t-[#B4846C] animate-spin" />
+            <span class="font-sans text-xs font-semibold text-[#9E7060]">Loading owners…</span>
           </div>
-          <div v-else-if="!owners.length" class="p-8 text-center font-sans text-sm text-[#3B1F0E]/50">
-            No owners found.
+          <div v-else-if="!owners.length" class="p-12 flex flex-col items-center justify-center text-center">
+            <div class="w-12 h-12 rounded-2xl bg-[#F7EFE6] border border-[#E8D9CB] flex items-center justify-center text-[#7D5A50] mb-3 shadow-xs">
+              <Icon name="heroicons:user-group" class="w-6 h-6" />
+            </div>
+            <h3 class="font-display font-bold text-base text-[#3D2B24]">No owners found</h3>
+            <p class="font-sans text-xs text-[#9E7060] mt-1 leading-relaxed max-w-xs">
+              {{ hasActiveFilters ? 'No cafe owners matched your active search or filters.' : 'No registered cafe owners yet.' }}
+            </p>
+            <button
+              v-if="hasActiveFilters"
+              type="button"
+              class="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[#5C3A28] bg-[#F7EFE6] border border-[#E8D9CB] hover:bg-[#EEDFC4] active:scale-95 transition-[transform,background-color] duration-140 ease-out"
+              @click="resetFilters"
+            >
+              <Icon name="heroicons:arrow-path" class="w-3.5 h-3.5" />
+              <span>Reset filters</span>
+            </button>
           </div>
           <OwnerManagementMobileCard
             v-for="(owner, index) in owners"
@@ -297,33 +322,54 @@ onMounted(() => {
         </div>
 
         <!-- Desktop Table View (visible on medium screens and up) -->
-        <div class="hidden overflow-x-auto
-                    md:block">
+        <div class="hidden overflow-x-auto md:block">
           <table class="w-full text-left">
             <thead>
-              <tr class="bg-[#FBF2E1] border-b border-[#F3E7D2]">
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Owner</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Cafe</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Contacts</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Status</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Joined</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Actions</th>
+              <tr class="bg-[#FAF4ED] border-b border-[#EEDFC4]">
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Owner</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Cafe</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Contacts</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Status</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Joined</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Actions</th>
               </tr>
             </thead>
             <tbody>
+              <!-- Loading State -->
               <tr v-if="loading">
-                <td colspan="6" class="px-6 py-10 text-center">
-                  <div class="flex flex-col items-center justify-center gap-2 text-[#3B1F0E]/50">
-                    <Icon name="heroicons:arrow-path" class="w-5 h-5 animate-spin text-[#B4846C]" />
-                    <span class="font-sans text-sm">Loading owners…</span>
+                <td colspan="6" class="px-6 py-16 text-center">
+                  <div class="flex flex-col items-center justify-center gap-3">
+                    <div class="w-8 h-8 rounded-full border-2 border-[#EEDFC4] border-t-[#B4846C] animate-spin" />
+                    <span class="font-sans text-xs font-semibold text-[#9E7060]">Loading cafe owners…</span>
                   </div>
                 </td>
               </tr>
+
+              <!-- Empty State -->
               <tr v-else-if="!owners.length">
-                <td colspan="6" class="px-6 py-10 text-center font-sans text-sm text-[#3B1F0E]/50">
-                  No owners found.
+                <td colspan="6" class="px-6 py-16 text-center">
+                  <div class="max-w-xs mx-auto flex flex-col items-center justify-center text-center">
+                    <div class="w-12 h-12 rounded-2xl bg-[#F7EFE6] border border-[#E8D9CB] flex items-center justify-center text-[#7D5A50] mb-3 shadow-xs">
+                      <Icon name="heroicons:user-group" class="w-6 h-6" />
+                    </div>
+                    <h3 class="font-display font-bold text-base text-[#3D2B24]">No owners found</h3>
+                    <p class="font-sans text-xs text-[#9E7060] mt-1 leading-relaxed">
+                      {{ hasActiveFilters ? 'No cafe owners matched your active search or filters. Try adjusting them.' : 'No registered cafe owners yet.' }}
+                    </p>
+                    <button
+                      v-if="hasActiveFilters"
+                      type="button"
+                      class="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[#5C3A28] bg-[#F7EFE6] border border-[#E8D9CB] hover:bg-[#EEDFC4] active:scale-95 transition-[transform,background-color] duration-140 ease-out"
+                      @click="resetFilters"
+                    >
+                      <Icon name="heroicons:arrow-path" class="w-3.5 h-3.5" />
+                      <span>Reset filters</span>
+                    </button>
+                  </div>
                 </td>
               </tr>
+
+              <!-- Rows -->
               <OwnerManagementTableRow
                 v-for="(owner, index) in owners"
                 :key="owner.uuid"
@@ -336,11 +382,39 @@ onMounted(() => {
             </tbody>
           </table>
         </div>
-      </div>
-      
-      <!-- Pagination (Separate Frame) -->
-      <div v-if="owners.length > 0" class="bg-white rounded-b-[20px] border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
-        <CommonPagination :page="currentPage" :last-page="lastPage" @change="goToPage" />
+
+        <!-- Integrated Pagination Footer -->
+        <div v-if="owners.length > 0" class="border-t border-[#F3E7D2] px-6 py-3.5 bg-[#FAF4ED]/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div class="font-sans text-xs text-[#9E7060]">
+            Showing <strong class="text-[#3D2B24] font-semibold">{{ paginationFrom }}</strong> to <strong class="text-[#3D2B24] font-semibold">{{ paginationTo }}</strong> of <strong class="text-[#3D2B24] font-semibold">{{ total }}</strong> registered owners
+          </div>
+          
+          <div class="flex items-center gap-1.5">
+            <button
+              type="button"
+              class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#EDD8CC] bg-white text-[#7D5A50] hover:bg-[#FDF3E7] hover:text-[#3D2B24] disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs"
+              :disabled="currentPage <= 1"
+              aria-label="Previous page"
+              @click="goToPage(currentPage - 1)"
+            >
+              <Icon name="heroicons:chevron-left" class="w-4 h-4" />
+            </button>
+
+            <span class="font-sans text-xs font-bold text-[#5C3A28] px-2.5">
+              Page {{ currentPage }} of {{ Math.max(1, lastPage) }}
+            </span>
+
+            <button
+              type="button"
+              class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#EDD8CC] bg-white text-[#7D5A50] hover:bg-[#FDF3E7] hover:text-[#3D2B24] disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs"
+              :disabled="currentPage >= Math.max(1, lastPage)"
+              aria-label="Next page"
+              @click="goToPage(currentPage + 1)"
+            >
+              <Icon name="heroicons:chevron-right" class="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </div>
     </main>
 

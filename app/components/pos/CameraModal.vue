@@ -31,7 +31,7 @@ async function startCamera() {
   error.value = ''
 
   if (!navigator?.mediaDevices?.getUserMedia) {
-    error.value = 'Camera is not supported on this browser. Please upload a photo instead.'
+    error.value = 'Camera is not supported on this browser.'
     loading.value = false
     return
   }
@@ -57,9 +57,9 @@ async function startCamera() {
     }
   } catch (err: any) {
     if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
-      error.value = 'Camera permission was denied. Please allow camera access in your browser or choose Upload.'
+      error.value = 'Camera permission was denied. Please allow camera access in your browser settings.'
     } else if (err?.name === 'NotFoundError' || err?.name === 'DevicesNotFoundError') {
-      error.value = 'No camera found on this device. Please upload a photo instead.'
+      error.value = 'No camera found on this device. Please connect a webcam.'
     } else {
       error.value = err?.message || 'Could not start camera.'
     }
@@ -213,31 +213,15 @@ onUnmounted(() => {
           <div class="flex gap-2 pt-2">
             <button
               type="button"
-              @click="triggerFallbackUpload"
-              class="h-10 px-4 rounded-lg bg-[#7B5A50] hover:bg-[#65463D] text-white text-xs font-bold transition-all flex items-center gap-1.5"
-            >
-              <Icon name="heroicons:arrow-up-tray" class="w-4 h-4" />
-              Upload from file
-            </button>
-            <button
-              type="button"
               @click="startCamera"
-              class="h-10 px-3 rounded-lg border border-[#6B5048] text-xs font-semibold text-gray-200 hover:bg-white/5 transition-all"
+              class="h-10 px-4 rounded-xl bg-[#7B5A50] hover:bg-[#65463D] text-white text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-sm"
             >
-              Retry
+              <Icon name="heroicons:arrow-path" class="w-4 h-4" />
+              <span>Retry Camera</span>
             </button>
           </div>
         </div>
       </div>
-
-      <!-- Hidden file input for fallback -->
-      <input
-        ref="fallbackInputRef"
-        type="file"
-        accept="image/*"
-        class="sr-only"
-        @change="onFallbackFileSelected"
-      />
 
       <!-- Controls -->
       <div class="p-4 bg-[#231814] border-t border-[#44312A] flex items-center justify-between">
@@ -252,16 +236,7 @@ onUnmounted(() => {
           <Icon name="heroicons:arrow-path" class="w-4 h-4" />
           <span>Flip</span>
         </button>
-        <button
-          v-else
-          type="button"
-          @click="triggerFallbackUpload"
-          class="h-10 px-3 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-semibold text-gray-200 flex items-center gap-1.5 transition-colors"
-          title="Upload file instead"
-        >
-          <Icon name="heroicons:photo" class="w-4 h-4" />
-          <span>Upload</span>
-        </button>
+        <div v-else class="w-10"></div>
 
         <!-- Capture Trigger Button -->
         <button
