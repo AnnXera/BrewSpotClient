@@ -17,9 +17,14 @@ const props = withDefaults(defineProps<{
   formatValue: (n: number) => string
   caption: string
   height?: number
-}>(), { height: 260 })
+  integer?: boolean // counts: keep every gridline on a whole number
+}>(), { height: 260, integer: false })
 
-const max = computed(() => niceMax(Math.max(0, ...props.points.map(p => p.value))))
+// Counts get a top that splits into whole quarters (4, 8, 12...), so small values don't repeat axis labels.
+const max = computed(() => {
+  const top = niceMax(Math.max(0, ...props.points.map(p => p.value)))
+  return props.integer ? Math.max(4, Math.ceil(top / 4) * 4) : top
+})
 const ticks = computed(() => [1, 0.75, 0.5, 0.25, 0].map(f => max.value * f))
 
 // Keep about a dozen labels at most so they never collide.

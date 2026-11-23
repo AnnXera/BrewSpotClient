@@ -20,6 +20,15 @@ const measure = ref<'revenue' | 'orders'>('revenue')
 const points = computed<BarPoint[]>(() => {
   const d = data.value
   if (!d) return []
+  if (d.granularity === 'hour') {
+    return d.series.map(p => ({
+      key: `${p.start}-${p.hour}`,
+      label: formatHour(p.hour ?? 0),
+      title: `${formatHour(p.hour ?? 0)} to ${formatHour(((p.hour ?? 0) + 1) % 24)}`,
+      value: measure.value === 'revenue' ? p.revenue : p.orders,
+      detail: measure.value === 'revenue' ? `${formatCount(p.orders)} orders` : formatPesoCents(p.revenue),
+    }))
+  }
   return d.series.map(p => ({
     key: p.start,
     label: d.granularity === 'month' ? formatDay(p.start, { month: 'short' }) : formatDay(p.start),
@@ -42,7 +51,7 @@ const kpis = computed(() => {
   ]
 })
 
-const unit = computed(() => ({ day: 'day', week: 'week', month: 'month' }[data.value?.granularity ?? 'day']))
+const unit = computed(() => ({ hour: 'hour', day: 'day', week: 'week', month: 'month' }[data.value?.granularity ?? 'day']))
 // POS discount keys as labels; PWD stays an acronym.
 function discountLabel(type: string) {
   if (type.toLowerCase() === 'pwd') return 'PWD'
@@ -83,8 +92,15 @@ function excelReport(): Omit<ExcelReport, 'cafe'> | null {
   const trend: ExcelSheet<TrendRow> = {
     name: `Trend by ${unit.value}`,
     columns: [
-      { header: `${unit.value[0]!.toUpperCase()}${unit.value.slice(1)} starting`, value: p => p.total ? 'Total' : p.start, format: p => p.total ? 'text' : 'date' },
-      { header: 'Ending', value: p => p.end, format: 'date' },
+      ...(d.granularity === 'hour'
+        ? [
+            { header: 'Date', value: (p: TrendRow) => p.total ? 'Total' : p.start, format: (p: TrendRow) => p.total ? 'text' : 'date' },
+            { header: 'Hour', value: (p: TrendRow) => p.total || p.hour == null ? '' : `${formatHour(p.hour)} to ${formatHour((p.hour + 1) % 24)}` },
+          ] as ExcelColumn<TrendRow>[]
+        : [
+            { header: `${unit.value[0]!.toUpperCase()}${unit.value.slice(1)} starting`, value: (p: TrendRow) => p.total ? 'Total' : p.start, format: (p: TrendRow) => p.total ? 'text' : 'date' },
+            { header: 'Ending', value: (p: TrendRow) => p.end, format: 'date' },
+          ] as ExcelColumn<TrendRow>[]),
       { header: 'Income', value: p => p.revenue, format: 'peso' },
       { header: 'Orders', value: p => p.orders, format: 'count' },
     ],
