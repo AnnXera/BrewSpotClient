@@ -100,6 +100,61 @@ function toggle(i: CategoryServingItem) {
 
 const dirtyCount = computed(() => Object.keys(drafts.value).length)
 
+// Category-wide limit: one value written as a draft to every editable item in the category
+// (all pages, ignoring the search), then saved with Save Changes like any other edit.
+const ALL_PAGE_SIZE = 50 // the API's per_page cap
+const bulkLimit = ref<number | null>(null)
+const applyingBulk = ref(false)
+const bulkNote = ref('')
+
+// Sold, spoiled, refunded and voided today: what the limit can't go below.
+function usedOf(i: CategoryServingItem) {
+  return Math.max(0, i.daily_limit - i.available_stock)
+}
+
+async function fetchAllCategoryItems() {
+  const all: CategoryServingItem[] = []
+  let p = 1
+  let last = 1
+  do {
+    const res = await service.categoryItems(branchUuid.value, categoryUuid.value, { page: p, per_page: ALL_PAGE_SIZE })
+    all.push(...res.items.data)
+    last = res.items.last_page
+    p++
+  } while (p <= last)
+  return all
+}
+
+async function applyBulkLimit() {
+  const value = bulkLimit.value
+  if (value == null || !Number.isInteger(value) || value < 0 || applyingBulk.value) return
+  applyingBulk.value = true
+  bulkNote.value = ''
+  errorMessage.value = ''
+  try {
+    const all = (await fetchAllCategoryItems()).filter(i => i.editable)
+    const skipped: string[] = []
+    let applied = 0
+    for (const i of all) {
+      const used = usedOf(i)
+      // The server rejects a limit below what is used; 0 (no limit) is rejected once there are sales.
+      if (used > 0 && (value === 0 || value < used)) {
+        skipped.push(`${i.menu_name} (${used} used)`)
+        continue
+      }
+      setLimit(i, value)
+      applied++
+    }
+    const what = value === 0 ? 'no limit' : `a limit of ${value}`
+    bulkNote.value = `Set ${what} on ${applied} item${applied === 1 ? '' : 's'}. Review and press Save Changes.`
+      + (skipped.length ? ` Skipped, already used more today: ${skipped.join(', ')}.` : '')
+  } catch (e: any) {
+    failure(e, 'Could not load the items in this category.')
+  } finally {
+    applyingBulk.value = false
+  }
+}
+
 function failure(e: any, fallback: string) {
   planLock.value = planLockFromError(e)
   errorMessage.value = planLock.value ? '' : e?.data?.message ?? fallback
@@ -140,6 +195,7 @@ async function save() {
   try {
     const res = await service.saveCategoryItems(branchUuid.value, categoryUuid.value, changes)
     drafts.value = {}
+    bulkNote.value = ''
     triggerToast(res.message || 'Servings saved', 'Daily category limits updated successfully')
     await load()
   } catch (e: any) {
@@ -332,6 +388,62 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
+          <!-- Category-wide limit -->
+          <div class="border-b border-[#E3CFB4] bg-[#FDF3E7]/40 px-5 py-4">
+            <form
+              class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+              @submit.prevent="applyBulkLimit"
+            >
+              <div class="flex items-start gap-3 min-w-0">
+                <span class="flex size-9 shrink-0 items-center justify-center rounded-xl border border-[#E3CFB4] bg-white text-[#9E7060]">
+                  <Icon name="heroicons:squares-2x2" class="w-[18px] h-[18px]" />
+                </span>
+                <div class="min-w-0">
+                  <label for="bulk-limit" class="block font-display text-[14px] font-semibold text-[#3B1F0E]">
+                    Same limit for every item
+                  </label>
+                  <p class="mt-0.5 text-[12px] leading-snug text-[#8B6656]">
+                    Fills every item in {{ categoryName || 'this category' }}. Adjust any card, then save. Use 0 for no limit.
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2 shrink-0">
+                <div class="flex h-10 items-center rounded-xl border border-[#E3CFB4] bg-white shadow-2xs focus-within:ring-2 focus-within:ring-[#7D5A50] focus-within:border-transparent">
+                  <input
+                    id="bulk-limit"
+                    v-model.number="bulkLimit"
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputmode="numeric"
+                    placeholder="30"
+                    class="bulk-input h-full w-16 rounded-l-xl bg-transparent pl-3 text-right font-mono text-[14px] font-semibold tabular-nums text-[#3B1F0E] placeholder:font-normal placeholder:text-[#C9B39A] focus:outline-none"
+                  >
+                  <span class="pl-1.5 pr-3 text-[12px] font-medium text-[#9E7060]">servings</span>
+                </div>
+                <button
+                  type="submit"
+                  :disabled="bulkLimit == null || bulkLimit < 0 || applyingBulk || saving"
+                  class="apply-btn inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#3B1F0E] px-4 font-display text-[13px] font-semibold text-[#FFF0D1] shadow-2xs hover:bg-[#2C1709] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#3B1F0E] disabled:bg-[#EBE0D2] disabled:text-[#A89F91] disabled:shadow-none disabled:cursor-not-allowed disabled:active:scale-100"
+                >
+                  <Icon v-if="applyingBulk" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
+                  <Icon v-else name="heroicons:arrow-down-on-square-stack" class="w-4 h-4" />
+                  {{ applyingBulk ? 'Applying...' : 'Apply to all' }}
+                </button>
+              </div>
+            </form>
+
+            <p
+              v-if="bulkNote"
+              role="status"
+              class="mt-3 flex items-start gap-2 rounded-lg border border-[#E3CFB4] bg-white px-3 py-2 text-[12px] leading-snug text-[#7D5A50]"
+            >
+              <Icon name="heroicons:information-circle" class="mt-px w-4 h-4 shrink-0 text-[#B4846C]" />
+              <span>{{ bulkNote }}</span>
+            </p>
+          </div>
+
           <!-- Items Content -->
           <div class="p-5 min-h-[160px]">
             <!-- Loading Skeletons -->
@@ -469,10 +581,27 @@ onBeforeUnmount(() => {
               color 160ms ease-out;
 }
 
+.apply-btn {
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+              background-color 160ms ease-out;
+}
+
+/* Hide the number spinner: the field is short and typed into. */
+.bulk-input::-webkit-outer-spin-button,
+.bulk-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.bulk-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .scroll-reveal,
   .stagger-card,
-  .save-btn {
+  .save-btn,
+  .apply-btn {
     animation: none !important;
     transition: none !important;
     transform: none !important;
