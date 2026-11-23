@@ -139,6 +139,12 @@ const employmentErrorCount = computed(() => {
   return roleAndPin + scheduleCount
 })
 
+// Step indicator: an error count wins over the step number; step 1 shows a check once passed.
+const steps = computed(() => [
+  { key: 'personal' as const, label: 'Personal details', errors: personalErrorCount.value, done: activeTab.value === 'employment' },
+  { key: 'employment' as const, label: 'Role & schedule', errors: employmentErrorCount.value, done: false },
+])
+
 watch(() => props.show, (open) => {
   if (open) {
     form.value = props.employee ? formFrom(props.employee) : emptyForm()
@@ -399,6 +405,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
+  <!-- On body, so it covers the sidebar too and centres on the whole window -->
+  <Teleport to="body">
   <transition
     enter-active-class="transition duration-200 ease-out"
     enter-from-class="opacity-0"
@@ -409,27 +417,28 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   >
     <div
       v-if="show"
-      class="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 md:p-6 overflow-y-auto"
+      class="fixed inset-0 z-[3000] bg-black/45 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="employee-form-title"
     >
+      <!-- Capped to the window: header, steps and footer stay put, only the body scrolls -->
       <form
-        class="relative bg-white rounded-3xl w-full max-w-[860px] flex flex-col shadow-[0_24px_50px_-12px_rgba(59,31,14,0.22)] border border-[#EEDFC4] overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150"
+        class="relative bg-white rounded-3xl w-full max-w-[860px] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] flex flex-col shadow-[0_24px_50px_-12px_rgba(59,31,14,0.22)] border border-[#EEDFC4] overflow-hidden animate-in fade-in zoom-in-95 duration-150"
         novalidate
         @submit.prevent="submit"
       >
         <!-- Header -->
-        <div class="flex items-center justify-between gap-4 px-6 md:px-8 pt-5.5 pb-4.5 border-b border-[#EEDFC4] bg-[#FDFBF7]">
-          <div class="flex items-center gap-3.5">
-            <div class="w-10.5 h-10.5 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0 shadow-2xs">
+        <div class="flex items-start justify-between gap-4 px-6 md:px-8 pt-6 pb-5 border-b border-[#EEDFC4] bg-[#FDFBF7]">
+          <div class="flex items-center gap-4 min-w-0">
+            <div class="w-11 h-11 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0 shadow-2xs">
               <Icon :name="isEdit ? 'heroicons:user-circle' : 'heroicons:user-plus'" class="w-5 h-5" />
             </div>
             <div>
               <h2 id="employee-form-title" class="text-xl md:text-2xl font-display font-extrabold text-[#3B1F0E]">
                 {{ isEdit ? 'Edit Employee Information' : 'Add Employee Information' }}
               </h2>
-              <p class="text-xs text-[#8A6E64] mt-0.5">
+              <p class="text-[13px] text-[#8A6E64] mt-0.5">
                 {{ isEdit ? 'Update employee profile, branch assignment, and work schedule' : 'Register a new team member, assign their role, and configure schedule' }}
               </p>
             </div>
@@ -445,60 +454,47 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           </button>
         </div>
 
-        <!-- Segmented Step Navigation -->
-        <div class="px-6 md:px-8 py-2.5 border-b border-[#F0E4D3] bg-[#FCFAF6] flex items-center justify-between gap-3 select-none">
-          <div class="inline-flex p-1 rounded-2xl bg-[#EFE7DC] border border-[#E5D7C6] gap-1">
-            <button
-              type="button"
-              @click="activeTab = 'personal'"
-              class="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer active:scale-95"
-              :class="activeTab === 'personal'
-                ? 'bg-white text-[#3B1F0E] shadow-2xs'
-                : 'text-[#8A6E64] hover:text-[#3B1F0E]'"
-            >
-              <Icon name="heroicons:user" class="w-3.5 h-3.5" :class="activeTab === 'personal' ? 'text-[#3B1F0E]' : 'text-[#8A6E64]'" />
-              <span>1. Personal Details</span>
-              <span
-                v-if="personalErrorCount > 0"
-                class="w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-extrabold flex items-center justify-center shrink-0"
+        <!-- Steps -->
+        <nav aria-label="Form steps" class="px-6 md:px-8 py-3 border-b border-[#F0E4D3] bg-[#FCFAF6] select-none">
+          <ol class="flex items-center gap-3">
+            <li v-for="(step, i) in steps" :key="step.key" class="flex items-center gap-3" :class="i === 0 ? '' : 'flex-1 sm:flex-none'">
+              <span v-if="i > 0" class="h-px w-6 shrink-0 bg-[#E3D3BF] sm:w-10" aria-hidden="true" />
+              <button
+                type="button"
+                class="group inline-flex items-center gap-2.5 rounded-xl py-1 pr-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                :aria-current="activeTab === step.key ? 'step' : undefined"
+                @click="activeTab = step.key"
               >
-                {{ personalErrorCount }}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              @click="activeTab = 'employment'"
-              class="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer active:scale-95"
-              :class="activeTab === 'employment'
-                ? 'bg-white text-[#3B1F0E] shadow-2xs'
-                : 'text-[#8A6E64] hover:text-[#3B1F0E]'"
-            >
-              <Icon name="heroicons:briefcase" class="w-3.5 h-3.5" :class="activeTab === 'employment' ? 'text-[#3B1F0E]' : 'text-[#8A6E64]'" />
-              <span>2. Role & Schedule</span>
-              <span
-                v-if="employmentErrorCount > 0"
-                class="w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-extrabold flex items-center justify-center shrink-0"
-              >
-                {{ employmentErrorCount }}
-              </span>
-            </button>
-          </div>
-
-          <span class="text-xs font-bold text-[#8A6E64] hidden sm:inline">
-            Step {{ activeTab === 'personal' ? '1 of 2' : '2 of 2' }}
-          </span>
-        </div>
+                <span
+                  class="flex size-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold transition-colors"
+                  :class="step.errors
+                    ? 'bg-red-500 text-white'
+                    : activeTab === step.key
+                      ? 'bg-[#3B1F0E] text-[#FFF8EA]'
+                      : step.done
+                        ? 'bg-[#EAD9C6] text-[#5C4037]'
+                        : 'bg-white border border-[#E0D0BE] text-[#8A6E64]'"
+                >
+                  <template v-if="step.errors">{{ step.errors }}</template>
+                  <Icon v-else-if="step.done && activeTab !== step.key" name="heroicons:check" class="h-3.5 w-3.5" />
+                  <template v-else>{{ i + 1 }}</template>
+                </span>
+                <span class="text-[13px] font-semibold whitespace-nowrap" :class="activeTab === step.key ? 'text-[#3B1F0E]' : 'text-[#8A6E64] group-hover:text-[#3B1F0E]'">
+                  {{ step.label }}
+                </span>
+              </button>
+            </li>
+          </ol>
+        </nav>
 
         <!-- Body with Generous, Breathable Input Spacing -->
-        <div class="custom-form-scroll flex-1 px-6 md:px-8 py-6 overflow-y-auto max-h-[64vh] space-y-6">
+        <div class="custom-form-scroll flex-1 min-h-0 px-6 md:px-8 py-6 overflow-y-auto overscroll-contain divide-y divide-[#F0E4D3]">
           <!-- TAB 1: PERSONAL DETAILS -->
           <template v-if="activeTab === 'personal'">
             <!-- Card 1: Basic Identity -->
-            <div class="p-5 sm:p-6 rounded-2xl bg-[#FCFBF8] border border-[#EADCC7] space-y-4.5 shadow-2xs">
+            <section class="space-y-4 py-6 first:pt-0 last:pb-0">
               <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-[#7D5A50]"></span>
-                <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#482D25]">
+                <h3 class="font-display text-[16px] font-semibold text-[#3B1F0E]">
                   Basic Information
                 </h3>
               </div>
@@ -549,13 +545,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                   <span v-if="errors.lastname" class="text-xs font-bold text-red-600">{{ errors.lastname }}</span>
                 </label>
               </div>
-            </div>
+            </section>
 
             <!-- Card 2: Contact & Address -->
-            <div class="p-5 sm:p-6 rounded-2xl bg-[#FCFBF8] border border-[#EADCC7] space-y-4.5 shadow-2xs">
+            <section class="space-y-4 py-6 first:pt-0 last:pb-0">
               <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-[#7D5A50]"></span>
-                <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#482D25]">
+                <h3 class="font-display text-[16px] font-semibold text-[#3B1F0E]">
                   Contact & Residential Details
                 </h3>
               </div>
@@ -593,7 +588,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                     class="flex h-12 items-center gap-3 px-4 rounded-xl border bg-white shadow-2xs transition-all focus-within:border-[#3B1F0E] focus-within:ring-2 focus-within:ring-[#3B1F0E]/12"
                     :class="errors.email ? 'border-red-400 bg-red-50/40' : 'border-[#E0D0BE] hover:border-[#D4C3B2]'"
                   >
-                    <Icon name="heroicons:envelope" class="w-4.5 h-4.5 text-[#8A6E64] shrink-0" />
+                    <Icon name="heroicons:envelope" class="w-[18px] h-[18px] text-[#8A6E64] shrink-0" />
                     <input
                       v-model="form.email"
                       type="email"
@@ -614,7 +609,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                   class="flex h-12 items-center gap-3 px-4 rounded-xl border bg-white shadow-2xs transition-all focus-within:border-[#3B1F0E] focus-within:ring-2 focus-within:ring-[#3B1F0E]/12"
                   :class="errors.address ? 'border-red-400 bg-red-50/40' : 'border-[#E0D0BE] hover:border-[#D4C3B2]'"
                 >
-                  <Icon name="heroicons:map-pin" class="w-4.5 h-4.5 text-[#8A6E64] shrink-0" />
+                  <Icon name="heroicons:map-pin" class="w-[18px] h-[18px] text-[#8A6E64] shrink-0" />
                   <input
                     v-model="form.address"
                     type="text"
@@ -626,16 +621,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 </div>
                 <span v-if="errors.address" class="text-xs font-bold text-red-600">{{ errors.address }}</span>
               </label>
-            </div>
+            </section>
           </template>
 
           <!-- TAB 2: ROLE & SCHEDULE -->
           <template v-else>
             <!-- Card 1: Role & Credentials -->
-            <div class="p-5 sm:p-6 rounded-2xl bg-[#FCFBF8] border border-[#EADCC7] space-y-4.5 shadow-2xs">
+            <section class="space-y-4 py-6 first:pt-0 last:pb-0">
               <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-[#7D5A50]"></span>
-                <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#482D25]">
+                <h3 class="font-display text-[16px] font-semibold text-[#3B1F0E]">
                   Role & Branch Assignment
                 </h3>
               </div>
@@ -679,7 +673,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                     class="flex h-12 items-center gap-3 px-4 rounded-xl border bg-white shadow-2xs transition-all focus-within:border-[#3B1F0E] focus-within:ring-2 focus-within:ring-[#3B1F0E]/12"
                     :class="errors.pin ? 'border-red-400 bg-red-50/40' : 'border-[#E0D0BE] hover:border-[#D4C3B2]'"
                   >
-                    <Icon name="heroicons:finger-print" class="w-4.5 h-4.5 text-[#8A6E64] shrink-0" />
+                    <Icon name="heroicons:finger-print" class="w-[18px] h-[18px] text-[#8A6E64] shrink-0" />
                     <input
                       :value="form.pin"
                       type="password"
@@ -697,7 +691,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
               <!-- Position Hint Callout -->
               <div v-if="positionHint" class="flex items-start gap-2.5 p-3 rounded-xl bg-[#FAF4ED] border border-[#EEDFC4] text-xs text-[#7D5A50] leading-relaxed">
-                <Icon name="heroicons:information-circle" class="w-4.5 h-4.5 text-[#B4846C] shrink-0 mt-0.5" />
+                <Icon name="heroicons:information-circle" class="w-[18px] h-[18px] text-[#B4846C] shrink-0 mt-0.5" />
                 <span>{{ positionHint }}</span>
               </div>
 
@@ -713,18 +707,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 />
                 <span v-if="errors.employment_status" class="text-xs font-bold text-red-600">{{ errors.employment_status }}</span>
               </div>
-            </div>
+            </section>
 
             <!-- Card 2: Weekly Schedule -->
-            <div class="p-5 sm:p-6 rounded-2xl bg-[#FCFBF8] border border-[#EADCC7] space-y-4.5 shadow-2xs">
+            <section class="space-y-4 py-6 first:pt-0 last:pb-0">
               <div class="flex items-center justify-between gap-2 flex-wrap">
                 <div class="flex items-center gap-2">
-                  <span class="w-2 h-2 rounded-full bg-[#7D5A50]"></span>
                   <div>
-                    <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#482D25]">
+                    <h3 class="font-display text-[16px] font-semibold text-[#3B1F0E]">
                       Weekly Work Schedule
                     </h3>
-                    <p class="text-xs text-[#8A6E64] mt-0.5">
+                    <p class="text-[13px] text-[#8A6E64] mt-0.5">
                       Configure daily shift hours or assign off days for this employee.
                     </p>
                   </div>
@@ -732,7 +725,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               </div>
 
               <EmployeesScheduleEditor v-model="form.schedule" :errors="scheduleErrors" :disabled="saving" />
-            </div>
+            </section>
           </template>
         </div>
 
@@ -742,46 +735,32 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           <p class="text-xs font-bold text-red-700 whitespace-pre-line">{{ serverError }}</p>
         </div>
 
-        <!-- Footer -->
-        <div class="flex items-center justify-between px-6 md:px-8 py-4.5 border-t border-[#EEDFC4] bg-[#FAF8F5] rounded-b-3xl">
-          <!-- Left side button -->
-          <div>
-            <button
-              v-if="activeTab === 'employment'"
-              type="button"
-              @click="activeTab = 'personal'"
-              class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer shadow-2xs"
-            >
-              <Icon name="heroicons:arrow-left" class="w-3.5 h-3.5" />
-              <span>Personal Details</span>
-            </button>
-            <button
-              v-else
-              type="button"
-              @click="close"
-              class="px-4.5 py-2.5 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer shadow-2xs outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
-            >
-              Cancel
-            </button>
-          </div>
+        <!-- Footer: Cancel stays on the left; back and the main action on the right -->
+        <div class="flex flex-col-reverse gap-2.5 px-6 md:px-8 py-4 border-t border-[#EEDFC4] bg-[#FAF8F5] sm:flex-row sm:items-center sm:justify-between">
+          <button
+            type="button"
+            class="h-11 rounded-xl px-4 text-sm font-semibold text-[#8A6E64] whitespace-nowrap transition-colors hover:bg-[#F3ECE3] hover:text-[#3B1F0E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+            @click="close"
+          >
+            Cancel
+          </button>
 
-          <!-- Right side buttons -->
-          <div class="flex items-center gap-3">
+          <div class="flex flex-col-reverse gap-2.5 sm:flex-row sm:items-center">
             <template v-if="activeTab === 'personal'">
               <button
                 v-if="isEdit"
                 type="submit"
                 :disabled="saving"
-                class="px-4.5 py-2.5 rounded-xl border border-[#3B1F0E] text-[#3B1F0E] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer shadow-2xs"
+                class="h-11 rounded-xl border border-[#D8C7B5] bg-white px-5 text-sm font-semibold text-[#3B1F0E] whitespace-nowrap transition-colors hover:bg-[#FAF4ED] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
               >
-                Save Changes
+                Save changes
               </button>
               <button
                 type="button"
+                class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#3B1F0E] px-5 text-sm font-semibold text-[#FFF8EA] whitespace-nowrap transition-colors hover:bg-[#2A150A] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#3B1F0E]"
                 @click="goToEmploymentTab"
-                class="inline-flex items-center gap-2 px-5.5 py-2.5 rounded-xl bg-[#3B1F0E] hover:bg-[#2A150A] text-[#FFF8EA] text-xs sm:text-sm font-bold active:scale-95 transition-all shadow-md cursor-pointer"
               >
-                <span>Continue to Role & Schedule</span>
+                Next: Role & schedule
                 <Icon name="heroicons:arrow-right" class="w-4 h-4" />
               </button>
             </template>
@@ -789,18 +768,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             <template v-else>
               <button
                 type="button"
-                @click="close"
-                class="px-4.5 py-2.5 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer shadow-2xs outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                class="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border border-[#D8C7B5] bg-white px-4 text-sm font-semibold text-[#5C4037] whitespace-nowrap transition-colors hover:bg-[#FAF4ED] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                @click="activeTab = 'personal'"
               >
-                Cancel
+                <Icon name="heroicons:arrow-left" class="w-4 h-4" />
+                Back
               </button>
               <button
                 type="submit"
                 :disabled="saving"
-                class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#3B1F0E] hover:bg-[#2A150A] text-[#FFF8EA] text-xs sm:text-sm font-bold active:scale-95 transition-all shadow-md disabled:opacity-50 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#3B1F0E] px-6 text-sm font-semibold text-[#FFF8EA] whitespace-nowrap transition-colors hover:bg-[#2A150A] active:scale-[0.98] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#3B1F0E]"
               >
                 <Icon v-if="saving" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
-                <span>{{ saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Save Employee' }}</span>
+                {{ saving ? 'Saving…' : isEdit ? 'Save changes' : 'Save employee' }}
               </button>
             </template>
           </div>
@@ -808,6 +788,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </form>
     </div>
   </transition>
+  </Teleport>
 </template>
 
 <style scoped>
