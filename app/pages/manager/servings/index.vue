@@ -7,13 +7,16 @@ import CommonPagination from '~/components/common/Pagination.vue'
 import ServingsCategoryCard from '~/components/servings/CategoryCard.vue'
 import ServingsIngredientsUsedPanel from '~/components/servings/IngredientsUsedPanel.vue'
 import ServingsServingLogPanel from '~/components/servings/ServingLogPanel.vue'
+import ServingsLogIngredientsModal from '~/components/servings/LogIngredientsModal.vue'
 import BranchPicker from '~/components/common/BranchPicker.vue'
 import type {
   IngredientUsage,
   IngredientUsageSort,
   ServingCategorySort,
   ServingCategorySummary,
+  ServingLogDetail,
   ServingLogEntry,
+  ServingLogIngredient,
 } from '~/services/ServingService'
 import { spoilageItemLabel, type SpoilageLog } from '~/services/PosService'
 
@@ -108,6 +111,39 @@ async function loadLog() {
   log.value = res.log.data
 }
 
+// Ingredients one log entry used, shown in a modal when its row is clicked.
+const logEntry = ref<ServingLogEntry | null>(null)
+const logDetail = ref<ServingLogDetail | null>(null)
+const logIngredients = ref<ServingLogIngredient[]>([])
+const logIngredientsLoading = ref(false)
+const logIngredientsError = ref('')
+let logRequest = 0
+
+async function openLogEntry(entry: ServingLogEntry) {
+  const id = ++logRequest
+  logEntry.value = entry
+  logDetail.value = null
+  logIngredients.value = []
+  logIngredientsError.value = ''
+  logIngredientsLoading.value = true
+  try {
+    const res = await service.logIngredients(branchUuid.value, entry.uuid)
+    if (id !== logRequest) return
+    logDetail.value = res.entry
+    logIngredients.value = res.ingredients
+  } catch (e: any) {
+    if (id !== logRequest) return
+    logIngredientsError.value = e?.data?.message ?? 'Could not load the ingredients for this serving.'
+  } finally {
+    if (id === logRequest) logIngredientsLoading.value = false
+  }
+}
+
+function closeLogEntry() {
+  logRequest++
+  logEntry.value = null
+}
+
 async function loadSpoilage() {
   const res = await service.spoilage(branchUuid.value)
   spoilage.value = res.logs
@@ -165,6 +201,7 @@ watch(categoryPage, () => loadCategories().catch((e) => failure(e, 'Could not lo
 watch(ingredientSearch, () => debounced(loadIngredients))
 watch(ingredientSort, () => loadIngredients().catch((e) => failure(e, 'Could not load servings.')))
 watch(branchUuid, async () => {
+  closeLogEntry()
   loading.value = true
   categoryPage.value = 1
   await loadAll()
@@ -337,7 +374,16 @@ onBeforeUnmount(() => {
               :ingredients="ingredients"
               :loading="loading"
             />
-            <ServingsServingLogPanel :entries="log" :loading="loading" />
+            <ServingsServingLogPanel :entries="log" :loading="loading" @select="openLogEntry" />
+            <ServingsLogIngredientsModal
+              :entry="logEntry"
+              :detail="logDetail"
+              :ingredients="logIngredients"
+              :loading="logIngredientsLoading"
+              :error="logIngredientsError"
+              @close="closeLogEntry"
+              @retry="logEntry && openLogEntry(logEntry)"
+            />
           </div>
 
           <ServingsSpoilagePanel

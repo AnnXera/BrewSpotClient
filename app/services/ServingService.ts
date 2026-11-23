@@ -69,6 +69,20 @@ export interface ServingLogEntry {
     sold_at: string
 }
 
+export interface ServingLogDetail extends ServingLogEntry {
+    size_name: string | null
+    addons: { name: string; quantity: number }[]
+}
+
+// What one sold line used. quantity is the line total; null amounts are unmeasured units ("to taste").
+export interface ServingLogIngredient {
+    name: string
+    unit: string
+    measured: boolean
+    quantity: number | null
+    per_serving: number | null
+}
+
 export interface ServingListParams {
     search?: string
     sort?: string
@@ -141,6 +155,12 @@ export class ServingService extends BaseService {
     log(branchUuid: string, params: ServingListParams = {}) {
         return this.get<{ success: boolean; date: string; log: Paginated<ServingLogEntry> }>(
             `${this.base(branchUuid)}/log`, this.clean(params))
+    }
+
+    // Ingredients one serving log entry used (today only).
+    logIngredients(branchUuid: string, lineUuid: string) {
+        return this.get<{ success: boolean; entry: ServingLogDetail; ingredients: ServingLogIngredient[] }>(
+            `${this.base(branchUuid)}/log/${lineUuid}/ingredients`)
     }
 
     // Today's spoilage entries (logged on the registers), voided ones included.
