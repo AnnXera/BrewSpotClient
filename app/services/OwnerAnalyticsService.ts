@@ -35,8 +35,8 @@ export interface AnalyticsSales {
         previous: { revenue: number; orders: number; avg_order_value: number }
         change: { revenue: number | null; orders: number | null; avg_order_value: number | null } // null: nothing to compare
     }
-    granularity: 'day' | 'week' | 'month'
-    series: { start: string; end: string; revenue: number; orders: number }[]
+    granularity: 'hour' | 'day' | 'week' | 'month' // hour: a single day
+    series: { start: string; end: string; hour?: number; revenue: number; orders: number }[] // hour: 0-23, only when granularity is hour
     heatmap: { orders: number; revenue: number }[][] // [weekday 0 = Sunday][hour]
     payments: { method: string; orders: number; amount: number; share: number }[]
     discounts: { type: string; orders: number; amount: number }[]
