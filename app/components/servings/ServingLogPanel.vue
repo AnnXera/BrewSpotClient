@@ -3,6 +3,7 @@
 import type { ServingLogEntry } from '~/services/ServingService'
 
 defineProps<{ entries: ServingLogEntry[]; loading: boolean }>()
+defineEmits<{ (e: 'select', entry: ServingLogEntry): void }>()
 
 function time(iso: string) {
   return new Date(iso).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true })
@@ -50,11 +51,14 @@ function time(iso: string) {
       </div>
 
       <!-- Log Rows -->
-      <div
+      <button
         v-else
         v-for="e in entries"
         :key="e.uuid"
-        class="log-row flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#FAF4ED]/60 border border-transparent hover:border-[#EBE0D2] transition-colors duration-150"
+        type="button"
+        :aria-label="`Show ingredients used for ${e.menu_name ?? 'this item'}, ${e.order_number}`"
+        class="log-row group w-full text-left flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#FAF4ED]/60 border border-transparent hover:border-[#EBE0D2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] transition-colors duration-150 cursor-pointer"
+        @click="$emit('select', e)"
       >
         <img
           v-if="e.picture"
@@ -85,9 +89,13 @@ function time(iso: string) {
             <span class="font-mono text-[11px] font-medium text-[#7D5A50] bg-[#FAF4ED] border border-[#EBE0D2] rounded px-1.5 py-0.2">
               {{ e.order_number }}
             </span>
+            <span class="ml-auto inline-flex items-center gap-0.5 text-[11px] font-medium text-[#B4846C] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-150">
+              Ingredients
+              <Icon name="heroicons:chevron-right" class="w-3 h-3" />
+            </span>
           </div>
         </div>
-      </div>
+      </button>
     </div>
   </section>
 </template>
