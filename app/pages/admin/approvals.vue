@@ -163,7 +163,7 @@ async function handleDecision(status: 'approved' | 'rejected', reason?: string) 
   decisionLoading.value = true
   try {
     const res = isBranch
-      ? await ownerService.updateBranchStatus(targetUuid, status, reason)
+      ? await ownerService.updateBranchStatus(targetUuid, status, reason, allowResubmit.value)
       : await ownerService.updateStatus(targetUuid, status, reason, allowResubmit.value)
 
     if (!res.success) {
@@ -188,7 +188,7 @@ async function handleDecision(status: 'approved' | 'rejected', reason?: string) 
 // Reject modal
 const rejectModalOpen = ref(false)
 const rejectReason = ref('')
-// Owner applications only: unchecked makes the rejection final
+// Owner applications and branches: unchecked makes the rejection final
 const allowResubmit = ref(true)
 
 function openRejectModal() {
@@ -530,21 +530,25 @@ watch(() => route.query.uuid, async (uuid) => {
             class="w-full rounded-xl border border-[#EDD8CC] px-4 py-3 font-sans text-sm text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30 resize-none"
           />
 
-          <label
-            v-if="modalKind === 'owner'"
-            class="flex items-start gap-3 mt-4 cursor-pointer select-none"
-          >
+          <label class="flex items-start gap-3 mt-4 cursor-pointer select-none">
             <input
               v-model="allowResubmit"
               type="checkbox"
               class="mt-0.5 h-4 w-4 rounded border-[#EDD8CC] text-[#7D5A50] focus:ring-[#7D5A50]/30"
             />
             <span class="font-sans text-sm text-[#3B1F0E]">
-              Let the applicant edit and resubmit
+              {{ modalKind === 'branch' ? 'Let the owner edit and resubmit this branch' : 'Let the applicant edit and resubmit' }}
               <span class="block text-xs text-[#3B1F0E]/60 mt-0.5">
-                {{ allowResubmit
-                  ? 'They can fix the issue and send the same application back for review.'
-                  : 'Final rejection. Use for ineligible or suspicious applications; they cannot reapply with this email.' }}
+                <template v-if="modalKind === 'branch'">
+                  {{ allowResubmit
+                    ? 'They can fix the issue and send the same branch back for review.'
+                    : 'Final rejection. The owner can only delete this branch.' }}
+                </template>
+                <template v-else>
+                  {{ allowResubmit
+                    ? 'They can fix the issue and send the same application back for review.'
+                    : 'Final rejection. Use for ineligible or suspicious applications; they cannot reapply with this email.' }}
+                </template>
               </span>
             </span>
           </label>

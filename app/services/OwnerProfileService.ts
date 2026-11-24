@@ -56,6 +56,16 @@ export interface BranchDetail {
     documents?: BranchDocument[]
 }
 
+// The latest admin review of a branch (owner side).
+export interface BranchReview {
+    status: 'pending_approval' | 'approved' | 'rejected' | 'withdrawn'
+    reason: string | null
+    can_resubmit: boolean
+    submitted_at: string | null
+    reviewed_at: string | null
+    resubmitted: boolean // pending again after a rejection
+}
+
 export class OwnerProfileService extends BaseService {
     // Records that the first-login welcome modal was dismissed.
     dismissWelcome() {
@@ -63,7 +73,17 @@ export class OwnerProfileService extends BaseService {
     }
 
     getBranch(uuid: string) {
-        return this.get<{ success: boolean; message?: string; branch?: BranchDetail }>(`/owner/branches/${uuid}`)
+        return this.get<{ success: boolean; message?: string; branch?: BranchDetail; review?: BranchReview | null }>(`/owner/branches/${uuid}`)
+    }
+
+    // Correct a rejected side branch and send it back for review. 422 carries errors.<field>.
+    resubmitBranch(uuid: string, form: FormData) {
+        return this.post<{ success: boolean; message: string; branch?: BranchDetail }>(`/owner/branches/${uuid}/resubmit`, form)
+    }
+
+    // Withdraws a branch under review, or removes a rejected one.
+    deleteBranch(uuid: string) {
+        return this.delete<{ success: boolean; message: string }>(`/owner/branches/${uuid}`)
     }
 
     getBranches(perPage = 6, page = 1, search = '', status = '') {

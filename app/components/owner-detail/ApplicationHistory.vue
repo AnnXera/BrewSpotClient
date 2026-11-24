@@ -2,8 +2,8 @@
 <script lang="ts">
 export interface ApplicationHistoryEntry {
   uuid: string
-  kind: 'application' | 'resubmission' | 'branch'
-  status: 'pending_approval' | 'approved' | 'rejected'
+  kind: 'application' | 'resubmission' | 'branch' | 'branch_resubmission'
+  status: 'pending_approval' | 'approved' | 'rejected' | 'withdrawn'
   branch_name: string | null
   reason: string | null
   can_resubmit: boolean
@@ -20,12 +20,14 @@ const KIND: Record<ApplicationHistoryEntry['kind'], { label: string; icon: strin
   application: { label: 'Owner application', icon: 'heroicons:user-plus' },
   resubmission: { label: 'Resubmitted application', icon: 'heroicons:arrow-path-rounded-square' },
   branch: { label: 'Branch submission', icon: 'heroicons:building-storefront' },
+  branch_resubmission: { label: 'Branch resubmission', icon: 'heroicons:arrow-path-rounded-square' },
 }
 
 const DOT: Record<ApplicationHistoryEntry['status'], string> = {
   approved: 'bg-[#D4EDDA] text-[#28A745] border-[#A9D8B4]',
   rejected: 'bg-[#FDE8E8] text-[#DC3545] border-[#F2B8BD]',
   pending_approval: 'bg-[#F0E8E5] text-[#B4846C] border-[#E2CFC6]',
+  withdrawn: 'bg-[#F0E3CE] text-[#8B6656] border-[#E3D2B8]',
 }
 
 const fmt = new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -70,6 +72,7 @@ const when = (iso: string | null) => (iso ? fmt.format(new Date(iso)) : null)
               <dt class="text-[#9E7060]">Reviewed</dt>
               <dd class="text-[#3D2B24] font-medium">
                 <template v-if="e.reviewed_at">{{ when(e.reviewed_at) }}<template v-if="e.reviewed_by"> by {{ e.reviewed_by }}</template></template>
+                <template v-else-if="e.status === 'withdrawn'">Withdrawn by the owner before review</template>
                 <template v-else>Waiting for review</template>
               </dd>
             </div>
