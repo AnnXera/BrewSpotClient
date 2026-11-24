@@ -100,8 +100,12 @@ const effectiveReason = computed(() => {
   if (selectedReasonChip.value && reason.value) {
     return `${selectedReasonChip.value} - ${reason.value}`
   }
-  return selectedReasonChip.value || reason.value || 'Customer refund'
+  return selectedReasonChip.value || reason.value
 })
+
+// Voids and refunds must say why: a quick reason or a typed note.
+const reasonRequired = computed(() => true)
+const hasReason = computed(() => !!selectedReasonChip.value || reason.value.trim().length > 0)
 
 async function fetchManagers() {
   loadingManagers.value = true
@@ -204,6 +208,7 @@ const canSubmit = computed(() => {
   return (
     !!selectedManagerUuid.value &&
     pin.value.length >= 4 &&
+    (!reasonRequired.value || hasReason.value) &&
     !loading.value &&
     !successMessage.value
   )
@@ -212,6 +217,7 @@ const canSubmit = computed(() => {
 // What the confirm button needs before it can be pressed, said plainly.
 const submitHint = computed(() => {
   if (successMessage.value) return ''
+  if (reasonRequired.value && !hasReason.value) return isVoid.value ? 'Pick or type a reason for the void' : 'Pick or type a reason for the refund'
   if (!selectedManagerUuid.value) return 'Pick a manager to approve'
   if (pin.value.length < 4) return isVoid.value ? 'Enter PIN to void' : 'Enter PIN to refund'
   return ''
@@ -362,13 +368,15 @@ async function submitRefund() {
             <Icon name="heroicons:information-circle" class="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
             <div>
               <p class="font-bold uppercase tracking-wide text-[11px] text-amber-950">Immediate inventory restock</p>
-              <p class="text-amber-800 mt-0.5">Voiding cancels this transaction completely. Its servings are not put back on sale, so the remaining servings stay the same.</p>
+              <p class="text-amber-800 mt-0.5">Voiding cancels this transaction completely. Its servings go back on sale, so the remaining servings go up again.</p>
             </div>
           </div>
 
           <fieldset :disabled="busy">
             <legend class="text-sm font-semibold text-[#2d201b] mb-2">
-              Reason <span class="font-normal text-[#8A6E64]">(optional)</span>
+              Reason
+              <span v-if="reasonRequired" class="font-normal text-[#A2352A]">(required)</span>
+              <span v-else class="font-normal text-[#8A6E64]">(optional)</span>
             </legend>
             <div class="flex flex-wrap gap-2 mb-2">
               <button
@@ -391,7 +399,9 @@ async function submitRefund() {
               v-model="reason"
               type="text"
               maxlength="200"
-              placeholder="Add a note for the record"
+              :required="reasonRequired"
+              :aria-required="reasonRequired"
+              :placeholder="reasonRequired ? 'Pick a reason above or type why' : 'Add a note for the record'"
               class="w-full h-11 px-3.5 rounded-lg border border-[#D6C5B8] bg-white text-sm text-[#2d201b] placeholder:text-[#8A6E64] focus:outline-none focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/25 disabled:bg-[#FBF7F2]"
             />
           </fieldset>
