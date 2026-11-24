@@ -30,6 +30,22 @@ const displayName = computed(() => {
 
 const { openDocument, openImage } = useDocumentViewer()
 
+// The branch's BIR Certificate of Registration and the details entered with it.
+const birDocument = computed(() =>
+  (props.branch?.documents ?? []).find((d: any) => d.doc_type === 'BIR') ?? null
+)
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
+function formatVat(value: string | null | undefined) {
+  if (value === 'vat-registered') return 'VAT-registered'
+  if (value === 'non-vat') return 'Non-VAT'
+  return '—'
+}
+
 function viewCafePicture() {
   if (props.branch?.cafe_picture) {
     openImage(props.branch.cafe_picture, `${displayName.value} photo`)
@@ -132,6 +148,50 @@ function viewCafePicture() {
                 <p class="text-[#3B1F0E] break-words">{{ branch.address || '—' }}</p>
               </div>
             </div>
+          </div>
+
+          <!-- BIR Details -->
+          <div>
+            <div class="flex items-center justify-between gap-3 mb-3">
+              <h3 class="font-display text-base sm:text-lg font-bold text-[#3D2B24]">
+                BIR Details
+              </h3>
+              <button
+                v-if="birDocument"
+                type="button"
+                class="cursor-pointer inline-flex items-center gap-1.5 font-display font-semibold text-xs sm:text-sm text-[#7D5A50] hover:text-[#3D2B24] transition-colors"
+                @click="openDocument(birDocument.download_url, 'BIR Certificate')"
+              >
+                <Icon name="heroicons:eye" class="w-4 h-4" />
+                View certificate
+              </button>
+            </div>
+
+            <div v-if="birDocument" class="rounded-xl overflow-hidden border border-[#EDD8CC] font-display text-sm">
+              <div class="grid grid-cols-[35%_65%] bg-[#FFF8EA] px-5 py-3">
+                <p class="font-semibold text-[#7D5A50]">TIN</p>
+                <p class="text-[#3B1F0E] tabular-nums break-all">{{ birDocument.tin_number || '—' }}</p>
+              </div>
+              <div class="grid grid-cols-[35%_65%] bg-[#FFF8EA] px-5 py-3 border-t border-[#EDD8CC]">
+                <p class="font-semibold text-[#7D5A50]">VAT Status</p>
+                <p class="text-[#3B1F0E]">{{ formatVat(birDocument.vat) }}</p>
+              </div>
+              <div class="grid grid-cols-[35%_65%] bg-[#FFF8EA] px-5 py-3 border-t border-[#EDD8CC]">
+                <p class="font-semibold text-[#7D5A50]">Registered On</p>
+                <p class="text-[#3B1F0E]">{{ formatDate(birDocument.registered_at) }}</p>
+              </div>
+              <div v-if="birDocument.expired_at" class="grid grid-cols-[35%_65%] bg-[#FFF8EA] px-5 py-3 border-t border-[#EDD8CC]">
+                <p class="font-semibold text-[#7D5A50]">Expires On</p>
+                <p class="text-[#3B1F0E]">{{ formatDate(birDocument.expired_at) }}</p>
+              </div>
+              <div class="grid grid-cols-[35%_65%] bg-[#FFF8EA] px-5 py-3 border-t border-[#EDD8CC]">
+                <p class="font-semibold text-[#7D5A50]">Last Uploaded</p>
+                <p class="text-[#3B1F0E]">{{ formatDate(birDocument.uploaded_at) }}</p>
+              </div>
+            </div>
+            <p v-else class="rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] px-5 py-4 font-display text-sm text-[#9E7060] text-center">
+              No BIR certificate on file for this branch.
+            </p>
           </div>
 
           <!-- Documents -->
