@@ -217,9 +217,9 @@ onUnmounted(() => clearTimeout(successTimer))
                 <dt class="text-[#8A6E64]">Order Type:</dt>
                 <dd class="font-bold text-[#2D201B]">{{ receiptData.orderType || 'Dine In' }}</dd>
               </div>
-              <div v-if="receiptData.status?.toLowerCase() === 'refunded'" class="flex justify-between text-amber-800 font-bold bg-amber-50 px-1.5 py-0.5 rounded">
+              <div v-if="['refunded', 'partially_refunded'].includes(receiptData.status?.toLowerCase() ?? '')" class="flex justify-between text-amber-800 font-bold bg-amber-50 px-1.5 py-0.5 rounded">
                 <dt>Status:</dt>
-                <dd>REFUNDED</dd>
+                <dd>{{ receiptData.status?.toLowerCase() === 'partially_refunded' ? 'PARTLY REFUNDED' : 'REFUNDED' }}</dd>
               </div>
             </dl>
 

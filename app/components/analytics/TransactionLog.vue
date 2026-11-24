@@ -91,15 +91,19 @@ const range = computed(() => {
   return `${formatCount(first)}–${formatCount(first + rows.value.length - 1)} of ${formatCount(p.total)}`
 })
 
-const settled = (s: string) => s === 'completed' || s === 'paid'
+const settled = (s: string) => s === 'completed' || s === 'paid' || s === 'partially_refunded'
+// Partly refunded sales show what they kept.
+const amountOf = (t: TransactionLogRow) => t.status === 'partially_refunded' ? t.total_amount - (t.refunded_amount ?? 0) : t.total_amount
 
 function statusLabel(s: string) {
+  if (s === 'partially_refunded') return 'Partly refunded'
   if (settled(s)) return 'Completed'
   if (s === 'void' || s === 'voided') return 'Voided'
   return s.replace(/^\w/, c => c.toUpperCase())
 }
 
 function statusClass(s: string) {
+  if (s === 'partially_refunded') return 'bg-[#FBEBD3] text-[#8A5A12]'
   if (settled(s)) return 'bg-[#E7F1E4] text-[#2F5D2A]'
   if (s === 'refunded') return 'bg-[#FBEBD3] text-[#8A5A12]'
   return 'bg-[#F8E1DD] text-[#A2352A]'
@@ -196,7 +200,7 @@ const loadReceipt = (uuid: string) => service.getTransaction(uuid)
               <span v-if="t.changed_at" class="mt-0.5 block text-[12px] text-[#A2352A]">{{ changeNote(t) }}</span>
             </span>
             <span class="shrink-0 text-right">
-              <span class="block text-[14px] font-semibold tabular-nums" :class="settled(t.status) ? 'text-[#3D2B24]' : 'text-[#9E7060] line-through'">{{ formatPesoCents(t.total_amount) }}</span>
+              <span class="block text-[14px] font-semibold tabular-nums" :class="settled(t.status) ? 'text-[#3D2B24]' : 'text-[#9E7060] line-through'">{{ formatPesoCents(amountOf(t)) }}</span>
               <span class="mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold" :class="statusClass(t.status)">{{ statusLabel(t.status) }}</span>
             </span>
           </button>
@@ -240,7 +244,7 @@ const loadReceipt = (uuid: string) => service.getTransaction(uuid)
               <td class="py-2.5 pr-3 text-right tabular-nums">{{ formatCount(t.items) }}</td>
               <td class="py-2.5 pr-3">{{ t.payment_method ? formatMethod(t.payment_method) : '-' }}</td>
               <td class="whitespace-nowrap py-2.5 pr-3 text-right tabular-nums">
-                <span class="font-semibold" :class="{ 'text-[#9E7060] line-through': !settled(t.status) }">{{ formatPesoCents(t.total_amount) }}</span>
+                <span class="font-semibold" :class="{ 'text-[#9E7060] line-through': !settled(t.status) }">{{ formatPesoCents(amountOf(t)) }}</span>
                 <span v-if="t.discount_amount > 0" class="block text-[11px] text-[#9E7060]">−{{ formatPesoCents(t.discount_amount) }} discount</span>
               </td>
               <td class="py-2.5">

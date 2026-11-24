@@ -72,6 +72,7 @@ export interface TransactionLogRow {
     discount_type: string | null
     discount_amount: number
     total_amount: number
+    refunded_amount?: number // partly refunded sales: what was given back
     status: string
     refund: TransactionRefund | null
 }

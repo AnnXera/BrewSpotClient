@@ -43,6 +43,7 @@ export interface ManagerTransactionItem {
     created_at: string
     staff_name: string
     total_amount: number
+    refunded_amount?: number // partly refunded sales: what was given back
     status: string
     order_type?: string | null
     items_count: number
@@ -122,6 +123,7 @@ export interface ManagerTransactionDetailItem {
     size_name: string | null
     temperature: string | null // hot or iced, on items sold both ways
     quantity: number
+    refunded_quantity?: number // how many of the line were refunded
     unit_price: number
     line_total: number
     addons: {
@@ -143,6 +145,7 @@ export interface ManagerTransactionDetail {
     discount_type: string | null
     discount_amount: number
     total_amount: number
+    refunded_amount?: number // running money refunded, item by item
     payment: {
         method: string
         reference_number: string | null

@@ -86,6 +86,7 @@ function statusBadgeClass(status: string) {
     case 'paid':
       return 'bg-emerald-100 text-emerald-800 border-emerald-300'
     case 'refunded':
+    case 'partially_refunded':
       return 'bg-amber-100 text-amber-800 border-amber-300'
     case 'void':
     case 'voided':
@@ -165,7 +166,7 @@ function statusBadgeClass(status: string) {
                 <span class="text-xs text-[#8A6E64]">Status</span>
                 <div>
                   <span :class="['px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider border', statusBadgeClass(detail.status)]">
-                    {{ detail.status }}
+                    {{ detail.status.replace(/_/g, ' ') }}
                   </span>
                 </div>
               </div>
@@ -180,7 +181,7 @@ function statusBadgeClass(status: string) {
             <!-- Refund / void trail (owner transaction log) -->
             <div v-if="detail.changed_at" class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs space-y-1 text-amber-900">
               <p>
-                <span class="font-semibold capitalize">{{ detail.status }}</span> on {{ formatDate(detail.changed_at) }}
+                <span class="font-semibold capitalize">{{ detail.status.replace(/_/g, ' ') }}</span> on {{ formatDate(detail.changed_at) }}
                 <template v-if="detail.refund"> · approved by <span class="font-semibold">{{ detail.refund.by }}</span><template v-if="detail.refund.role"> ({{ detail.refund.role }})</template></template>
               </p>
               <p v-if="detail.refund?.reason">Reason: {{ detail.refund.reason }}</p>
@@ -209,6 +210,9 @@ function statusBadgeClass(status: string) {
                         + {{ a.quantity }}x {{ a.name }} ({{ formatPesoCents(a.price) }})
                       </div>
                     </div>
+                    <p v-if="item.refunded_quantity" class="mt-1 text-xs font-semibold text-amber-800">
+                      {{ item.refunded_quantity >= item.quantity ? 'Refunded' : `${item.refunded_quantity} of ${item.quantity} refunded` }}
+                    </p>
                   </div>
                   <span class="font-semibold text-[#2D201B] tabular-nums shrink-0">
                     {{ formatPesoCents(item.line_total) }}
@@ -231,6 +235,16 @@ function statusBadgeClass(status: string) {
                 <span>Total Amount</span>
                 <span class="text-lg text-[#3B1F0E] tabular-nums">{{ formatPesoCents(detail.total_amount) }}</span>
               </div>
+              <template v-if="detail.status === 'partially_refunded' && (detail.refunded_amount ?? 0) > 0">
+                <div class="flex justify-between text-amber-800">
+                  <span>Refunded</span>
+                  <span class="tabular-nums font-medium">-{{ formatPesoCents(detail.refunded_amount ?? 0) }}</span>
+                </div>
+                <div class="flex justify-between font-bold text-[#2D201B]">
+                  <span>Kept</span>
+                  <span class="tabular-nums">{{ formatPesoCents(detail.total_amount - (detail.refunded_amount ?? 0)) }}</span>
+                </div>
+              </template>
             </div>
 
             <!-- Payment Details -->

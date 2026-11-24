@@ -30,7 +30,9 @@ function onRefundSuccess(updated: any) {
   if (updated) {
     detail.value = updated
   } else if (detail.value) {
-    detail.value.status = refundMode.value === 'void' ? 'voided' : 'refunded'
+    // No sale came back: reload it, since a refund may have covered only some items.
+    if (refundMode.value === 'void') detail.value.status = 'voided'
+    else load()
   }
   emit('refunded', detail.value)
 }
@@ -71,7 +73,11 @@ const timeLabel = computed(() => createdAt.value.toLocaleTimeString('en-US', { h
 const dateLabel = computed(() => createdAt.value.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }))
 
 const status = computed(() => detail.value?.status ?? props.preview.status)
-const isSettled = computed(() => ['completed', 'paid'].includes(status.value?.toLowerCase()))
+const isSettled = computed(() => ['completed', 'paid', 'partially_refunded'].includes(status.value?.toLowerCase()))
+const isPartlyRefunded = computed(() => status.value?.toLowerCase() === 'partially_refunded')
+const refundedAmount = computed(() => detail.value?.refunded_amount ?? 0)
+// Something left to refund (a refunded line can't be picked again).
+const canRefundMore = computed(() => isSettled.value && (detail.value?.items ?? []).some(i => i.quantity > (i.refunded_quantity ?? 0)))
 const itemCount = computed(() => detail.value?.items.reduce((n, i) => n + i.quantity, 0) ?? 0)
 
 const paymentLabels: Record<string, string> = { cash: 'Cash', card: 'Card', ewallet: 'E-Wallet' }
@@ -123,6 +129,7 @@ onUnmounted(() => clearTimeout(copiedTimer))
         <div class="text-right shrink-0">
           <span v-if="status?.toLowerCase() === 'refunded'" class="inline-block mb-1 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300">REFUNDED</span>
           <span v-else-if="status?.toLowerCase() === 'voided'" class="inline-block mb-1 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-300">VOIDED</span>
+          <span v-else-if="isPartlyRefunded" class="inline-block mb-1 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300">PARTLY REFUNDED</span>
           <span v-else-if="!isSettled" class="inline-block mb-1 text-[11px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-50 text-red-800 border border-red-200">{{ status }}</span>
           <p class="font-display text-[1.75rem] leading-none font-semibold tabular-nums tracking-tight" :class="isSettled ? 'text-[#7B5A50]' : 'text-[#8A6E64] line-through'">
             {{ formatCurrency(detail?.total_amount ?? preview.total_amount) }}
@@ -164,6 +171,9 @@ onUnmounted(() => clearTimeout(copiedTimer))
               <p class="text-base font-semibold text-[#2d201b] leading-snug break-words">{{ item.menu_name }}</p>
               <p v-if="lineDetails(item)" class="text-sm text-[#6B5048] leading-snug break-words">{{ lineDetails(item) }}</p>
               <p v-if="item.quantity > 1" class="text-sm text-[#8A6E64] tabular-nums">{{ formatCurrency(item.unit_price) }} each</p>
+              <p v-if="item.refunded_quantity" class="text-sm font-semibold text-amber-800 tabular-nums">
+                {{ item.refunded_quantity >= item.quantity ? 'Refunded' : `${item.refunded_quantity} of ${item.quantity} refunded` }}
+              </p>
             </div>
             <span class="text-base font-semibold text-[#2d201b] tabular-nums text-right">{{ formatCurrency(item.line_total) }}</span>
           </li>
@@ -184,6 +194,16 @@ onUnmounted(() => clearTimeout(copiedTimer))
           <dt>Total</dt>
           <dd>{{ formatCurrency(detail.total_amount) }}</dd>
         </div>
+        <template v-if="isPartlyRefunded && refundedAmount > 0">
+          <div class="flex justify-between text-amber-800">
+            <dt>Refunded</dt>
+            <dd>&minus; {{ formatCurrency(refundedAmount) }}</dd>
+          </div>
+          <div class="flex justify-between items-baseline text-base font-semibold text-[#2d201b]">
+            <dt>Kept</dt>
+            <dd>{{ formatCurrency(detail.total_amount - refundedAmount) }}</dd>
+          </div>
+        </template>
       </dl>
 
       <!-- Payment -->
@@ -298,8 +318,10 @@ onUnmounted(() => clearTimeout(copiedTimer))
           View Receipt
         </button>
 
-        <div v-if="isSettled" class="grid grid-cols-2 gap-2.5">
+        <div v-if="canRefundMore" class="grid gap-2.5" :class="isPartlyRefunded ? 'grid-cols-1' : 'grid-cols-2'">
+          <!-- A partly refunded sale can't be voided: refund the rest instead -->
           <button
+            v-if="!isPartlyRefunded"
             type="button"
             @click="openRefund('void')"
             class="w-full h-11 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5 focus:ring-2 focus:ring-amber-600/30 active:scale-[0.99]"
@@ -313,19 +335,19 @@ onUnmounted(() => clearTimeout(copiedTimer))
             type="button"
             @click="openRefund('refund')"
             class="w-full h-11 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5 focus:ring-2 focus:ring-red-600/30 active:scale-[0.99]"
-            title="Refund this sale (Requires Manager PIN)"
+            title="Refund some or all items (Requires Manager PIN)"
           >
             <Icon name="heroicons:arrow-uturn-left" class="w-4 h-4 text-red-600" />
-            Refund Sale
+            {{ isPartlyRefunded ? 'Refund More Items' : 'Refund Items' }}
           </button>
         </div>
       </section>
 
-      <section v-if="detail && status?.toLowerCase() === 'refunded'" class="mx-5 mt-0 mb-6 p-3.5 rounded-lg bg-amber-50 border border-amber-200">
+      <section v-if="detail && (status?.toLowerCase() === 'refunded' || isPartlyRefunded)" class="mx-5 mt-0 mb-6 p-3.5 rounded-lg bg-amber-50 border border-amber-200">
         <div class="flex items-start gap-2.5">
           <Icon name="heroicons:information-circle" class="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
           <div>
-            <p class="text-xs font-bold text-amber-900 uppercase tracking-wide">Sale Refunded</p>
+            <p class="text-xs font-bold text-amber-900 uppercase tracking-wide">{{ isPartlyRefunded ? 'Some Items Refunded' : 'Sale Refunded' }}</p>
             <p v-if="detail.walk_in_note" class="text-xs text-amber-800 mt-0.5 break-words">{{ detail.walk_in_note }}</p>
             <p v-else class="text-xs text-amber-800 mt-0.5">This transaction has been refunded by a manager. Serving quantities were restored to inventory.</p>
           </div>
