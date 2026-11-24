@@ -106,6 +106,13 @@ export class OwnerProfileService extends BaseService {
         return this.patch<{ success: boolean; message: string; branch?: any }>(`/owner/branches/${uuid}`, payload)
     }
 
+    // Contact email, phone and picture. PHP only parses multipart bodies on POST, so the
+    // PATCH is sent as POST with Laravel's _method override. 422 carries errors.<field>.
+    updateBranchDetails(uuid: string, form: FormData) {
+        form.set('_method', 'PATCH')
+        return this.post<{ success: boolean; message: string; branch?: any }>(`/owner/branches/${uuid}`, form)
+    }
+
     // The cafe's week (Monday first). useOperatingHours converts it for the UI.
     getOperatingHours() {
         return this.get<{ success: boolean; data?: ApiOpeningHour[] }>('/owner/opening-hours')

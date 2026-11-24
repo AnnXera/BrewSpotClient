@@ -39,6 +39,7 @@ const categoryTabs: { value: ActivityCategory | null; label: string; key: 'all' 
   { value: 'servings', label: 'Servings', key: 'servings' },
   { value: 'floor_plans', label: 'Floor plans', key: 'floor_plans' },
   { value: 'reservations', label: 'Reservations', key: 'reservations' },
+  { value: 'branch', label: 'Branch details', key: 'branch' },
   { value: 'auth', label: 'Dashboard sign-ins', key: 'auth' },
 ]
 
@@ -73,8 +74,8 @@ const scopeLabel = computed(() => {
 })
 
 const note = computed(() => isOwner.value
-  ? 'Who signed in or out, who used a register, and who changed employees, the menu, servings, floor plans or reservations. Newest first.'
-  : 'Who used this branch\'s registers, and who changed its employees, servings, floor plans or reservations. Menu changes the owner made for the whole cafe are listed too. Newest first.')
+  ? 'Who signed in or out, who used a register, and who changed employees, the menu, servings, floor plans, reservations or branch details. Newest first.'
+  : 'Who used this branch\'s registers, and who changed its employees, servings, floor plans, reservations or details. Menu changes the owner made for the whole cafe are listed too. Newest first.')
 
 // ── Loading ──
 const data = ref<ActivityLogResponse | null>(null)
@@ -182,6 +183,7 @@ const ACTIONS: Record<string, { label: string; icon: string; tone: string }> = {
   'menu.category_created': { label: 'Category added', icon: 'heroicons:plus-circle', tone: ADD },
   'menu.category_updated': { label: 'Category edited', icon: 'heroicons:pencil-square', tone: EDIT },
   'menu.category_deleted': { label: 'Category deleted', icon: 'heroicons:trash', tone: REMOVE },
+  'branch.details_updated': { label: 'Branch details edited', icon: 'heroicons:building-storefront', tone: EDIT },
 }
 // Availability rows: on or off at a branch.
 function actionInfo(l: ActivityLogRow) {
@@ -220,7 +222,7 @@ function toggle(uuid: string) {
 // Lines under "Show changes": a category save's items, the days a schedule change touched, or what a reservation edit changed.
 function detailLines(l: ActivityLogRow): string[] {
   if (l.meta?.items?.length) return l.meta.items.map(changeLine)
-  if (l.action === 'reservation.updated' && l.meta?.changes?.length) {
+  if ((l.action === 'reservation.updated' || l.action === 'branch.details_updated') && l.meta?.changes?.length) {
     return l.meta.changes.map(c => ('before' in c || 'after' in c)
       ? `${c.field}: ${c.before || 'none'} → ${c.after || 'none'}`
       : `${c.field} changed`)

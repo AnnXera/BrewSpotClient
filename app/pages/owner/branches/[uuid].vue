@@ -95,6 +95,31 @@ async function fetchBranch() {
 
 const { openDocument } = useDocumentViewer()
 
+// ── Edit contact details (email, phone, picture) ──
+const showEditContact = ref(false)
+const toastMessage = ref('')
+let toastTimer: ReturnType<typeof setTimeout> | undefined
+
+function showToast(msg: string) {
+  toastMessage.value = msg
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toastMessage.value = '' }, 4000)
+}
+onBeforeUnmount(() => clearTimeout(toastTimer))
+
+function onContactSaved(updated: Partial<BranchDetail> | undefined) {
+  showEditContact.value = false
+  if (branch.value && updated) {
+    branch.value = {
+      ...branch.value,
+      cafe_email: updated.cafe_email ?? branch.value.cafe_email,
+      cafe_phonenumber: updated.cafe_phonenumber ?? branch.value.cafe_phonenumber,
+      cafe_picture_url: updated.cafe_picture_url ?? branch.value.cafe_picture_url,
+    }
+  }
+  showToast('Branch details updated. Managers have been notified.')
+}
+
 onMounted(fetchBranch)
 </script>
 
@@ -245,6 +270,15 @@ onMounted(fetchBranch)
                       {{ branch.branch_type }}
                     </span>
                     <StatusBadge :status="branch.status" />
+                    <button
+                      v-if="isOperational"
+                      type="button"
+                      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#DED4CA] bg-white text-xs font-semibold text-[#5B463C] hover:border-[#7D5A50] hover:bg-[#F8EFE7] transition-colors"
+                      @click="showEditContact = true"
+                    >
+                      <Icon name="heroicons:pencil-square" class="size-3.5 text-[#7D5A50]" />
+                      <span>Edit</span>
+                    </button>
                   </div>
                 </div>
 
@@ -371,6 +405,30 @@ onMounted(fetchBranch)
         </div>
       </Transition>
     </main>
+
+    <CafeManagementEditBranchContactModal
+      v-if="branch"
+      :show="showEditContact"
+      :branch="branch"
+      @close="showEditContact = false"
+      @saved="onContactSaved"
+    />
+
+    <Teleport to="body">
+      <transition
+        enter-active-class="transition duration-300 ease-out"
+        enter-from-class="opacity-0 -translate-y-2"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition duration-200 ease-in"
+        leave-from-class="opacity-100 translate-y-0"
+        leave-to-class="opacity-0 -translate-y-2"
+      >
+        <div v-if="toastMessage" role="status" aria-live="polite" class="fixed top-6 right-6 z-[3100] bg-[#7D5A50] text-[#FFF8EA] px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-[#B4846C]">
+          <Icon name="heroicons:check-circle" class="w-5 h-5 text-emerald-400 shrink-0" />
+          <span class="text-sm font-bold">{{ toastMessage }}</span>
+        </div>
+      </transition>
+    </Teleport>
   </div>
 </template>
 

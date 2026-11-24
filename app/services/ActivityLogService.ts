@@ -3,7 +3,7 @@ import { BaseService } from './BaseService'
 
 // Activity Log pages (owner: whole cafe; manager: one branch): who signed in or out, who used
 // a register, and who changed servings, floor plans, employees or the menu. Dates are Y-m-d and inclusive; no branch means every branch.
-export type ActivityCategory = 'auth' | 'pos' | 'servings' | 'floor_plans' | 'reservations' | 'employees' | 'menu'
+export type ActivityCategory = 'auth' | 'pos' | 'servings' | 'floor_plans' | 'reservations' | 'employees' | 'menu' | 'branch'
 export type ActivityRole = 'owner' | 'manager' | 'cashier'
 
 export interface ActivityLogQuery {
@@ -40,6 +40,7 @@ export interface ActivityLogRow {
     // | menu.item_created | menu.item_updated | menu.item_deleted | menu.item_availability
     // | menu.category_created | menu.category_updated | menu.category_deleted | menu.category_availability
     // | reservation.created | reservation.updated | reservation.cancelled
+    // | branch.details_updated
     action: string
     description: string
     actor: { name: string | null; role: string | null }
@@ -50,7 +51,7 @@ export interface ActivityLogRow {
         items?: ServingChange[] // serving.category_saved
         before?: Record<string, any> // employee.schedule_updated: day name => "08:00-17:00" | "Day off"
         after?: Record<string, any>
-        changes?: ReservationChange[] // reservation.updated
+        changes?: ReservationChange[] // reservation.updated, branch.details_updated
     }) | null
 }
 
