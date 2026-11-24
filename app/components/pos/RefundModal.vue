@@ -87,7 +87,7 @@ const left = (i: Line) => Math.max(0, i.quantity - (i.refunded_quantity ?? 0))
 const refundable = computed(() => items.value.filter(i => left(i) > 0))
 const alreadyRefunded = computed(() => (props.transaction.refunded_amount ?? 0) > 0)
 
-// Line uuid -> how many to refund. Starts with everything still refundable.
+// Line uuid -> how many to refund. Starts at 0 for every item; the cashier adds with the stepper.
 const picked = ref<Record<string, number>>({})
 function pickAll() {
   picked.value = Object.fromEntries(refundable.value.map(i => [i.uuid, left(i)]))
@@ -167,7 +167,7 @@ watch(() => props.show, (val) => {
     reason.value = ''
     selectedReasonChip.value = ''
     wasMade.value = true
-    pickAll()
+    pickNone()
     errorMessage.value = ''
     attemptsLeft.value = null
     successMessage.value = ''
@@ -179,7 +179,7 @@ let closeTimer: ReturnType<typeof setTimeout> | undefined
 
 onMounted(() => {
   if (props.show) {
-    pickAll()
+    pickNone()
     fetchManagers()
   }
   window.addEventListener('keydown', handleKeyDown)
