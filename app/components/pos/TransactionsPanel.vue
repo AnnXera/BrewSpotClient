@@ -8,6 +8,7 @@ interface PosTransaction {
   created_at: string
   staff_name: string
   total_amount: number
+  refunded_amount?: number // partly refunded sales: what was given back
   status: string
   order_type?: string | null
   items_count: number
@@ -74,7 +75,7 @@ const hours = computed(() => {
     const h = new Date(t.created_at).getHours()
     const slot = byHour.get(h) ?? { count: 0, total: 0 }
     slot.count++
-    slot.total += t.total_amount
+    slot.total += amountOf(t)
     byHour.set(h, slot)
   }
   const seen = [...byHour.keys(), new Date().getHours()]
@@ -119,7 +120,7 @@ const filteredSales = computed(() => {
 })
 
 const isFiltered = computed(() => selectedHour.value !== null || searchQuery.value.trim() !== '')
-const filteredTotal = computed(() => filteredSales.value.reduce((sum, t) => sum + t.total_amount, 0))
+const filteredTotal = computed(() => filteredSales.value.reduce((sum, t) => sum + amountOf(t), 0))
 
 // Ledger grouped by hour, newest hour first.
 const groups = computed(() => {
@@ -132,7 +133,7 @@ const groups = computed(() => {
       out.push(group)
     }
     group.sales.push(t)
-    group.total += t.total_amount
+    group.total += amountOf(t)
   }
   return out
 })
@@ -142,7 +143,10 @@ function clearFilters() {
   selectedHour.value = null
 }
 
-const isSettled = (status: string) => ['completed', 'paid'].includes(status?.toLowerCase())
+const isSettled = (status: string) => ['completed', 'paid', 'partially_refunded'].includes(status?.toLowerCase())
+const isPartlyRefunded = (t: PosTransaction) => t.status?.toLowerCase() === 'partially_refunded'
+// Partly refunded sales count what they kept.
+const amountOf = (t: PosTransaction) => isPartlyRefunded(t) ? t.total_amount - (t.refunded_amount ?? 0) : t.total_amount
 
 // Tapping a sale opens its details over the list; the list stays mounted so its scroll and filters survive.
 const openSale = ref<PosTransaction | null>(null)
@@ -306,7 +310,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown, true))
                 <li v-for="txn in group.sales" :key="txn.uuid" class="mx-2">
                   <div
                     @click="viewSale(txn, $event)"
-                    :aria-label="`View sale #${txn.receipt_number || txn.uuid}, ${formatTime(txn.created_at)}, ${formatCurrency(txn.total_amount)}`"
+                    :aria-label="`View sale #${txn.receipt_number || txn.uuid}, ${formatTime(txn.created_at)}, ${formatCurrency(amountOf(txn))}`"
                     role="button"
                     tabindex="0"
                     class="txn-row w-full text-left px-3 py-3 rounded-md flex items-center justify-between gap-x-3 hover:bg-[#FBF7F2] active:bg-[#F3EBE2] transition-colors cursor-pointer select-none"
@@ -327,6 +331,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown, true))
                           <span v-else-if="txn.status?.toLowerCase() === 'voided'" class="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-300">
                             VOIDED
                           </span>
+                          <span v-else-if="isPartlyRefunded(txn)" class="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300">
+                            PARTLY REFUNDED
+                          </span>
                           <span v-else-if="!isSettled(txn.status)" class="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-50 text-red-800 border border-red-200">
                             {{ txn.status }}
                           </span>
@@ -337,7 +344,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown, true))
 
                     <div class="flex items-center gap-2.5 shrink-0">
                       <span class="text-sm font-semibold tabular-nums text-right" :class="isSettled(txn.status) ? 'text-[#2d201b]' : 'line-through text-[#8A6E64]'">
-                        {{ formatCurrency(txn.total_amount) }}
+                        {{ formatCurrency(amountOf(txn)) }}
+                        <span v-if="isPartlyRefunded(txn)" class="block text-[11px] font-normal text-[#8A6E64] line-through">{{ formatCurrency(txn.total_amount) }}</span>
                       </span>
                       <Icon name="heroicons:chevron-right" class="w-4 h-4 text-[#B89A8E] shrink-0" />
                     </div>

@@ -43,6 +43,7 @@ export interface PosTransactionDetail {
     discount_id_number?: string | null
     discount_id_image?: string | null
     total_amount: number
+    refunded_amount?: number // running money refunded, item by item
     payment: { method: string; reference_number: string | null; amount_tendered: number; change: number } | null
     items: {
         uuid: string
@@ -50,6 +51,7 @@ export interface PosTransactionDetail {
         size_name: string | null
         temperature: string | null // hot or iced, on items sold both ways
         quantity: number
+        refunded_quantity?: number // how many of the line were refunded already
         unit_price: number
         line_total: number
         addons: { name: string; quantity: number; price: number }[]
@@ -68,6 +70,7 @@ export interface SpoilageLog {
     unit_value: number | null // price per serving kept when logged (size price, else base price)
     reason: SpoilageReason | null
     logged_by: string | null
+    approved_by?: string | null // manager or owner who approved it with their PIN
     device_name: string | null
     voided_at: string | null
     voided_by: string | null
@@ -170,12 +173,15 @@ export class DevicePosService extends BaseService {
     }
 
     // sizeUuid is required for items that come in sizes, and must be null otherwise.
-    logSpoilage(menuItemUuid: string, sizeUuid: string | null, quantity: number, reason: SpoilageReason | null) {
+    // A manager or the owner approves the entry with their PIN.
+    logSpoilage(menuItemUuid: string, sizeUuid: string | null, quantity: number, reason: SpoilageReason, managerUuid: string, pin: string) {
         return this.post<{ success: boolean; message: string; log: SpoilageLog }>('/pos/device/spoilage', {
             menu_item_uuid: menuItemUuid,
             size_uuid: sizeUuid,
             quantity,
             reason,
+            manager_uuid: managerUuid,
+            pin,
         })
     }
 
@@ -208,12 +214,14 @@ export class DevicePosService extends BaseService {
     }
 
     // restock: the order was never made, so its servings go back on sale; otherwise they count as refunded (still used up).
-    refundTransaction(transactionUuid: string, managerUuid: string, pin: string, reason?: string, restock = false) {
-        return this.post<{ success: boolean; message: string; transaction?: PosTransactionDetail }>('/pos/device/transactions/' + transactionUuid + '/refund', {
+    // items: which lines and how many; left out, everything not refunded yet.
+    refundTransaction(transactionUuid: string, managerUuid: string, pin: string, reason?: string, restock = false, items?: { uuid: string; quantity: number }[]) {
+        return this.post<{ success: boolean; message: string; refunded_amount?: number; transaction?: PosTransactionDetail }>('/pos/device/transactions/' + transactionUuid + '/refund', {
             manager_uuid: managerUuid,
             pin,
             reason,
             restock,
+            ...(items ? { items } : {}),
         })
     }
 

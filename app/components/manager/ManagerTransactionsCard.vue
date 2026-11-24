@@ -125,6 +125,7 @@ function statusBadgeClass(status: string) {
     case 'paid':
       return 'bg-emerald-50 text-emerald-700 border-emerald-200'
     case 'refunded':
+    case 'partially_refunded':
       return 'bg-amber-50 text-amber-700 border-amber-200'
     case 'void':
       return 'bg-rose-50 text-rose-700 border-rose-200'
@@ -333,13 +334,14 @@ function paymentIcon(method: string) {
 
             <!-- Total Amount -->
             <td class="py-3 px-4 text-right font-display font-bold text-[#2D201B] tabular-nums whitespace-nowrap">
-              {{ formatPesoCents(tx.total_amount) }}
+              {{ formatPesoCents(tx.status === 'partially_refunded' ? tx.total_amount - (tx.refunded_amount ?? 0) : tx.total_amount) }}
+              <span v-if="tx.status === 'partially_refunded'" class="block text-[11px] font-sans font-normal text-[#8A6E64] line-through">{{ formatPesoCents(tx.total_amount) }}</span>
             </td>
 
             <!-- Status -->
             <td class="py-3 px-4 text-center whitespace-nowrap">
               <span :class="['px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize border', statusBadgeClass(tx.status)]">
-                {{ tx.status }}
+                {{ tx.status.replace(/_/g, ' ') }}
               </span>
             </td>
 

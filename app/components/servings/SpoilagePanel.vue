@@ -39,7 +39,7 @@ function time(iso: string) {
             <span class="shrink-0">{{ time(e.created_at) }}</span>
           </div>
           <p class="font-display text-[12px] text-[#9E7060]">
-            <template v-if="e.reason">{{ spoilageReasonLabels[e.reason] }} &bull; </template>{{ e.logged_by ?? 'Unknown' }}<template v-if="e.device_name"> on {{ e.device_name }}</template>
+            <template v-if="e.reason">{{ spoilageReasonLabels[e.reason] }} &bull; </template>{{ e.logged_by ?? 'Unknown' }}<template v-if="e.device_name"> on {{ e.device_name }}</template><template v-if="e.approved_by">, approved by {{ e.approved_by }}</template>
           </p>
           <p v-if="e.voided_at" class="font-display text-[12px] font-semibold text-[#7D5A50]">
             Voided by {{ e.voided_by ?? 'a manager' }} at {{ time(e.voided_at) }}

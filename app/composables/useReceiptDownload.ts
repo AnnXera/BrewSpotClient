@@ -71,7 +71,7 @@ export function useReceiptDownload() {
       if (data.discountAmount && data.discountAmount > 0) estimatedHeight += 24
       if (data.referenceNumber) estimatedHeight += 20
       if (data.walkInNote) estimatedHeight += 28
-      if (data.status && data.status.toLowerCase() === 'refunded') estimatedHeight += 30
+      if (data.status && ['refunded', 'partially_refunded'].includes(data.status.toLowerCase())) estimatedHeight += 30
 
       const height = Math.max(estimatedHeight, 520)
 
@@ -175,11 +175,11 @@ export function useReceiptDownload() {
       ctx.fillText(orderTypeDisplay, rightX, y)
       y += 18
 
-      if (data.status && data.status.toLowerCase() === 'refunded') {
+      if (data.status && ['refunded', 'partially_refunded'].includes(data.status.toLowerCase())) {
         ctx.textAlign = 'center'
         ctx.fillStyle = '#92400E'
         ctx.font = 'bold 12px "Inter", sans-serif'
-        ctx.fillText('** SALE REFUNDED **', centerX, y)
+        ctx.fillText(data.status.toLowerCase() === 'partially_refunded' ? '** PARTLY REFUNDED **' : '** SALE REFUNDED **', centerX, y)
         y += 18
       }
 
@@ -408,8 +408,8 @@ export function useReceiptDownload() {
       rows.push(line('Date:', formatDate(data.date)))
       rows.push(line('Cashier:', data.cashier))
       rows.push(line('Order Type:', (data.orderType || 'dine_in').replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())))
-      if (data.status && data.status.toLowerCase() === 'refunded') {
-        rows.push(center('** SALE REFUNDED **'))
+      if (data.status && ['refunded', 'partially_refunded'].includes(data.status.toLowerCase())) {
+        rows.push(center(data.status.toLowerCase() === 'partially_refunded' ? '** PARTLY REFUNDED **' : '** SALE REFUNDED **'))
       }
       rows.push(divider)
       rows.push(line('ITEM', 'AMOUNT'))

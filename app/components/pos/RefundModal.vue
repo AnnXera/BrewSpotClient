@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Refund a whole sale. Left side is the cashier's part (what, made or not, why);
-// right side is handed to the manager, who approves with their PIN.
+// Refund some or all of a sale's items, or void the whole sale. Left side is the cashier's
+// part (which items, made or not, why); right side is handed to the manager, who approves with their PIN.
 import type { PosTransactionDetail } from '~/services/PosService'
 import { variantLabel } from '~/utils/variant'
 
@@ -80,6 +80,43 @@ const formattedReceipt = computed(() => {
 const items = computed(() => props.transaction.items ?? [])
 const itemCount = computed(() => items.value.reduce((n, i) => n + i.quantity, 0))
 
+type Line = PosTransactionDetail['items'][number]
+
+// ── Which items to refund (refunds only; a void takes everything) ──
+const left = (i: Line) => Math.max(0, i.quantity - (i.refunded_quantity ?? 0))
+const refundable = computed(() => items.value.filter(i => left(i) > 0))
+const alreadyRefunded = computed(() => (props.transaction.refunded_amount ?? 0) > 0)
+
+// Line uuid -> how many to refund. Starts with everything still refundable.
+const picked = ref<Record<string, number>>({})
+function pickAll() {
+  picked.value = Object.fromEntries(refundable.value.map(i => [i.uuid, left(i)]))
+}
+function pickNone() {
+  picked.value = {}
+}
+function setPicked(i: Line, n: number) {
+  const q = Math.min(left(i), Math.max(0, n))
+  const next = { ...picked.value }
+  if (q > 0) next[i.uuid] = q
+  else delete next[i.uuid]
+  picked.value = next
+}
+const pickedCount = computed(() => Object.values(picked.value).reduce((a, n) => a + n, 0))
+const pickedAll = computed(() => refundable.value.every(i => (picked.value[i.uuid] ?? 0) === left(i)))
+
+// Same math as the server: each item less its share of the discount; the refund that
+// empties the sale returns exactly what is left.
+const remaining = computed(() => Math.round(((props.transaction.total_amount ?? 0) - (props.transaction.refunded_amount ?? 0)) * 100) / 100)
+const refundEstimate = computed(() => {
+  if (isVoid.value) return props.transaction.total_amount
+  if (pickedAll.value) return remaining.value
+  const subtotal = items.value.reduce((a, i) => a + i.unit_price * i.quantity, 0)
+  const ratio = subtotal > 0 ? props.transaction.total_amount / subtotal : 0
+  const amount = items.value.reduce((a, i) => a + Math.round(i.unit_price * (picked.value[i.uuid] ?? 0) * ratio * 100) / 100, 0)
+  return Math.min(Math.round(amount * 100) / 100, remaining.value)
+})
+
 const paymentLabels: Record<string, string> = { cash: 'Cash', card: 'Card', ewallet: 'E-Wallet' }
 const paymentLabel = computed(() => {
   const method = props.transaction.payment?.method
@@ -130,6 +167,7 @@ watch(() => props.show, (val) => {
     reason.value = ''
     selectedReasonChip.value = ''
     wasMade.value = true
+    pickAll()
     errorMessage.value = ''
     attemptsLeft.value = null
     successMessage.value = ''
@@ -140,7 +178,10 @@ watch(() => props.show, (val) => {
 let closeTimer: ReturnType<typeof setTimeout> | undefined
 
 onMounted(() => {
-  if (props.show) fetchManagers()
+  if (props.show) {
+    pickAll()
+    fetchManagers()
+  }
   window.addEventListener('keydown', handleKeyDown)
 })
 
@@ -209,6 +250,7 @@ const canSubmit = computed(() => {
     !!selectedManagerUuid.value &&
     pin.value.length >= 4 &&
     (!reasonRequired.value || hasReason.value) &&
+    (isVoid.value || pickedCount.value > 0) &&
     !loading.value &&
     !successMessage.value
   )
@@ -217,6 +259,7 @@ const canSubmit = computed(() => {
 // What the confirm button needs before it can be pressed, said plainly.
 const submitHint = computed(() => {
   if (successMessage.value) return ''
+  if (!isVoid.value && pickedCount.value === 0) return 'Pick the items to refund'
   if (reasonRequired.value && !hasReason.value) return isVoid.value ? 'Pick or type a reason for the void' : 'Pick or type a reason for the refund'
   if (!selectedManagerUuid.value) return 'Pick a manager to approve'
   if (pin.value.length < 4) return isVoid.value ? 'Enter PIN to void' : 'Enter PIN to refund'
@@ -243,7 +286,8 @@ async function submitRefund() {
           selectedManagerUuid.value,
           pin.value,
           effectiveReason.value,
-          !wasMade.value
+          !wasMade.value,
+          Object.entries(picked.value).map(([uuid, quantity]) => ({ uuid, quantity }))
         )
 
     if (res.success) {
@@ -285,7 +329,7 @@ async function submitRefund() {
       <header class="shrink-0 flex items-center gap-4 pl-6 pr-3 py-4 border-b border-[#EADFD3]">
         <div class="min-w-0 flex-1">
           <h3 id="refund-modal-title" class="font-display text-xl font-semibold text-[#2d201b] leading-tight">
-            {{ isVoid ? 'Void sale' : 'Refund sale' }} {{ formattedReceipt }}
+            {{ isVoid ? 'Void sale' : 'Refund items' }} {{ formattedReceipt }}
           </h3>
           <p class="text-sm text-[#6B5048] mt-0.5 truncate">
             Rung up by {{ transaction.staff_name }} &middot; {{ paymentLabel }}
@@ -294,7 +338,10 @@ async function submitRefund() {
         <div class="text-right shrink-0">
           <p class="text-xs font-semibold text-[#8A6E64]">{{ isVoid ? 'Void total' : 'Back to customer' }}</p>
           <p class="font-display text-[1.75rem] leading-none font-semibold tabular-nums tracking-tight text-[#2d201b]">
-            {{ formatCurrency(transaction.total_amount) }}
+            {{ formatCurrency(refundEstimate) }}
+          </p>
+          <p v-if="!isVoid && alreadyRefunded" class="mt-1 text-[11px] text-[#8A6E64] tabular-nums">
+            {{ formatCurrency(transaction.refunded_amount ?? 0) }} refunded before
           </p>
         </div>
         <button
@@ -315,11 +362,22 @@ async function submitRefund() {
 
           <section aria-labelledby="refund-items-heading" class="md:min-h-0 md:flex-1 flex flex-col">
             <div class="flex items-baseline justify-between mb-1">
-              <h4 id="refund-items-heading" class="text-sm font-semibold text-[#2d201b]">{{ isVoid ? "What's being voided" : "What's being refunded" }}</h4>
-              <span class="text-sm text-[#8A6E64] tabular-nums">{{ itemCount }} {{ itemCount === 1 ? 'item' : 'items' }}</span>
+              <h4 id="refund-items-heading" class="text-sm font-semibold text-[#2d201b]">{{ isVoid ? "What's being voided" : 'Which items are being refunded?' }}</h4>
+              <span v-if="isVoid" class="text-sm text-[#8A6E64] tabular-nums">{{ itemCount }} {{ itemCount === 1 ? 'item' : 'items' }}</span>
+              <button
+                v-else-if="refundable.length"
+                type="button"
+                :disabled="busy"
+                class="min-h-9 px-2 -mr-2 rounded-lg text-sm font-semibold text-[#7B5A50] hover:bg-[#F3EBE2] disabled:opacity-50"
+                @click="pickedAll ? pickNone() : pickAll()"
+              >
+                {{ pickedAll ? 'Clear all' : 'Select all' }}
+              </button>
             </div>
             <p v-if="!items.length" class="py-3 text-sm text-[#6B5048]">No items were recorded on this sale.</p>
-            <ul v-else class="divide-y divide-[#F3EBE2] max-h-52 md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto refund-scroll -mr-2 pr-2">
+
+            <!-- Void: the whole sale, as it was rung up -->
+            <ul v-else-if="isVoid" class="divide-y divide-[#F3EBE2] max-h-52 md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto refund-scroll -mr-2 pr-2">
               <li v-for="item in items" :key="item.uuid" class="py-2.5 grid grid-cols-[2rem_1fr_auto] gap-x-3 items-start">
                 <span class="text-sm font-semibold text-[#7B5A50] tabular-nums">{{ item.quantity }}&times;</span>
                 <div class="min-w-0">
@@ -329,6 +387,56 @@ async function submitRefund() {
                 <span class="text-sm font-semibold text-[#2d201b] tabular-nums text-right">{{ formatCurrency(item.line_total) }}</span>
               </li>
             </ul>
+
+            <!-- Refund: pick how many of each item come back -->
+            <ul v-else class="divide-y divide-[#F3EBE2] max-h-64 md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto refund-scroll -mr-2 pr-2">
+              <li
+                v-for="item in items"
+                :key="item.uuid"
+                class="py-2.5 flex items-center gap-3"
+                :class="left(item) === 0 ? 'opacity-55' : ''"
+              >
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-semibold text-[#2d201b] leading-snug break-words">{{ item.menu_name }}</p>
+                  <p class="text-xs text-[#6B5048] leading-snug break-words">
+                    <span class="tabular-nums">{{ formatCurrency(item.unit_price) }} each</span>
+                    <template v-if="lineDetails(item)"> · {{ lineDetails(item) }}</template>
+                  </p>
+                  <p v-if="item.refunded_quantity" class="text-xs font-medium text-red-800 tabular-nums">
+                    {{ left(item) === 0 ? 'Already refunded' : `${item.refunded_quantity} of ${item.quantity} refunded before` }}
+                  </p>
+                </div>
+
+                <!-- Stepper: 0 up to what is still refundable -->
+                <div v-if="left(item) > 0" class="shrink-0 flex items-center gap-1" role="group" :aria-label="`${item.menu_name}: how many to refund`">
+                  <button
+                    type="button"
+                    :disabled="busy || !(picked[item.uuid] ?? 0)"
+                    class="key w-11 h-11 rounded-lg border border-[#E2D5C8] bg-white flex items-center justify-center text-[#2d201b]"
+                    :aria-label="`One fewer ${item.menu_name}`"
+                    @click="setPicked(item, (picked[item.uuid] ?? 0) - 1)"
+                  >
+                    <Icon name="heroicons:minus" class="w-4 h-4" />
+                  </button>
+                  <span class="w-14 text-center text-sm tabular-nums" aria-live="polite">
+                    <span class="font-semibold text-[#2d201b]">{{ picked[item.uuid] ?? 0 }}</span>
+                    <span class="text-[#8A6E64]"> / {{ left(item) }}</span>
+                  </span>
+                  <button
+                    type="button"
+                    :disabled="busy || (picked[item.uuid] ?? 0) >= left(item)"
+                    class="key w-11 h-11 rounded-lg border border-[#E2D5C8] bg-white flex items-center justify-center text-[#2d201b]"
+                    :aria-label="`One more ${item.menu_name}`"
+                    @click="setPicked(item, (picked[item.uuid] ?? 0) + 1)"
+                  >
+                    <Icon name="heroicons:plus" class="w-4 h-4" />
+                  </button>
+                </div>
+              </li>
+            </ul>
+            <p v-if="!isVoid && transaction.discount_amount > 0" class="pt-2 text-xs text-[#6B5048]">
+              Each item returns its price less its share of the {{ transaction.discount_type || '' }} discount.
+            </p>
             <dl v-if="transaction.discount_amount > 0" class="pt-2 mt-1 border-t border-[#EADFD3] space-y-1 text-sm tabular-nums">
               <div class="flex justify-between text-[#6B5048]">
                 <dt>Subtotal</dt>
@@ -556,7 +664,7 @@ async function submitRefund() {
               <template v-if="successMessage">{{ isVoid ? 'Voided' : 'Refunded' }}</template>
               <template v-else-if="loading">{{ isVoid ? 'Processing void' : 'Processing refund' }}</template>
               <template v-else-if="submitHint">{{ submitHint }}</template>
-              <template v-else>{{ isVoid ? 'Void Sale' : 'Refund' }} {{ formatCurrency(transaction.total_amount) }}</template>
+              <template v-else>{{ isVoid ? 'Void Sale' : `Refund ${pickedCount} ${pickedCount === 1 ? 'item' : 'items'}` }} {{ formatCurrency(refundEstimate) }}</template>
             </button>
           </div>
         </section>
