@@ -136,18 +136,9 @@ export interface ApprovalSnapshotResponse {
     }
 }
 
-export interface ApplicationHistoryEntry {
-    approval_uuid: string
-    status: string
-    reason: string | null
-    reviewed_at: string | null
-    reviewer: string | null
-    cafe_name: string | null
-    branch_name: string | null
-    branch_type: string | null
-    is_archived: boolean
-    submitted_at: string | null
-}
+// Same shape as owner details' application_history (see components/owner-detail/ApplicationHistory.vue).
+import type { ApplicationHistoryEntry } from '~/components/owner-detail/ApplicationHistory.vue'
+export type { ApplicationHistoryEntry }
 
 export class OwnerManagementService extends BaseService {
     stats() {
@@ -194,7 +185,12 @@ export class OwnerManagementService extends BaseService {
         return this.get<{ success: boolean; history: ApplicationHistoryEntry[] }>(`/admin/owners/${uuid}/application-history`)
     }
 
-    updateBranchStatus(uuid: string, status: 'approved' | 'rejected', reason?: string) {
-        return this.patch<{ success: boolean; message: string }>(`/admin/branches/${uuid}/status`, { status, reason })
+    /** allowResubmit applies to rejections: false makes it final (the owner can only delete the branch) */
+    updateBranchStatus(uuid: string, status: 'approved' | 'rejected', reason?: string, allowResubmit = true) {
+        return this.patch<{ success: boolean; message: string }>(`/admin/branches/${uuid}/status`, {
+            status,
+            reason,
+            ...(status === 'rejected' ? { allow_resubmit: allowResubmit } : {}),
+        })
     }
 }

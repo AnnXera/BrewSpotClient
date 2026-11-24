@@ -223,7 +223,13 @@ function viewCafePicture() {
               </div>
 
               <!-- Review Info -->
-              <template v-if="approval.status !== 'pending_approval'">
+              <p
+                v-if="approval.status === 'withdrawn'"
+                class="mt-[24px] rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] px-[20px] py-[12px] font-display text-[14px] text-[#7D5A50]"
+              >
+                The owner withdrew this branch before it was reviewed.
+              </p>
+              <template v-else-if="approval.status !== 'pending_approval'">
                 <h3 class="font-display text-[18px] font-bold text-[#3D2B24] mb-[16px] mt-[24px]">
                   Review Information
                 </h3>
@@ -247,6 +253,14 @@ function viewCafePicture() {
                   >
                     <p class="font-semibold text-[#7D5A50]">Reason</p>
                     <p class="text-[#DC3545]">{{ approval.reason }}</p>
+                  </div>
+
+                  <div
+                    v-if="approval.status === 'rejected' && approval.can_resubmit !== undefined"
+                    class="grid grid-cols-[35%_65%] bg-[#FFF8EA] px-[20px] py-[10px] border-t border-[#EDD8CC]"
+                  >
+                    <p class="font-semibold text-[#7D5A50]">Resubmission</p>
+                    <p class="text-[#3B1F0E]">{{ approval.can_resubmit ? 'Allowed' : 'Not allowed (final)' }}</p>
                   </div>
                 </div>
               </template>

@@ -41,6 +41,7 @@ const KIND_STYLE: Record<NotificationKind, { icon: string; tone: NotificationTon
     pin_changed: { icon: 'key', tone: 'warning' },
     refund_approved: { icon: 'receipt-refund', tone: 'neutral' },
     spoilage_logged: { icon: 'trash', tone: 'warning' },
+    branch_details_updated: { icon: 'building-storefront', tone: 'neutral' },
 }
 
 function fromApi(n: ApiNotification): AppNotification {

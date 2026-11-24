@@ -12,6 +12,8 @@ export type NotificationKind =
     | 'subscription_expiring' | 'renewal_open' | 'subscription_expired'
     // Manager (owner for a locked manager PIN): what's happening at the branch
     | 'servings_low' | 'sold_out' | 'pin_locked' | 'refund_approved' | 'spoilage_logged'
+    // Manager: the owner changed the branch's contact details or picture
+    | 'branch_details_updated'
     // Owner: a manager set a new PIN themselves
     | 'pin_changed'
 

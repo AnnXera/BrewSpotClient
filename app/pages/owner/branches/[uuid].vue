@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { BranchDetail } from '~/services/OwnerProfileService'
+import type { BranchDetail, BranchReview } from '~/services/OwnerProfileService'
 import { isOperationalBranchStatus } from '~/utils/branchStatus'
 
 definePageMeta({
@@ -13,6 +13,7 @@ const router = useRouter()
 const ownerService = useOwnerProfileService()
 
 const branch = ref<BranchDetail | null>(null)
+const review = ref<BranchReview | null>(null)
 const loading = ref(true)
 const errorMessage = ref('')
 type BranchTab = 'details' | 'employees' | 'floor-plans'
@@ -83,6 +84,7 @@ async function fetchBranch() {
     const res = await ownerService.getBranch(route.params.uuid as string)
     if (res.success && res.branch) {
       branch.value = res.branch
+      review.value = res.review ?? null
     } else {
       errorMessage.value = res.message || 'Branch not found.'
     }
@@ -94,6 +96,68 @@ async function fetchBranch() {
 }
 
 const { openDocument } = useDocumentViewer()
+
+// ── Edit contact details (email, phone, picture) ──
+const showEditContact = ref(false)
+const toastMessage = ref('')
+let toastTimer: ReturnType<typeof setTimeout> | undefined
+
+function showToast(msg: string) {
+  toastMessage.value = msg
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toastMessage.value = '' }, 4000)
+}
+onBeforeUnmount(() => clearTimeout(toastTimer))
+
+// ── Branch under review / rejected ──
+const isSide = computed(() => (branch.value?.branch_type || '').toLowerCase() === 'side')
+const canResubmit = computed(() => isSide.value && branchStatus.value === 'rejected' && review.value?.status === 'rejected' && review.value.can_resubmit)
+const canRemove = computed(() => isSide.value && (branchStatus.value === 'rejected' || branchStatus.value === 'pending_approval'))
+const showResubmit = ref(false)
+const confirmRemove = ref(false)
+const removing = ref(false)
+const removeError = ref('')
+
+function onResubmitted(updated: BranchDetail | undefined) {
+  showResubmit.value = false
+  showToast('Branch resubmitted. An admin will review it again.')
+  if (updated) branch.value = { ...branch.value!, ...updated }
+  fetchBranch()
+}
+
+async function removeBranch() {
+  if (!branch.value) return
+  removing.value = true
+  removeError.value = ''
+  try {
+    const res = await ownerService.deleteBranch(branch.value.uuid)
+    if (res.success) {
+      confirmRemove.value = false
+      router.push('/owner/cafes')
+    } else {
+      removeError.value = res.message || 'The branch could not be removed.'
+      confirmRemove.value = false
+    }
+  } catch (e: any) {
+    removeError.value = e?.data?.message || 'The branch could not be removed. Please try again.'
+    confirmRemove.value = false
+  } finally {
+    removing.value = false
+  }
+}
+
+function onContactSaved(updated: Partial<BranchDetail> | undefined) {
+  showEditContact.value = false
+  if (branch.value && updated) {
+    branch.value = {
+      ...branch.value,
+      cafe_email: updated.cafe_email ?? branch.value.cafe_email,
+      cafe_phonenumber: updated.cafe_phonenumber ?? branch.value.cafe_phonenumber,
+      cafe_picture_url: updated.cafe_picture_url ?? branch.value.cafe_picture_url,
+    }
+  }
+  showToast('Branch details updated. Managers have been notified.')
+}
 
 onMounted(fetchBranch)
 </script>
@@ -218,15 +282,51 @@ onMounted(fetchBranch)
               class="w-5 h-5 shrink-0 mt-0.5"
               :class="branchStatus === 'rejected' ? 'text-red-600' : 'text-amber-600'"
             />
-            <div class="text-sm">
+            <div class="text-sm flex-1 min-w-0">
               <p class="font-bold">
-                {{ branchStatus === 'rejected' ? 'This branch was rejected' : 'This branch is waiting for approval' }}
+                <template v-if="branchStatus === 'rejected'">This branch was rejected</template>
+                <template v-else-if="review?.resubmitted">This branch was resubmitted and is waiting for review</template>
+                <template v-else>This branch is waiting for approval</template>
               </p>
-              <p class="mt-0.5">
-                {{ branchStatus === 'rejected'
-                  ? 'An administrator did not approve this branch, so employees, registers, menu, servings, reservations and floor plans are unavailable for it.'
-                  : 'Employees, registers, menu, servings, reservations and floor plans unlock once an administrator approves this branch.' }}
+
+              <template v-if="branchStatus === 'rejected'">
+                <p class="mt-1.5 rounded-lg bg-white/70 border border-red-200 px-3 py-2">
+                  <span class="font-semibold">Reason:</span> {{ review?.reason || 'No reason was given.' }}
+                </p>
+                <p class="mt-1.5 text-xs text-red-800">
+                  <template v-if="review?.reviewed_at">Reviewed {{ formatDate(review.reviewed_at, 'short') }}. </template>
+                  <template v-if="canResubmit">Fix what the admin pointed out and resubmit it, or delete the branch.</template>
+                  <template v-else-if="isSide">This rejection is final, so the branch can't be resubmitted. You can delete it.</template>
+                  <template v-else>Employees, registers, menu, servings, reservations and floor plans are unavailable for it.</template>
+                </p>
+              </template>
+              <p v-else class="mt-0.5">
+                <template v-if="review?.submitted_at">Submitted {{ formatDate(review.submitted_at, 'short') }}. </template>
+                Employees, registers, menu, servings, reservations and floor plans unlock once an administrator approves this branch.
               </p>
+
+              <div v-if="canResubmit || canRemove" class="mt-3 flex flex-wrap gap-2">
+                <button
+                  v-if="canResubmit"
+                  type="button"
+                  class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#7D5A50] text-white text-xs font-bold hover:bg-[#6A4A41] transition-colors"
+                  @click="showResubmit = true"
+                >
+                  <Icon name="heroicons:pencil-square" class="size-4" />
+                  Edit and resubmit
+                </button>
+                <button
+                  v-if="canRemove"
+                  type="button"
+                  class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border bg-white text-xs font-bold transition-colors"
+                  :class="branchStatus === 'rejected' ? 'border-red-300 text-red-700 hover:bg-red-50' : 'border-amber-300 text-amber-800 hover:bg-amber-50'"
+                  @click="confirmRemove = true"
+                >
+                  <Icon :name="branchStatus === 'rejected' ? 'heroicons:trash' : 'heroicons:arrow-uturn-left'" class="size-4" />
+                  {{ branchStatus === 'rejected' ? 'Delete branch' : 'Withdraw submission' }}
+                </button>
+              </div>
+              <p v-if="removeError" role="alert" class="mt-2 text-xs font-semibold text-red-700">{{ removeError }}</p>
             </div>
           </div>
 
@@ -245,6 +345,15 @@ onMounted(fetchBranch)
                       {{ branch.branch_type }}
                     </span>
                     <StatusBadge :status="branch.status" />
+                    <button
+                      v-if="isOperational"
+                      type="button"
+                      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#DED4CA] bg-white text-xs font-semibold text-[#5B463C] hover:border-[#7D5A50] hover:bg-[#F8EFE7] transition-colors"
+                      @click="showEditContact = true"
+                    >
+                      <Icon name="heroicons:pencil-square" class="size-3.5 text-[#7D5A50]" />
+                      <span>Edit</span>
+                    </button>
                   </div>
                 </div>
 
@@ -371,6 +480,52 @@ onMounted(fetchBranch)
         </div>
       </Transition>
     </main>
+
+    <CafeManagementResubmitBranchModal
+      v-if="branch && canResubmit"
+      :show="showResubmit"
+      :branch="branch"
+      :reason="review?.reason ?? null"
+      @close="showResubmit = false"
+      @resubmitted="onResubmitted"
+    />
+
+    <ConfirmDialog
+      :open="confirmRemove"
+      :title="branchStatus === 'rejected' ? 'Delete this branch?' : 'Withdraw this branch?'"
+      :message="branchStatus === 'rejected'
+        ? 'The rejected branch and its documents will be removed. Its application history is kept.'
+        : 'The branch will be taken out of the admin review queue and removed. You can add it again later.'"
+      :confirm-label="branchStatus === 'rejected' ? 'Delete' : 'Withdraw'"
+      danger
+      :loading="removing"
+      @confirm="removeBranch"
+      @cancel="confirmRemove = false"
+    />
+
+    <CafeManagementEditBranchContactModal
+      v-if="branch"
+      :show="showEditContact"
+      :branch="branch"
+      @close="showEditContact = false"
+      @saved="onContactSaved"
+    />
+
+    <Teleport to="body">
+      <transition
+        enter-active-class="transition duration-300 ease-out"
+        enter-from-class="opacity-0 -translate-y-2"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition duration-200 ease-in"
+        leave-from-class="opacity-100 translate-y-0"
+        leave-to-class="opacity-0 -translate-y-2"
+      >
+        <div v-if="toastMessage" role="status" aria-live="polite" class="fixed top-6 right-6 z-[3100] bg-[#7D5A50] text-[#FFF8EA] px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-[#B4846C]">
+          <Icon name="heroicons:check-circle" class="w-5 h-5 text-emerald-400 shrink-0" />
+          <span class="text-sm font-bold">{{ toastMessage }}</span>
+        </div>
+      </transition>
+    </Teleport>
   </div>
 </template>
 

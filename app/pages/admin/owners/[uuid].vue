@@ -3,6 +3,7 @@
 import { useRoute } from 'vue-router'
 import DropdownList from '~/components/common/DropdownList.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
+import type { ApplicationHistoryEntry } from '~/components/owner-detail/ApplicationHistory.vue'
 
 definePageMeta({
   role: 'Admin',
@@ -27,13 +28,15 @@ const ownerDocuments = ref<any[]>([])
 const cafes = ref<any[]>([])
 const subscription = ref<any>(null)
 const paymentHistory = ref<any[]>([])
+const applicationHistory = ref<ApplicationHistoryEntry[]>([])
 
-const activeTab = ref<'profile' | 'branches'>(
-  route.query.tab === 'branches' ? 'branches' : 'profile'
-)
+type OwnerTab = 'profile' | 'branches' | 'history'
+const isOwnerTab = (v: unknown): v is OwnerTab => v === 'profile' || v === 'branches' || v === 'history'
+
+const activeTab = ref<OwnerTab>(isOwnerTab(route.query.tab) ? route.query.tab : 'profile')
 
 watch(() => route.query.tab, (newTab) => {
-  if (newTab === 'branches' || newTab === 'profile') {
+  if (isOwnerTab(newTab)) {
     activeTab.value = newTab
   }
 })
@@ -48,6 +51,7 @@ async function fetchOwner() {
       cafes.value = res.cafes ?? []
       subscription.value = res.subscription
       paymentHistory.value = res.payment_history ?? []
+      applicationHistory.value = res.application_history ?? []
     }
   } catch (e) {
     console.error('Failed to load owner', e)
@@ -242,7 +246,29 @@ onMounted(fetchOwner)
             />
           </button>
 
-          <!-- full-width baseline underneath both tabs -->
+          <button
+            type="button"
+            class="font-display transition-colors relative z-10 flex items-center gap-2
+                   min-[360px]:px-5 min-[360px]:py-3.5 min-[360px]:text-[14px]
+                   md:px-5 md:py-3.5 md:text-[16px]"
+            :class="activeTab === 'history'
+              ? 'text-[#3B1F0E] font-bold'
+              : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
+            @click="activeTab = 'history'"
+          >
+            <span class="hidden sm:inline">Application History</span>
+            <span class="sm:hidden">History</span>
+            <span
+              class="rounded-full px-2 py-0.5 text-[11px] font-bold"
+              :class="activeTab === 'history' ? 'bg-[#3B1F0E] text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+            >{{ applicationHistory.length }}</span>
+            <span
+              v-if="activeTab === 'history'"
+              class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full"
+            />
+          </button>
+
+          <!-- full-width baseline underneath the tabs -->
           <div class="absolute left-0 right-0 bottom-0 h-px bg-[#EEDFC4]" />
         </div>
 
@@ -273,6 +299,9 @@ onMounted(fetchOwner)
             :owner-name="owner ? `${owner.firstname} ${owner.lastname}` : undefined"
           />
         </template>
+
+        <!-- APPLICATION HISTORY TAB -->
+        <OwnerDetailApplicationHistory v-else-if="activeTab === 'history'" :entries="applicationHistory" />
 
         <!-- BRANCHES TAB -->
         <template v-else>
