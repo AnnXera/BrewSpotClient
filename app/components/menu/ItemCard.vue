@@ -42,11 +42,12 @@ const getImageUrl = () => {
 
 <template>
   <div 
-    class="bg-white rounded-2xl border border-[#EEDFC4] flex flex-col group hover:shadow-md transition-shadow cursor-pointer p-3 h-[300px]"
+    class="bg-white rounded-2xl border border-[#EEDFC4] flex flex-col group hover:shadow-md transition-shadow cursor-pointer p-3"
     @click="$emit('view', item.uuid || item.id || '')"
   >
     <!-- Image Area -->
-    <div class="h-[140px] w-full bg-[#FBF2E1] relative shrink-0 rounded-xl overflow-hidden mb-[9px]">
+    <!-- 4:3 to match the item picture cropper, so the card shows exactly the cropped frame -->
+    <div class="aspect-[4/3] w-full bg-[#FBF2E1] relative shrink-0 rounded-xl overflow-hidden mb-[9px]">
       <img 
         v-if="item.picture" 
         :src="getImageUrl() || ''" 

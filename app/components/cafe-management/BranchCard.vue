@@ -49,17 +49,15 @@ function statusMeta(s: string) {
     :class="selected ? 'bg-[#FBF2E1]' : ''"
   >
     <!-- Select -->
-    <label class="flex items-center self-center p-1 -m-1 cursor-pointer" @click.stop>
-      <input
-        type="checkbox"
+    <div class="flex items-center self-center">
+      <CommonBrandCheckbox
         :checked="selected"
         :disabled="!selectable"
         :title="selectable ? undefined : 'Only approved branches can be activated or deactivated'"
-        @change="emit('update:selected', ($event.target as HTMLInputElement).checked)"
         :aria-label="`Select ${branch.branch_name || 'branch'}`"
-        class="w-5 h-5 rounded border-[#D9C4A8] text-[#7D5A50] focus:ring-[#7D5A50] cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+        @change="emit('update:selected', $event)"
       />
-    </label>
+    </div>
 
     <!-- Branch: photo, name, type -->
     <div class="flex items-center gap-3 min-w-0">

@@ -33,12 +33,12 @@ const hasLowStockLimit = computed(() =>
   <div class="px-5 py-4 border-b border-[#EEDFC4] flex flex-wrap gap-3 items-center min-h-[76px]">
     <template v-if="selectedCount > 0">
       <div class="flex items-center gap-3">
-        <input
-          type="checkbox"
+        <CommonBrandCheckbox
           :checked="selectedCount === totalCount && totalCount > 0"
-          class="w-5 h-5 rounded border-[#D9C4A8] text-[#7D5A50] focus:ring-[#7D5A50] cursor-pointer"
-          @change="emit('toggleSelectAll', ($event.target as HTMLInputElement).checked)"
-        >
+          :indeterminate="selectedCount > 0 && selectedCount < totalCount"
+          aria-label="Select all branches on this page"
+          @change="emit('toggleSelectAll', $event)"
+        />
         <span class="text-[#3D2B24] font-semibold text-sm tabular-nums">{{ selectedCount }} selected</span>
       </div>
 

@@ -399,6 +399,8 @@ watch(() => props.show, (newVal) => {
       picturePreview.value = null
     }
     pictureFile.value = null
+    originalPicture.value = null
+    cropperFile.value = null
     nextTick(() => {
       isDirty.value = false
     })
@@ -426,13 +428,28 @@ const triggerFileInput = () => {
   fileInput.value?.click()
 }
 
+// Cropping: a newly picked file opens the cropper (4:3, the item card's picture shape); the
+// untouched original is kept so "Adjust" re-crops from full quality instead of cropping the crop.
+const originalPicture = ref<File | null>(null)
+const cropperFile = ref<File | null>(null)
+
 const onFileChange = (e: Event) => {
   const target = e.target as HTMLInputElement
   const file = target.files?.[0]
-  if (file) {
-    pictureFile.value = file
-    picturePreview.value = URL.createObjectURL(file)
-  }
+  target.value = '' // lets the same file be picked again
+  if (file) cropperFile.value = file
+}
+
+const applyCrop = (cropped: File) => {
+  originalPicture.value = cropperFile.value
+  cropperFile.value = null
+  if (picturePreview.value?.startsWith('blob:')) URL.revokeObjectURL(picturePreview.value)
+  pictureFile.value = cropped
+  picturePreview.value = URL.createObjectURL(cropped)
+}
+
+const adjustPicture = () => {
+  if (originalPicture.value) cropperFile.value = originalPicture.value
 }
 
 const ingredientInputs = ref<{ focus: () => void }[]>([])
@@ -668,13 +685,13 @@ const saveItem = async () => {
             <p class="text-[11px] text-[#8A6E64] mt-1">How the item shows on the menu and at the register.</p>
           </div>
 
-          <!-- From lg the photo sits beside the fields as a square exactly as tall as them -->
+          <!-- From lg the photo sits beside the fields as a 4:3 frame (320x240) exactly as tall as them -->
           <div class="flex flex-col lg:flex-row gap-5">
             <!-- Photo -->
-            <div class="w-36 lg:w-60 shrink-0">
+            <div class="w-48 lg:w-80 shrink-0">
               <button
                 type="button"
-                class="relative w-full aspect-square rounded-2xl bg-white hover:bg-[#FAF6F0] border-2 border-dashed border-[#D8C7B5] hover:border-[#3B1F0E] overflow-hidden group cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                class="relative w-full aspect-[4/3] rounded-2xl bg-white hover:bg-[#FAF6F0] border-2 border-dashed border-[#D8C7B5] hover:border-[#3B1F0E] overflow-hidden group cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
                 :aria-label="picturePreview ? 'Change photo' : 'Upload photo'"
                 @click="triggerFileInput"
               >
@@ -706,6 +723,25 @@ const saveItem = async () => {
                 accept="image/*"
                 @change="onFileChange"
               />
+              <!-- Re-open the cropper on the photo picked in this session -->
+              <div v-if="originalPicture" class="flex gap-2 mt-2">
+                <button
+                  type="button"
+                  @click="adjustPicture"
+                  class="flex-1 h-8 rounded-lg border border-[#D8C7B5] bg-white text-[#5C4037] text-xs font-bold hover:bg-[#FAF4ED] active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                >
+                  <Icon name="heroicons:scissors" class="w-3.5 h-3.5" />
+                  Adjust
+                </button>
+                <button
+                  type="button"
+                  @click="triggerFileInput"
+                  class="flex-1 h-8 rounded-lg border border-[#D8C7B5] bg-white text-[#5C4037] text-xs font-bold hover:bg-[#FAF4ED] active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                >
+                  <Icon name="heroicons:camera" class="w-3.5 h-3.5" />
+                  Change
+                </button>
+              </div>
             </div>
 
             <!-- Name, category, description -->
@@ -1111,6 +1147,14 @@ const saveItem = async () => {
       :isDestructive="confirmDialog.isDestructive"
       @close="confirmDialog.show = false"
       @confirm="runConfirm"
+    />
+    <CommonImageCropper
+      :show="!!cropperFile"
+      :file="cropperFile"
+      :aspect="4 / 3"
+      title="Adjust Item Photo"
+      @cancel="cropperFile = null"
+      @apply="applyCrop"
     />
     <AlertModal
       :show="alertDialog.show"

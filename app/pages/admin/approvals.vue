@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import SearchInput from '~/components/common/SearchInput.vue'
 import type { ApprovalListItem, ApprovalStats, Paginated } from '~/services/OwnerManagementService'
+import type { CafeUpdateRequest } from '~/services/CafeUpdateService'
 
 definePageMeta({
   role: 'Admin',
@@ -16,9 +17,11 @@ const links = [
 ]
 
 const ownerService = useOwnerManagementService()
+const cafeUpdateService = useCafeUpdateService()
 const route = useRoute()
 
-type RegistrationTab = 'owner' | 'branch'
+// 'cafe_update': owner requests to change registered cafe details (today, the cafe name)
+type RegistrationTab = 'owner' | 'branch' | 'cafe_update'
 // 'pending' and 'resubmitted' split what awaits review (the API's 'pending_approval')
 type StatusTab = 'general' | 'pending' | 'resubmitted' | 'approved' | 'rejected'
 
@@ -26,10 +29,13 @@ const registrationTab = ref<RegistrationTab>('owner')
 const statusTab = ref<StatusTab>('general')
 const search = ref('')
 
-const statsByType = ref<Record<RegistrationTab, ApprovalStats | null>>({ owner: null, branch: null })
+const statsByType = ref<Record<RegistrationTab, ApprovalStats | null>>({ owner: null, branch: null, cafe_update: null })
 const stats = computed(() => statsByType.value[registrationTab.value])
 const approvals = ref<ApprovalListItem[]>([])
+const cafeUpdates = ref<CafeUpdateRequest[]>([])
 const loading = ref(false)
+const isCafeUpdateTab = computed(() => registrationTab.value === 'cafe_update')
+const rowCount = computed(() => (isCafeUpdateTab.value ? cafeUpdates.value.length : approvals.value.length))
 
 const currentPage = ref(1)
 const lastPage = ref(1)
@@ -38,18 +44,51 @@ const perPage = 15
 
 // Fetch both types so the registration tabs can show their pending counts
 async function fetchStats() {
-  const types: RegistrationTab[] = ['owner', 'branch']
-  await Promise.all(types.map(async (type) => {
-    try {
-      const res = await ownerService.approvalStats(type)
-      if (res.success) statsByType.value[type] = res.stats
-    } catch {
-      // badges just show placeholders if this fails
+  const types: Array<'owner' | 'branch'> = ['owner', 'branch']
+  await Promise.all([
+    ...types.map(async (type) => {
+      try {
+        const res = await ownerService.approvalStats(type)
+        if (res.success) statsByType.value[type] = res.stats
+      } catch {
+        // badges just show placeholders if this fails
+      }
+    }),
+    (async () => {
+      try {
+        const res = await cafeUpdateService.stats()
+        if (res.success) statsByType.value.cafe_update = res.stats
+      } catch {
+        // same
+      }
+    })(),
+  ])
+}
+
+async function fetchCafeUpdates(silent = false) {
+  if (!silent) loading.value = true
+  try {
+    const res = await cafeUpdateService.list({
+      per_page: perPage,
+      page: currentPage.value,
+      status: statusTab.value === 'general' ? undefined : statusTab.value,
+      search: search.value || undefined,
+    })
+    if (res.success) {
+      cafeUpdates.value = res.requests.data
+      currentPage.value = res.requests.current_page
+      lastPage.value = res.requests.last_page
+      total.value = res.requests.total
     }
-  }))
+  } catch {
+    cafeUpdates.value = []
+  } finally {
+    loading.value = false
+  }
 }
 
 async function fetchApprovals(silent = false) {
+  if (isCafeUpdateTab.value) return fetchCafeUpdates(silent)
   if (!silent) loading.value = true
   try {
     const res = await ownerService.approvals({
@@ -135,6 +174,29 @@ function closeModal() {
   modalOpen.value = false
   modalApproval.value = null
   modalOwnerDetails.value = null
+  cafeUpdateOpen.value = false
+  cafeUpdate.value = null
+}
+
+// Cafe update (name change) detail modal
+const cafeUpdateOpen = ref(false)
+const cafeUpdateLoading = ref(false)
+const cafeUpdate = ref<CafeUpdateRequest | null>(null)
+
+async function openCafeUpdate(uuid: string, preview?: CafeUpdateRequest) {
+  cafeUpdate.value = preview ?? null
+  cafeUpdateOpen.value = true
+  cafeUpdateLoading.value = true
+  try {
+    // The detail adds each branch's current COR beside the new one
+    const res = await cafeUpdateService.show(uuid)
+    if (res.success) cafeUpdate.value = res.request
+  } catch (e) {
+    console.error('Failed to load cafe update', e)
+    if (!preview) cafeUpdateOpen.value = false
+  } finally {
+    cafeUpdateLoading.value = false
+  }
 }
 
 const decisionLoading = ref(false)
@@ -149,7 +211,11 @@ function kindOf(approval: Pick<ApprovalListItem, 'branch'> | null): Registration
 }
 const modalKind = computed<RegistrationTab>(() => kindOf(modalApproval.value))
 
+// Which kind of request the open modal (and the shared reject dialog) is deciding
+const decisionKind = computed<RegistrationTab>(() => (cafeUpdateOpen.value ? 'cafe_update' : modalKind.value))
+
 async function handleDecision(status: 'approved' | 'rejected', reason?: string) {
+  if (cafeUpdateOpen.value) return decideCafeUpdate(status, reason)
   if (!modalApproval.value) return
   decisionError.value = ''
 
@@ -180,6 +246,29 @@ async function handleDecision(status: 'approved' | 'rejected', reason?: string) 
   } catch (e: any) {
     console.error('Failed to update status', e)
     decisionError.value = e?.data?.message || e?.response?._data?.message || 'The decision could not be saved. Please try again.'
+  } finally {
+    decisionLoading.value = false
+  }
+}
+
+async function decideCafeUpdate(status: 'approved' | 'rejected', reason?: string) {
+  if (!cafeUpdate.value) return
+  decisionError.value = ''
+  decisionLoading.value = true
+  try {
+    const res = await cafeUpdateService.review(cafeUpdate.value.uuid, status, reason, allowResubmit.value)
+    if (!res.success) {
+      decisionError.value = res.message || 'The decision could not be saved. Please try again.'
+      return
+    }
+    closeModal()
+    rejectModalOpen.value = false
+    rejectReason.value = ''
+    allowResubmit.value = true
+    fetchStats()
+    fetchApprovals()
+  } catch (e: any) {
+    decisionError.value = e?.data?.message || 'The decision could not be saved. Please try again.'
   } finally {
     decisionLoading.value = false
   }
@@ -243,11 +332,25 @@ async function openFromQuery(uuid: string) {
   }
 }
 
+// ?type=cafe_update&request=<uuid> (the admin notification for a name change)
+async function openCafeUpdateFromQuery(uuid: string) {
+  if (!isCafeUpdateTab.value) switchRegistrationTab('cafe_update')
+  await openCafeUpdate(uuid)
+}
+
 onMounted(async () => {
+  if (route.query.type === 'cafe_update') registrationTab.value = 'cafe_update'
   fetchStats()
   await fetchApprovals()
 
   if (route.query.uuid) await openFromQuery(route.query.uuid as string)
+  else if (route.query.request) await openCafeUpdateFromQuery(route.query.request as string)
+})
+
+watch(() => route.query.request, async (uuid) => {
+  if (!uuid) return
+  await openCafeUpdateFromQuery(uuid as string)
+  fetchStats()
 })
 
 // A notification clicked while already on this page only changes the query, so the page doesn't remount.
@@ -316,15 +419,31 @@ watch(() => route.query.uuid, async (uuid) => {
           >{{ statsByType.branch.pending_approval }}</span>
           <span v-if="registrationTab === 'branch'" class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full" />
         </button>
+
+        <button
+          type="button"
+          class="flex items-center gap-2 px-5 py-[10px] font-display text-[16px] transition-colors relative z-10"
+          :class="registrationTab === 'cafe_update' ? 'text-[#3B1F0E] font-bold' : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
+          @click="switchRegistrationTab('cafe_update')"
+        >
+          Cafe Updates
+          <span
+            v-if="statsByType.cafe_update?.pending_approval"
+            class="rounded-full px-2 py-0.5 text-[11px] font-bold font-sans"
+            :class="registrationTab === 'cafe_update' ? 'bg-[#7D5A50] text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+            :title="`${statsByType.cafe_update.pending_approval} pending`"
+          >{{ statsByType.cafe_update.pending_approval }}</span>
+          <span v-if="registrationTab === 'cafe_update'" class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full" />
+        </button>
       </div>
 
       <!-- Combined Search/Tabs + Table Card -->
-      <div :class="['bg-white border border-[#EEDFC4] overflow-hidden', approvals.length > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
+      <div :class="['bg-white border border-[#EEDFC4] overflow-hidden', rowCount > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
 
         <!-- Search + Status Tabs Bar -->
         <div class="flex items-center gap-[24px] px-[20px] py-[18px] border-b border-[#F3E7D2]">
           <!-- Search -->
-          <SearchInput v-model="search" placeholder="Search owner" class="flex-1 min-w-[220px]" />
+          <SearchInput v-model="search" :placeholder="isCafeUpdateTab ? 'Search cafe or owner' : 'Search owner'" class="flex-1 min-w-[220px]" />
 
           <!-- General / Pending / Approved / Rejected -->
           <div class="inline-flex items-center bg-white border border-[#EDD8CC] rounded-xl gap-1 p-[8px] font-display font-medium text-[16px]">
@@ -350,9 +469,9 @@ watch(() => route.query.uuid, async (uuid) => {
               >{{ stats?.pending ?? stats?.pending_approval ?? 0 }}</span>
             </button>
 
-            <!-- Owners correcting a rejected application (side branches are never resubmitted) -->
+            <!-- Owners correcting a rejected application or name change (side branches are never resubmitted) -->
             <button
-              v-if="registrationTab === 'owner'"
+              v-if="registrationTab === 'owner' || registrationTab === 'cafe_update'"
               type="button"
               class="flex items-center gap-2 px-[20px] py-[8px] rounded-[8px] transition-colors"
               :class="statusTab === 'resubmitted' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
@@ -411,6 +530,18 @@ watch(() => route.query.uuid, async (uuid) => {
               </tr>
             </thead>
 
+            <!-- Cafe Updates columns -->
+            <thead v-else-if="isCafeUpdateTab">
+              <tr class="bg-[#FBF2E1] border-b border-[#F3E7D2]">
+                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Change</th>
+                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Owner</th>
+                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">CORs</th>
+                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Status</th>
+                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Submitted At</th>
+                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Actions</th>
+              </tr>
+            </thead>
+
             <!-- Branch Registration columns -->
             <thead v-else>
               <tr class="bg-[#FBF2E1] border-b border-[#F3E7D2]">
@@ -432,11 +563,46 @@ watch(() => route.query.uuid, async (uuid) => {
                   </div>
                 </td>
               </tr>
-              <tr v-else-if="!approvals.length">
+              <tr v-else-if="!rowCount">
                 <td colspan="6" class="px-6 py-10 text-center font-sans text-sm text-[#3B1F0E]/50">
-                  No applications found.
+                  {{ isCafeUpdateTab ? 'No cafe updates found.' : 'No applications found.' }}
                 </td>
               </tr>
+
+              <template v-else-if="isCafeUpdateTab">
+                <tr
+                  v-for="req in cafeUpdates"
+                  :key="req.uuid"
+                  class="border-b border-[#F3E7D2] last:border-b-0 hover:bg-[#FFFDF9] transition-colors cursor-pointer"
+                  @click="openCafeUpdate(req.uuid, req)"
+                >
+                  <td class="px-6 py-4 max-w-[320px]">
+                    <p class="font-sans text-[11px] font-semibold uppercase tracking-wide text-[#9E7060]">Name change</p>
+                    <p class="font-sans text-sm text-[#8B6656] truncate">{{ req.old_name }}</p>
+                    <p class="font-display text-[15px] font-bold text-[#3B1F0E] truncate">→ {{ req.new_name }}</p>
+                  </td>
+                  <td class="px-6 py-4">
+                    <p class="font-sans text-sm font-semibold text-[#3B1F0E]">{{ req.owner?.name || '—' }}</p>
+                    <p class="font-sans text-xs text-[#9E7060]">{{ req.owner?.email }}</p>
+                  </td>
+                  <td class="px-6 py-4 font-sans text-sm text-[#3B1F0E]">
+                    {{ req.documents.length }} {{ req.documents.length === 1 ? 'branch' : 'branches' }}
+                  </td>
+                  <td class="px-6 py-4"><StatusBadge :status="req.status" /></td>
+                  <td class="px-6 py-4 font-sans text-sm text-[#3B1F0E]/80 whitespace-nowrap">
+                    {{ req.submitted_at ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(req.submitted_at)) : '—' }}
+                  </td>
+                  <td class="px-6 py-4">
+                    <button
+                      type="button"
+                      class="rounded-lg border border-[#EDD8CC] bg-white px-3 py-1.5 font-display text-sm font-medium text-[#7D5A50] hover:bg-[#FBF2E1] transition-colors"
+                      @click.stop="openCafeUpdate(req.uuid, req)"
+                    >
+                      View
+                    </button>
+                  </td>
+                </tr>
+              </template>
 
               <template v-else-if="registrationTab === 'owner'">
                 <ApprovalTableRow
@@ -461,9 +627,9 @@ watch(() => route.query.uuid, async (uuid) => {
           </table>
         </div>
       </div>
-      
+
       <!-- Pagination (Separate Frame) -->
-      <div v-if="approvals.length > 0" class="bg-white rounded-b-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
+      <div v-if="rowCount > 0" class="bg-white rounded-b-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
         <CommonPagination :page="currentPage" :last-page="lastPage" @change="goToPage" />
       </div>
     </main>
@@ -495,10 +661,20 @@ watch(() => route.query.uuid, async (uuid) => {
       @reject="openRejectModal"
     />
 
+    <ApprovalCafeUpdateDetailsModal
+      :open="cafeUpdateOpen"
+      :loading="cafeUpdateLoading && !cafeUpdate"
+      :request="cafeUpdate"
+      :decision-loading="decisionLoading"
+      @close="closeModal"
+      @approve="handleDecision('approved')"
+      @reject="openRejectModal"
+    />
+
     <!-- Approve failures (reject failures show inside the reason dialog) -->
     <Teleport to="body">
       <div
-        v-if="decisionError && modalOpen && !rejectModalOpen"
+        v-if="decisionError && (modalOpen || cafeUpdateOpen) && !rejectModalOpen"
         class="fixed top-6 left-1/2 -translate-x-1/2 z-[70] max-w-md w-[calc(100%-2rem)] rounded-xl bg-white border border-[#F5C2C0] shadow-lg px-4 py-3 flex items-start gap-3"
         role="alert"
       >
@@ -520,7 +696,9 @@ watch(() => route.query.uuid, async (uuid) => {
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
           <h2 class="font-display text-lg font-semibold text-[#3B1F0E] mb-2">Reason for rejection</h2>
           <p class="font-sans text-sm text-[#3B1F0E]/70 mb-4">
-            This reason will be included in the email sent to the owner.
+            {{ decisionKind === 'cafe_update'
+              ? 'The owner sees this reason in Cafe Management and in their notifications.'
+              : 'This reason will be included in the email sent to the owner.' }}
           </p>
 
           <textarea
@@ -537,9 +715,16 @@ watch(() => route.query.uuid, async (uuid) => {
               class="mt-0.5 h-4 w-4 rounded border-[#EDD8CC] text-[#7D5A50] focus:ring-[#7D5A50]/30"
             />
             <span class="font-sans text-sm text-[#3B1F0E]">
-              {{ modalKind === 'branch' ? 'Let the owner edit and resubmit this branch' : 'Let the applicant edit and resubmit' }}
+              {{ decisionKind === 'cafe_update'
+                ? 'Let the owner request this name again'
+                : decisionKind === 'branch' ? 'Let the owner edit and resubmit this branch' : 'Let the applicant edit and resubmit' }}
               <span class="block text-xs text-[#3B1F0E]/60 mt-0.5">
-                <template v-if="modalKind === 'branch'">
+                <template v-if="decisionKind === 'cafe_update'">
+                  {{ allowResubmit
+                    ? 'They can fix the CORs and send the same name back for review.'
+                    : 'This name is final. They can still request a different name.' }}
+                </template>
+                <template v-else-if="decisionKind === 'branch'">
                   {{ allowResubmit
                     ? 'They can fix the issue and send the same branch back for review.'
                     : 'Final rejection. The owner can only delete this branch.' }}

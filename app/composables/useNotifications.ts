@@ -19,6 +19,7 @@ const KIND_STYLE: Record<NotificationKind, { icon: string; tone: NotificationTon
     owner_application: { icon: 'user-plus', tone: 'neutral' },
     owner_resubmission: { icon: 'arrow-path-rounded-square', tone: 'warning' },
     branch_submission: { icon: 'building-storefront', tone: 'neutral' },
+    cafe_update: { icon: 'pencil-square', tone: 'neutral' },
 
     account_approved: { icon: 'check-badge', tone: 'good' },
     account_rejected: { icon: 'x-circle', tone: 'bad' },
@@ -26,6 +27,8 @@ const KIND_STYLE: Record<NotificationKind, { icon: string; tone: NotificationTon
     account_reactivated: { icon: 'arrow-path', tone: 'good' },
     branch_approved: { icon: 'building-storefront', tone: 'good' },
     branch_rejected: { icon: 'building-storefront', tone: 'bad' },
+    cafe_name_approved: { icon: 'pencil-square', tone: 'good' },
+    cafe_name_rejected: { icon: 'pencil-square', tone: 'bad' },
 
     payment_received: { icon: 'banknotes', tone: 'good' },
     payment_failed: { icon: 'exclamation-triangle', tone: 'bad' },

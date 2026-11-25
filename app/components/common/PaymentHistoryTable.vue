@@ -1,11 +1,10 @@
 <!-- app/components/common/PaymentHistoryTable.vue -->
 <template>
   <div>
-    <!-- Main Payment History Card Container -->
-    <div :class="['w-full max-w-full bg-white border border-[#EEDFC4] overflow-hidden shadow-sm', filteredHistory.length > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
-      <!-- Top Feature Bar: Search, Filters & Export CSV -->
-      <div v-if="showControls" class="p-4 sm:p-5 border-b border-[#F3E7D2] flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-3 sm:gap-4">
-        <!-- Search Input -->
+    <!-- Main card: same frame as the Cafe Management table (filter bar, header row, row list) -->
+    <div :class="['w-full max-w-full bg-white border border-[#EEDFC4] shadow-sm flex flex-col', filteredHistory.length > 0 && !loading ? 'rounded-t-[20px] border-b-0' : 'rounded-[20px]']">
+      <!-- Filter bar: search, dates, status, export -->
+      <div v-if="showControls" class="px-5 py-4 border-b border-[#EEDFC4] min-h-[76px] flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-3">
         <SearchInput
           v-model="searchQuery"
           placeholder="Search TXN ID, activity, amount..."
@@ -13,10 +12,7 @@
           class="w-full 2xl:w-80 shrink-0"
         />
 
-        <!-- Action Buttons & Filters -->
         <div class="flex flex-wrap items-center gap-2 sm:gap-3 w-full 2xl:w-auto justify-start sm:justify-end">
-          
-          <!-- Date Pickers -->
           <div class="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
             <EmilCalendar
               v-model="startDate"
@@ -51,7 +47,7 @@
 
           <button
             type="button"
-            class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl font-display text-xs sm:text-sm font-semibold bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FDF3E7] hover:border-[#7D5A50] transition-all shadow-xs shrink-0 active:scale-[0.98] cursor-pointer h-10"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 rounded-xl font-display text-xs sm:text-sm font-semibold bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FDF3E7] hover:border-[#7D5A50] transition-all shadow-xs shrink-0 active:scale-[0.98] cursor-pointer h-10"
             title="Export records to formatted Excel spreadsheet"
             @click="handleExportExcel"
           >
@@ -61,106 +57,125 @@
         </div>
       </div>
 
-      <div class="overflow-x-auto w-full">
-        <table class="w-full text-left border-collapse min-w-[680px]">
-          <thead>
-            <tr class="bg-[#FFF0D1] border-b border-[#F3E7D2]">
-              <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
-                Transaction ID
-              </th>
-              <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
-                Date
-              </th>
-              <th v-if="showOwnerName" class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
-                Owner Name
-              </th>
-              <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
-                Activity / Plan Type
-              </th>
-              <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
-                Amount
-              </th>
-              <th class="font-sans text-[12px] font-semibold tracking-wider text-[#9E7060] uppercase px-6 py-4">
-                Payment Status
-              </th>
-            </tr>
-          </thead>
+      <!-- Loading -->
+      <div v-if="loading" class="flex justify-center items-center py-12" role="status">
+        <span class="sr-only">Loading payment records…</span>
+        <Icon name="heroicons:arrow-path" class="w-8 h-8 animate-spin text-[#7D5A50]" aria-hidden="true" />
+      </div>
 
-          <!-- Table Body -->
-          <tbody>
-            <tr v-if="loading">
-              <td colspan="6" class="px-6 py-12 text-center font-sans text-sm text-[#8B6656]">
-                <div class="flex items-center justify-center gap-2">
-                  <Icon name="heroicons:arrow-path" class="w-5 h-5 animate-spin text-[#B4846C]" />
-                  <span>Loading payment records...</span>
-                </div>
-              </td>
-            </tr>
+      <!-- Empty -->
+      <div v-else-if="!filteredHistory.length" class="px-6 py-14 text-center">
+        <p class="font-display font-extrabold text-lg text-[#3D2B24]">
+          {{ hasFilters ? 'No payments match these filters' : 'No payments yet' }}
+        </p>
+        <p class="text-sm text-[#9E7060] mt-1">
+          {{ hasFilters ? 'Try a different search, date range, or status.' : 'Subscription payments will show up here.' }}
+        </p>
+        <button
+          v-if="hasFilters"
+          type="button"
+          @click="clearFilters"
+          class="mt-4 text-sm font-bold text-[#7D5A50] underline underline-offset-4 hover:text-[#3D2B24]"
+        >
+          Clear filters
+        </button>
+      </div>
 
-            <tr v-else-if="!filteredHistory.length">
-              <td colspan="6" class="px-6 py-12 text-center font-sans text-sm text-[#8B6656]/70">
-                No matching subscription payment history found.
-              </td>
-            </tr>
+      <template v-else>
+        <!-- Column labels (wide screens only; rows stack on small screens). The arrow column has no label. -->
+        <div
+          class="hidden lg:grid items-center gap-x-4 px-6 py-3.5 bg-[#FAF4ED] border-b border-[#EEDFC4] font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase"
+          :class="gridCols"
+        >
+          <span>Transaction</span>
+          <span>Date</span>
+          <span v-if="showOwnerName">Owner</span>
+          <span>Activity / Plan</span>
+          <span>Amount</span>
+          <span>Status</span>
+          <span class="w-9" aria-hidden="true"></span>
+        </div>
 
-            <tr
-              v-for="txn in paginatedRows"
-              :key="txn.transaction_id"
-              class="border-b border-[#F3E7D2] last:border-b-0 hover:bg-[#FFFDF9] transition-colors group cursor-pointer"
+        <ul class="divide-y divide-[#F3E7D2]">
+          <li v-for="txn in paginatedRows" :key="txn.transaction_id">
+            <div
+              class="group grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-4 gap-y-1.5 px-5 sm:px-6 py-4 cursor-pointer transition-colors duration-150 ease-out [@media(hover:hover)]:hover:bg-[#FAF4ED]/70"
+              :class="gridCols"
               @click="openReceiptModal(txn)"
             >
-              <!-- Transaction ID with click to copy feature -->
-              <td class="px-6 py-5 font-sans text-[14px] font-bold text-[#3B1F0E] whitespace-nowrap">
-                <div class="inline-flex items-center gap-2">
-                  <span>{{ formatTxnId(txn.transaction_id) }}</span>
-                  <button
-                    type="button"
-                    class="inline-flex items-center justify-center opacity-0 group-hover:opacity-100 p-1 text-[#9E7060] hover:text-[#3B1F0E] transition-opacity"
-                    title="Copy Transaction ID"
-                    @click.stop="copyToClipboard(formatTxnId(txn.transaction_id))"
-                  >
-                    <Icon name="heroicons:document-duplicate" class="w-4 h-4" />
-                  </button>
+              <!-- Transaction: icon tile, ID with copy; below lg also the activity and date -->
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-[38px] h-[38px] shrink-0 rounded-lg bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center">
+                  <Icon name="heroicons:receipt-percent" class="w-[18px] h-[18px]" />
                 </div>
-              </td>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1">
+                    <span class="font-sans text-sm font-bold leading-snug text-[#3D2B24] group-hover:text-[#8B5A3C] transition-colors truncate tabular-nums">
+                      {{ formatTxnId(txn.transaction_id) }}
+                    </span>
+                    <button
+                      type="button"
+                      class="inline-flex items-center justify-center p-1 rounded-md text-[#B4846C] hover:text-[#3B1F0E] opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                      :aria-label="`Copy ${formatTxnId(txn.transaction_id)}`"
+                      title="Copy Transaction ID"
+                      @click.stop="copyToClipboard(formatTxnId(txn.transaction_id))"
+                    >
+                      <Icon name="heroicons:document-duplicate" class="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <p class="lg:hidden font-sans text-[11px] font-medium leading-tight text-[#9E7060] truncate">
+                    {{ txn.description }} · {{ formatDate(txn.date) }}<template v-if="showOwnerName && txn.owner_name"> · {{ txn.owner_name }}</template>
+                  </p>
+                </div>
+              </div>
 
               <!-- Date -->
-              <td class="px-6 py-5 font-sans text-[14px] text-[#3B1F0E]/80 whitespace-nowrap">
-                {{ formatDate(txn.date) }}
-              </td>
+              <p class="hidden lg:flex items-center gap-1.5 min-w-0 font-sans text-xs font-semibold text-[#3D2B24]">
+                <Icon name="heroicons:calendar" class="w-3.5 h-3.5 shrink-0 text-[#B4846C]" />
+                <span class="truncate">{{ formatDate(txn.date) }}</span>
+              </p>
 
-              <!-- Owner Name -->
-              <td v-if="showOwnerName" class="px-6 py-5 font-sans text-[14px] font-semibold text-[#3B1F0E] whitespace-nowrap">
-                {{ txn.owner_name || 'N/A' }}
-              </td>
+              <!-- Owner -->
+              <p v-if="showOwnerName" class="hidden lg:flex items-center gap-1.5 min-w-0 font-sans text-xs" :class="txn.owner_name ? 'font-semibold text-[#3D2B24]' : 'italic text-[#9E7060]/80'">
+                <Icon name="heroicons:user" class="w-3.5 h-3.5 shrink-0 text-[#B4846C]" />
+                <span class="truncate">{{ txn.owner_name || 'Unknown owner' }}</span>
+              </p>
 
-              <!-- Activity / Plan Type -->
-              <td class="px-6 py-5 font-sans text-[14px] font-semibold text-[#3B1F0E]">
+              <!-- Activity / Plan -->
+              <p class="hidden lg:block min-w-0 font-sans text-xs font-semibold text-[#3D2B24] truncate" :title="txn.description">
                 {{ txn.description }}
-              </td>
+              </p>
 
-              <!-- Amount -->
-              <td class="px-6 py-5 font-sans text-[14px] font-bold text-[#3B1F0E] whitespace-nowrap">
-                {{ formatAmount(txn.amount) }}
-              </td>
-
-              <!-- Payment Status Pill -->
-              <td class="px-6 py-5 whitespace-nowrap">
-                <span
-                  class="inline-flex items-center justify-center px-3.5 py-1 rounded-full text-[13px] font-semibold tracking-wide"
-                  :class="getStatusClasses(txn.status)"
-                >
-                  {{ formatStatusLabel(txn.status) }}
+              <!-- Amount and status: stacked on the right below lg, their own columns from lg -->
+              <div class="flex flex-col items-end gap-1 lg:contents">
+                <span class="font-sans text-sm font-bold text-[#3D2B24] tabular-nums whitespace-nowrap">
+                  {{ formatAmount(txn.amount) }}
                 </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                <span>
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold shrink-0" :class="statusMeta(txn.status).badge">
+                    <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="statusMeta(txn.status).dot" aria-hidden="true" />
+                    {{ formatStatusLabel(txn.status) }}
+                  </span>
+                </span>
+              </div>
+
+              <!-- Open receipt -->
+              <button
+                type="button"
+                :aria-label="`View receipt ${formatTxnId(txn.transaction_id)}`"
+                class="inline-flex items-center justify-center w-9 h-9 -mr-2 lg:mr-0 rounded-xl text-[#B4846C] transition-colors group-hover:text-[#7D5A50] [@media(hover:hover)]:hover:bg-[#F3E7D2] outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                @click.stop="openReceiptModal(txn)"
+              >
+                <Icon name="heroicons:chevron-right" class="w-5 h-5" />
+              </button>
+            </div>
+          </li>
+        </ul>
+      </template>
     </div>
 
-    <!-- Pagination (Separate Frame) -->
-    <div v-if="filteredHistory.length > 0" class="w-full max-w-full bg-white rounded-b-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
+    <!-- Pagination: the shared component in its own bottom frame, as on Cafe Management -->
+    <div v-if="filteredHistory.length > 0 && !loading" class="w-full max-w-full bg-white rounded-b-[20px] border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
       <CommonPagination
         :page="currentPage"
         :last-page="lastPage"
@@ -366,6 +381,21 @@ const paginatedRows = computed(() => {
   return filteredHistory.value.slice(start, start + props.perPage)
 })
 
+// Same column rhythm as the Cafe Management table; the last column holds the open arrow.
+// Written out in full so Tailwind sees both class strings.
+const gridCols = computed(() => props.showOwnerName
+  ? 'lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.8fr)_minmax(0,1fr)_8.5rem_auto]'
+  : 'lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)_8.5rem_auto]')
+
+const hasFilters = computed(() => !!(searchQuery.value.trim() || selectedStatus.value || startDate.value || endDate.value))
+
+function clearFilters() {
+  searchQuery.value = ''
+  selectedStatus.value = ''
+  startDate.value = ''
+  endDate.value = ''
+}
+
 watch([searchQuery, selectedStatus, startDate, endDate], () => {
   currentPage.value = 1
 })
@@ -431,6 +461,18 @@ function getStatusClasses(st?: string): string {
     return 'bg-[#FEF3C7] text-[#D97706]'
   }
   return 'bg-[#FDE8E8] text-[#DC3545]'
+}
+
+// Same pill as the Cafe Management status: soft fill, matching border, coloured dot.
+function statusMeta(st?: string): { badge: string, dot: string } {
+  const s = (st || '').toLowerCase()
+  if (['active', 'succeeded', 'success', 'paid', 'approved'].includes(s)) {
+    return { badge: 'bg-[#E8F7EE] text-[#28A745] border-[#C3ECD3]', dot: 'bg-[#28A745]' }
+  }
+  if (['pending', 'pending_approval'].includes(s)) {
+    return { badge: 'bg-[#FDF0D5] text-[#8A5A0B] border-[#F3D9A4]', dot: 'bg-[#D9962B]' }
+  }
+  return { badge: 'bg-[#FDE8E8] text-[#DC3545] border-[#F8B4B4]', dot: 'bg-[#DC3545]' }
 }
 
 function copyToClipboard(text: string) {
