@@ -108,9 +108,9 @@ onMounted(fetchItem)
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row min-h-screen bg-[#FFF8EA]">
+  <div class="flex flex-col md:flex-row min-h-screen bg-[#fdf3e7]">
     <NavBar :links="links" />
-    <main class="flex-1 p-6 sm:p-8 lg:p-12 font-display min-w-0">
+    <main class="flex-1 p-4 md:p-6 lg:p-10 max-w-7xl mx-auto w-full font-display min-w-0">
       <!-- Breadcrumbs -->
       <MenuBreadcrumbs :items="breadcrumbs" />
 
@@ -131,55 +131,59 @@ onMounted(fetchItem)
             v-if="item.picture"
             :src="item.picture"
             :alt="item.menu_name"
-            class="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl object-cover shrink-0 border border-[#F4E6DE]"
+            class="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl object-cover shrink-0 border border-[#EEDFC4] shadow-sm"
           />
-          <div v-else class="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl bg-[#FBF2E1] border border-[#F4E6DE] flex items-center justify-center shrink-0">
+          <div v-else class="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl bg-[#FBF2E1] border border-[#EEDFC4] flex items-center justify-center shrink-0">
             <Icon name="heroicons:photo" class="w-10 h-10 text-[#B4846C]/50" />
           </div>
 
           <div class="flex-1 min-w-0 flex flex-col gap-3">
             <div class="flex flex-wrap items-start justify-between gap-4">
               <div class="min-w-0">
-                <h1 class="text-[28px] sm:text-[36px] leading-tight font-bold text-[#3D2B24] break-words">
+                <h1 class="text-[28px] sm:text-[32px] leading-tight font-bold text-[#3B1F0E] break-words">
                   {{ item.menu_name }}
                 </h1>
-                <div class="mt-2 flex flex-wrap items-center gap-2 font-sans text-sm">
-                  <span class="inline-flex items-center rounded-full bg-[#FBF2E1] px-3 py-1 font-semibold text-[#7D5A50]">
+                <div class="mt-2 flex flex-wrap items-center gap-2 font-sans text-xs">
+                  <NuxtLink
+                    :to="`/owner/menu-management/category/${item.category_uuid || 'uncategorized'}`"
+                    class="inline-flex items-center gap-1 rounded-full bg-[#FBF2E1] border border-[#EEDFC4] px-2.5 py-1 font-bold text-[#7D5A50] hover:bg-[#F5EAD4] hover:text-[#3B1F0E] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                  >
+                    <Icon name="heroicons:squares-2x2" class="w-3.5 h-3.5" />
                     {{ item.category_name || 'Uncategorized' }}
-                  </span>
-                  <span v-if="item.sizes?.length" class="inline-flex items-center rounded-full border border-[#EEDFC4] px-3 py-1 font-medium text-[#7D5A50]">
+                  </NuxtLink>
+                  <span v-if="item.sizes?.length" class="inline-flex items-center rounded-full border border-[#EEDFC4] bg-white px-2.5 py-1 font-semibold text-[#7D5A50]">
                     {{ item.sizes.length }} sizes
                   </span>
-                  <span v-if="item.is_hot_and_iced" class="inline-flex items-center rounded-full border border-[#EEDFC4] px-3 py-1 font-medium text-[#7D5A50]">
+                  <span v-if="item.is_hot_and_iced" class="inline-flex items-center rounded-full border border-[#EEDFC4] bg-white px-2.5 py-1 font-semibold text-[#7D5A50]">
                     Hot and iced
                   </span>
-                  <span v-if="!item.is_available" class="inline-flex items-center rounded-full bg-red-50 px-3 py-1 font-semibold text-red-700">
+                  <span v-if="!item.is_available" class="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2.5 py-1 font-bold text-red-700">
                     Unavailable
                   </span>
                 </div>
               </div>
               <button
                 type="button"
-                class="inline-flex items-center gap-2 px-4 py-3 rounded-[10px] border border-[#7D5A50] text-sm font-semibold text-[#7D5A50] hover:bg-[#FBF2E1] transition-colors shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+                class="h-10 px-4 rounded-xl border border-[#D8C7B5] bg-white text-[#3B1F0E] font-sans text-sm font-bold flex items-center gap-1.5 hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer shadow-2xs shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
                 @click="openEdit"
               >
-                <img src="/images/edit-item.svg" alt="" width="16" height="16" />
-                Edit Item
+                <Icon name="heroicons:pencil-square" class="w-4 h-4" />
+                <span>Edit Item</span>
               </button>
             </div>
-            <p :class="['font-sans text-base max-w-[65ch] break-words', item.description ? 'text-[#3D2B24]' : 'text-[#9E7060]']">
+            <p :class="['font-sans max-w-[65ch] break-words', item.description ? 'text-base text-[#3D2B24]' : 'text-sm italic text-[#A8988B]']">
               {{ item.description || 'No description provided' }}
             </p>
           </div>
         </header>
 
-        <div class="mt-8 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-5 items-start">
+        <div class="mt-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-6 items-start">
           <!-- Main column: what it sells for and what goes into it -->
           <div class="flex flex-col gap-5 min-w-0">
 
             <!-- Pricing -->
-            <section class="bg-white border border-[#F4E6DE] rounded-2xl p-6" aria-labelledby="pricing-title">
-              <h2 id="pricing-title" class="text-xl font-bold text-[#3D2B24]">Pricing</h2>
+            <section class="bg-white border border-[#EEDFC4] rounded-2xl shadow-sm p-5 sm:p-6" aria-labelledby="pricing-title">
+              <h2 id="pricing-title" class="text-lg font-bold text-[#3B1F0E]">Pricing</h2>
 
               <!-- One price -->
               <p v-if="!item.sizes?.length && !item.is_hot_and_iced" class="mt-3 text-[28px] font-bold text-[#3D2B24] tabular-nums">
@@ -220,9 +224,9 @@ onMounted(fetchItem)
             </section>
 
             <!-- Recipe -->
-            <section class="bg-white border border-[#F4E6DE] rounded-2xl p-6" aria-labelledby="recipe-title">
+            <section class="bg-white border border-[#EEDFC4] rounded-2xl shadow-sm p-5 sm:p-6" aria-labelledby="recipe-title">
               <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <h2 id="recipe-title" class="text-xl font-bold text-[#3D2B24]">Recipe</h2>
+                <h2 id="recipe-title" class="text-lg font-bold text-[#3B1F0E]">Recipe</h2>
                 <p class="font-sans text-sm text-[#9E7060]">
                   One serving<template v-if="item.is_hot_and_iced">, hot or iced</template>
                 </p>
@@ -260,12 +264,14 @@ onMounted(fetchItem)
                 </table>
               </div>
 
-              <p v-else class="mt-3 font-sans text-sm text-[#9E7060]">No recipe added for this item.</p>
+              <p v-else class="mt-3 font-sans text-xs text-[#8A6E64] bg-[#FDFBF7] border border-dashed border-[#D8C7B5] rounded-xl px-4 py-3">
+                No recipe yet. Add ingredients with Edit Item.
+              </p>
             </section>
 
             <!-- Add-ons -->
-            <section class="bg-white border border-[#F4E6DE] rounded-2xl p-6" aria-labelledby="addons-title">
-              <h2 id="addons-title" class="text-xl font-bold text-[#3D2B24]">Add-ons</h2>
+            <section class="bg-white border border-[#EEDFC4] rounded-2xl shadow-sm p-5 sm:p-6" aria-labelledby="addons-title">
+              <h2 id="addons-title" class="text-lg font-bold text-[#3B1F0E]">Add-ons</h2>
               <ul v-if="item.addons?.length" class="mt-4 flex flex-wrap gap-2 font-sans">
                 <li
                   v-for="addon in item.addons"
@@ -277,14 +283,15 @@ onMounted(fetchItem)
                   <span v-if="!addon.is_available" class="text-xs font-normal text-[#9E7060]">(off)</span>
                 </li>
               </ul>
-              <p v-else class="mt-3 font-sans text-sm text-[#9E7060]">No add-ons. Pick them with Edit Item.</p>
+              <p v-else class="mt-3 font-sans text-xs text-[#8A6E64] bg-[#FDFBF7] border border-dashed border-[#D8C7B5] rounded-xl px-4 py-3">
+                No add-ons yet. Pick them with Edit Item.
+              </p>
             </section>
           </div>
 
           <!-- Side column: where it is sold -->
-          <div class="lg:sticky lg:top-6">
-            <ItemBranchesPanel :key="branchesKey" :item-uuid="itemUuid" />
-          </div>
+          <!-- The panel is sticky and sized on its own -->
+          <ItemBranchesPanel :key="branchesKey" :item-uuid="itemUuid" />
         </div>
       </template>
     </main>

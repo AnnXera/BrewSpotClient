@@ -46,7 +46,13 @@ const birInputRef = ref<HTMLInputElement | null>(null)
 
 const errors = ref<Record<string, string>>({})
 
-const hasBackendErrors = computed(() => Object.keys(props.backendErrors || {}).length > 0)
+// Field errors render inline; the banner only lists errors with no field to attach to
+const FORM_FIELDS = Object.values(STEP_FIELDS).flat()
+const generalBackendErrors = computed(() =>
+  Object.entries(props.backendErrors || {})
+    .filter(([field]) => !FORM_FIELDS.includes(field))
+    .flatMap(([, msgs]) => msgs)
+)
 
 // Reset or populate on show
 watch(() => props.show, (open) => {
@@ -77,6 +83,12 @@ onBeforeUnmount(() => {
 function fieldError(key: string): string | undefined {
   return errors.value[key] || props.backendErrors?.[key]?.[0]
 }
+
+// Step indicator: an error count wins over the step number; step 1 shows a check once passed.
+const steps = computed(() => [
+  { step: 1, label: 'General information', errors: STEP_FIELDS[1]!.filter(f => !!fieldError(f)).length, done: currentStep.value > 1 },
+  { step: 2, label: 'Legal documents (BIR)', errors: STEP_FIELDS[2]!.filter(f => !!fieldError(f)).length, done: false }
+])
 
 function onCafeMobileInput(event: Event) {
   const target = event.target as HTMLInputElement
@@ -237,6 +249,7 @@ function handleSubmit() {
 </script>
 
 <template>
+  <Teleport to="body">
   <div v-if="show" class="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
     <!-- Backdrop with subtle blur -->
     <div
@@ -250,10 +263,10 @@ function handleSubmit() {
       role="dialog"
       aria-modal="true"
       aria-labelledby="branch-modal-title"
-      class="relative bg-white rounded-3xl w-full max-w-[820px] flex flex-col shadow-[0_24px_50px_-12px_rgba(59,31,14,0.22)] border border-[#EEDFC4] overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150"
+      class="relative bg-white rounded-3xl w-full max-w-[820px] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] flex flex-col shadow-[0_24px_50px_-12px_rgba(59,31,14,0.22)] border border-[#EEDFC4] overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150"
     >
       <!-- Header -->
-      <div class="flex items-center justify-between gap-4 px-6 md:px-8 pt-5 pb-4 border-b border-[#EEDFC4] bg-[#FDFBF7]">
+      <div class="flex items-center justify-between gap-4 px-6 md:px-8 pt-5 pb-4 border-b border-[#EEDFC4] bg-[#FDFBF7] shrink-0">
         <div class="flex items-center gap-3.5">
           <div class="w-10 h-10 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0 shadow-2xs">
             <Icon name="heroicons:building-storefront" class="w-5 h-5" />
@@ -272,64 +285,62 @@ function handleSubmit() {
           type="button"
           @click="emit('close')"
           aria-label="Close modal"
-          class="w-8.5 h-8.5 rounded-xl bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+          class="w-9 h-9 rounded-xl bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
         >
           <Icon name="heroicons:x-mark" class="w-4 h-4" />
         </button>
       </div>
 
-      <!-- Segmented Step Navigation (Emil Kowalski Style) -->
-      <div class="px-6 md:px-8 py-2.5 border-b border-[#F0E4D3] bg-[#FCFAF6] flex items-center justify-between gap-3 select-none">
-        <div class="inline-flex p-1 rounded-2xl bg-[#EFE7DC] border border-[#E5D7C6] gap-1">
-          <button
-            type="button"
-            @click="goToStep(1)"
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-            :class="currentStep === 1
-              ? 'bg-white text-[#3B1F0E] shadow-sm font-extrabold'
-              : 'text-[#8A6E64] hover:text-[#3B1F0E]'"
-          >
-            <Icon name="heroicons:information-circle" class="w-3.5 h-3.5" :class="currentStep === 1 ? 'text-[#7D5A50]' : 'text-[#A8988B]'" />
-            <span>1. General Information</span>
-          </button>
-
-          <button
-            type="button"
-            @click="goToStep(2)"
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-            :class="currentStep === 2
-              ? 'bg-white text-[#3B1F0E] shadow-sm font-extrabold'
-              : 'text-[#8A6E64] hover:text-[#3B1F0E]'"
-          >
-            <Icon name="heroicons:document-text" class="w-3.5 h-3.5" :class="currentStep === 2 ? 'text-[#7D5A50]' : 'text-[#A8988B]'" />
-            <span>2. Legal Documents (BIR)</span>
-          </button>
-        </div>
-
-        <span class="text-xs font-bold text-[#8A6E64]">
-          Step {{ currentStep }} of 2
-        </span>
-      </div>
+      <!-- Steps -->
+      <nav aria-label="Form steps" class="px-6 md:px-8 py-3 border-b border-[#F0E4D3] bg-[#FCFAF6] select-none shrink-0">
+        <ol class="flex items-center gap-3">
+          <li v-for="(s, i) in steps" :key="s.step" class="flex items-center gap-3" :class="i === 0 ? '' : 'flex-1 sm:flex-none'">
+            <span v-if="i > 0" class="h-px w-6 shrink-0 bg-[#E3D3BF] sm:w-10" aria-hidden="true" />
+            <button
+              type="button"
+              class="group inline-flex items-center gap-2.5 rounded-xl py-1 pr-2 text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+              :aria-current="currentStep === s.step ? 'step' : undefined"
+              @click="goToStep(s.step)"
+            >
+              <span
+                class="flex size-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold transition-colors"
+                :class="s.errors
+                  ? 'bg-red-500 text-white'
+                  : currentStep === s.step
+                    ? 'bg-[#3B1F0E] text-[#FFF8EA]'
+                    : s.done
+                      ? 'bg-[#EAD9C6] text-[#5C4037]'
+                      : 'bg-white border border-[#E0D0BE] text-[#8A6E64]'"
+              >
+                <template v-if="s.errors">{{ s.errors }}</template>
+                <Icon v-else-if="s.done && currentStep !== s.step" name="heroicons:check" class="h-3.5 w-3.5" />
+                <template v-else>{{ i + 1 }}</template>
+              </span>
+              <span class="text-[13px] font-semibold whitespace-nowrap" :class="currentStep === s.step ? 'text-[#3B1F0E]' : 'text-[#8A6E64] group-hover:text-[#3B1F0E]'">
+                {{ s.label }}
+              </span>
+            </button>
+          </li>
+        </ol>
+      </nav>
 
       <!-- Backend Errors Alert Banner -->
-      <div v-if="hasBackendErrors" role="alert" class="mx-6 md:mx-8 mt-4 p-3.5 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-xs shrink-0 shadow-2xs">
+      <div v-if="generalBackendErrors.length" role="alert" class="mx-6 md:mx-8 mt-4 p-3.5 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-xs shrink-0 shadow-2xs">
         <p class="font-bold mb-1.5 text-xs flex items-center gap-1.5">
           <Icon name="heroicons:exclamation-triangle" class="w-4 h-4 text-red-500 shrink-0" />
           <span>Please correct the following errors:</span>
         </p>
         <ul class="list-disc pl-5 space-y-0.5 text-[11px] font-medium">
-          <template v-for="(msgs, field) in backendErrors" :key="field">
-            <li v-for="msg in msgs" :key="msg">{{ msg }}</li>
-          </template>
+          <li v-for="msg in generalBackendErrors" :key="msg">{{ msg }}</li>
         </ul>
       </div>
 
       <!-- Form Content: Scrollable Body -->
-      <form @submit.prevent="handleSubmit" class="flex-1 overflow-y-auto px-6 md:px-8 py-4.5 space-y-4 max-h-[68vh]">
+      <form @submit.prevent="handleSubmit" class="flex-1 min-h-0 overflow-y-auto px-6 md:px-8 py-4">
         <!-- ════════════ STEP 1: General Information ════════════ -->
         <div v-show="currentStep === 1" class="space-y-4">
           <!-- Card 1: Branch Identity & Location -->
-          <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4.5 sm:p-5 shadow-2xs space-y-3.5">
+          <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5">
             <div class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
               <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
               <span>Branch Identity & Location</span>
@@ -374,7 +385,7 @@ function handleSubmit() {
           </div>
 
           <!-- Card 2: Contact Details -->
-          <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4.5 sm:p-5 shadow-2xs space-y-3.5">
+          <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5">
             <div class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
               <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
               <span>Contact Details</span>
@@ -431,7 +442,7 @@ function handleSubmit() {
           </div>
 
           <!-- Card 3: Storefront Branding -->
-          <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4.5 sm:p-5 shadow-2xs space-y-3.5">
+          <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5">
             <div class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
               <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
               <span>Storefront Branding (Optional)</span>
@@ -517,7 +528,7 @@ function handleSubmit() {
         <!-- ════════════ STEP 2: Legal Documents (BIR) ════════════ -->
         <div v-show="currentStep === 2" class="space-y-4">
           <!-- Card 1: Tax Identification & Registration -->
-          <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4.5 sm:p-5 shadow-2xs space-y-3.5">
+          <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5">
             <div class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
               <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
               <span>Tax Identification & Registration</span>
@@ -527,7 +538,7 @@ function handleSubmit() {
               <!-- TIN Number -->
               <div>
                 <label class="block text-xs font-bold text-[#3B1F0E] mb-1">
-                  {{ mainTinPrefix ? 'BIR Branch Code *' : 'TIN Number *' }}
+                  {{ mainTinPrefix ? 'BIR Branch Code' : 'TIN Number' }} <span class="text-red-500">*</span>
                 </label>
 
                 <!-- With Main TIN Prefix -->
@@ -579,7 +590,7 @@ function handleSubmit() {
                 </label>
                 <DropdownList
                   v-model="form.vat"
-                  :options="[{ value: 'vat-registered', label: 'VAT Registered' }, { value: 'non-vat', label: 'Non-VAT' }]"
+                  :options="[{ value: 'vat-registered', label: 'VAT' }, { value: 'non-vat', label: 'Non-VAT' }]"
                   size="md"
                   :invalid="!!fieldError('vat')"
                 />
@@ -597,6 +608,7 @@ function handleSubmit() {
               </label>
               <EmilCalendar
                 v-model="form.bir_registered_at"
+                class="sm:!w-full"
                 placeholder="Select BIR registration date"
                 align="left"
                 :invalid="!!fieldError('bir_registered_at')"
@@ -610,7 +622,7 @@ function handleSubmit() {
           </div>
 
           <!-- Card 2: BIR Registration Document -->
-          <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4.5 sm:p-5 shadow-2xs space-y-3.5">
+          <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5">
             <div class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
               <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
               <span>BIR Certificate of Registration (Form 2303) <span class="text-red-500">*</span></span>
@@ -697,37 +709,26 @@ function handleSubmit() {
       </form>
 
       <!-- Footer: Intuitive Progression & Balanced Actions -->
-      <div class="flex items-center justify-between px-6 md:px-8 py-3.5 border-t border-[#EEDFC4] bg-[#FAF8F5] rounded-b-3xl">
+      <div class="flex items-center justify-between px-6 md:px-8 py-3.5 border-t border-[#EEDFC4] bg-[#FAF8F5] rounded-b-3xl shrink-0">
         <!-- Left Action -->
-        <div>
-          <button
-            v-if="currentStep === 1"
-            type="button"
-            @click="emit('close')"
-            class="px-5 py-2 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
-          >
-            Cancel
-          </button>
-          <button
-            v-else
-            type="button"
-            @click="prevStep"
-            class="px-4 py-2 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
-          >
-            <Icon name="heroicons:arrow-left" class="w-4 h-4" />
-            <span>Back</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          @click="emit('close')"
+          class="px-5 py-2 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+        >
+          Cancel
+        </button>
 
         <!-- Right Action -->
         <div class="flex items-center gap-3">
           <button
             v-if="currentStep === 2"
             type="button"
-            @click="emit('close')"
-            class="px-5 py-2 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+            @click="prevStep"
+            class="px-4 py-2 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
           >
-            Cancel
+            <Icon name="heroicons:arrow-left" class="w-4 h-4" />
+            <span>Back</span>
           </button>
 
           <!-- Step 1 Primary: Next Step -->
@@ -758,4 +759,5 @@ function handleSubmit() {
       </div>
     </div>
   </div>
+  </Teleport>
 </template>

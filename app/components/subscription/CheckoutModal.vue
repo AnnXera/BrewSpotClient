@@ -24,8 +24,10 @@ const authCookie = useCookie('auth_token')
 
 const finalPrice = computed(() => {
   if (!props.plan) return '0.00'
-  const price = props.billingCycle === 'yearly'
-    ? (props.plan.yearly_price ?? props.plan.price)
+  // A yearly price of 0 means the plan has no yearly option (the server bills it on its own
+  // term), so show its regular price rather than "Pay ₱0.00".
+  const price = props.billingCycle === 'yearly' && Number(props.plan.yearly_price) > 0
+    ? props.plan.yearly_price
     : props.plan.price
   const num = typeof price === 'string' ? parseFloat(price) : price
   return isNaN(num) ? '0.00' : num.toFixed(2)

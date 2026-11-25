@@ -87,7 +87,12 @@ async function fetchData() {
 onMounted(fetchData)
 
 const pageTitle = computed(() => currentCategory.value?.name || 'Category Items')
-const pageSubtitle = computed(() => currentCategory.value?.description || 'Manage items for this category.')
+const pageSubtitle = computed(() => {
+  if (currentCategory.value?.description) return currentCategory.value.description
+  if (isLoading.value) return ''
+  const count = items.value.length
+  return count === 0 ? 'No items in this category yet.' : `${count} ${count === 1 ? 'item' : 'items'} in this category`
+})
 
 const breadcrumbs = computed(() => {
   return [
@@ -215,26 +220,25 @@ const links = OWNER_NAV_LINKS
         :title="pageTitle"
         :subtitle="pageSubtitle"
         :breadcrumbs="breadcrumbs"
+        icon="heroicons:rectangle-stack"
       >
-        <template v-if="isRealCategory && currentCategory" #title-actions>
+        <template v-if="isRealCategory && currentCategory" #actions>
           <button
             type="button"
-            class="w-9 h-9 rounded-full bg-white border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center hover:bg-[#F5EAD4] transition-colors"
-            title="Edit Category"
-            aria-label="Edit category"
-            @click="canEditMenu() && (isCategoryModalOpen = true)"
-          >
-            <Icon name="heroicons:pencil-square" class="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            class="w-9 h-9 rounded-full bg-[#FDE8E8] text-[#D9534F] flex items-center justify-center hover:bg-[#FAD4D4] transition-colors disabled:opacity-50"
-            title="Delete Category"
-            aria-label="Delete category"
+            class="h-10 px-4 rounded-xl border border-red-200 bg-white text-red-600 text-sm font-bold flex items-center gap-1.5 hover:bg-red-50 active:scale-95 transition-all cursor-pointer disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-red-300"
             :disabled="isDeletingCategory"
             @click="handleDeleteCategory"
           >
-            <Icon name="heroicons:trash" class="w-5 h-5" />
+            <Icon name="heroicons:trash" class="w-4 h-4" />
+            <span>Delete</span>
+          </button>
+          <button
+            type="button"
+            class="h-10 px-4 rounded-xl border border-[#D8C7B5] bg-white text-[#3B1F0E] text-sm font-bold flex items-center gap-1.5 hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer shadow-2xs outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+            @click="canEditMenu() && (isCategoryModalOpen = true)"
+          >
+            <Icon name="heroicons:pencil-square" class="w-4 h-4" />
+            <span>Edit Category</span>
           </button>
         </template>
       </MenuPageHeader>

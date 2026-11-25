@@ -7,6 +7,8 @@ import { FLOOR_TAB_LIMIT, doorAsset, tableAsset } from '~/utils/floorPlanCatalog
 import EmilCalendar from '~/components/common/EmilCalendar.vue'
 import DialogShell from '~/components/common/DialogShell.vue'
 import BranchPicker from '~/components/common/BranchPicker.vue'
+import SearchInput from '~/components/common/SearchInput.vue'
+import DropdownList from '~/components/common/DropdownList.vue'
 
 // Shared with owners, who reach it at /owner/reservations for any of their branches.
 definePageMeta({
@@ -64,9 +66,48 @@ const waitlistLoading = ref(false)
 const submitting = ref(false)
 const updatingReservation = ref<string | null>(null)
 const waitlistActionError = ref('')
+// Its own error, so a booking-form or day-load error never replaces the list (and opening it keeps the form's message).
+const waitlistError = ref('')
 const selectedWaitlistReservation = ref<ReservationRecord | null>(null)
 const waitlistSearch = ref('')
 const waitlistStatusFilter = ref('all')
+const waitlistStatusOptions = [
+  { value: 'all', label: 'All statuses' },
+  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'seated', label: 'Seated' },
+  { value: 'no_show', label: 'No-show' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  seated: 'Seated',
+  no_show: 'No-show',
+  cancelled: 'Cancelled',
+}
+function statusLabel(status: string) {
+  return STATUS_LABELS[status] ?? status.replace('_', ' ')
+}
+function statusChipClass(status: string) {
+  if (status === 'seated') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  if (status === 'confirmed' || status === 'pending') return 'bg-[#FAF4ED] text-[#7D5A50] border-[#E3CFB4]'
+  if (status === 'no_show') return 'bg-amber-50 text-amber-800 border-amber-200'
+  return 'bg-[#F4F1EE] text-[#8B756A] border-[#E2DAD3]'
+}
+
+function closeWaitlist() {
+  showWaitlist.value = false
+  selectedWaitlistReservation.value = null
+}
+function onWaitlistKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && showWaitlist.value) {
+    if (selectedWaitlistReservation.value) selectedWaitlistReservation.value = null
+    else closeWaitlist()
+  }
+}
+onMounted(() => window.addEventListener('keydown', onWaitlistKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onWaitlistKeydown))
 const selectedTable = ref<FloorPlanTable | null>(null)
 const selectedChair = ref<FloorPlanElement | null>(null)
 const inspectedTable = ref<FloorPlanTable | null>(null)
@@ -385,6 +426,12 @@ watch(selectedDate, () => {
   loadDayReservations()
 })
 
+// Left open past midnight, the page moves on to the new day instead of staying on yesterday,
+// where every slot reads "Passed" and the date sits outside the strip.
+watch(todayDate, (today) => {
+  if (selectedDate.value < today) selectedDate.value = today
+})
+
 // Keep the picked time on a bookable slot: the same time if it exists, else the next one after it.
 function ensureValidTime() {
   const open = slots.value.filter((slot) => !slot.past)
@@ -524,9 +571,9 @@ async function updateReservationStatus(item: ReservationRecord, status: Reservat
     // Swap in the server's copy so the row shows its new status and actions right away.
     reservations.value = reservations.value.map((reservation) => reservation.uuid === item.uuid ? response.reservation : reservation)
     await loadDayReservations()
-    const statusLabel = status.charAt(0).toUpperCase() + status.slice(1)
+    const label = statusLabel(status)
     const tableName = item.table?.table_name ? `Table ${item.table.table_name}` : 'Reservation'
-    triggerToast(`Reservation ${statusLabel}`, `${tableName} for ${item.customer_name} marked as ${status}.`)
+    triggerToast(`Reservation ${label}`, `${tableName} for ${item.customer_name} marked as ${label.toLowerCase()}.`)
   } catch (error: any) {
     // The row stays as it was; the message shows above the list instead of replacing it.
     waitlistActionError.value = error?.data?.message ?? 'Could not update the reservation status.'
@@ -538,12 +585,12 @@ async function updateReservationStatus(item: ReservationRecord, status: Reservat
 async function openWaitlist() {
   showWaitlist.value = true
   waitlistLoading.value = true
-  reservationError.value = ''
+  waitlistError.value = ''
   waitlistActionError.value = ''
   try {
     await loadReservations()
   } catch (error: any) {
-    reservationError.value = error?.data?.message ?? 'Could not load the waitlist.'
+    waitlistError.value = error?.data?.message ?? 'Could not load the waitlist.'
   } finally {
     waitlistLoading.value = false
   }
@@ -592,6 +639,22 @@ function jumpTo(entry: { start: Date }) {
 }
 
 const phoneDigits = computed(() => reservation.customerPhone.replace(/\D/g, ''))
+// PH mobile number: 11 digits starting with 09 (mirrors StoreReservationRequest::PHONE_RULE).
+const phoneValid = computed(() => /^09\d{9}$/.test(phoneDigits.value))
+const phoneHint = computed(() => {
+  const digits = phoneDigits.value
+  if (!digits || phoneValid.value) return ''
+  if (!'09'.startsWith(digits.slice(0, 2))) return 'Phone numbers start with 09.'
+  return 'Phone numbers have 11 digits and start with 09.'
+})
+
+// Typing or pasting keeps digits only, so "0917 123 4567" or "+63..." can't sneak past the 11-digit limit.
+function onPhoneInput(event: Event) {
+  const input = event.target as HTMLInputElement
+  const digits = input.value.replace(/\D/g, '').slice(0, 11)
+  reservation.customerPhone = digits
+  if (input.value !== digits) input.value = digits
+}
 
 // Most guests the selection can take: one chair is one seat, counter seating only
 // has the seats other bookings that day leave free, any other table its capacity.
@@ -608,7 +671,9 @@ const maxGuests = computed(() => {
 
 const guestsError = computed(() => {
   const size = reservation.partySize
-  if (!selectedTable.value || !Number.isFinite(size)) return ''
+  if (!selectedTable.value) return ''
+  // A cleared field leaves '' (v-model.number), which would disable booking without saying why.
+  if (typeof size !== 'number' || !Number.isFinite(size)) return 'Enter the number of guests.'
   if (!Number.isInteger(size) || size < 1) return 'Enter at least 1 guest.'
   if (size > maxGuests.value) {
     const seats = `${maxGuests.value} ${maxGuests.value === 1 ? 'seat' : 'seats'}`
@@ -624,7 +689,7 @@ const canConfirm = computed(() =>
   && selectedSlotValid.value
   && Boolean(selectedTable.value)
   && Boolean(reservation.customerName.trim())
-  && phoneDigits.value.length === 11
+  && phoneValid.value
   && Number.isInteger(reservation.partySize)
   && reservation.partySize >= 1
   && reservation.partySize <= maxGuests.value
@@ -772,23 +837,27 @@ onBeforeUnmount(() => {
   <div class="reservations flex min-h-screen flex-col bg-[#FFF8EA] md:flex-row">
     <NavBar :links="links" />
     <main class="min-w-0 flex-1 p-4 md:p-8">
-      <header class="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 class="font-display text-3xl font-semibold tracking-tight text-[#3B2A24]">Reservations</h1>
-          <p class="mt-1 text-sm text-[#76605A]">Pick a date and time to see which tables are free.</p>
+      <!-- Same format as the Servings header: big tight title, icon-led subtitle line -->
+      <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="min-w-0">
+          <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">Reservations</h1>
+          <p class="mt-1.5 flex items-center gap-1.5 text-[13px] text-[#8B6656]">
+            <Icon name="heroicons:calendar-days" class="h-3.5 w-3.5 shrink-0 text-[#B4846C]" />
+            <span>Pick a date and time to see which tables are free.</span>
+          </p>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2 shrink-0">
           <BranchPicker v-if="showBranchPicker" v-model="branchUuid" :options="branchOptions" />
           <button
             type="button"
             data-walkthrough="reservations-waitlist-btn"
-            class="inline-flex h-10 items-center gap-2 rounded-lg border border-[#C79679] px-4 text-sm text-[#5B463C] transition-colors hover:bg-[#F8EFE7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/30"
-            :class="showWaitlist ? 'bg-[#F8EFE7]' : 'bg-white'"
+            class="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D8C7B5] px-4 text-sm font-bold text-[#3B1F0E] shadow-2xs transition-all hover:bg-[#FAF4ED] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+            :class="showWaitlist ? 'bg-[#FAF4ED]' : 'bg-white'"
             @click.stop="openWaitlist"
           >
             <Icon name="heroicons:queue-list" class="size-4" />
             Waitlist
-            <span class="rounded-full bg-[#F2E0D2] px-2 text-xs tabular-nums text-[#7D5A50]">{{ reservations.length }}</span>
+            <span class="rounded-full bg-[#FAF4ED] border border-[#E3CFB4] px-2 text-xs tabular-nums text-[#7D5A50]">{{ reservations.length }}</span>
           </button>
         </div>
       </header>
@@ -1108,7 +1177,7 @@ onBeforeUnmount(() => {
             </label>
             <div class="grid grid-cols-[minmax(0,1fr)_96px] gap-2">
               <label class="block text-xs text-[#5B463C]">Phone number
-                <input v-model="reservation.customerPhone" type="tel" inputmode="numeric" maxlength="11" pattern="[0-9]{11}" placeholder="09XXXXXXXXX" class="field tabular-nums">
+                <input :value="reservation.customerPhone" type="tel" inputmode="numeric" maxlength="11" pattern="09[0-9]{9}" placeholder="09XXXXXXXXX" :aria-invalid="!!phoneHint" aria-describedby="phone-hint" class="field tabular-nums" @input="onPhoneInput">
               </label>
               <label class="block text-xs text-[#5B463C]">Guests
                 <input
@@ -1124,7 +1193,7 @@ onBeforeUnmount(() => {
               </label>
             </div>
             <p v-if="guestsError" id="guests-error" class="text-xs text-[#A4472E]" role="alert">{{ guestsError }}</p>
-            <p v-if="reservation.customerPhone && phoneDigits.length !== 11" class="text-xs text-[#76605A]">Phone numbers have 11 digits.</p>
+            <p v-if="phoneHint" id="phone-hint" class="text-xs text-[#A4472E]">{{ phoneHint }}</p>
             <label class="block text-xs text-[#5B463C]">Notes
               <textarea v-model="reservation.notes" rows="2" placeholder="Allergies, occasion, high chair…" class="field resize-none" />
             </label>
@@ -1140,55 +1209,100 @@ onBeforeUnmount(() => {
         </aside>
       </div>
 
-      <div v-if="showWaitlist" class="fixed inset-0 z-50 flex items-center justify-center bg-[#3B2A24]/40 p-4" @click.self="showWaitlist = false">
-        <section class="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-2xl border border-[#DCC8B8] bg-white p-5 shadow-2xl">
-          <div class="flex items-center justify-between gap-3 border-b border-[#E8D7C7] pb-4">
-            <div>
-              <h2 class="text-lg text-[#3B2A24]">Waitlist</h2>
-              <p class="mt-1 text-xs text-[#8B756A]">{{ reservations.length }} saved reservation{{ reservations.length === 1 ? '' : 's' }}</p>
-            </div>
-            <button type="button" aria-label="Close waitlist" class="rounded-lg border border-[#DCC8B8] px-3 py-1 text-sm text-[#5B463C] hover:bg-[#F8EFE7]" @click="showWaitlist = false">×</button>
-          </div>
-          <div v-if="!selectedWaitlistReservation" class="max-h-[55vh] overflow-y-auto pt-4">
-            <div v-if="waitlistLoading" class="text-sm text-[#9D877B]">Loading saved reservations…</div>
-            <div v-else-if="reservationError" class="text-sm text-[#A96746]">{{ reservationError }}</div>
-            <div v-else-if="!reservations.length" class="text-sm text-[#9D877B]">No reservations saved yet.</div>
-            <template v-else>
-              <p v-if="waitlistActionError" role="alert" class="mb-3 rounded-lg bg-[#F8E5DC] px-3 py-2 text-xs text-[#8B4F42]">{{ waitlistActionError }}</p>
-              <div class="mb-3 flex flex-col gap-2 sm:flex-row">
-                <label class="relative flex-1">
-                  <span class="sr-only">Search reservations</span>
-                  <input
-                    v-model="waitlistSearch"
-                    type="search"
-                    placeholder="Search name, table, or phone"
-                    class="w-full rounded-lg border border-[#DCC8B8] bg-white px-3 py-2 text-xs text-[#5B463C] outline-none focus:border-[#A96746]"
-                  >
-                </label>
-                <label>
-                  <span class="sr-only">Filter reservations by status</span>
-                  <select v-model="waitlistStatusFilter" class="w-full rounded-lg border border-[#DCC8B8] bg-white px-3 py-2 text-xs capitalize text-[#5B463C] outline-none focus:border-[#A96746] sm:w-36">
-                    <option value="all">All statuses</option>
-                    <option value="seated">Seated</option>
-                    <option value="no_show">No-show</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </label>
+      <div v-if="showWaitlist" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5" @click.self="closeWaitlist">
+        <div class="fixed inset-0 bg-black/45 backdrop-blur-sm" aria-hidden="true" @click="closeWaitlist"></div>
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="waitlist-title"
+          class="relative w-full max-w-2xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] flex flex-col overflow-hidden rounded-3xl border border-[#EEDFC4] bg-white shadow-[0_24px_50px_-12px_rgba(59,31,14,0.22)] animate-in fade-in zoom-in-95 duration-150"
+        >
+          <!-- Header -->
+          <div class="flex items-center justify-between gap-4 px-6 pt-5 pb-4 border-b border-[#EEDFC4] bg-[#FDFBF7] shrink-0">
+            <div class="flex items-center gap-3.5 min-w-0">
+              <div class="w-10 h-10 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0 shadow-2xs">
+                <Icon name="heroicons:queue-list" class="w-5 h-5" />
               </div>
-              <div v-if="!filteredReservations.length" class="py-4 text-sm text-[#9D877B]">No reservations match your search or filter.</div>
-              <div v-else class="grid gap-2">
-                <div v-for="item in filteredReservations" :key="item.uuid" class="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#F8EFE7] px-4 py-3 text-xs text-[#5B463C]">
-                  <button type="button" class="min-w-0 flex-1 cursor-pointer text-left hover:text-[#A96746]" :aria-label="`View reservation for ${item.customer_name}`" @click="selectedWaitlistReservation = item">
-                    <strong>{{ item.customer_name }}</strong>
-                    <span> · Table {{ tableNumber(item) }} · {{ formatReservationDate(item.reservation_date) }} · {{ formatReservationTime(item.reservation_date) }}</span>
+              <div class="min-w-0">
+                <h2 id="waitlist-title" class="text-xl font-display font-extrabold text-[#3B1F0E] truncate">
+                  {{ selectedWaitlistReservation ? selectedWaitlistReservation.customer_name : 'Waitlist' }}
+                </h2>
+                <p class="text-xs text-[#8A6E64] mt-0.5">
+                  <template v-if="selectedWaitlistReservation">Reservation details</template>
+                  <template v-else>{{ reservations.length }} saved reservation{{ reservations.length === 1 ? '' : 's' }}</template>
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="Close waitlist"
+              class="w-9 h-9 rounded-xl bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+              @click="closeWaitlist"
+            >
+              <Icon name="heroicons:x-mark" class="w-4 h-4" />
+            </button>
+          </div>
+
+          <!-- List -->
+          <div v-if="!selectedWaitlistReservation" class="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+            <div v-if="waitlistLoading" class="flex items-center justify-center gap-2 py-10 text-sm text-[#8A6E64]">
+              <Icon name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
+              Loading saved reservations…
+            </div>
+            <div v-else-if="waitlistError" role="alert" class="flex flex-col items-center text-center py-10">
+              <Icon name="heroicons:exclamation-triangle" class="w-8 h-8 text-red-400 mb-2" />
+              <p class="text-sm font-semibold text-[#3B1F0E]">{{ waitlistError }}</p>
+              <button
+                type="button"
+                class="mt-3 h-9 px-3.5 rounded-xl border border-[#D8C7B5] bg-white text-sm font-bold text-[#3B1F0E] inline-flex items-center gap-1.5 hover:bg-[#FAF4ED] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                @click="openWaitlist"
+              >
+                <Icon name="heroicons:arrow-path" class="w-4 h-4" />
+                Try again
+              </button>
+            </div>
+            <div v-else-if="!reservations.length" class="flex flex-col items-center text-center py-10">
+              <div class="size-12 rounded-full bg-[#FDF3E7] border border-[#E3CFB4] flex items-center justify-center text-[#9E7060] mb-2">
+                <Icon name="heroicons:queue-list" class="w-6 h-6" />
+              </div>
+              <p class="font-display font-medium text-[14px] text-[#3B1F0E]">No reservations saved yet</p>
+              <p class="text-[12px] text-[#8B6656] mt-0.5">Bookings made on the floor plan will appear here.</p>
+            </div>
+            <template v-else>
+              <p v-if="waitlistActionError" role="alert" class="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{{ waitlistActionError }}</p>
+              <div class="mb-3 flex flex-col gap-2 sm:flex-row">
+                <SearchInput v-model="waitlistSearch" placeholder="Search name, table, or phone" aria-label="Search reservations" clearable white class="sm:flex-1" />
+                <div class="sm:w-44 shrink-0">
+                  <DropdownList v-model="waitlistStatusFilter" :options="waitlistStatusOptions" size="sm" card aria-label="Filter reservations by status" />
+                </div>
+              </div>
+              <div v-if="!filteredReservations.length" class="py-6 text-center text-sm text-[#8A6E64]">No reservations match your search or filter.</div>
+              <ul v-else class="grid gap-2">
+                <li
+                  v-for="item in filteredReservations"
+                  :key="item.uuid"
+                  class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#EADCC7] bg-[#FCFBF8] px-4 py-3"
+                >
+                  <button
+                    type="button"
+                    class="min-w-0 flex-1 cursor-pointer text-left rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 group"
+                    :aria-label="`View reservation for ${item.customer_name}`"
+                    @click="selectedWaitlistReservation = item"
+                  >
+                    <span class="flex items-center gap-2">
+                      <span class="text-sm font-bold text-[#2D201B] truncate group-hover:underline">{{ item.customer_name }}</span>
+                      <span class="shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold" :class="statusChipClass(item.status)">{{ statusLabel(item.status) }}</span>
+                    </span>
+                    <span class="mt-0.5 block text-xs text-[#8A6E64] truncate">
+                      Table {{ tableNumber(item) }} · {{ formatReservationDate(item.reservation_date) }} · {{ formatReservationTime(item.reservation_date) }} · {{ item.party_size }} guest{{ item.party_size === 1 ? '' : 's' }}
+                    </span>
                   </button>
-                  <div class="flex flex-wrap items-center gap-2 text-[#8B756A]">
-                    <span class="capitalize">{{ item.status.replace('_', ' ') }}</span>
+                  <div class="flex flex-wrap items-center gap-2">
                     <!-- Bookings are saved confirmed, so the waitlist only seats, marks no-show, or cancels. -->
                     <template v-if="item.status === 'confirmed'">
                       <button
                         type="button"
-                        class="relative z-10 cursor-pointer rounded-md bg-[#3B2A24] px-3 py-1.5 text-[10px] text-white disabled:cursor-wait disabled:opacity-50"
+                        class="relative z-10 h-8 cursor-pointer rounded-lg bg-[#3B1F0E] px-3 text-xs font-bold text-[#FFF8EA] hover:bg-[#2A150A] transition-colors disabled:cursor-wait disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
                         :disabled="updatingReservation === item.uuid"
                         @pointerdown.stop
                         @click.prevent.stop="updateReservationStatus(item, 'seated')"
@@ -1198,7 +1312,7 @@ onBeforeUnmount(() => {
                       <button
                         v-if="reservationStarted(item)"
                         type="button"
-                        class="relative z-10 cursor-pointer rounded-md border border-[#C79679] px-3 py-1.5 text-[10px] text-[#8B4F42] disabled:cursor-wait disabled:opacity-50"
+                        class="relative z-10 h-8 cursor-pointer rounded-lg border border-amber-200 bg-white px-3 text-xs font-bold text-amber-800 hover:bg-amber-50 transition-colors disabled:cursor-wait disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
                         :disabled="updatingReservation === item.uuid"
                         @pointerdown.stop
                         @click.prevent.stop="updateReservationStatus(item, 'no_show')"
@@ -1209,7 +1323,7 @@ onBeforeUnmount(() => {
                     <template v-if="(item.status === 'pending' || item.status === 'confirmed') && !reservationStarted(item)">
                       <button
                         type="button"
-                        class="relative z-10 cursor-pointer rounded-md border border-[#C79679] px-3 py-1.5 text-[10px] text-[#8B4F42] disabled:cursor-wait disabled:opacity-50"
+                        class="relative z-10 h-8 cursor-pointer rounded-lg border border-red-200 bg-white px-3 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors disabled:cursor-wait disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-red-300"
                         :disabled="updatingReservation === item.uuid"
                         @pointerdown.stop
                         @click.prevent.stop="updateReservationStatus(item, 'cancelled')"
@@ -1217,42 +1331,58 @@ onBeforeUnmount(() => {
                         Cancel
                       </button>
                     </template>
+                    <Icon v-if="updatingReservation === item.uuid" name="heroicons:arrow-path" class="w-4 h-4 text-[#7D5A50] animate-spin" />
                   </div>
-                </div>
-              </div>
+                </li>
+              </ul>
             </template>
           </div>
-          <div v-else class="pt-4">
-            <div class="flex items-center justify-between gap-3">
-              <h3 class="text-base font-semibold text-[#3B2A24]">{{ selectedWaitlistReservation.customer_name }}</h3>
-              <button type="button" class="text-xs text-[#A96746] underline" @click="selectedWaitlistReservation = null">Back to waitlist</button>
+
+          <!-- Details -->
+          <div v-else class="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+            <button
+              type="button"
+              class="mb-3 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 -ml-2 text-sm font-bold text-[#7D5A50] hover:bg-[#FBF2E1] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+              @click="selectedWaitlistReservation = null"
+            >
+              <Icon name="heroicons:arrow-left" class="w-4 h-4" />
+              Back to waitlist
+            </button>
+            <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs">
+              <div class="mb-3.5 flex items-center justify-between gap-2">
+                <div class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+                  <span>Booking</span>
+                </div>
+                <span class="rounded-full border px-2 py-0.5 text-[11px] font-semibold" :class="statusChipClass(selectedWaitlistReservation.status)">{{ statusLabel(selectedWaitlistReservation.status) }}</span>
+              </div>
+              <dl class="grid gap-3.5 sm:grid-cols-2">
+                <div>
+                  <dt class="text-[11px] font-bold text-[#8A6E64]">Reservation date</dt>
+                  <dd class="mt-0.5 text-sm font-semibold text-[#2D201B]">{{ formatReservationDate(selectedWaitlistReservation.reservation_date) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-[11px] font-bold text-[#8A6E64]">Arrival time</dt>
+                  <dd class="mt-0.5 text-sm font-semibold text-[#2D201B]">{{ formatReservationTime(selectedWaitlistReservation.reservation_date) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-[11px] font-bold text-[#8A6E64]">Table</dt>
+                  <dd class="mt-0.5 text-sm font-semibold text-[#2D201B]">Table {{ tableNumber(selectedWaitlistReservation) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-[11px] font-bold text-[#8A6E64]">Phone number</dt>
+                  <dd class="mt-0.5 text-sm font-semibold text-[#2D201B] tabular-nums">{{ selectedWaitlistReservation.customer_phone }}</dd>
+                </div>
+                <div>
+                  <dt class="text-[11px] font-bold text-[#8A6E64]">Party size</dt>
+                  <dd class="mt-0.5 text-sm font-semibold text-[#2D201B]">{{ selectedWaitlistReservation.party_size }} guest{{ selectedWaitlistReservation.party_size === 1 ? '' : 's' }}</dd>
+                </div>
+                <div class="sm:col-span-2">
+                  <dt class="text-[11px] font-bold text-[#8A6E64]">Note</dt>
+                  <dd class="mt-0.5 whitespace-pre-wrap text-sm" :class="selectedWaitlistReservation.notes?.trim() ? 'font-semibold text-[#2D201B]' : 'italic text-[#A8988B]'">{{ selectedWaitlistReservation.notes?.trim() || 'No note added.' }}</dd>
+                </div>
+              </dl>
             </div>
-            <dl class="mt-4 grid gap-3 text-xs text-[#5B463C] sm:grid-cols-2">
-              <div>
-                <dt class="text-[10px] uppercase text-[#8B756A]">Reservation date</dt>
-                <dd class="mt-1">{{ formatReservationDate(selectedWaitlistReservation.reservation_date) }}</dd>
-              </div>
-              <div>
-                <dt class="text-[10px] uppercase text-[#8B756A]">Arrival time</dt>
-                <dd class="mt-1">{{ formatReservationTime(selectedWaitlistReservation.reservation_date) }}</dd>
-              </div>
-              <div>
-                <dt class="text-[10px] uppercase text-[#8B756A]">Table number</dt>
-                <dd class="mt-1">Table {{ tableNumber(selectedWaitlistReservation) }}</dd>
-              </div>
-              <div>
-                <dt class="text-[10px] uppercase text-[#8B756A]">Phone number</dt>
-                <dd class="mt-1">{{ selectedWaitlistReservation.customer_phone }}</dd>
-              </div>
-              <div>
-                <dt class="text-[10px] uppercase text-[#8B756A]">Party size</dt>
-                <dd class="mt-1">{{ selectedWaitlistReservation.party_size }} guest{{ selectedWaitlistReservation.party_size === 1 ? '' : 's' }}</dd>
-              </div>
-              <div class="sm:col-span-2">
-                <dt class="text-[10px] uppercase text-[#8B756A]">Note</dt>
-                <dd class="mt-1 whitespace-pre-wrap">{{ selectedWaitlistReservation.notes?.trim() || 'No note added.' }}</dd>
-              </div>
-            </dl>
           </div>
         </section>
       </div>
@@ -1276,7 +1406,7 @@ onBeforeUnmount(() => {
         @close="stayOnPage"
       >
         <p v-if="!canConfirm && !submitting" class="rounded-lg bg-[#F8EFE7] px-3 py-2 text-xs text-[#5B463C]">
-          To book it, stay and finish the table, guest name, 11-digit phone number and guest count.
+          To book it, stay and finish the table, guest name, phone number (11 digits starting with 09) and guest count.
         </p>
         <p v-if="reservationError" role="alert" class="mt-2 text-xs text-[#A4472E]">{{ reservationError }}</p>
         <template #actions>

@@ -19,12 +19,17 @@ defineEmits<{
 
 <template>
   <div
-    class="bg-white rounded-2xl border flex flex-col group hover:shadow-md transition-all cursor-pointer p-4"
+    role="button"
+    tabindex="0"
+    :aria-label="`Edit ${ingredient.name}`"
+    class="bg-white rounded-2xl border flex flex-col group hover:shadow-md transition-all cursor-pointer p-4 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
     :class="[
       !ingredient.is_active ? 'opacity-60' : '',
-      selected ? 'border-[#B4846C] bg-[#FDF8F3] ring-2 ring-[#B4846C]/20' : 'border-[#EEDFC4]'
+      selected ? 'border-[#B4846C] bg-[#FDF8F3] ring-2 ring-[#B4846C]/20' : 'border-[#EEDFC4] hover:border-[#D8C7B5]'
     ]"
     @click="$emit('edit')"
+    @keydown.enter.self.prevent="$emit('edit')"
+    @keydown.space.self.prevent="$emit('edit')"
   >
     <div class="flex items-center gap-3 mt-1">
       <div class="relative w-11 h-11 shrink-0">

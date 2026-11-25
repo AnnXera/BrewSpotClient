@@ -49,29 +49,82 @@ function emptyRow(): RecipeRow {
   return { ingredient_uuid: null, ingredient_name: '', quantity_display: '', unit: INGREDIENT_UNITS[0] ?? '' }
 }
 
+interface OfferableItem {
+  uuid: string
+  menu_name: string
+  category_uuid: string | null
+  category_name: string | null
+  base_price: string | number | null
+  picture: string | null
+}
+
 const ingredients = ref<Ingredient[]>([])
-const menuItems = ref<Array<{ uuid: string; menu_name: string }>>([])
+const menuItems = ref<OfferableItem[]>([])
 const itemSearch = ref('')
+// 'all', 'uncategorized', or a category uuid
+const itemCategory = ref('all')
 
 async function loadOptions() {
   const [ingredientRes, itemRes] = await Promise.allSettled([menuService.getIngredients(), menuService.getMenuItems()])
   ingredients.value = ingredientRes.status === 'fulfilled' ? ingredientRes.value.ingredients ?? [] : []
   if (itemRes.status === 'fulfilled') {
     const items = itemRes.value.items as any
-    menuItems.value = (Array.isArray(items) ? items : items?.data ?? []).map((i: any) => ({ uuid: i.uuid, menu_name: i.menu_name }))
+    menuItems.value = (Array.isArray(items) ? items : items?.data ?? []).map((i: any) => ({
+      uuid: i.uuid,
+      menu_name: i.menu_name,
+      category_uuid: i.category_uuid ?? null,
+      category_name: i.category_name ?? null,
+      base_price: i.base_price ?? null,
+      picture: i.picture ?? null,
+    }))
   } else {
     menuItems.value = []
   }
 }
 
+// Categories that actually have items, A to Z, with Uncategorized last.
+const itemCategoryOptions = computed(() => {
+  const named = new Map<string, string>()
+  let hasUncategorized = false
+  for (const item of menuItems.value) {
+    if (item.category_uuid) named.set(item.category_uuid, item.category_name || 'Category')
+    else hasUncategorized = true
+  }
+  return [
+    { value: 'all', label: 'All categories' },
+    ...[...named].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ value, label })),
+    ...(hasUncategorized ? [{ value: 'uncategorized', label: 'Uncategorized' }] : []),
+  ]
+})
+
 const filteredMenuItems = computed(() => {
   const q = itemSearch.value.trim().toLowerCase()
-  return q ? menuItems.value.filter(i => i.menu_name.toLowerCase().includes(q)) : menuItems.value
+  const category = itemCategory.value
+  return menuItems.value.filter(i =>
+    (category === 'all' || (category === 'uncategorized' ? !i.category_uuid : i.category_uuid === category))
+    && (!q || i.menu_name.toLowerCase().includes(q))
+  )
 })
+
+const allShownSelected = computed(() =>
+  filteredMenuItems.value.length > 0 && filteredMenuItems.value.every(i => form.value.item_uuids.includes(i.uuid))
+)
 
 function toggleItem(uuid: string) {
   const list = form.value.item_uuids
   form.value.item_uuids = list.includes(uuid) ? list.filter(u => u !== uuid) : [...list, uuid]
+}
+
+// Selects every item the search and category filter show, or clears them if all are already selected.
+function toggleAllShown() {
+  const shown = filteredMenuItems.value.map(i => i.uuid)
+  form.value.item_uuids = allShownSelected.value
+    ? form.value.item_uuids.filter(u => !shown.includes(u))
+    : [...new Set([...form.value.item_uuids, ...shown])]
+}
+
+function formatItemPrice(value: string | number | null) {
+  return value === null || value === '' ? '' : `₱${Number(value).toFixed(2)}`
 }
 
 // Same rule as the server's Ingredient::normalize().
@@ -115,6 +168,7 @@ watch(() => props.show, (open) => {
   errors.value = { name: '', price: '', max_quantity: '' }
   serverRowErrors.value = {}
   itemSearch.value = ''
+  itemCategory.value = 'all'
   loadOptions()
 
   const a = props.addon
@@ -134,7 +188,7 @@ watch(() => props.show, (open) => {
     item_uuids: a?.items?.map(i => i.uuid) ?? []
   }
   nextTick(() => { isDirty.value = false })
-})
+}, { immediate: true }) // also when the page opens with the modal already showing (an ?action= link)
 
 watch(form, () => { isDirty.value = true }, { deep: true })
 
@@ -295,186 +349,320 @@ function confirmDelete() {
 }
 
 const inputClass = (invalid: boolean) => [
-  'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow',
-  invalid ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
+  'w-full bg-white border rounded-xl px-3.5 py-3 text-sm font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal shadow-2xs focus:outline-none focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 transition-all',
+  invalid ? 'border-red-400 bg-red-50/30' : 'border-[#D8C7B5]'
 ]
 </script>
 
 <template>
-  <div v-if="show" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" @click="handleClose"></div>
+  <div v-if="show" class="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+    <!-- Backdrop -->
+    <div
+      class="fixed inset-0 bg-black/45 backdrop-blur-sm transition-opacity duration-200"
+      @click="handleClose"
+      aria-hidden="true"
+    ></div>
 
-    <div class="relative bg-white rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="addon-modal-title"
+      class="relative bg-white rounded-3xl w-full max-w-[820px] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] flex flex-col shadow-[0_24px_50px_-12px_rgba(59,31,14,0.22)] border border-[#EEDFC4] overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150"
+    >
       <!-- Header -->
-      <div class="flex items-center justify-between px-8 py-5 border-b border-[#EEDFC4]">
-        <h2 class="text-3xl font-display font-bold text-[#3B1F0E]">
-          {{ isEditMode ? 'Edit Add-on' : 'Add Add-on' }}
-        </h2>
+      <div class="flex items-center justify-between gap-4 px-6 md:px-8 pt-5 pb-4 border-b border-[#EEDFC4] bg-[#FDFBF7] shrink-0">
+        <div class="flex items-center gap-3.5 min-w-0">
+          <div class="w-10 h-10 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0 shadow-2xs">
+            <Icon name="heroicons:sparkles" class="w-5 h-5" />
+          </div>
+          <div class="min-w-0">
+            <h2 id="addon-modal-title" class="text-xl font-display font-extrabold text-[#3B1F0E] truncate">
+              {{ isEditMode ? 'Edit Add-on' : 'Add New Add-on' }}
+            </h2>
+            <p class="text-xs text-[#8A6E64] mt-0.5">
+              {{ isEditMode ? 'Update the price, recipe, and which items offer this add-on.' : 'Set the price, what one serving uses, and which items offer it.' }}
+            </p>
+          </div>
+        </div>
         <button
+          type="button"
+          aria-label="Close modal"
+          class="w-9 h-9 rounded-xl bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
           @click="handleClose"
-          class="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F5] text-[#7D5A50] hover:bg-[#EEDFC4] transition-colors focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/40"
-          title="Close Modal"
         >
-          <Icon name="heroicons:x-mark" class="w-5 h-5" />
+          <Icon name="heroicons:x-mark" class="w-4 h-4" />
         </button>
       </div>
 
       <!-- Body -->
-      <div ref="bodyEl" class="flex-1 overflow-y-auto p-8 space-y-8">
-        <div class="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr] gap-5">
-          <div>
-            <label class="block text-sm font-bold text-[#B4846C] uppercase tracking-wider mb-2">Name</label>
-            <input v-model="form.name" type="text" maxlength="100" placeholder="e.g. Oreo Crumbles" :class="inputClass(!!errors.name)" />
-            <p v-if="errors.name" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.name }}</p>
-          </div>
-          <div>
-            <label class="block text-sm font-bold text-[#B4846C] uppercase tracking-wider mb-2">Price</label>
-            <input v-model="form.price" type="number" step="0.01" min="0" placeholder="0.00" :class="inputClass(!!errors.price)" />
-            <p v-if="errors.price" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.price }}</p>
-          </div>
-          <div>
-            <!-- One-line label like Name and Price, so all three inputs line up -->
-            <label class="block text-sm font-bold text-[#B4846C] uppercase tracking-wider mb-2 whitespace-nowrap">Max per drink</label>
-            <input v-model.number="form.max_quantity" type="number" min="1" :max="MAX_PER_DRINK" step="1" placeholder="No limit" :class="inputClass(!!errors.max_quantity)" />
-            <p v-if="errors.max_quantity" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ errors.max_quantity }}</p>
-            <p v-else class="text-xs text-[#B4846C] mt-1 ml-1">Optional</p>
-          </div>
-        </div>
+      <div ref="bodyEl" class="flex-1 min-h-0 overflow-y-auto px-6 md:px-8 py-4 space-y-4">
+        <!-- ── Details ─────────────────────────────────────────── -->
+        <section class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5" aria-labelledby="addon-details-title">
+          <h3 id="addon-details-title" class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+            <span>Details</span>
+          </h3>
 
-        <label class="inline-flex items-center gap-2 text-sm font-bold text-[#7D5A50] cursor-pointer select-none">
-          <input v-model="form.is_available" type="checkbox" class="w-4 h-4 rounded accent-[#3B1F0E]" />
-          Available at the register
-        </label>
-
-        <hr class="border-[#EEDFC4]" />
-
-        <!-- Recipe -->
-        <div>
-          <div class="mb-4">
-            <h3 class="text-2xl font-display font-bold text-[#3B1F0E]">Recipe</h3>
-            <p class="text-sm text-[#9E7060] mt-1">What one serving uses. A drink with 2 of this add-on uses twice as much. Leave empty if it uses nothing you track.</p>
+          <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3.5">
+            <div class="min-w-0">
+              <label for="addon-name" class="block text-xs font-bold text-[#3B1F0E] mb-1">Name <span class="text-red-500">*</span></label>
+              <input id="addon-name" v-model="form.name" type="text" maxlength="100" placeholder="e.g. Oreo Crumbles" :class="inputClass(!!errors.name)" />
+              <p v-if="errors.name" data-row-error class="text-red-600 text-xs font-semibold mt-1">{{ errors.name }}</p>
+            </div>
+            <div class="min-w-0">
+              <label for="addon-price" class="block text-xs font-bold text-[#3B1F0E] mb-1">Price <span class="text-red-500">*</span></label>
+              <div class="relative">
+                <span class="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center text-sm font-semibold text-[#B4846C]">₱</span>
+                <input id="addon-price" v-model="form.price" type="number" step="0.01" min="0" placeholder="0.00" :class="[inputClass(!!errors.price), 'pl-8 tabular-nums']" />
+              </div>
+              <p v-if="errors.price" data-row-error class="text-red-600 text-xs font-semibold mt-1">{{ errors.price }}</p>
+            </div>
+            <div class="min-w-0">
+              <label for="addon-max" class="block text-xs font-bold text-[#3B1F0E] mb-1 whitespace-nowrap">Max per drink <span class="font-semibold text-[#8A6E64]">(Optional)</span></label>
+              <input id="addon-max" v-model.number="form.max_quantity" type="number" min="1" :max="MAX_PER_DRINK" step="1" placeholder="No limit" :class="[inputClass(!!errors.max_quantity), 'tabular-nums']" />
+              <p v-if="errors.max_quantity" data-row-error class="text-red-600 text-xs font-semibold mt-1">{{ errors.max_quantity }}</p>
+              <p v-else class="text-[11px] text-[#8A6E64] mt-1">1 to {{ MAX_PER_DRINK }}, or empty for no limit.</p>
+            </div>
           </div>
 
-          <div class="hidden md:grid grid-cols-[2fr_1fr_1fr_auto] gap-4 mb-2 px-1">
-            <span class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">Ingredient</span>
-            <span class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">Amount</span>
-            <span class="text-sm font-bold text-[#B4846C] uppercase tracking-wider">Unit</span>
-            <span class="w-8"></span>
+          <!-- Availability -->
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="form.is_available"
+            class="w-full flex items-center justify-between gap-3 rounded-xl border border-[#D8C7B5] bg-white px-3.5 py-2.5 text-left shadow-2xs hover:bg-[#FAF6F0] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+            @click="form.is_available = !form.is_available"
+          >
+            <span class="min-w-0">
+              <span class="block text-xs font-bold text-[#3B1F0E]">Available at the register</span>
+              <span class="block text-[11px] text-[#8A6E64] mt-0.5">
+                {{ form.is_available ? 'Cashiers can add it to orders.' : 'Hidden from cashiers until you turn it back on.' }}
+              </span>
+            </span>
+            <span
+              aria-hidden="true"
+              :class="[
+                'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors',
+                form.is_available ? 'border-[#3B1F0E] bg-[#3B1F0E]' : 'border-[#B4846C] bg-white'
+              ]"
+            >
+              <span
+                :class="[
+                  'rounded-full transition-[transform,width,height,background-color]',
+                  form.is_available ? 'h-4 w-4 translate-x-[17px] bg-white shadow-sm' : 'h-3.5 w-3.5 translate-x-[2px] bg-[#B4846C]'
+                ]"
+              ></span>
+            </span>
+          </button>
+        </section>
+
+        <!-- ── Recipe ──────────────────────────────────────────── -->
+        <section class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs" aria-labelledby="addon-recipe-title">
+          <div class="mb-3.5">
+            <h3 id="addon-recipe-title" class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+              <span>Recipe</span>
+            </h3>
+            <p class="text-[11px] text-[#8A6E64] mt-1">What one serving uses. A drink with 2 of this add-on uses twice as much. Leave empty if it uses nothing you track.</p>
           </div>
 
-          <div class="space-y-4">
+          <div class="hidden sm:grid grid-cols-[2fr_1fr_1fr_auto] gap-3 mb-2 px-1">
+            <span class="text-[11px] font-bold text-[#8A6E64] uppercase tracking-wider">Ingredient</span>
+            <span class="text-[11px] font-bold text-[#8A6E64] uppercase tracking-wider">Amount</span>
+            <span class="text-[11px] font-bold text-[#8A6E64] uppercase tracking-wider">Unit</span>
+            <span class="w-10"></span>
+          </div>
+
+          <div class="space-y-3">
             <div
               v-for="(recipe, index) in form.recipes"
               :key="index"
-              class="flex flex-col md:grid md:grid-cols-[2fr_1fr_1fr_auto] gap-4 items-start md:items-center bg-white md:bg-transparent p-4 md:p-0 rounded-xl border border-[#EEDFC4] md:border-none"
+              class="grid grid-cols-[1fr_1fr_auto] sm:grid-cols-[2fr_1fr_1fr_auto] gap-3 items-start max-sm:pb-3 max-sm:border-b max-sm:border-[#EEDFC4] max-sm:last:border-b-0 max-sm:last:pb-0"
             >
-              <div class="w-full">
-                <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Ingredient</label>
+              <div class="col-span-full sm:col-span-1 min-w-0">
+                <label class="block sm:hidden text-[11px] font-bold text-[#8A6E64] uppercase tracking-wider mb-1">Ingredient</label>
                 <IngredientPicker
                   :ref="(el) => setIngredientInputRef(el, index)"
                   v-model:name="recipe.ingredient_name"
                   :ingredients="ingredients"
                   :used-names="usedNamesExcept(index)"
                   :invalid="!!rowErrors[index]"
+                  white
                   @pick="onPick(recipe, index, $event)"
                   @enter="handleEnterOnIngredient(index)"
                 />
-                <p v-if="rowErrors[index]" data-row-error class="text-red-500 text-xs font-bold mt-1 ml-1">{{ rowErrors[index] }}</p>
+                <p v-if="rowErrors[index]" data-row-error class="text-red-600 text-xs font-semibold mt-1">{{ rowErrors[index] }}</p>
               </div>
 
-              <div class="w-full">
-                <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Amount</label>
+              <div class="min-w-0">
+                <label class="block sm:hidden text-[11px] font-bold text-[#8A6E64] uppercase tracking-wider mb-1">Amount</label>
                 <input
                   :value="recipe.quantity_display"
                   @input="onQuantityInput(recipe, $event)"
                   type="text"
                   inputmode="decimal"
                   placeholder="e.g. 1/4 or 2.5"
+                  aria-label="Amount"
                   @keydown.enter.prevent="handleEnterOnIngredient(index)"
-                  class="w-full bg-[#fef8f0] border border-[#EEDFC4] text-[#3B1F0E] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#B4846C] focus:border-transparent"
+                  :class="[inputClass(false), 'tabular-nums']"
                 />
               </div>
 
-              <div class="w-full relative">
-                <label class="block md:hidden text-xs font-bold text-[#B4846C] uppercase mb-1">Unit</label>
+              <div class="min-w-0">
+                <label class="block sm:hidden text-[11px] font-bold text-[#8A6E64] uppercase tracking-wider mb-1">Unit</label>
+                <!-- An existing ingredient is always measured in its own unit. -->
                 <DropdownList
                   v-model="recipe.unit"
                   :options="INGREDIENT_UNIT_OPTIONS"
                   :disabled="!!recipe.ingredient_uuid"
+                  size="sm"
+                  card
+                  aria-label="Unit"
                   :title="recipe.ingredient_uuid ? `${recipe.ingredient_name} is measured in ${recipe.unit}` : undefined"
                 />
               </div>
 
-              <div class="w-full md:w-auto flex justify-end md:justify-center mt-2 md:mt-0">
-                <button
-                  @click="removeIngredient(index)"
-                  class="w-8 h-8 flex items-center justify-center rounded-lg text-[#D9534F] bg-[#fef8f0] hover:bg-[#FDE8E8] transition-colors focus:outline-none focus:ring-2 focus:ring-[#D9534F]/40"
-                  title="Remove Ingredient"
-                >
-                  <Icon name="heroicons:trash" class="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                type="button"
+                class="self-end sm:self-start w-10 h-11 flex items-center justify-center rounded-xl text-[#D9534F] hover:bg-[#FDE8E8] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#D9534F]/40"
+                :aria-label="`Remove ${recipe.ingredient_name.trim() || 'ingredient'}`"
+                @click="removeIngredient(index)"
+              >
+                <Icon name="heroicons:trash" class="w-4 h-4" />
+              </button>
             </div>
           </div>
 
           <button
+            type="button"
+            class="mt-3 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 -ml-2 text-sm font-bold text-[#7D5A50] hover:bg-[#FBF2E1] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#B4846C]"
             @click="addIngredient"
-            class="w-full mt-4 flex items-center justify-center py-3 rounded-xl border border-[#EEDFC4] bg-[#fef8f0]/30 hover:bg-[#EEDFC4]/30 text-[#B4846C] transition-colors focus:outline-none focus:ring-2 focus:ring-[#B4846C]"
-            title="Add Ingredient"
           >
-            <Icon name="heroicons:plus" class="w-5 h-5" />
+            <Icon name="heroicons:plus" class="w-4 h-4" />
+            Add ingredient
           </button>
-        </div>
+        </section>
 
-        <hr class="border-[#EEDFC4]" />
-
-        <!-- Items that offer it -->
-        <div>
-          <div class="mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <!-- ── Offered on ──────────────────────────────────────── -->
+        <section class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5" aria-labelledby="addon-items-title">
+          <div class="flex items-center justify-between gap-3">
             <div>
-              <h3 class="text-2xl font-display font-bold text-[#3B1F0E]">Offered On</h3>
-              <p class="text-sm text-[#9E7060] mt-1">{{ form.item_uuids.length }} of {{ menuItems.length }} menu items</p>
+              <h3 id="addon-items-title" class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+                <span>Offered On</span>
+              </h3>
+              <p class="text-[11px] text-[#8A6E64] mt-1">The menu items cashiers can add this to.</p>
             </div>
-            <SearchInput v-model="itemSearch" placeholder="Search items" clearable class="sm:w-56" />
+            <span class="text-xs font-bold text-[#8A6E64] whitespace-nowrap tabular-nums">
+              {{ form.item_uuids.length }} of {{ menuItems.length }} selected
+            </span>
           </div>
 
-          <p v-if="menuItems.length === 0" class="text-sm text-[#7D5A50]">No menu items yet.</p>
-          <div v-else class="max-h-64 overflow-y-auto border border-[#EEDFC4] rounded-xl divide-y divide-[#EEDFC4]">
-            <label
-              v-for="item in filteredMenuItems"
-              :key="item.uuid"
-              class="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#fef8f0]"
-            >
-              <input
-                type="checkbox"
-                :checked="form.item_uuids.includes(item.uuid)"
-                @change="toggleItem(item.uuid)"
-                class="w-4 h-4 rounded accent-[#3B1F0E]"
-              />
-              <span class="text-sm text-[#3B1F0E]">{{ item.menu_name }}</span>
-            </label>
-            <p v-if="filteredMenuItems.length === 0" class="px-4 py-3 text-sm text-[#7D5A50]">No items match "{{ itemSearch.trim() }}".</p>
-          </div>
-        </div>
+          <p v-if="menuItems.length === 0" class="text-xs text-[#8A6E64] bg-white border border-dashed border-[#D8C7B5] rounded-xl px-4 py-3">
+            No menu items yet. Add items first, then offer this add-on on them.
+          </p>
+          <template v-else>
+            <!-- Filters -->
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2.5">
+              <SearchInput v-model="itemSearch" placeholder="Search items" clearable white class="sm:flex-1" />
+              <div class="sm:w-52 shrink-0">
+                <DropdownList
+                  v-model="itemCategory"
+                  :options="itemCategoryOptions"
+                  size="sm"
+                  card
+                  icon="heroicons:squares-2x2"
+                  aria-label="Filter items by category"
+                />
+              </div>
+              <button
+                type="button"
+                :disabled="filteredMenuItems.length === 0"
+                class="h-11 px-3.5 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-sm font-bold whitespace-nowrap shadow-2xs hover:bg-[#FAF4ED] transition-colors disabled:opacity-40 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                @click="toggleAllShown"
+              >
+                {{ allShownSelected ? 'Clear shown' : 'Select all shown' }}
+              </button>
+            </div>
+
+            <!-- Item tiles: tap to offer it on that item -->
+            <div v-if="filteredMenuItems.length" class="max-h-[19rem] overflow-y-auto -mx-1 px-1 py-1">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button
+                  v-for="item in filteredMenuItems"
+                  :key="item.uuid"
+                  type="button"
+                  role="checkbox"
+                  :aria-checked="form.item_uuids.includes(item.uuid)"
+                  class="flex items-center gap-3 p-2 pr-3 rounded-xl border bg-white text-left transition-all outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                  :class="form.item_uuids.includes(item.uuid)
+                    ? 'border-[#3B1F0E] ring-1 ring-[#3B1F0E] shadow-sm'
+                    : 'border-[#D8C7B5] hover:border-[#B4846C] hover:bg-[#FAF6F0] shadow-2xs'"
+                  @click="toggleItem(item.uuid)"
+                >
+                  <span class="relative w-12 h-12 rounded-lg overflow-hidden bg-[#FBF2E1] shrink-0 flex items-center justify-center">
+                    <img
+                      v-if="item.picture"
+                      :src="item.picture"
+                      alt=""
+                      class="w-full h-full object-cover"
+                      @error="($event.target as HTMLImageElement).style.display = 'none'"
+                    />
+                    <Icon v-else name="heroicons:photo" class="w-5 h-5 text-[#B4846C]/50" />
+                  </span>
+                  <span class="flex-1 min-w-0">
+                    <span class="block text-sm font-bold text-[#2D201B] truncate">{{ item.menu_name }}</span>
+                    <span class="block text-[11px] text-[#8A6E64] truncate">
+                      {{ item.category_name || 'Uncategorized' }}<template v-if="formatItemPrice(item.base_price)"> · {{ formatItemPrice(item.base_price) }}</template>
+                    </span>
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    class="w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors"
+                    :class="form.item_uuids.includes(item.uuid) ? 'bg-[#3B1F0E] border-[#3B1F0E] text-white' : 'bg-white border-[#D8C7B5] text-transparent'"
+                  >
+                    <Icon v-if="form.item_uuids.includes(item.uuid)" name="heroicons:check" class="w-3 h-3" />
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <p v-else class="text-xs text-[#8A6E64] bg-white border border-dashed border-[#D8C7B5] rounded-xl px-4 py-3">
+              No items match<template v-if="itemSearch.trim()"> "{{ itemSearch.trim() }}"</template><template v-if="itemCategory !== 'all'"> in this category</template>.
+            </p>
+          </template>
+        </section>
       </div>
 
-      <!-- Footer -->
-      <div class="px-8 py-5 border-t border-[#EEDFC4] flex items-center justify-between gap-3 bg-white">
+      <!-- Footer: Cancel (and Delete) on the left, the main action on the right -->
+      <div class="flex items-center justify-between gap-3 px-6 md:px-8 py-3.5 border-t border-[#EEDFC4] bg-[#FAF8F5] rounded-b-3xl shrink-0">
+        <div class="flex items-center gap-2.5">
+          <button
+            type="button"
+            class="px-5 py-2 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+            @click="handleClose"
+          >
+            Cancel
+          </button>
+          <button
+            v-if="isEditMode"
+            type="button"
+            :disabled="isSubmitting"
+            class="px-4 py-2 rounded-xl border border-red-200 bg-white text-red-600 text-xs sm:text-sm font-bold flex items-center gap-1.5 hover:bg-red-50 active:scale-95 transition-all cursor-pointer disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+            @click="confirmDelete"
+          >
+            <Icon name="heroicons:trash" class="w-4 h-4" />
+            <span>Delete</span>
+          </button>
+        </div>
         <button
-          v-if="isEditMode"
-          @click="confirmDelete"
-          class="px-4 py-3 rounded-xl text-sm font-bold text-[#D9534F] hover:bg-[#FDE8E8] transition-colors focus:outline-none focus:ring-2 focus:ring-[#D9534F]/40"
-        >
-          Delete
-        </button>
-        <span v-else></span>
-        <button
-          @click="save"
+          type="button"
           :disabled="isSubmitting"
-          class="bg-[#3B1F0E] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#2A160A] transition-colors shadow-md disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#3B1F0E]/40 focus-visible:ring-offset-2"
+          class="px-6 py-2 rounded-xl bg-[#3B1F0E] hover:bg-[#2A150A] text-[#FFF8EA] text-xs sm:text-sm font-bold active:scale-95 transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+          @click="save"
         >
-          <Icon v-if="isSubmitting" name="heroicons:arrow-path" class="w-5 h-5 animate-spin" />
-          {{ isSubmitting ? 'Saving...' : 'Confirm' }}
+          <Icon v-if="isSubmitting" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
+          <span>{{ isSubmitting ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Add-on' }}</span>
         </button>
       </div>
     </div>

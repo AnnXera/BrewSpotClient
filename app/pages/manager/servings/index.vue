@@ -183,10 +183,11 @@ async function handleRefresh() {
 }
 
 // Debounce the text searches; sort and page changes reload right away.
-let searchTimer: ReturnType<typeof setTimeout> | undefined
+// Each search has its own timer, so typing in one doesn't cancel the other's pending load.
+const searchTimers = new Map<() => Promise<void>, ReturnType<typeof setTimeout>>()
 function debounced(fn: () => Promise<void>) {
-  clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => fn().catch((e) => failure(e, 'Could not load servings.')), 300)
+  clearTimeout(searchTimers.get(fn))
+  searchTimers.set(fn, setTimeout(() => fn().catch((e) => failure(e, 'Could not load servings.')), 300))
 }
 
 watch(categorySearch, () => {
@@ -223,7 +224,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  clearTimeout(searchTimer)
+  for (const timer of searchTimers.values()) clearTimeout(timer)
 })
 </script>
 

@@ -9,6 +9,8 @@ const props = defineProps<{
   // Normalized names already used in other rows of this recipe (hidden from suggestions).
   usedNames: string[]
   invalid?: boolean
+  // White field for use on cream cards (e.g. the item modal)
+  white?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -110,10 +112,15 @@ defineExpose({ focus: () => inputEl.value?.focus() })
       autocomplete="off"
       role="combobox"
       :aria-expanded="open && hasOptions"
-      :class="[
-        'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent',
-        invalid ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
-      ]"
+      :class="white
+        ? [
+            'w-full bg-white border rounded-xl px-3.5 py-3 text-sm font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal shadow-2xs focus:outline-none focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 transition-all',
+            invalid ? 'border-red-400 bg-red-50/30' : 'border-[#D8C7B5]'
+          ]
+        : [
+            'w-full bg-[#fef8f0] border text-[#3B1F0E] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:border-transparent',
+            invalid ? 'border-red-500 focus:ring-red-500' : 'border-[#EEDFC4] focus:ring-[#B4846C]'
+          ]"
       @focus="open = true"
       @blur="close"
       @input="onInput"

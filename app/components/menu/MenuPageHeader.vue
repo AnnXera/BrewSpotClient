@@ -1,56 +1,38 @@
 <script setup lang="ts">
-import { useOperatingHours } from '~/composables/useOperatingHours'
 import MenuBreadcrumbs from '~/components/menu/MenuBreadcrumbs.vue'
 
 defineProps<{
   title: string
   subtitle?: string
   breadcrumbs?: { label: string; to?: string }[]
+  // Leading icon on the subtitle line
+  icon?: string
 }>()
-
-const { formattedSummary, isOpenNow } = useOperatingHours()
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-    <div class="flex flex-col gap-1">
+  <!-- Same format as the Servings header: big tight title, icon-led subtitle line -->
+  <header class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-6">
+    <div class="min-w-0">
       <!-- Breadcrumbs -->
-      <MenuBreadcrumbs v-if="breadcrumbs && breadcrumbs.length" :items="breadcrumbs" class="mb-1" />
-      
-      <div class="flex items-center gap-3 flex-wrap">
-        <h1 class="font-display text-[32px] font-bold text-[#3B1F0E] leading-tight">
+      <MenuBreadcrumbs v-if="breadcrumbs && breadcrumbs.length" :items="breadcrumbs" class="mb-1.5" />
+
+      <div class="flex flex-wrap items-baseline gap-3">
+        <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">
           {{ title }}
         </h1>
         <slot name="title-actions" />
       </div>
-      <p v-if="subtitle" class="font-sans text-base text-[#7D5A50]">
-        {{ subtitle }}
+
+      <p v-if="subtitle" class="mt-1.5 flex items-center gap-1.5 text-[13px] text-[#8B6656]">
+        <Icon v-if="icon" :name="icon" class="h-3.5 w-3.5 shrink-0 text-[#B4846C]" />
+        <span>{{ subtitle }}</span>
       </p>
     </div>
 
-    <!-- Chosen Store Operating Hours Badge in Menu Management -->
-    <div
-      data-walkthrough="menu-operating-hours"
-      class="flex items-center gap-3 bg-white p-3.5 px-4.5 rounded-2xl border border-[#EEDFC4] shadow-xs shrink-0 hover:shadow-sm transition-all"
-    >
-      <div class="w-10 h-10 rounded-xl bg-[#7D5A50]/10 text-[#7D5A50] flex items-center justify-center shrink-0">
-        <Icon name="heroicons:clock" class="w-5.5 h-5.5" />
-      </div>
-      <div>
-        <div class="flex items-center gap-2">
-          <span class="text-[10px] font-extrabold uppercase text-[#9E7060] tracking-wider">Cafe Operating Hours</span>
-          <span 
-            class="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.2 rounded-full border"
-            :class="isOpenNow ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'"
-          >
-            <span class="w-1.5 h-1.5 rounded-full" :class="isOpenNow ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
-            {{ isOpenNow ? 'Open Now' : 'Closed' }}
-          </span>
-        </div>
-        <p class="text-xs font-extrabold text-[#3B1F0E] mt-0.5">
-          {{ formattedSummary }}
-        </p>
-      </div>
+    <!-- Page-level actions on the right -->
+    <div v-if="$slots.actions" class="flex items-center gap-2.5 shrink-0 self-start md:self-auto">
+      <slot name="actions" />
     </div>
-  </div>
+  </header>
 </template>
