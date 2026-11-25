@@ -24,20 +24,20 @@ const statusLabel = computed(() => status.value.replaceAll('_', ' '))
 // Pending and rejected branches are admin-controlled: not selectable for bulk status changes
 const selectable = computed(() => isOperationalBranchStatus(status.value))
 
-function statusColor(s: string) {
+// Same pill style as the admin Owner Management table: soft fill, matching border, coloured dot.
+function statusMeta(s: string) {
   switch (s) {
     case 'active':
     case 'approved':
-      return 'bg-[#D3F5DF] text-[#1F7A45] border-emerald-200'
+      return { badge: 'bg-[#E8F7EE] text-[#28A745] border-[#C3ECD3]', dot: 'bg-[#28A745] animate-pulse' }
     case 'suspended':
-    case 'inactive':
     case 'rejected':
-      return 'bg-red-50 text-red-800 border-red-200'
+      return { badge: 'bg-[#FDE8E8] text-[#DC3545] border-[#F8B4B4]', dot: 'bg-[#DC3545]' }
     case 'pending_approval':
     case 'pending':
-      return 'bg-[#FDF0D5] text-[#8A5A0B] border-amber-200'
-    default:
-      return 'bg-gray-100 text-gray-800 border-gray-200'
+      return { badge: 'bg-[#FDF0D5] text-[#8A5A0B] border-[#F3D9A4]', dot: 'bg-[#D9962B]' }
+    default: // inactive and anything else
+      return { badge: 'bg-[#F0E3CE] text-[#8B6656] border-[#E4D1B8]', dot: 'bg-[#8B6656]' }
   }
 }
 </script>
@@ -45,7 +45,7 @@ function statusColor(s: string) {
 <template>
   <div
     @click="emit('view', branch.uuid)"
-    class="group grid grid-cols-[auto_minmax(0,1fr)_auto] lg:grid-cols-[auto_minmax(0,2.2fr)_minmax(0,2fr)_minmax(0,1.3fr)_8.5rem_auto] items-center gap-x-4 gap-y-1.5 px-5 sm:px-6 py-4 cursor-pointer transition-colors [@media(hover:hover)]:hover:bg-[#FDF8F3]"
+    class="group grid grid-cols-[auto_minmax(0,1fr)_auto] lg:grid-cols-[auto_minmax(0,2.2fr)_minmax(0,2fr)_minmax(0,1.3fr)_8.5rem_auto] items-center gap-x-4 gap-y-1.5 px-5 sm:px-6 py-4 cursor-pointer transition-colors duration-150 ease-out [@media(hover:hover)]:hover:bg-[#FAF4ED]/70"
     :class="selected ? 'bg-[#FBF2E1]' : ''"
   >
     <!-- Select -->
@@ -63,7 +63,7 @@ function statusColor(s: string) {
 
     <!-- Branch: photo, name, type -->
     <div class="flex items-center gap-3 min-w-0">
-      <div class="w-11 h-11 shrink-0 rounded-xl overflow-hidden bg-[#7D5A50] flex items-center justify-center text-[#FFF8EA]">
+      <div class="w-[38px] h-[38px] shrink-0 rounded-lg overflow-hidden bg-[#7D5A50] flex items-center justify-center text-[#FFF8EA] ring-2 ring-white shadow-xs">
         <img
           v-if="branch.cafe_picture && !imageError"
           :src="branch.cafe_picture"
@@ -71,34 +71,37 @@ function statusColor(s: string) {
           class="w-full h-full object-cover"
           @error="imageError = true"
         />
-        <span v-else class="font-display font-extrabold text-lg uppercase" aria-hidden="true">
+        <span v-else class="font-display font-bold text-sm uppercase" aria-hidden="true">
           {{ (branch.branch_name || 'B').charAt(0) }}
         </span>
       </div>
       <div class="min-w-0">
-        <h3 class="font-display font-extrabold text-[15px] leading-snug text-[#3D2B24] truncate">
+        <h3 class="font-sans text-sm font-bold leading-snug text-[#3D2B24] group-hover:text-[#8B5A3C] transition-colors truncate">
           {{ branch.branch_name || 'Unnamed branch' }}
         </h3>
-        <p v-if="branch.branch_type" class="text-xs font-semibold text-[#9E7060] capitalize truncate">
-          {{ branch.branch_type }}
+        <p v-if="branch.branch_type" class="font-sans text-[11px] font-medium leading-tight text-[#9E7060] capitalize truncate">
+          {{ branch.branch_type }} branch
         </p>
       </div>
     </div>
 
     <!-- Address -->
-    <p class="col-start-2 row-start-3 lg:col-start-auto lg:row-start-auto text-[13px] min-w-0 truncate" :class="branch.address ? 'text-[#5C4037]' : 'text-[#B4846C]'">
-      <Icon name="heroicons:map-pin" class="w-3.5 h-3.5 mr-1 -mt-0.5 text-[#B4846C] lg:hidden" />{{ branch.address || 'No address on file' }}
+    <p class="col-start-2 row-start-3 lg:col-start-auto lg:row-start-auto flex items-center gap-1.5 min-w-0 font-sans text-xs font-semibold" :class="branch.address ? 'text-[#3D2B24]' : 'text-[#B4846C]'">
+      <Icon name="heroicons:map-pin" class="w-3.5 h-3.5 shrink-0 text-[#B4846C]" />
+      <span class="truncate">{{ branch.address || 'No address on file' }}</span>
     </p>
 
     <!-- Manager -->
-    <p class="hidden lg:block text-[13px] truncate" :class="branch.manager_name ? 'text-[#5C4037]' : 'text-[#B4846C]'">
-      {{ branch.manager_name || 'Unassigned' }}
+    <p class="hidden lg:flex items-center gap-1.5 min-w-0 font-sans text-xs" :class="branch.manager_name ? 'font-semibold text-[#3D2B24]' : 'italic text-[#9E7060]/80'">
+      <Icon name="heroicons:user" class="w-3.5 h-3.5 shrink-0 text-[#B4846C]" />
+      <span class="truncate">{{ branch.manager_name || 'Unassigned' }}</span>
     </p>
 
 
     <!-- State: branch status, plus live open state when the branch is active -->
     <div class="flex flex-row flex-wrap items-center gap-x-3 gap-y-1 col-start-2 row-start-2 lg:flex-col lg:items-start lg:col-start-auto lg:row-start-auto">
-      <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full capitalize border" :class="statusColor(status)">
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold capitalize shrink-0" :class="statusMeta(status).badge">
+        <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="statusMeta(status).dot" aria-hidden="true" />
         {{ statusLabel }}
       </span>
       <span v-if="isActive && isLoaded" class="inline-flex items-center gap-1.5 text-[11px] font-semibold" :class="isOpenNow ? 'text-emerald-700' : 'text-[#9E7060]'">

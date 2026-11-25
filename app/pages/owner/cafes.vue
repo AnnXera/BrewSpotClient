@@ -23,6 +23,10 @@ const { saveOperatingHours } = useOperatingHours()
 
 const currentPage = ref(1)
 const lastPage = ref(1)
+// For the "Showing x to y of z branches" footer
+const pageTotal = ref(0)
+const pageFrom = ref<number | null>(null)
+const pageTo = ref<number | null>(null)
 const perPage = 6
 
 const search = ref('')
@@ -37,6 +41,17 @@ const lowStockThresholdPercent = ref<number | null>(null)
 const isAddBranchOpen = ref(false)
 const isOperatingHoursOpen = ref(false)
 const isLowStockModalOpen = ref(false)
+
+// ?edit=stock-limit (the branch page's Low Stock Alert Limit link) opens the limit editor
+// straight away, then drops the query so a refresh doesn't open it again.
+const route = useRoute()
+const router = useRouter()
+onMounted(() => {
+  if (route.query.edit !== 'stock-limit') return
+  isLowStockModalOpen.value = true
+  const { edit, ...rest } = route.query
+  router.replace({ query: rest })
+})
 const savingBranch = ref(false)
 const savingHours = ref(false)
 const savingLowStock = ref(false)
@@ -45,26 +60,28 @@ const lowStockError = ref('')
 const toastMessage = ref('')
 const backendErrors = ref<Record<string, string[]>>({})
 
-function showToast(msg: string) {
+const toastKind = ref<'success' | 'error'>('success')
+let toastTimer: ReturnType<typeof setTimeout> | undefined
+
+// One timer at a time, so an earlier toast's timeout can't cut a newer one short.
+function showToast(msg: string, kind: 'success' | 'error' = 'success') {
   toastMessage.value = msg
-  setTimeout(() => {
+  toastKind.value = kind
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
     toastMessage.value = ''
-  }, 4000)
+  }, kind === 'error' ? 6000 : 4000)
 }
+onBeforeUnmount(() => clearTimeout(toastTimer))
 
-// No mock data - relies on actual API responses
-
-// Computed Summary Metrics
-const totalBranchesCount = computed(() => branches.value.length)
-const activeBranchesCount = computed(() => {
-  return branches.value.filter(b => (b.status || '').toLowerCase() === 'active').length
-})
-const inactiveBranchesCount = computed(() => {
-  return branches.value.filter(b => (b.status || '').toLowerCase() === 'inactive' || (b.status || '').toLowerCase() === 'suspended').length
-})
-const pendingBranchesCount = computed(() => {
-  return branches.value.filter(b => (b.status || '').toLowerCase().includes('pending')).length
-})
+// Summary cards count every branch the owner has. The list below is one page (6) and follows
+// the search and status filter, so counting it would undercount as soon as there are more.
+const branchCounts = ref<{ total: number; active: number; inactive: number; pending: number; rejected: number } | null>(null)
+const totalBranchesCount = computed(() => branchCounts.value?.total ?? branches.value.length)
+const activeBranchesCount = computed(() => branchCounts.value?.active ?? 0)
+const inactiveBranchesCount = computed(() => branchCounts.value?.inactive ?? 0)
+const pendingBranchesCount = computed(() => branchCounts.value?.pending ?? 0)
+const rejectedBranchesCount = computed(() => branchCounts.value?.rejected ?? 0)
 
 const canAddBranch = computed(() => hasFeature('multi_branch'))
 const { requireFeature } = useSubscriptionGate()
@@ -82,6 +99,7 @@ async function fetchBranches() {
       cafeName.value = res.cafe_name
     }
     if (res.success) {
+      if (res.branch_counts) branchCounts.value = res.branch_counts
       mainTinPrefix.value = res.main_tin_prefix ?? null
       if (res.low_stock_threshold_percent !== undefined) {
         lowStockThresholdPercent.value = res.low_stock_threshold_percent
@@ -91,9 +109,16 @@ async function fetchBranches() {
       branches.value = res.branches.data
       currentPage.value = res.branches.current_page
       lastPage.value = res.branches.last_page
+      pageTotal.value = res.branches.total ?? branches.value.length
+      pageFrom.value = res.branches.from ?? null
+      pageTo.value = res.branches.to ?? null
     } else {
       branches.value = []
     }
+    // Only branches still on screen stay selected, so a bulk action never reaches ones the
+    // page, search or filter has since hidden.
+    const visible = new Set(branches.value.map(b => b.uuid))
+    selectedBranches.value = selectedBranches.value.filter(uuid => visible.has(uuid))
   } catch (e) {
     branches.value = []
     errorMessage.value = 'Failed to load branches.'
@@ -212,13 +237,22 @@ function toggleSelectAll(checked: boolean) {
 async function bulkUpdateStatus(newStatus: string) {
   if (!selectedBranches.value.length || bulkLoading.value) return
   bulkLoading.value = true
-  
-  const promises = selectedBranches.value.map(uuid => ownerService.updateBranch(uuid, { status: newStatus }))
-  await Promise.allSettled(promises)
-  
+
+  const uuids = [...selectedBranches.value]
+  const results = await Promise.allSettled(uuids.map(uuid => ownerService.updateBranch(uuid, { status: newStatus })))
+  // A request can resolve with success: false as well as reject; both mean that branch didn't change.
+  const failed = results.filter(r => r.status === 'rejected' || (r.value as any)?.success === false).length
+  const changed = uuids.length - failed
+  const verb = newStatus === 'active' ? 'activated' : 'deactivated'
+  const count = (n: number) => `${n} branch${n === 1 ? '' : 'es'}`
+
   selectedBranches.value = []
   bulkLoading.value = false
   await fetchBranches()
+
+  if (!failed) showToast(`${count(changed)} ${verb}.`)
+  else if (!changed) showToast(`Couldn't change ${count(failed)}. Please try again.`, 'error')
+  else showToast(`${count(changed)} ${verb}, but ${count(failed)} couldn't be changed.`, 'error')
 }
 
 function viewDetails(uuid: string) {
@@ -239,8 +273,18 @@ function viewDetails(uuid: string) {
         leave-from-class="opacity-100 translate-y-0"
         leave-to-class="opacity-0 -translate-y-2"
       >
-        <div v-if="toastMessage" role="status" aria-live="polite" class="fixed top-6 right-6 z-[1000] bg-[#7D5A50] text-[#FFF8EA] px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-[#B4846C]">
-          <Icon name="heroicons:check-circle" class="w-5 h-5 text-emerald-400 shrink-0" />
+        <div
+          v-if="toastMessage"
+          :role="toastKind === 'error' ? 'alert' : 'status'"
+          aria-live="polite"
+          class="fixed top-6 right-6 z-[1000] px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 border"
+          :class="toastKind === 'error' ? 'bg-red-50 text-red-800 border-red-200' : 'bg-[#7D5A50] text-[#FFF8EA] border-[#B4846C]'"
+        >
+          <Icon
+            :name="toastKind === 'error' ? 'heroicons:exclamation-triangle' : 'heroicons:check-circle'"
+            class="w-5 h-5 shrink-0"
+            :class="toastKind === 'error' ? 'text-red-500' : 'text-emerald-400'"
+          />
           <span class="text-sm font-bold">{{ toastMessage }}</span>
         </div>
       </transition>
@@ -248,9 +292,13 @@ function viewDetails(uuid: string) {
     <main class="flex-1 p-6 sm:p-8 lg:p-10 space-y-8">
       <!-- Header: cafe title + cafe-wide opening hours (click to edit) -->
       <header class="flex flex-col md:flex-row md:items-start justify-between gap-4">
-        <div>
-          <h1 class="font-display text-3xl sm:text-4xl font-extrabold text-[#3D2B24] tracking-tight">{{ cafeName || 'Cafe Management' }}</h1>
-          <p class="text-xs sm:text-sm text-[#9E7060] mt-1 font-medium">Manage your branches and the opening hours they share.</p>
+        <!-- Same format as the Servings header: big tight title, icon-led subtitle line -->
+        <div class="min-w-0">
+          <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">{{ cafeName || 'Cafe Management' }}</h1>
+          <p class="mt-1.5 flex items-center gap-1.5 text-[13px] text-[#8B6656]">
+            <Icon name="heroicons:building-storefront" class="h-3.5 w-3.5 shrink-0 text-[#B4846C]" />
+            <span>Manage your branches and the opening hours they share.</span>
+          </p>
         </div>
 
         <CafeManagementOperatingHoursPanel
@@ -281,18 +329,21 @@ function viewDetails(uuid: string) {
         </div>
 
         <div class="bg-white border border-[#F3E7D2] rounded-[20px] p-6 shadow-sm space-y-2 hover:border-[#7D5A50] transition-colors">
-          <p class="text-[11px] font-bold text-[#9E7060] uppercase tracking-wider">Pending/Registering</p>
+          <p class="text-[11px] font-bold text-[#9E7060] uppercase tracking-wider">Pending Approval</p>
           <p class="text-3xl font-extrabold text-[#3D2B24]">{{ pendingBranchesCount }}</p>
+          <p v-if="rejectedBranchesCount" class="text-[11px] font-semibold text-[#A4472E]">
+            + {{ rejectedBranchesCount }} rejected
+          </p>
         </div>
       </div>
 
       <!-- Main Container with Filter Bar and Branch List (wrapped with pagination so main's space-y gap doesn't split them) -->
       <div>
-      <div :class="['bg-white border border-[#EEDFC4] shadow-sm flex flex-col', branches.length > 0 ? 'rounded-t-[24px] border-b-0' : 'rounded-[24px]']">
+      <div :class="['bg-white border border-[#EEDFC4] shadow-sm flex flex-col', branches.length > 0 ? 'rounded-t-[20px] border-b-0' : 'rounded-[20px]']">
         <!-- Filter Bar -->
         <CafeManagementCafeFilterBar
           data-walkthrough="cafe-filter-bar"
-          class="sticky top-0 z-20 bg-white rounded-t-[24px]"
+          class="sticky top-0 z-20 bg-white rounded-t-[20px]"
           v-model:search="search"
           v-model:status="status"
           :selected-count="selectedBranches.length"
@@ -338,8 +389,9 @@ function viewDetails(uuid: string) {
 
           <template v-else-if="branches.length">
             <!-- Column labels (wide screens only; rows stack on small screens) -->
+            <!-- Same header row as the admin Owner Management table; the arrow column has no label -->
             <div
-              class="hidden lg:grid grid-cols-[auto_minmax(0,2.2fr)_minmax(0,2fr)_minmax(0,1.3fr)_8.5rem_auto] items-center gap-x-4 px-6 py-2.5 bg-[#FDF8F3] border-b border-[#F3E7D2] text-[11px] font-bold text-[#9E7060]"
+              class="hidden lg:grid grid-cols-[auto_minmax(0,2.2fr)_minmax(0,2fr)_minmax(0,1.3fr)_8.5rem_auto] items-center gap-x-4 px-6 py-3.5 bg-[#FAF4ED] border-b border-[#EEDFC4] font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase"
             >
               <input
                 type="checkbox"
@@ -371,10 +423,14 @@ function viewDetails(uuid: string) {
       </div>
       
       <!-- Pagination (Separate Frame) -->
-      <div v-if="branches.length > 0" class="sticky bottom-0 z-20 bg-white rounded-b-[24px] border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
+      <!-- Pagination: the shared component -->
+      <div v-if="branches.length > 0" class="sticky bottom-0 z-20 bg-white rounded-b-[20px] border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
         <Pagination
           :page="currentPage"
           :last-page="lastPage"
+          :total="pageTotal"
+          :from="pageFrom"
+          :to="pageTo"
           @change="goToPage"
         />
       </div>

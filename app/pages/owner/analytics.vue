@@ -6,7 +6,7 @@ import MenuTab from '~/components/analytics/MenuTab.vue'
 import BranchesTab from '~/components/analytics/BranchesTab.vue'
 import OperationsTab from '~/components/analytics/OperationsTab.vue'
 import { ANALYTICS_PRESETS, rangeFor, type AnalyticsFilterState, type AnalyticsPreset, type AnalyticsTab } from '~/utils/analyticsRange'
-import { formatSpan } from '~/utils/dashboardFormat'
+import { formatSpan, toDay } from '~/utils/dashboardFormat'
 import type { ExcelReport } from '~/composables/useExcelExport'
 
 definePageMeta({
@@ -31,13 +31,20 @@ const tabComponents = { sales: SalesTab, menu: MenuTab, branches: BranchesTab, o
 const q = route.query
 const isDay = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
 const initialPreset = (ANALYTICS_PRESETS.find(p => p.value === q.range)?.value ?? '30d') as AnalyticsPreset
-const initialRange = initialPreset === 'custom' && isDay(q.from) && isDay(q.to)
-  ? { from: q.from, to: q.to }
+// A custom range from the URL is only used if it is one the date picker would accept:
+// start on or before end, not in the future, at most a year long. Otherwise 30 days.
+const todayKey = toDay(new Date())
+const validCustom = isDay(q.from) && isDay(q.to)
+  && q.from <= q.to
+  && q.to <= todayKey
+  && (Date.parse(q.to) - Date.parse(q.from)) / 86400000 <= 365
+const initialRange = initialPreset === 'custom' && validCustom
+  ? { from: q.from as string, to: q.to as string }
   : rangeFor(initialPreset === 'custom' ? '30d' : initialPreset)
 
 const tab = ref<AnalyticsTab>(tabs.find(t => t.value === q.tab)?.value ?? 'sales')
 const state = ref<AnalyticsFilterState>({
-  preset: initialPreset === 'custom' && !(isDay(q.from) && isDay(q.to)) ? '30d' : initialPreset,
+  preset: initialPreset === 'custom' && !validCustom ? '30d' : initialPreset,
   ...initialRange,
   branch: typeof q.branch === 'string' ? q.branch : null,
 })
@@ -126,18 +133,20 @@ function onTabKey(e: KeyboardEvent, i: number) {
 
     <main class="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10 xl:px-12">
       <div class="mx-auto max-w-[1360px] space-y-6">
+        <!-- Same format as the Servings header. The dates and branch live in the filter bar. -->
         <header class="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
-          <div>
-            <h1 class="font-display text-[28px] font-semibold leading-tight tracking-[-0.015em] text-[#3B1F0E] md:text-[34px]">Analytics</h1>
-            <p class="mt-1 text-sm text-[#8B6656]">
-              {{ formatSpan(state.from, state.to) }} · {{ scopeLabel }}
+          <div class="min-w-0">
+            <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">Analytics</h1>
+            <p class="mt-1.5 flex items-center gap-1.5 text-[13px] text-[#8B6656]">
+              <Icon name="heroicons:chart-bar" class="h-3.5 w-3.5 shrink-0 text-[#B4846C]" />
+              <span>Sales, menu, branch and operations reports for {{ cafeName || 'your cafe' }}.</span>
             </p>
           </div>
           <button
             v-if="activeTab?.excelReport"
             type="button"
             data-walkthrough="analytics-export"
-            class="inline-flex items-center gap-2 rounded-[12px] border border-[#E9D7BF] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#3B1F0E] shadow-[0_1px_2px_rgba(59,31,14,0.06)] transition-colors hover:bg-[#FBF4EA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex h-11 items-center gap-2 rounded-xl border border-[#D8C7B5] bg-white px-4 text-[13px] font-bold text-[#3B1F0E] shadow-sm transition-colors hover:border-[#B4846C] hover:bg-[#FAF4ED] outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="!activeTab.exportReady || exporting"
             :title="exportHint"
             @click="exportTab"
@@ -170,11 +179,11 @@ function onTabKey(e: KeyboardEvent, i: number) {
             :aria-controls="`analytics-panel-${t.value}`"
             :tabindex="tab === t.value ? 0 : -1"
             class="relative inline-flex shrink-0 items-center gap-2 border-b-2 px-3.5 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#7D5A50]"
-            :class="tab === t.value ? 'border-[#7D5A50] text-[#3B1F0E]' : 'border-transparent text-[#8B6656] hover:text-[#3B1F0E]'"
+            :class="tab === t.value ? 'border-[#3B1F0E] text-[#3B1F0E]' : 'border-transparent text-[#8B6656] hover:border-[#D8C7B5] hover:text-[#3B1F0E]'"
             @click="tab = t.value"
             @keydown="onTabKey($event, i)"
           >
-            <Icon :name="tab === t.value ? `${t.icon}-solid` : t.icon" class="h-[18px] w-[18px]" />
+            <Icon :name="`${t.icon}-solid`" class="h-[18px] w-[18px]" />
             {{ t.label }}
           </button>
         </div>

@@ -203,7 +203,7 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Table card -->
-      <div class="bg-white border border-[#EDD8CC] rounded-2xl overflow-hidden">
+      <div class="bg-white border border-[#EEDFC4] rounded-[20px] shadow-sm overflow-hidden">
         <!-- Toolbar -->
         <div class="flex flex-col gap-3 p-4 border-b border-[#EDD8CC]
                     sm:px-[22px] sm:py-[18px]
@@ -281,30 +281,25 @@ onBeforeUnmount(() => {
           <!-- Desktop table -->
           <div class="hidden md:block overflow-x-auto">
             <table class="w-full text-left">
+              <!-- Same header and loading row as the admin Owner Management table -->
               <thead>
-                <tr class="bg-[#FFF8EA] border-b border-[#EDD8CC]">
-                  <th class="px-5 py-4 font-sans font-bold text-[11px] text-[#9E7060] uppercase tracking-[0.08px] whitespace-nowrap">Employee</th>
-                  <th class="px-5 py-4 font-sans font-bold text-[11px] text-[#9E7060] uppercase tracking-[0.08px] whitespace-nowrap">Contacts</th>
-                  <th class="px-5 py-4 font-sans font-bold text-[11px] text-[#9E7060] uppercase tracking-[0.08px] whitespace-nowrap">Position</th>
-                  <th class="px-5 py-4 font-sans font-bold text-[11px] text-[#9E7060] uppercase tracking-[0.08px] whitespace-nowrap">Status</th>
-                  <th class="px-5 py-4"><span class="sr-only">Actions</span></th>
+                <tr class="bg-[#FAF4ED] border-b border-[#EEDFC4]">
+                  <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5 whitespace-nowrap">Employee</th>
+                  <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5 whitespace-nowrap">Contacts</th>
+                  <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5 whitespace-nowrap">Position</th>
+                  <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5 whitespace-nowrap">Status</th>
+                  <th class="px-6 py-3.5"><span class="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
-                <template v-if="loading">
-                  <tr v-for="n in 3" :key="n" class="border-b border-[#EDD8CC] last:border-b-0 animate-pulse">
-                    <td class="px-5 py-3.5">
-                      <div class="flex items-center gap-3">
-                        <div class="w-[43px] h-[43px] rounded-full bg-[#F3E7D2]" />
-                        <div class="h-3 w-28 rounded bg-[#F3E7D2]" />
-                      </div>
-                    </td>
-                    <td class="px-5 py-3.5"><div class="h-3 w-32 rounded bg-[#F3E7D2]" /></td>
-                    <td class="px-5 py-3.5"><div class="h-3 w-16 rounded bg-[#F3E7D2]" /></td>
-                    <td class="px-5 py-3.5"><div class="h-6 w-16 rounded-full bg-[#F3E7D2]" /></td>
-                    <td class="px-5 py-3.5"><div class="ml-auto h-9 w-[130px] rounded-[10px] bg-[#F3E7D2]" /></td>
-                  </tr>
-                </template>
+                <tr v-if="loading">
+                  <td colspan="5" class="px-6 py-16 text-center">
+                    <div class="flex flex-col items-center justify-center gap-3">
+                      <div class="w-8 h-8 rounded-full border-2 border-[#EEDFC4] border-t-[#B4846C] animate-spin" />
+                      <span class="font-sans text-xs font-semibold text-[#9E7060]">Loading employees…</span>
+                    </div>
+                  </td>
+                </tr>
                 <template v-else>
                   <EmployeesTableRow
                     v-for="(member, index) in members"
@@ -332,14 +327,38 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
-          <CommonPagination
-            :page="currentPage"
-            :last-page="lastPage"
-            :total="total"
-            :from="from"
-            :to="to"
-            @change="goToPage"
-          />
+          <!-- Pagination footer, as on the admin Owner Management table -->
+          <div v-if="members.length > 0" class="border-t border-[#F3E7D2] px-6 py-3.5 bg-[#FAF4ED]/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="font-sans text-xs text-[#9E7060]">
+              Showing <strong class="text-[#3D2B24] font-semibold">{{ from ?? 0 }}</strong> to <strong class="text-[#3D2B24] font-semibold">{{ to ?? 0 }}</strong> of <strong class="text-[#3D2B24] font-semibold">{{ total }}</strong> {{ total === 1 ? 'employee' : 'employees' }}
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#EDD8CC] bg-white text-[#7D5A50] hover:bg-[#FDF3E7] hover:text-[#3D2B24] disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs"
+                :disabled="currentPage <= 1"
+                aria-label="Previous page"
+                @click="goToPage(currentPage - 1)"
+              >
+                <Icon name="heroicons:chevron-left" class="w-4 h-4" />
+              </button>
+
+              <span class="font-sans text-xs font-bold text-[#5C3A28] px-2.5">
+                Page {{ currentPage }} of {{ Math.max(1, lastPage) }}
+              </span>
+
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#EDD8CC] bg-white text-[#7D5A50] hover:bg-[#FDF3E7] hover:text-[#3D2B24] disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs"
+                :disabled="currentPage >= Math.max(1, lastPage)"
+                aria-label="Next page"
+                @click="goToPage(currentPage + 1)"
+              >
+                <Icon name="heroicons:chevron-right" class="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </template>
       </div>
     </template>
