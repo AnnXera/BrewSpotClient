@@ -4,6 +4,9 @@ import { usePlanFeature } from '~/composables/usePlanFeature'
 import { useOperatingHours, type DaySchedule } from '~/composables/useOperatingHours'
 import { isOperationalBranchStatus } from '~/utils/branchStatus'
 import Pagination from '~/components/common/Pagination.vue'
+import ConfirmModal from '~/components/common/ConfirmModal.vue'
+import { useDialogs } from '~/composables/useDialogs'
+import type { CafeUpdateRequest, NameChangeBranch } from '~/services/CafeUpdateService'
 
 definePageMeta({
   role: 'Cafe Owner',
@@ -86,7 +89,69 @@ const rejectedBranchesCount = computed(() => branchCounts.value?.rejected ?? 0)
 const canAddBranch = computed(() => hasFeature('multi_branch'))
 const { requireFeature } = useSubscriptionGate()
 
+// ── Cafe name change ──
+// The cafe name is the trade name on every branch's COR, so a rename goes to an admin with
+// an updated COR per branch. The old name stays in use until it is approved.
+const cafeUpdateService = useCafeUpdateService()
+const { confirmDialog, askConfirm, runConfirm } = useDialogs()
+const nameChange = ref<CafeUpdateRequest | null>(null)
+const nameChangeBranches = ref<NameChangeBranch[]>([])
+const isRenameOpen = ref(false)
+const cancellingRename = ref(false)
+
+const renamePending = computed(() => nameChange.value?.status === 'pending_approval' || nameChange.value?.status === 'resubmitted')
+const renameRejected = computed(() => nameChange.value?.status === 'rejected')
+
+async function fetchNameChange() {
+  try {
+    const res = await cafeUpdateService.overview()
+    nameChange.value = res.request
+    nameChangeBranches.value = res.branches
+    if (res.cafe_name) cafeName.value = res.cafe_name
+  } catch {
+    // Not critical: the page works without it, and the server still blocks conflicting actions
+  }
+}
+
+async function openRename() {
+  await fetchNameChange() // the branch list must be current: every one needs a COR
+  isRenameOpen.value = true
+}
+
+function onRenameSubmitted(request: CafeUpdateRequest) {
+  nameChange.value = request
+  isRenameOpen.value = false
+  showToast('Name change sent. An admin will review it.')
+}
+
+function cancelRename() {
+  const request = nameChange.value
+  if (!request) return
+  askConfirm({
+    title: 'Cancel name change',
+    message: `Cancel the request to rename the cafe to ${request.new_name}? You can send a new one any time.`,
+    confirmText: 'Cancel request',
+    isDestructive: true,
+    onConfirm: async () => {
+      cancellingRename.value = true
+      try {
+        await cafeUpdateService.withdraw(request.uuid)
+        await fetchNameChange()
+        showToast('Name change cancelled.')
+      } catch (e: any) {
+        showToast(e?.data?.message || 'Could not cancel the name change.', 'error')
+      } finally {
+        cancellingRename.value = false
+      }
+    },
+  })
+}
+
 function openAddBranch() {
+  if (renamePending.value) {
+    showToast('Add branches after your cafe name change is decided, so their COR shows the right name.', 'error')
+    return
+  }
   if (requireFeature('multi_branch', 'Multiple branches')) isAddBranchOpen.value = true
 }
 
@@ -208,6 +273,7 @@ function goToPage(page: number) {
 onMounted(() => {
   fetchCurrentSubscription(true, true)
   fetchBranches()
+  fetchNameChange()
 })
 
 watch(status, () => {
@@ -294,7 +360,19 @@ function viewDetails(uuid: string) {
       <header class="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <!-- Same format as the Servings header: big tight title, icon-led subtitle line -->
         <div class="min-w-0">
-          <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">{{ cafeName || 'Cafe Management' }}</h1>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">{{ cafeName || 'Cafe Management' }}</h1>
+            <!-- Rename: hidden while a request is waiting (the banner below handles it) -->
+            <button
+              v-if="cafeName && !renamePending"
+              type="button"
+              class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[#EEDFC4] bg-white text-xs font-bold text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] hover:border-[#D8C7B5] active:scale-95 transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+              @click="openRename"
+            >
+              <Icon name="heroicons:pencil-square" class="w-3.5 h-3.5" />
+              Rename
+            </button>
+          </div>
           <p class="mt-1.5 flex items-center gap-1.5 text-[13px] text-[#8B6656]">
             <Icon name="heroicons:building-storefront" class="h-3.5 w-3.5 shrink-0 text-[#B4846C]" />
             <span>Manage your branches and the opening hours they share.</span>
@@ -307,6 +385,48 @@ function viewDetails(uuid: string) {
           @edit="isOperatingHoursOpen = true"
         />
       </header>
+
+      <!-- Cafe name change: waiting for review, or not approved -->
+      <section
+        v-if="(renamePending || renameRejected) && nameChange"
+        :role="renameRejected ? 'alert' : 'status'"
+        aria-label="Cafe name change"
+        class="-mt-3 flex flex-col sm:flex-row sm:items-center gap-4 bg-white border border-[#EEDFC4] rounded-[20px] shadow-sm px-5 py-4"
+      >
+        <div class="flex items-center gap-3.5 min-w-0 flex-1">
+          <span class="w-10 h-10 shrink-0 rounded-xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center">
+            <Icon :name="renameRejected ? 'heroicons:exclamation-circle' : 'heroicons:clock'" class="w-5 h-5" />
+          </span>
+          <div class="min-w-0">
+            <p class="text-sm text-[#3D2B24]">
+              <template v-if="renameRejected">Renaming to <strong class="font-bold">{{ nameChange.new_name }}</strong> was not approved</template>
+              <template v-else>Renaming to <strong class="font-bold">{{ nameChange.new_name }}</strong> is waiting for review</template>
+            </p>
+            <p class="mt-0.5 text-[13px] text-[#9E7060]">
+              <template v-if="renameRejected">{{ nameChange.reason || 'No reason was given.' }}</template>
+              <template v-else>Your cafe stays {{ nameChange.old_name }} until an admin approves it.</template>
+            </p>
+          </div>
+        </div>
+
+        <button
+          v-if="renameRejected"
+          type="button"
+          class="shrink-0 self-start sm:self-auto h-9 px-4 rounded-xl bg-[#7D5A50] text-sm font-semibold text-[#FFF8EA] hover:bg-[#684940] active:scale-[0.98] transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+          @click="openRename"
+        >
+          {{ nameChange.can_resubmit ? 'Edit and resubmit' : 'Request a different name' }}
+        </button>
+        <button
+          v-else
+          type="button"
+          :disabled="cancellingRename"
+          class="shrink-0 self-start sm:self-auto h-9 px-4 rounded-xl border border-[#EEDFC4] bg-white text-sm font-semibold text-[#7D5A50] hover:bg-[#FAF4ED] active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+          @click="cancelRename"
+        >
+          Cancel request
+        </button>
+      </section>
 
       <!-- 4 Metric Summary Cards -->
       <div
@@ -460,6 +580,25 @@ function viewDetails(uuid: string) {
         :error="lowStockError"
         @close="isLowStockModalOpen = false; lowStockError = ''"
         @save="handleSaveLowStockThreshold"
+      />
+
+      <CafeManagementRenameCafeModal
+        :show="isRenameOpen"
+        :current-name="cafeName"
+        :branches="nameChangeBranches"
+        :previous="nameChange"
+        @close="isRenameOpen = false"
+        @submitted="onRenameSubmitted"
+      />
+
+      <ConfirmModal
+        :show="confirmDialog.show"
+        :title="confirmDialog.title"
+        :message="confirmDialog.message"
+        :confirmText="confirmDialog.confirmText"
+        :isDestructive="confirmDialog.isDestructive"
+        @close="confirmDialog.show = false"
+        @confirm="runConfirm"
       />
     </main>
   </div>

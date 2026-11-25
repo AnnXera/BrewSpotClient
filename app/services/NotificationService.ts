@@ -3,10 +3,11 @@ import { BaseService } from './BaseService'
 
 export type NotificationKind =
     // Admin
-    | 'owner_application' | 'owner_resubmission' | 'branch_submission'
+    | 'owner_application' | 'owner_resubmission' | 'branch_submission' | 'cafe_update'
     // Owner: account and branch decisions
     | 'account_approved' | 'account_rejected' | 'account_suspended' | 'account_reactivated'
     | 'branch_approved' | 'branch_rejected'
+    | 'cafe_name_approved' | 'cafe_name_rejected'
     // Owner: subscription and billing
     | 'payment_received' | 'payment_failed' | 'plan_change_scheduled' | 'subscription_cancelled'
     | 'subscription_expiring' | 'renewal_open' | 'subscription_expired'
