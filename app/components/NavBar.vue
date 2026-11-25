@@ -43,6 +43,33 @@ const profileDropdownOpen = ref(false)
 const profileRef = ref<HTMLElement | null>(null)
 const mobileProfileRef = ref<HTMLElement | null>(null)
 
+// Every page renders its own NavBar, so the sidebar is rebuilt on each navigation and
+// its nav list would jump back to the top. Its scroll position is kept across pages here.
+const navScrollEl = ref<HTMLElement | null>(null)
+const savedNavScroll = useState<number>('nav-sidebar-scroll', () => 0)
+// Until the owner scrolls or the async category list has settled, scroll events come from
+// restoring (and may be clamped while the list is still short), so they must not overwrite the saved value.
+let restoringNavScroll = true
+
+const restoreNavScroll = () => {
+  if (navScrollEl.value && restoringNavScroll) navScrollEl.value.scrollTop = savedNavScroll.value
+}
+const onNavScroll = () => {
+  if (!restoringNavScroll && navScrollEl.value) savedNavScroll.value = navScrollEl.value.scrollTop
+}
+const onNavUserScroll = () => { restoringNavScroll = false }
+
+onMounted(() => {
+  nextTick(restoreNavScroll)
+})
+// Categories load after mount and can make the list taller, so restore again once they arrive
+watch(navCategories, () => {
+  nextTick(() => {
+    restoreNavScroll()
+    restoringNavScroll = false
+  })
+})
+
 // State for open navigation dropdowns
 const openNavDropdowns = ref<Record<string, boolean>>({})
 
@@ -200,7 +227,15 @@ function toggleDropdown(link: NavLink) {
     <div class="h-px bg-[#B4846C] mt-6 shrink-0" />
 
     <!-- Nav items: fills the space between logo and profile, scrolls if taller -->
-    <nav class="flex-1 min-h-0 overflow-y-auto nav-scroll flex flex-col gap-2 mt-6 -mx-2 px-2">
+    <nav
+      ref="navScrollEl"
+      class="flex-1 min-h-0 overflow-y-auto nav-scroll flex flex-col gap-2 mt-6 -mx-2 px-2"
+      @scroll.passive="onNavScroll"
+      @wheel.passive="onNavUserScroll"
+      @touchstart.passive="onNavUserScroll"
+      @pointerdown="onNavUserScroll"
+      @keydown="onNavUserScroll"
+    >
       <template v-for="(link, i) in dynamicLinks" :key="link.label + link.to">
         <!-- Section header: a divider (except above the first) and a small label -->
         <div v-if="link.isHeader" class="flex flex-col gap-2" :class="i > 0 ? 'mt-2' : ''">

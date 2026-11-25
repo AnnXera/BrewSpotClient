@@ -38,7 +38,8 @@ const getImageUrl = () => {
     @keydown.enter.self.prevent="$emit('click', category.uuid || category.id || '')"
   >
     <!-- Image Area -->
-    <div class="h-[140px] w-full bg-[#FBF2E1] relative shrink-0 rounded-xl overflow-hidden mb-4">
+    <!-- 4:3 to match the category picture cropper, so the card shows exactly the cropped frame -->
+    <div class="aspect-[4/3] w-full bg-[#FBF2E1] relative shrink-0 rounded-xl overflow-hidden mb-4">
       <img 
         v-if="category.picture" 
         :src="getImageUrl() || ''" 

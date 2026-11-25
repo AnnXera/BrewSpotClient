@@ -393,13 +393,12 @@ function viewDetails(uuid: string) {
             <div
               class="hidden lg:grid grid-cols-[auto_minmax(0,2.2fr)_minmax(0,2fr)_minmax(0,1.3fr)_8.5rem_auto] items-center gap-x-4 px-6 py-3.5 bg-[#FAF4ED] border-b border-[#EEDFC4] font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase"
             >
-              <input
-                type="checkbox"
+              <CommonBrandCheckbox
                 :checked="selectableBranches.length > 0 && selectedBranches.length === selectableBranches.length"
                 :indeterminate="selectedBranches.length > 0 && selectedBranches.length < selectableBranches.length"
-                @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
+                :disabled="selectableBranches.length === 0"
+                @change="toggleSelectAll"
                 aria-label="Select all branches on this page"
-                class="w-5 h-5 rounded border-[#D9C4A8] text-[#7D5A50] focus:ring-[#7D5A50] cursor-pointer"
               />
               <span>Branch</span>
               <span>Address</span>

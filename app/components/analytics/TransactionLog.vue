@@ -86,12 +86,6 @@ onUnmounted(() => clearTimeout(searchTimer))
 
 const rows = computed(() => data.value?.transactions ?? [])
 const allBranches = computed(() => !data.value?.filters.branch)
-const range = computed(() => {
-  const p = data.value?.pagination
-  if (!p || !p.total) return ''
-  const first = (p.page - 1) * p.per_page + 1
-  return `${formatCount(first)}–${formatCount(first + rows.value.length - 1)} of ${formatCount(p.total)}`
-})
 
 // The status dropdown, each option with how many sales it has in this period.
 const statusOptions = computed(() => statusTabs.map(s => ({
@@ -260,7 +254,7 @@ const loadReceipt = (uuid: string) => service.getTransaction(uuid)
       </ul>
 
       <!-- Wide screens: table -->
-      <div class="hidden overflow-x-auto rounded-xl border border-[#F0E4D3] xl:block">
+      <div class="hidden overflow-x-auto rounded-t-xl border border-b-0 border-[#F0E4D3] xl:block">
         <table class="w-full text-left text-[13px]">
           <thead class="bg-[#FDFBF7]">
             <tr class="border-b border-[#F0E4D3] text-[11px] font-bold uppercase tracking-wider text-[#8A6E64]">
@@ -319,9 +313,13 @@ const loadReceipt = (uuid: string) => service.getTransaction(uuid)
         </table>
       </div>
 
-      <!-- The app's shared pagination, under a "Showing x–y of z" line -->
-      <nav v-if="data" aria-label="Transaction log pages" class="mt-4 border-t border-[#F3E7D2]">
-        <p v-if="range" class="pt-3 text-center text-[12px] tabular-nums text-[#8B6656]">Showing {{ range }}</p>
+      <!-- The app's shared pagination in its own bottom frame, as on Cafe Management:
+           joined under the table on wide screens, a standalone frame under the cards below xl -->
+      <nav
+        v-if="data"
+        aria-label="Transaction log pages"
+        class="mt-2 xl:mt-0 overflow-hidden rounded-xl xl:rounded-t-none border border-[#F0E4D3] bg-white"
+      >
         <Pagination
           :page="page"
           :last-page="data.pagination.last_page"

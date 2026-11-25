@@ -5,6 +5,7 @@ import type { PlanLock } from '~/utils/planLock'
 import type { BranchStaffStats, EmploymentStatus, StaffMember, StaffRole } from '~/services/StaffService'
 import DropdownList from '~/components/common/DropdownList.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
+import Pagination from '~/components/common/Pagination.vue'
 
 const props = defineProps<{
   branchUuid: string
@@ -52,9 +53,6 @@ const members = ref<StaffMember[]>([])
 const stats = ref<BranchStaffStats | null>(null)
 const currentPage = ref(1)
 const lastPage = ref(1)
-const total = ref(0)
-const from = ref<number | null>(null)
-const to = ref<number | null>(null)
 
 const loading = ref(true)
 const errorMessage = ref('')
@@ -101,9 +99,6 @@ async function fetchMembers() {
       members.value = res.staff.data
       currentPage.value = res.staff.current_page
       lastPage.value = res.staff.last_page
-      total.value = res.staff.total
-      from.value = res.staff.from
-      to.value = res.staff.to
     }
   } catch (e: any) {
     members.value = []
@@ -327,37 +322,13 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
-          <!-- Pagination footer, as on the admin Owner Management table -->
-          <div v-if="members.length > 0" class="border-t border-[#F3E7D2] px-6 py-3.5 bg-[#FAF4ED]/50 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div class="font-sans text-xs text-[#9E7060]">
-              Showing <strong class="text-[#3D2B24] font-semibold">{{ from ?? 0 }}</strong> to <strong class="text-[#3D2B24] font-semibold">{{ to ?? 0 }}</strong> of <strong class="text-[#3D2B24] font-semibold">{{ total }}</strong> {{ total === 1 ? 'employee' : 'employees' }}
-            </div>
-
-            <div class="flex items-center gap-1.5">
-              <button
-                type="button"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#EDD8CC] bg-white text-[#7D5A50] hover:bg-[#FDF3E7] hover:text-[#3D2B24] disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs"
-                :disabled="currentPage <= 1"
-                aria-label="Previous page"
-                @click="goToPage(currentPage - 1)"
-              >
-                <Icon name="heroicons:chevron-left" class="w-4 h-4" />
-              </button>
-
-              <span class="font-sans text-xs font-bold text-[#5C3A28] px-2.5">
-                Page {{ currentPage }} of {{ Math.max(1, lastPage) }}
-              </span>
-
-              <button
-                type="button"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#EDD8CC] bg-white text-[#7D5A50] hover:bg-[#FDF3E7] hover:text-[#3D2B24] disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs"
-                :disabled="currentPage >= Math.max(1, lastPage)"
-                aria-label="Next page"
-                @click="goToPage(currentPage + 1)"
-              >
-                <Icon name="heroicons:chevron-right" class="w-4 h-4" />
-              </button>
-            </div>
+          <!-- Pagination: the shared component, in a bottom frame as on Cafe Management -->
+          <div v-if="members.length > 0" class="border-t border-[#EEDFC4] bg-white">
+            <Pagination
+              :page="currentPage"
+              :last-page="lastPage"
+              @change="goToPage"
+            />
           </div>
         </template>
       </div>

@@ -50,6 +50,8 @@ watch(() => props.show, (newVal) => {
     errors.value = { name: '', picture: '' }
     searchQuery.value = ''
     sortBy.value = 'name-asc'
+    originalPicture.value = null
+    cropperFile.value = null
     if (props.category) {
       form.value = {
         name: props.category.name || '',
@@ -88,12 +90,34 @@ const getImageUrl = (path: string | null) => {
   return `${apiUrl.replace('/api', '')}/storage/${path}`
 }
 
+// Cropping: a newly picked file opens the cropper; the untouched original is kept so
+// "Adjust" always re-crops from full quality instead of cropping the crop.
+const originalPicture = ref<File | null>(null)
+const cropperFile = ref<File | null>(null)
+
+const setPreview = (file: File) => {
+  if (picturePreview.value?.startsWith('blob:')) URL.revokeObjectURL(picturePreview.value)
+  picturePreview.value = URL.createObjectURL(file)
+}
+
 const handleImageUpload = (event: Event) => {
   const target = event.target as HTMLInputElement
-  if (target.files && target.files[0]) {
-    form.value.picture = target.files[0]
-    picturePreview.value = URL.createObjectURL(target.files[0])
-  }
+  const file = target.files?.[0]
+  target.value = '' // lets the same file be picked again
+  if (!file) return
+  errors.value.picture = ''
+  cropperFile.value = file
+}
+
+const applyCrop = (cropped: File) => {
+  originalPicture.value = cropperFile.value
+  cropperFile.value = null
+  form.value.picture = cropped
+  setPreview(cropped)
+}
+
+const adjustPicture = () => {
+  if (originalPicture.value) cropperFile.value = originalPicture.value
 }
 
 const triggerFileInput = () => {
@@ -210,7 +234,7 @@ const saveCategory = async () => {
               <button
                 type="button"
                 @click="triggerFileInput"
-                class="relative w-full h-[130px] rounded-2xl overflow-hidden transition-all duration-150 cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                class="relative w-full aspect-[4/3] rounded-2xl overflow-hidden transition-all duration-150 cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
                 :class="picturePreview
                   ? 'border border-[#D8C7B5] shadow-2xs'
                   : 'border-2 border-dashed border-[#D8C7B5] hover:border-[#3B1F0E] bg-white hover:bg-[#FAF6F0]'"
@@ -233,6 +257,25 @@ const saveCategory = async () => {
                   </span>
                 </span>
               </button>
+              <!-- Re-open the cropper on the picture picked in this session -->
+              <div v-if="originalPicture" class="flex gap-2 mt-2">
+                <button
+                  type="button"
+                  @click="adjustPicture"
+                  class="flex-1 h-8 rounded-lg border border-[#D8C7B5] bg-white text-[#5C4037] text-xs font-bold hover:bg-[#FAF4ED] active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                >
+                  <Icon name="heroicons:scissors" class="w-3.5 h-3.5" />
+                  Adjust
+                </button>
+                <button
+                  type="button"
+                  @click="triggerFileInput"
+                  class="flex-1 h-8 rounded-lg border border-[#D8C7B5] bg-white text-[#5C4037] text-xs font-bold hover:bg-[#FAF4ED] active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                >
+                  <Icon name="heroicons:camera" class="w-3.5 h-3.5" />
+                  Change
+                </button>
+              </div>
               <p v-if="errors.picture" class="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
                 <Icon name="heroicons:exclamation-circle" class="w-3.5 h-3.5 shrink-0" />
                 <span>{{ errors.picture }}</span>
@@ -381,6 +424,15 @@ const saveCategory = async () => {
         </button>
       </div>
     </div>
+
+    <CommonImageCropper
+      :show="!!cropperFile"
+      :file="cropperFile"
+      :aspect="4 / 3"
+      title="Adjust Category Picture"
+      @cancel="cropperFile = null"
+      @apply="applyCrop"
+    />
 
     <AlertModal
       :show="alertDialog.show"
