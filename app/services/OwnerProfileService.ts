@@ -93,6 +93,8 @@ export class OwnerProfileService extends BaseService {
         return this.get<{
             success: boolean
             cafe_name: string | null
+            // Across all the owner's branches, regardless of page, search or status filter.
+            branch_counts?: { total: number; active: number; inactive: number; pending: number; rejected: number }
             low_stock_threshold_percent?: number | null
             main_tin_prefix?: string | null
             branches: Paginated<BranchSummary>

@@ -20,6 +20,13 @@ type BranchTab = 'details' | 'employees' | 'floor-plans'
 const TABS: BranchTab[] = ['details', 'employees', 'floor-plans']
 const isTab = (value: unknown): value is BranchTab => TABS.includes(value as BranchTab)
 
+// Employees and Floor Plans only show for a branch that can be operated.
+const branchTabs: { value: BranchTab; label: string; icon: string; walkthrough: string }[] = [
+  { value: 'details', label: 'Branch Details', icon: 'heroicons:building-storefront-solid', walkthrough: 'branch-tab-details' },
+  { value: 'employees', label: 'Employees', icon: 'heroicons:users-solid', walkthrough: 'cafe-employees-tab' },
+  { value: 'floor-plans', label: 'Floor Plans', icon: 'heroicons:map-solid', walkthrough: 'branch-tab-floor-plans' },
+]
+
 const activeTab = ref<BranchTab>(isTab(route.query.tab) ? route.query.tab : 'details')
 
 watch(() => route.query.tab, (newTab) => {
@@ -62,6 +69,11 @@ watch(isOperational, (ok) => {
 
 const pageTitle = computed(() => branch.value?.branch_name || 'Branch Details')
 
+const breadcrumbs = computed(() => [
+  { label: 'Cafe Management', to: '/owner/cafes' },
+  { label: pageTitle.value },
+])
+
 const birDocument = computed(() =>
   branch.value?.documents?.find(doc => doc.doc_type === 'BIR') ?? null,
 )
@@ -77,23 +89,45 @@ function formatVat(value: string | null | undefined) {
   return '—'
 }
 
+// The first load shows the spinner. A refresh keeps the page on screen and only spins the
+// Refresh button, so the cards and the employee list don't vanish and reload; if it fails,
+// the last details stay up with a notice instead of being replaced by an error.
+const refreshing = ref(false)
+const refreshError = ref('')
+
 async function fetchBranch() {
-  loading.value = true
+  const isRefresh = !!branch.value && branch.value.uuid === route.params.uuid
+  if (isRefresh) refreshing.value = true
+  else loading.value = true
   errorMessage.value = ''
+  refreshError.value = ''
   try {
     const res = await ownerService.getBranch(route.params.uuid as string)
     if (res.success && res.branch) {
       branch.value = res.branch
       review.value = res.review ?? null
+    } else if (isRefresh) {
+      refreshError.value = res.message || 'The branch details could not be refreshed.'
     } else {
       errorMessage.value = res.message || 'Branch not found.'
     }
   } catch (e: any) {
-    errorMessage.value = e?.data?.message || 'Failed to load branch details.'
+    if (isRefresh) refreshError.value = e?.data?.message || 'The branch details could not be refreshed.'
+    else errorMessage.value = e?.data?.message || 'Failed to load branch details.'
   } finally {
     loading.value = false
+    refreshing.value = false
   }
 }
+
+// Going from one branch's page to another reuses this page, so load the new branch.
+watch(() => route.params.uuid, (next, prev) => {
+  if (next && next !== prev) {
+    branch.value = null
+    review.value = null
+    fetchBranch()
+  }
+})
 
 const { openDocument } = useDocumentViewer()
 
@@ -163,93 +197,65 @@ onMounted(fetchBranch)
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row min-h-screen bg-[#FFF8EA]">
+  <div class="flex flex-col md:flex-row min-h-screen bg-[#FDF3E7]">
     <NavBar :links="links" />
-    <main class="flex-1 p-6 sm:p-8 lg:p-12 font-display cafe-entrance">
-      <!-- Breadcrumbs -->
-      <nav class="flex items-center gap-2 text-sm pb-1">
-        <NuxtLink to="/owner/cafes" class="inline-flex items-center gap-1.5 font-medium text-[#8C6E63] hover:text-[#3A2923] transition-colors">
-          <Icon name="heroicons:arrow-left" class="size-4 text-[#7D5A50]" />
-          <span>Cafe Management</span>
-        </NuxtLink>
-        <span class="text-[#8C6E63]/60">/</span>
-        <span class="font-medium text-[#3A2923]">{{ pageTitle }}</span>
-      </nav>
+    <main class="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10 xl:px-12 font-display cafe-entrance">
+      <div class="mx-auto max-w-[1360px]">
+      <!-- Breadcrumbs, the same as Menu Management's -->
+      <MenuBreadcrumbs :items="breadcrumbs" />
 
-      <!-- Header -->
-      <header class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mt-2 pb-2">
-        <div class="space-y-1 min-w-0">
-          <h1 class="font-display font-bold text-2xl sm:text-3xl lg:text-4xl text-[#3A2923] tracking-tight break-words">
+      <!-- Header, in the same format as the other pages -->
+      <header class="mt-1.5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="min-w-0">
+          <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E] break-words">
             {{ pageTitle }}
           </h1>
-          <p class="text-xs sm:text-sm text-[#7D5A50]">
-            Branch overview, legal documentation, and employee records.
+          <p class="mt-1.5 flex items-center gap-1.5 text-[13px] text-[#8B6656]">
+            <Icon name="heroicons:building-storefront" class="h-3.5 w-3.5 shrink-0 text-[#B4846C]" />
+            <span>Branch details, BIR documents, registers, employees and floor plans.</span>
           </p>
         </div>
 
-        <!-- Quick actions -->
-        <div class="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-[#DED4CA] bg-white text-xs font-semibold text-[#5B463C] shadow-sm hover:border-[#7D5A50] hover:bg-[#F8EFE7] active:scale-[0.97] transition-all duration-150 cursor-pointer disabled:opacity-50"
-            :disabled="loading"
-            title="Refresh branch details"
-            @click="fetchBranch"
-          >
-            <Icon name="heroicons:arrow-path" class="size-3.5 text-[#7D5A50]" :class="loading ? 'animate-spin' : ''" />
-            <span>Refresh</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          class="inline-flex h-11 shrink-0 items-center gap-2 self-start rounded-xl border border-[#D8C7B5] bg-white px-4 text-[13px] font-bold text-[#3B1F0E] shadow-sm transition-colors hover:border-[#B4846C] hover:bg-[#FAF4ED] outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
+          :disabled="loading || refreshing"
+          title="Refresh branch details"
+          @click="fetchBranch"
+        >
+          <Icon name="heroicons:arrow-path" class="size-4 text-[#7D5A50]" :class="refreshing ? 'animate-spin' : ''" />
+          <span>{{ refreshing ? 'Refreshing…' : 'Refresh' }}</span>
+        </button>
       </header>
 
+      <div v-if="refreshError" role="alert" class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800">
+        <Icon name="heroicons:exclamation-triangle" class="size-4 shrink-0 text-red-500" />
+        <span class="flex-1">{{ refreshError }} Showing the last details that loaded.</span>
+        <button type="button" class="font-bold underline underline-offset-2 hover:text-red-900" @click="fetchBranch">Try again</button>
+      </div>
+
       <!-- Clean Navigation Tabs -->
-      <nav class="flex items-center gap-6 border-b border-[#EDD8CC] mt-4" aria-label="Tabs">
-        <button
-          type="button"
-          data-walkthrough="branch-tab-details"
-          class="group relative pb-3 pt-1 text-sm font-semibold transition-colors duration-150 flex items-center gap-2 cursor-pointer focus-visible:outline-none active:scale-[0.98]"
-          :class="activeTab === 'details' ? 'text-[#3A2923]' : 'text-[#8C6E63] hover:text-[#3A2923]'"
-          @click="selectTab('details')"
-        >
-          <Icon name="heroicons:building-storefront" class="size-4.5 transition-colors" :class="activeTab === 'details' ? 'text-[#A96746]' : 'text-[#8C6E63] group-hover:text-[#3A2923]'" />
-          <span>Branch Details</span>
-          <span
-            v-if="activeTab === 'details'"
-            class="absolute inset-x-0 -bottom-px h-0.5 bg-[#3A2923] rounded-full"
-          />
-        </button>
-
-        <button
-          v-if="isOperational"
-          type="button"
-          data-walkthrough="cafe-employees-tab"
-          class="group relative pb-3 pt-1 text-sm font-semibold transition-colors duration-150 flex items-center gap-2 cursor-pointer focus-visible:outline-none active:scale-[0.98]"
-          :class="activeTab === 'employees' ? 'text-[#3A2923]' : 'text-[#8C6E63] hover:text-[#3A2923]'"
-          @click="selectTab('employees')"
-        >
-          <Icon name="heroicons:users" class="size-4.5 transition-colors" :class="activeTab === 'employees' ? 'text-[#A96746]' : 'text-[#8C6E63] group-hover:text-[#3A2923]'" />
-          <span>Employees</span>
-          <span
-            v-if="activeTab === 'employees'"
-            class="absolute inset-x-0 -bottom-px h-0.5 bg-[#3A2923] rounded-full"
-          />
-        </button>
-
-        <button
-          v-if="isOperational"
-          type="button"
-          data-walkthrough="branch-tab-floor-plans"
-          class="group relative pb-3 pt-1 text-sm font-semibold transition-colors duration-150 flex items-center gap-2 cursor-pointer focus-visible:outline-none active:scale-[0.98]"
-          :class="activeTab === 'floor-plans' ? 'text-[#3A2923]' : 'text-[#8C6E63] hover:text-[#3A2923]'"
-          @click="selectTab('floor-plans')"
-        >
-          <Icon name="heroicons:map" class="size-4.5 transition-colors" :class="activeTab === 'floor-plans' ? 'text-[#A96746]' : 'text-[#8C6E63] group-hover:text-[#3A2923]'" />
-          <span>Floor Plans</span>
-          <span
-            v-if="activeTab === 'floor-plans'"
-            class="absolute inset-x-0 -bottom-px h-0.5 bg-[#3A2923] rounded-full"
-          />
-        </button>
+      <!-- Same tabs as Analytics: underline on the active tab, filled icons -->
+      <nav
+        role="tablist"
+        aria-label="Branch sections"
+        class="branch-tabs -mx-4 mt-5 flex gap-1 overflow-x-auto overflow-y-hidden px-4 shadow-[inset_0_-1px_0_#E9D7BF] sm:mx-0 sm:px-0"
+      >
+        <template v-for="t in branchTabs" :key="t.value">
+          <button
+            v-if="t.value === 'details' || isOperational"
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === t.value"
+            :data-walkthrough="t.walkthrough"
+            class="relative inline-flex shrink-0 items-center gap-2 border-b-2 px-3.5 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#7D5A50]"
+            :class="activeTab === t.value ? 'border-[#3B1F0E] text-[#3B1F0E]' : 'border-transparent text-[#8B6656] hover:border-[#D8C7B5] hover:text-[#3B1F0E]'"
+            @click="selectTab(t.value)"
+          >
+            <Icon :name="t.icon" class="h-[18px] w-[18px]" />
+            {{ t.label }}
+          </button>
+        </template>
       </nav>
 
       <!-- Smooth Content Transition after Loading -->
@@ -332,17 +338,39 @@ onMounted(fetchBranch)
 
           <Transition name="fade-tab" mode="out-in">
             <!-- Branch Details Tab -->
-            <div v-if="activeTab === 'details'" key="details" class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+            <div v-if="activeTab === 'details'" key="details" class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+              <!-- Low stock alert limit: cafe-wide, so it sits above both branch cards -->
+              <div class="cafe-card cafe-card-1 lg:col-span-2 rounded-2xl bg-white border border-[#EDD8CC] shadow-sm px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-3 min-w-0">
+                  <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                    <Icon name="heroicons:bell-alert" class="size-5" />
+                  </span>
+                  <div class="min-w-0">
+                    <p class="text-sm font-bold text-[#3D2B24]">Low Stock Alert Limit</p>
+                    <p class="text-xs text-[#9E7060]">Shared across all branches. Managers and you are alerted when an item's servings drop to this level.</p>
+                  </div>
+                </div>
+                <NuxtLink
+                  :to="{ path: '/owner/cafes', query: { edit: 'stock-limit' } }"
+                  title="Change the low stock alert limit"
+                  class="inline-flex items-center gap-1.5 rounded-xl bg-white border border-[#E3CFB4] hover:border-[#7D5A50] px-3 py-1.5 text-sm font-extrabold text-[#3D2B24] tabular-nums transition-colors"
+                >
+                  <span>{{ branch.low_stock_threshold_percent ? `${branch.low_stock_threshold_percent}%` : 'Not set' }}</span>
+                  <Icon name="heroicons:pencil-square" class="size-4 text-[#7D5A50]" />
+                </NuxtLink>
+              </div>
+
               <!-- Branch Information -->
               <section class="cafe-card cafe-card-1 bg-white border border-[#EDD8CC] rounded-2xl p-6 shadow-sm flex flex-col gap-5">
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                  <h2 class="text-xl sm:text-2xl font-bold text-[#3D2B24] flex items-center gap-2">
+                  <h2 class="text-lg sm:text-xl font-bold text-[#3D2B24] flex items-center gap-2">
                     <Icon name="heroicons:information-circle" class="size-6 text-[#A96746]" />
                     Branch Information
                   </h2>
                   <div class="flex items-center gap-1.5">
-                    <span class="bg-[#FFF0D1] border border-[#EDD8CC] rounded-lg px-2.5 py-1 text-xs font-bold text-[#7D5A50] uppercase">
-                      {{ branch.branch_type }}
+                    <!-- Same pill shape and size as the status badge beside it -->
+                    <span class="inline-flex items-center rounded-full px-2 min-[360px]:px-2.5 py-0.5 min-[360px]:py-1 font-display font-semibold text-xs min-[360px]:text-[13px] sm:text-[14px] shrink-0 bg-[#FFF0D1] text-[#7D5A50]">
+                      {{ isMain ? 'Main' : 'Side' }}
                     </span>
                     <StatusBadge :status="branch.status" />
                     <button
@@ -393,27 +421,12 @@ onMounted(fetchBranch)
                       <p class="text-sm sm:text-base font-medium text-[#3D2B24]">{{ branch.cafe_phonenumber || '—' }}</p>
                     </div>
                   </div>
-
-                  <div class="mt-1 rounded-xl bg-[#FAF4ED] border border-[#EDD8CC] px-3.5 py-2.5 flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-2 min-w-0">
-                      <Icon name="heroicons:bell-alert" class="w-4 h-4 text-amber-600 shrink-0" />
-                      <span class="text-xs font-bold text-[#3D2B24]">Low Stock Alert Limit</span>
-                      <span class="text-[11px] font-medium text-[#9E7060] hidden sm:inline">· Shared across all branches</span>
-                    </div>
-                    <NuxtLink
-                      to="/owner/cafes"
-                      class="inline-flex items-center gap-1.5 rounded-lg bg-white border border-[#E3CFB4] hover:border-[#7D5A50] px-2.5 py-1 text-xs font-extrabold text-[#3D2B24] tabular-nums transition-colors"
-                    >
-                      <span>{{ branch.low_stock_threshold_percent ? `${branch.low_stock_threshold_percent}%` : 'Not set' }}</span>
-                      <Icon name="heroicons:pencil-square" class="w-3.5 h-3.5 text-[#7D5A50]" />
-                    </NuxtLink>
-                  </div>
                 </div>
               </section>
 
               <!-- BIR Document -->
               <section class="cafe-card cafe-card-2 bg-white border border-[#EDD8CC] rounded-2xl p-6 shadow-sm flex flex-col gap-4">
-                <h2 class="text-xl sm:text-2xl font-bold text-[#3D2B24] flex items-center gap-2">
+                <h2 class="text-lg sm:text-xl font-bold text-[#3D2B24] flex items-center gap-2">
                   <Icon name="heroicons:document-text" class="size-6 text-[#A96746]" />
                   BIR Document
                 </h2>
@@ -438,16 +451,16 @@ onMounted(fetchBranch)
 
                   <div class="grid grid-cols-2 gap-3">
                     <div class="flex flex-col gap-1 min-w-0">
-                      <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">TIN Number</p>
-                      <p class="text-[15px] font-medium text-[#3D2B24] break-all">{{ birDocument.tin_number || '—' }}</p>
+                      <p class="text-xs font-bold text-[#9E7060] uppercase tracking-wider">TIN Number</p>
+                      <p class="text-sm sm:text-base font-medium text-[#3D2B24] break-all">{{ birDocument.tin_number || '—' }}</p>
                     </div>
                     <div class="flex flex-col gap-1">
-                      <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">VAT Type</p>
-                      <p class="text-[15px] font-medium text-[#3D2B24]">{{ formatVat(birDocument.vat) }}</p>
+                      <p class="text-xs font-bold text-[#9E7060] uppercase tracking-wider">VAT Type</p>
+                      <p class="text-sm sm:text-base font-medium text-[#3D2B24]">{{ formatVat(birDocument.vat) }}</p>
                     </div>
                     <div class="flex flex-col gap-1">
-                      <p class="text-sm font-bold text-[#9E7060] uppercase tracking-[0.1px]">Registered Date</p>
-                      <p class="text-[15px] font-medium text-[#3D2B24]">{{ formatDate(birDocument.registered_at) }}</p>
+                      <p class="text-xs font-bold text-[#9E7060] uppercase tracking-wider">Registered Date</p>
+                      <p class="text-sm sm:text-base font-medium text-[#3D2B24]">{{ formatDate(birDocument.registered_at) }}</p>
                     </div>
                   </div>
                 </div>
@@ -479,6 +492,7 @@ onMounted(fetchBranch)
           </Transition>
         </div>
       </Transition>
+      </div>
     </main>
 
     <CafeManagementResubmitBranchModal
@@ -530,6 +544,14 @@ onMounted(fetchBranch)
 </template>
 
 <style scoped>
+/* Tabs scroll sideways on phones without showing a scrollbar, like Analytics. */
+.branch-tabs {
+  scrollbar-width: none;
+}
+.branch-tabs::-webkit-scrollbar {
+  display: none;
+}
+
 /* Page entrance */
 .cafe-entrance {
   animation: cafePageEnter 260ms cubic-bezier(0.23, 1, 0.32, 1) both;

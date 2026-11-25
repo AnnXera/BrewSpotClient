@@ -4,11 +4,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import AnalyticsFilterBar from '~/components/analytics/AnalyticsFilterBar.vue'
-import AnalyticsPanel from '~/components/analytics/AnalyticsPanel.vue'
 import DropdownList from '~/components/common/DropdownList.vue'
+import Pagination from '~/components/common/Pagination.vue'
+import SearchInput from '~/components/common/SearchInput.vue'
 import type { ActivityCategory, ActivityLogQuery, ActivityLogResponse, ActivityLogRow, ActivityRole, ServingChange } from '~/services/ActivityLogService'
 import { rangeFor, type AnalyticsFilterState } from '~/utils/analyticsRange'
-import { formatCount, formatSpan } from '~/utils/dashboardFormat'
+import { formatCount } from '~/utils/dashboardFormat'
 
 const props = defineProps<{
   scope: 'owner' | 'manager'
@@ -16,7 +17,7 @@ const props = defineProps<{
   branchName?: string // manager: shown under the title
 }>()
 
-const PER_PAGE = 25
+const PER_PAGE = 20
 const isOwner = computed(() => props.scope === 'owner')
 
 const service = useActivityLogService()
@@ -32,7 +33,7 @@ const page = ref(1)
 
 // Managers don't see dashboard sign-ins of the owner, but do see their branch's managers.
 const categoryTabs: { value: ActivityCategory | null; label: string; key: 'all' | ActivityCategory }[] = [
-  { value: null, label: 'All', key: 'all' },
+  { value: null, label: 'All activity', key: 'all' },
   { value: 'pos', label: 'Register', key: 'pos' },
   { value: 'employees', label: 'Employees', key: 'employees' },
   { value: 'menu', label: 'Menu', key: 'menu' },
@@ -42,6 +43,12 @@ const categoryTabs: { value: ActivityCategory | null; label: string; key: 'all' 
   { value: 'branch', label: 'Branch details', key: 'branch' },
   { value: 'auth', label: 'Dashboard sign-ins', key: 'auth' },
 ]
+
+// The activity type dropdown, each option with how many entries it has in this period.
+const categoryOptions = computed(() => categoryTabs.map(c => ({
+  value: c.value,
+  label: data.value ? `${c.label} (${formatCount(data.value.counts[c.key] ?? 0)})` : c.label,
+})))
 
 const roleOptions = computed<{ value: ActivityRole | null; label: string }[]>(() => [
   { value: null, label: 'Everyone' },
@@ -106,8 +113,10 @@ async function load() {
       per_page: PER_PAGE,
     })
     if (id !== requestId) return
-    if (res?.success) data.value = res
-    else failed.value = true
+    if (res?.success) {
+      data.value = res
+      expanded.value = new Set() // a new page or filter starts with every entry folded
+    } else failed.value = true
   } catch {
     if (id !== requestId) return
     failed.value = true
@@ -143,6 +152,14 @@ const range = computed(() => {
   const first = (p.page - 1) * p.per_page + 1
   return `${formatCount(first)}–${formatCount(first + rows.value.length - 1)} of ${formatCount(p.total)}`
 })
+
+// Moving to another page starts at the top of the list, not halfway down it.
+const listTop = ref<HTMLElement | null>(null)
+function goToPage(next: number) {
+  if (refreshing.value || next === page.value) return
+  page.value = next
+  listTop.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 // ── Presentation ──
 const ADD = 'bg-[#E4ECF4] text-[#2A4A6B]'
@@ -241,163 +258,290 @@ const hasDetails = (l: ActivityLogRow) => detailLines(l).length > 0
 const emptyText = computed(() =>
   query.value || category.value || role.value ? 'No activity matches these filters.' : 'No activity in this period.',
 )
+
+// ── Timeline ──
+// Summary tiles double as shortcuts into a category.
+const statTiles = computed(() => {
+  const c = data.value?.counts ?? {}
+  return [
+    { key: 'all' as const, value: null, label: 'All activity', icon: 'heroicons:clipboard-document-list', count: c.all ?? 0 },
+    { key: 'pos' as const, value: 'pos' as ActivityCategory, label: 'Register', icon: 'heroicons:computer-desktop', count: c.pos ?? 0 },
+    { key: 'menu' as const, value: 'menu' as ActivityCategory, label: 'Menu changes', icon: 'heroicons:book-open', count: c.menu ?? 0 },
+    { key: 'employees' as const, value: 'employees' as ActivityCategory, label: 'Employees', icon: 'heroicons:user-group', count: c.employees ?? 0 },
+  ]
+})
+
+const dayKey = (iso: string) => {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+}
+const longDay = new Intl.DateTimeFormat('en-PH', { weekday: 'long', month: 'short', day: 'numeric' })
+const timeOnly = new Intl.DateTimeFormat('en-PH', { hour: 'numeric', minute: '2-digit' })
+const formatTime = (iso: string) => timeOnly.format(new Date(iso))
+
+function dayLabel(iso: string) {
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
+  if (dayKey(iso) === dayKey(today.toISOString())) return 'Today'
+  if (dayKey(iso) === dayKey(yesterday.toISOString())) return 'Yesterday'
+  return longDay.format(new Date(iso))
+}
+
+// Rows arrive newest first; keep that order and break them into one group per day.
+const dayGroups = computed(() => {
+  const groups: { key: string; label: string; rows: ActivityLogRow[] }[] = []
+  for (const row of rows.value) {
+    const key = dayKey(row.created_at)
+    const last = groups[groups.length - 1]
+    if (last && last.key === key) last.rows.push(row)
+    else groups.push({ key, label: dayLabel(row.created_at), rows: [row] })
+  }
+  return groups
+})
+
+function initials(name: string | null) {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1]![0] : '')).toUpperCase()
+}
+
+// Avatar colour by role, so owner, manager and cashier entries are easy to tell apart.
+function avatarTone(r: string | null) {
+  if (r === 'Cafe Owner') return 'bg-[#3B1F0E] text-[#FFF8EA]'
+  if (r === 'Manager') return 'bg-[#E4ECF4] text-[#2A4A6B]'
+  if (r === 'Cashier') return 'bg-[#E7F1E4] text-[#2F5D2A]'
+  return 'bg-[#F3E7D2] text-[#6B4A3A]'
+}
+
+const hasFilters = computed(() => !!(query.value || category.value || role.value))
+function clearFilters() {
+  search.value = ''
+  query.value = ''
+  category.value = null
+  role.value = null
+}
 </script>
 
 <template>
   <div class="space-y-6">
+    <!-- Same format as the Servings header: big tight title, icon-led subtitle line -->
     <header>
-      <h1 class="font-display text-[28px] font-semibold leading-tight tracking-[-0.015em] text-[#3B1F0E] md:text-[34px]">Activity Log</h1>
-      <p class="mt-1 text-sm text-[#8B6656]">{{ formatSpan(state.from, state.to) }} · {{ scopeLabel }}</p>
+      <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">Activity Log</h1>
+      <p class="mt-1.5 flex items-start gap-1.5 text-[13px] text-[#8B6656]">
+        <Icon name="heroicons:clipboard-document-list" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#B4846C]" />
+        <span class="max-w-3xl">{{ note }}</span>
+      </p>
+      <!-- Managers have no branch picker, so name their branch here -->
+      <p v-if="!isOwner" class="mt-1 pl-5 text-[12px] font-semibold text-[#A8988B]">{{ scopeLabel }}</p>
     </header>
 
     <AnalyticsFilterBar v-model="state" :branches="branches" />
 
-    <AnalyticsPanel :title="isOwner ? 'Staff activity' : 'Branch activity'" :note="note">
-      <template #actions>
-        <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-          <div class="w-full sm:w-44">
-            <DropdownList
-              v-model="role"
-              :options="roleOptions"
-              size="xs"
-              icon="heroicons:user-circle"
-              aria-label="Person"
-              align="right"
-            />
-          </div>
-          <label class="relative block w-full sm:w-[260px]">
-            <span class="sr-only">Search activity</span>
-            <Icon name="heroicons:magnifying-glass" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9E7060]" />
-            <input
-              v-model="search"
-              type="search"
-              placeholder="Name or what they did"
-              class="h-9 w-full rounded-[10px] border border-[#E9D7BF] bg-white pl-9 pr-3 text-[13px] text-[#3B1F0E] placeholder:text-[#B09080] focus:border-[#7D5A50] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
-            >
-          </label>
-        </div>
-      </template>
-
-      <div role="radiogroup" aria-label="Activity type" class="-mt-1 mb-4 flex flex-wrap gap-1.5">
-        <button
-          v-for="c in categoryTabs"
-          :key="c.key"
-          type="button"
-          role="radio"
-          :aria-checked="category === c.value"
-          class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
-          :class="category === c.value ? 'border-[#7D5A50] bg-[#7D5A50] text-white' : 'border-[#E9D7BF] bg-white text-[#8B6656] hover:text-[#3B1F0E]'"
-          @click="category = c.value"
+    <!-- Summary tiles: counts for the period, and a quick way into each kind of activity -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <button
+        v-for="t in statTiles"
+        :key="t.key"
+        type="button"
+        class="group flex items-center gap-3 rounded-2xl border bg-white p-4 text-left shadow-sm transition-all outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+        :class="category === t.value ? 'border-[#3B1F0E] ring-1 ring-[#3B1F0E]' : 'border-[#EEDFC4] hover:border-[#D8C7B5] hover:shadow-sm'"
+        :aria-pressed="category === t.value"
+        @click="category = t.value"
+      >
+        <span
+          class="flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors"
+          :class="category === t.value ? 'bg-[#3B1F0E] text-[#FFF8EA]' : 'bg-[#FAF4ED] text-[#7D5A50] group-hover:text-[#3B1F0E]'"
         >
-          {{ c.label }}
-          <span v-if="data" class="tabular-nums" :class="category === c.value ? 'text-white/80' : 'text-[#B09080]'">{{ formatCount(data.counts[c.key] ?? 0) }}</span>
-        </button>
+          <Icon :name="t.icon" class="size-5" />
+        </span>
+        <span class="min-w-0">
+          <span class="block text-[11px] font-bold uppercase tracking-wider text-[#8A6E64]">{{ t.label }}</span>
+          <span class="block font-display text-2xl font-bold leading-tight text-[#3B1F0E] tabular-nums">
+            <template v-if="data">{{ formatCount(t.count) }}</template>
+            <span v-else class="skeleton inline-block h-6 w-10 rounded" />
+          </span>
+        </span>
+      </button>
+    </div>
+
+    <section class="overflow-hidden rounded-2xl border border-[#EEDFC4] bg-white shadow-sm">
+      <!-- Toolbar -->
+      <!-- One row: what kind of activity and who on the left, search on the right -->
+      <div ref="listTop" class="scroll-mt-6 flex flex-col gap-2 border-b border-[#F3E7D2] bg-[#FDFBF7] px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:px-5">
+        <div class="w-full sm:w-56">
+          <DropdownList
+            v-model="category"
+            :options="categoryOptions"
+            size="sm"
+            card
+            icon="heroicons:funnel"
+            aria-label="Activity type"
+          />
+        </div>
+        <div class="w-full sm:w-44">
+          <DropdownList
+            v-model="role"
+            :options="roleOptions"
+            size="sm"
+            card
+            icon="heroicons:user-circle"
+            aria-label="Person"
+          />
+        </div>
+        <span v-if="refreshing" class="hidden items-center gap-1.5 text-[12px] font-semibold text-[#8B6656] sm:inline-flex" role="status">
+          <Icon name="heroicons:arrow-path" class="size-3.5 animate-spin" />
+          Updating
+        </span>
+        <div class="w-full sm:ml-auto sm:w-[260px]">
+          <SearchInput v-model="search" placeholder="Name or what they did" aria-label="Search activity" clearable white />
+        </div>
       </div>
 
-      <div v-if="loading" class="space-y-2">
-        <span v-for="i in 8" :key="i" class="skeleton block h-10 rounded-lg" />
-      </div>
-
-      <div v-else-if="failed && !data" class="rounded-xl border border-[#F3E7D2] px-4 py-6 text-center text-[13px] text-[#8B6656]">
-        The activity log could not be loaded.
-        <button type="button" class="ml-1 font-semibold text-[#7D5A50] underline underline-offset-2" @click="load">Try again</button>
-      </div>
-
-      <p v-else-if="!rows.length" class="rounded-xl border border-dashed border-[#E9D7BF] px-4 py-8 text-center text-[13px] text-[#8B6656]">
-        {{ emptyText }}
-      </p>
-
-      <div v-else :class="{ 'opacity-60 transition-opacity': refreshing }">
-        <!-- Phones and tablets: one card per entry -->
-        <ul class="divide-y divide-[#F3E7D2] lg:hidden">
-          <li v-for="l in rows" :key="l.uuid" class="py-3">
-            <div class="flex items-start gap-3">
-              <span class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full" :class="actionInfo(l).tone">
-                <Icon :name="actionInfo(l).icon" class="h-4 w-4" />
-              </span>
-              <div class="min-w-0 flex-1">
-                <p class="text-[14px] font-semibold text-[#3D2B24]">
-                  {{ l.actor.name ?? 'Removed account' }}
-                  <span v-if="l.actor.role" class="ml-1 text-[12px] font-medium text-[#9E7060]">{{ roleLabel(l.actor.role) }}</span>
-                </p>
-                <p class="text-[13px] text-[#3D2B24]">{{ l.description }}</p>
-                <p class="mt-0.5 text-[12px] text-[#8B6656]">
-                  {{ formatWhen(l.created_at) }}<template v-if="allBranches"> · {{ branchLabel(l) }}</template>
-                </p>
-                <template v-if="hasDetails(l)">
-                  <button type="button" class="mt-1 text-[12px] font-semibold text-[#7D5A50] underline underline-offset-2" :aria-expanded="expanded.has(l.uuid)" @click="toggle(l.uuid)">
-                    {{ expanded.has(l.uuid) ? 'Hide changes' : 'Show changes' }}
-                  </button>
-                  <ul v-if="expanded.has(l.uuid)" class="mt-1 space-y-0.5 text-[12px] text-[#6B4A3A]">
-                    <li v-for="(line, i) in detailLines(l)" :key="i">{{ line }}</li>
-                  </ul>
-                </template>
-              </div>
-            </div>
-          </li>
-        </ul>
-
-        <!-- Wide screens: table -->
-        <div class="hidden overflow-x-auto lg:block">
-          <table class="w-full text-left text-[13px]">
-            <thead>
-              <tr class="border-b border-[#F3E7D2] text-[12px] font-medium text-[#8B6656]">
-                <th scope="col" class="py-2 pr-3 font-medium">Time</th>
-                <th scope="col" class="py-2 pr-3 font-medium">Person</th>
-                <th scope="col" class="py-2 pr-3 font-medium">Action</th>
-                <th scope="col" class="py-2 pr-3 font-medium">Details</th>
-                <th v-if="allBranches" scope="col" class="py-2 font-medium">Branch</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-[#F3E7D2]">
-              <tr v-for="l in rows" :key="l.uuid" class="align-top text-[#3D2B24]">
-                <td class="whitespace-nowrap py-2.5 pr-3 tabular-nums text-[#8B6656]">{{ formatWhen(l.created_at) }}</td>
-                <td class="whitespace-nowrap py-2.5 pr-3">
-                  <span class="font-semibold">{{ l.actor.name ?? 'Removed account' }}</span>
-                  <span v-if="l.actor.role" class="block text-[11px] text-[#9E7060]">{{ roleLabel(l.actor.role) }}</span>
-                </td>
-                <td class="whitespace-nowrap py-2.5 pr-3">
-                  <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" :class="actionInfo(l).tone">
-                    <Icon :name="actionInfo(l).icon" class="h-3.5 w-3.5" />
-                    {{ actionInfo(l).label }}
-                  </span>
-                </td>
-                <td class="py-2.5 pr-3">
-                  {{ l.description }}
-                  <template v-if="hasDetails(l)">
-                    <button type="button" class="ml-1 text-[12px] font-semibold text-[#7D5A50] underline underline-offset-2" :aria-expanded="expanded.has(l.uuid)" @click="toggle(l.uuid)">
-                      {{ expanded.has(l.uuid) ? 'Hide' : 'Show changes' }}
-                    </button>
-                    <ul v-if="expanded.has(l.uuid)" class="mt-1 space-y-0.5 text-[12px] text-[#6B4A3A]">
-                      <li v-for="(line, i) in detailLines(l)" :key="i">{{ line }}</li>
-                    </ul>
-                  </template>
-                </td>
-                <td v-if="allBranches" class="whitespace-nowrap py-2.5">{{ branchLabel(l) }}</td>
-              </tr>
-            </tbody>
-          </table>
+      <!-- Body -->
+      <div class="px-4 py-4 sm:px-5">
+        <!-- Loading -->
+        <div v-if="loading" class="space-y-3">
+          <div v-for="i in 6" :key="i" class="flex items-center gap-3">
+            <span class="skeleton size-9 shrink-0 rounded-full" />
+            <span class="flex-1 space-y-1.5">
+              <span class="skeleton block h-3.5 w-1/3 rounded" />
+              <span class="skeleton block h-3 w-2/3 rounded" />
+            </span>
+          </div>
         </div>
 
-        <nav v-if="data && data.pagination.last_page > 1" aria-label="Activity log pages" class="mt-4 flex items-center justify-between gap-3 border-t border-[#F3E7D2] pt-4 text-[12px] text-[#8B6656]">
-          <span class="tabular-nums">{{ range }}</span>
-          <span class="flex gap-1.5">
-            <button
-              type="button"
-              class="rounded-[8px] border border-[#E9D7BF] bg-white px-3 py-1 font-semibold text-[#3B1F0E] transition-colors hover:bg-[#FBF4EA] disabled:cursor-not-allowed disabled:opacity-40"
-              :disabled="page <= 1 || refreshing"
-              @click="page--"
-            >Previous</button>
-            <button
-              type="button"
-              class="rounded-[8px] border border-[#E9D7BF] bg-white px-3 py-1 font-semibold text-[#3B1F0E] transition-colors hover:bg-[#FBF4EA] disabled:cursor-not-allowed disabled:opacity-40"
-              :disabled="page >= data.pagination.last_page || refreshing"
-              @click="page++"
-            >Next</button>
+        <!-- Failed -->
+        <div v-else-if="failed && !data" role="alert" class="flex flex-col items-center py-12 text-center">
+          <Icon name="heroicons:exclamation-triangle" class="mb-2 size-8 text-red-400" />
+          <p class="text-sm font-semibold text-[#3B1F0E]">The activity log could not be loaded.</p>
+          <button
+            type="button"
+            class="mt-3 inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#D8C7B5] bg-white px-3.5 text-sm font-bold text-[#3B1F0E] transition-colors hover:bg-[#FAF4ED] outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+            @click="load"
+          >
+            <Icon name="heroicons:arrow-path" class="size-4" />
+            Try again
+          </button>
+        </div>
+
+        <!-- Empty -->
+        <div v-else-if="!rows.length" class="flex flex-col items-center py-12 text-center">
+          <span class="mb-2 flex size-12 items-center justify-center rounded-full border border-[#E3CFB4] bg-[#FDF3E7] text-[#9E7060]">
+            <Icon name="heroicons:clipboard-document-list" class="size-6" />
           </span>
-        </nav>
-        <p v-else-if="range" class="mt-3 text-[12px] tabular-nums text-[#8B6656]">{{ range }}</p>
+          <p class="font-display text-[15px] font-semibold text-[#3B1F0E]">{{ emptyText }}</p>
+          <button
+            v-if="hasFilters"
+            type="button"
+            class="mt-2 text-sm font-bold text-[#7D5A50] underline decoration-[#EEDFC4] underline-offset-2 hover:decoration-[#7D5A50]"
+            @click="clearFilters"
+          >
+            Clear filters
+          </button>
+          <p v-else class="mt-1 text-[12px] text-[#8B6656]">Try a wider date range above.</p>
+        </div>
+
+        <!-- Timeline, one group per day -->
+        <div v-else class="transition-opacity" :class="{ 'opacity-60': refreshing }" :aria-busy="refreshing">
+          <!-- A filter or page change failed: the entries below are from before it -->
+          <div v-if="failed" role="alert" class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800">
+            <Icon name="heroicons:exclamation-triangle" class="size-4 shrink-0 text-red-500" />
+            <span class="flex-1">Couldn't update the list. Showing the last entries that loaded.</span>
+            <button type="button" class="font-bold underline underline-offset-2 hover:text-red-900" @click="load">Try again</button>
+          </div>
+          <section v-for="g in dayGroups" :key="g.key" class="mb-5 last:mb-0" :aria-label="g.label">
+            <h3 class="mb-1 flex items-center gap-2 py-1.5">
+              <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#7D5A50]">{{ g.label }}</span>
+              <span class="h-px flex-1 bg-[#F3E7D2]" aria-hidden="true" />
+              <span class="text-[11px] font-semibold text-[#A8988B] tabular-nums">{{ g.rows.length }} {{ g.rows.length === 1 ? 'entry' : 'entries' }}</span>
+            </h3>
+
+            <ol class="relative">
+              <!-- The timeline's spine -->
+              <span class="absolute bottom-3 left-[17px] top-3 w-px bg-[#F0E4D3]" aria-hidden="true" />
+              <li v-for="l in g.rows" :key="l.uuid" class="relative flex gap-3 rounded-xl py-2.5 pr-2 transition-colors hover:bg-[#FDFBF7]">
+                <span
+                  class="relative z-[1] flex size-9 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ring-4 ring-white"
+                  :class="avatarTone(l.actor.role)"
+                  :title="roleLabel(l.actor.role) || undefined"
+                >
+                  {{ initials(l.actor.name) }}
+                </span>
+
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span class="text-[14px] font-bold text-[#2D201B]">{{ l.actor.name ?? 'Removed account' }}</span>
+                    <span v-if="l.actor.role" class="text-[11px] font-semibold text-[#A8988B]">{{ roleLabel(l.actor.role) }}</span>
+                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" :class="actionInfo(l).tone">
+                      <Icon :name="actionInfo(l).icon" class="size-3.5" />
+                      {{ actionInfo(l).label }}
+                    </span>
+                  </div>
+
+                  <p class="mt-0.5 text-[13px] leading-relaxed text-[#3D2B24]">{{ l.description }}</p>
+
+                  <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-[#8B6656]">
+                    <span class="inline-flex items-center gap-1 tabular-nums">
+                      <Icon name="heroicons:clock" class="size-3.5 text-[#B4846C]" />
+                      {{ formatTime(l.created_at) }}
+                    </span>
+                    <span v-if="allBranches" class="inline-flex items-center gap-1">
+                      <Icon name="heroicons:building-storefront" class="size-3.5 text-[#B4846C]" />
+                      {{ branchLabel(l) }}
+                    </span>
+                    <button
+                      v-if="hasDetails(l)"
+                      type="button"
+                      class="inline-flex items-center gap-0.5 font-semibold text-[#7D5A50] hover:text-[#3B1F0E] outline-none focus-visible:underline"
+                      :aria-expanded="expanded.has(l.uuid)"
+                      @click="toggle(l.uuid)"
+                    >
+                      {{ expanded.has(l.uuid) ? 'Hide changes' : `Show ${detailLines(l).length} ${detailLines(l).length === 1 ? 'change' : 'changes'}` }}
+                      <Icon name="heroicons:chevron-down" class="size-3.5 transition-transform" :class="expanded.has(l.uuid) ? 'rotate-180' : ''" />
+                    </button>
+                  </p>
+
+                  <ul v-if="hasDetails(l) && expanded.has(l.uuid)" class="mt-2 space-y-1 rounded-xl border border-[#F0E4D3] bg-[#FDFBF7] px-3 py-2 text-[12px] text-[#5C4037]">
+                    <li v-for="(line, i) in detailLines(l)" :key="i" class="flex gap-2">
+                      <span class="mt-1.5 size-1 shrink-0 rounded-full bg-[#B4846C]" aria-hidden="true" />
+                      <span>{{ line }}</span>
+                    </li>
+                  </ul>
+                </div>
+              </li>
+            </ol>
+          </section>
+        </div>
       </div>
-    </AnalyticsPanel>
+
+      <!-- The app's shared pagination, under a "Showing x–y of z" line -->
+      <nav v-if="data && rows.length" aria-label="Activity log pages" class="border-t border-[#F3E7D2]">
+        <p v-if="range" class="pt-3 text-center text-[12px] tabular-nums text-[#8B6656]">Showing {{ range }}</p>
+        <Pagination
+          :page="page"
+          :last-page="data.pagination.last_page"
+          @change="goToPage"
+        />
+      </nav>
+    </section>
   </div>
 </template>
+
+<style scoped>
+/* Loading placeholders. The Analytics page defines its own under .analytics; this page needs one too. */
+.skeleton {
+  background: linear-gradient(90deg, #F6ECDD, #FBF4EA, #F6ECDD);
+  background-size: 200% 100%;
+  animation: activity-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes activity-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+</style>
