@@ -9,6 +9,8 @@ defineProps<{
   modelValue?: string
   sortValue?: string
   sortOptions?: { label: string, value: string }[]
+  // White search and sort fields for use on cream cards (e.g. inside modals)
+  white?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -32,6 +34,7 @@ function handleAddClick() {
       <SearchInput
         :model-value="modelValue ?? ''"
         :placeholder="searchPlaceholder"
+        :white="white"
         class="max-w-[380px]"
         data-walkthrough="menu-search"
         @update:model-value="emit('update:modelValue', $event)"
@@ -41,7 +44,8 @@ function handleAddClick() {
       <div
         v-if="sortOptions && sortOptions.length > 0"
         data-walkthrough="menu-sort"
-        class="flex items-center gap-1.5 h-11 px-3 shrink-0 bg-[#FFF8EA] border border-[#EDD8CC] rounded-xl font-sans text-sm font-medium text-[#7D5A50]"
+        class="flex items-center gap-1.5 h-11 px-3 shrink-0 border rounded-xl font-sans text-sm font-medium text-[#7D5A50]"
+        :class="white ? 'bg-white border-[#D8C7B5] shadow-2xs' : 'bg-[#FFF8EA] border-[#EDD8CC]'"
       >
         <Icon name="heroicons:bars-3-bottom-left" class="w-4 h-4" />
         <DropdownList

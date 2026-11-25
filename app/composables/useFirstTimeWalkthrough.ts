@@ -141,8 +141,7 @@ export const OWNER_SETUP_MISSIONS: SetupMission[] = [
     steps: [
       'Click "Add Category" or select an existing category',
       'Use the Search Bar to find drinks or food items',
-      'Sort categories alphabetically or by popularity',
-      'Monitor live Cafe Operating Hours & status'
+      'Sort categories alphabetically or by popularity'
     ],
     detailedSteps: [
       {
@@ -165,13 +164,6 @@ export const OWNER_SETUP_MISSIONS: SetupMission[] = [
         proTip: 'Sort by popular items first so baristas spend less time browsing during rush hour.',
         targetHint: 'Sort Dropdown',
         targetSelector: '[data-walkthrough="menu-sort"]'
-      },
-      {
-        title: 'Cafe Operating Hours Badge',
-        instruction: 'This live badge displays your cafe\'s daily operating schedule and indicates whether the branch is currently Open or Closed.',
-        proTip: 'Status updates live automatically based on your weekly hours in Cafe Management.',
-        targetHint: 'Operating Hours Status Badge',
-        targetSelector: '[data-walkthrough="menu-operating-hours"]'
       }
     ],
     proTip: 'Items marked with hot & iced prices allow cashiers to seamlessly switch temperatures on the POS screen with automatic price adjustments.'

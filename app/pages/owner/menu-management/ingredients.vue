@@ -75,13 +75,20 @@ watch([searchQuery, sortBy], () => {
   currentPage.value = 1
 })
 
+const loadError = ref('')
+
 async function fetchData() {
   isLoading.value = true
+  loadError.value = ''
   try {
     const res = await menuService.getIngredients({ includeRetired: true })
     ingredients.value = res.ingredients ?? []
+    // Drop selections for ingredients that are gone (e.g. after a bulk delete)
+    const known = new Set(ingredients.value.map(i => i.uuid))
+    for (const uuid of selectedUuids.value) if (!known.has(uuid)) selectedUuids.value.delete(uuid)
   } catch (error) {
     console.error('Failed to fetch ingredients', error)
+    loadError.value = 'Couldn\'t load your ingredients. Check your connection and try again.'
   } finally {
     isLoading.value = false
   }
@@ -89,15 +96,22 @@ async function fetchData() {
 
 onMounted(fetchData)
 
-const isModalOpen = computed(() =>
-  route.query.action === 'add-ingredient' || route.query.action === 'edit-ingredient'
-)
-
 const ingredientToEdit = computed(() => {
   if (route.query.action === 'edit-ingredient' && route.query.ingredient) {
     return ingredients.value.find(i => i.uuid === route.query.ingredient) || null
   }
   return null
+})
+
+// The edit modal waits for its ingredient: opened from a link before the list
+// loads, it would otherwise start blank with the default unit and could save that.
+const isModalOpen = computed(() =>
+  route.query.action === 'add-ingredient' || !!ingredientToEdit.value
+)
+
+// An edit link for an ingredient that no longer exists just drops back to the list.
+watch([isLoading, () => route.query.ingredient], ([loading]) => {
+  if (!loading && route.query.action === 'edit-ingredient' && !ingredientToEdit.value) closeModal()
 })
 
 function handleAddAction() {
@@ -125,22 +139,62 @@ function toggleSelection(uuid: string, isSelected: boolean) {
   }
 }
 
+function ingredientCount(n: number) {
+  return n === 1 ? '1 ingredient' : `${n} ingredients`
+}
+
+// Each bulk action only touches the selected ingredients it applies to.
+const selectedIngredients = computed(() => ingredients.value.filter(i => selectedUuids.value.has(i.uuid)))
+const bulkTargets = computed(() => ({
+  retire: selectedIngredients.value.filter(i => i.is_active),
+  restore: selectedIngredients.value.filter(i => !i.is_active),
+  delete: selectedIngredients.value,
+}))
+
+// Bulk changes run a few requests at a time to stay under the API rate limit.
+const BULK_CONCURRENCY = 4
+
+async function runWithConcurrency<T, R>(items: T[], limit: number, task: (item: T) => Promise<R>) {
+  const results: PromiseSettledResult<R>[] = new Array(items.length)
+  let index = 0
+  const worker = async () => {
+    while (index < items.length) {
+      const i = index++
+      try {
+        results[i] = { status: 'fulfilled', value: await task(items[i]!) }
+      } catch (reason) {
+        results[i] = { status: 'rejected', reason }
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return results
+}
+
 function confirmBulkAction(action: 'retire'|'restore'|'delete') {
   if (!canEditMenu()) return
+  const targets = bulkTargets.value[action]
+  if (!targets.length) return
   bulkActionType.value = action
+  const count = ingredientCount(targets.length)
+  const inUse = targets.filter(i => i.used_in > 0).length
+  const allInUse = inUse > 1 && inUse === targets.length
   let msg = ''
   let title = ''
   if (action === 'retire') {
     title = 'Retire Ingredients?'
-    msg = `You are about to retire ${selectedUuids.value.size} ingredients. Some may be in use in recipes. Proceed?`
+    msg = `Retire ${count}? Retired ingredients stay in the recipes that use them but won't show when adding new recipes.`
+      + (allInUse ? ` ${inUse === 2 ? 'Both are' : 'All of them are'} used in recipes.`
+        : inUse ? ` ${targets.length === 1 ? 'It is' : inUse === 1 ? '1 of them is' : `${inUse} of them are`} used in a recipe.` : '')
   } else if (action === 'restore') {
     title = 'Restore Ingredients?'
-    msg = `You are about to restore ${selectedUuids.value.size} ingredients. Proceed?`
+    msg = `Restore ${count}? They'll show again when adding recipes.`
   } else {
     title = 'Delete Ingredients?'
-    msg = `You are about to permanently delete ${selectedUuids.value.size} ingredients. This cannot be undone. Ingredients still used in a menu item or add-on are skipped; retire those instead. Proceed?`
+    msg = `Permanently delete ${count}? This cannot be undone.`
+      + (inUse ? ` ${allInUse ? (inUse === 2 ? 'Both are' : 'All of them are') : targets.length === 1 ? 'It is' : inUse === 1 ? '1 is' : `${inUse} are`} still used in a menu item or add-on and will be skipped; retire ${targets.length === 1 ? 'it' : 'those'} instead.` : '')
   }
-  
+
   confirmModal.value = {
     show: true,
     title,
@@ -156,20 +210,15 @@ function confirmBulkAction(action: 'retire'|'restore'|'delete') {
 
 async function executeBulkAction() {
   isBulkLoading.value = true
-  const uuids = Array.from(selectedUuids.value)
+  errorMessage.value = ''
   const action = bulkActionType.value
-  
+  const uuids = bulkTargets.value[action].map(i => i.uuid)
+
   try {
-    const promises = uuids.map(uuid => {
-      if (action === 'delete') {
-        return menuService.deleteIngredient(uuid)
-      } else {
-        const is_active = action === 'restore'
-        return menuService.updateIngredient(uuid, { is_active })
-      }
-    })
-    
-    const results = await Promise.allSettled(promises)
+    const results = await runWithConcurrency(uuids, BULK_CONCURRENCY, uuid => action === 'delete'
+      ? menuService.deleteIngredient(uuid)
+      : menuService.updateIngredient(uuid, { is_active: action === 'restore' }))
+
     selectedUuids.value.clear()
     await fetchData()
 
@@ -181,16 +230,23 @@ async function executeBulkAction() {
       const explained = reasons.filter((m): m is string => !!m)
       errorMessage.value = reasons.length === uuids.length && reasons.length === 1
         ? (explained[0] ?? 'That ingredient could not be updated. Please try again.')
-        : `${reasons.length} of ${uuids.length} ingredients were not changed.` + (explained.length ? ' ' + [...new Set(explained)].join(' ') : '')
+        : `${reasons.length} of ${ingredientCount(uuids.length)} were not changed.` + (explained.length ? ' ' + [...new Set(explained)].join(' ') : '')
     }
   } catch (error) {
     console.error('Bulk action failed', error)
     errorMessage.value = 'Failed to process some ingredients. Please try again.'
-    setTimeout(() => { errorMessage.value = '' }, 4000)
   } finally {
     isBulkLoading.value = false
   }
 }
+
+const retiredCount = computed(() => ingredients.value.filter(i => !i.is_active).length)
+const pageSubtitle = computed(() => {
+  if (isLoading.value || loadError.value) return 'The ingredients your recipes use. Rename or retire them here.'
+  const total = ingredients.value.length
+  if (!total) return 'The ingredients your recipes use. Rename or retire them here.'
+  return `${ingredientCount(total)}` + (retiredCount.value ? ` · ${retiredCount.value} retired` : '') + '. Rename or retire them here.'
+})
 
 const breadcrumbs = [
   { label: 'Menu Management', to: '/owner/menu-management' },
@@ -206,11 +262,12 @@ const links = OWNER_NAV_LINKS
     <main class="flex-1 p-4 md:p-6 lg:p-10 max-w-7xl mx-auto w-full">
       <MenuPageHeader
         title="Ingredients"
-        subtitle="The ingredients your recipes use. Rename or retire them here."
+        :subtitle="pageSubtitle"
         :breadcrumbs="breadcrumbs"
+        icon="heroicons:beaker"
       />
 
-      <div :class="['bg-white border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm', filteredAndSorted.length > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
+      <div :class="['bg-white border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm', filteredAndSorted.length > 0 && !loadError && !isLoading ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
 
         <!-- Toolbar Section -->
         <div class="p-4 sm:p-6 border-b border-[#EEDFC4]">
@@ -234,10 +291,13 @@ const links = OWNER_NAV_LINKS
             leave-from-class="transform translate-y-0 opacity-100"
             leave-to-class="transform -translate-y-4 opacity-0"
           >
-            <div v-if="errorMessage" class="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-center justify-between shadow-sm">
-              <span class="font-medium text-sm">{{ errorMessage }}</span>
-              <button @click="errorMessage = ''" class="inline-flex items-center justify-center text-red-500 hover:text-red-700 focus:outline-none rounded-lg p-1 hover:bg-red-100 transition-colors">
-                <Icon name="heroicons:x-mark" class="w-5 h-5"/>
+            <div v-if="errorMessage" role="alert" class="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-start justify-between gap-3">
+              <span class="flex items-start gap-2 text-sm font-medium">
+                <Icon name="heroicons:exclamation-triangle" class="w-4 h-4 shrink-0 mt-0.5" />
+                {{ errorMessage }}
+              </span>
+              <button type="button" aria-label="Dismiss" @click="errorMessage = ''" class="shrink-0 inline-flex items-center justify-center text-red-500 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 rounded-lg p-1 hover:bg-red-100 transition-colors">
+                <Icon name="heroicons:x-mark" class="w-4 h-4"/>
               </button>
             </div>
           </Transition>
@@ -246,9 +306,22 @@ const links = OWNER_NAV_LINKS
             <Icon name="heroicons:arrow-path" class="w-8 h-8 text-[#7D5A50] animate-spin" />
           </div>
 
+          <div v-else-if="loadError" role="alert" class="flex flex-col items-center text-center py-16">
+            <Icon name="heroicons:exclamation-triangle" class="w-10 h-10 text-red-400 mb-3" />
+            <p class="font-display font-bold text-[#3B1F0E]">{{ loadError }}</p>
+            <button
+              type="button"
+              class="mt-4 h-10 px-4 rounded-xl border border-[#D8C7B5] bg-white text-[#3B1F0E] text-sm font-bold inline-flex items-center gap-1.5 hover:bg-[#FAF4ED] active:scale-95 transition-all outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+              @click="fetchData"
+            >
+              <Icon name="heroicons:arrow-path" class="w-4 h-4" />
+              Try again
+            </button>
+          </div>
+
           <template v-else>
             <div v-if="filteredAndSorted.length > 0">
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <IngredientCard
                   v-for="ingredient in paginatedIngredients"
                   :key="ingredient.uuid"
@@ -277,7 +350,7 @@ const links = OWNER_NAV_LINKS
       </div>
       
       <!-- Pagination (Separate Frame) -->
-      <div v-if="filteredAndSorted.length > 0" class="bg-white rounded-b-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
+      <div v-if="filteredAndSorted.length > 0 && !loadError && !isLoading" class="bg-white rounded-b-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
         <Pagination
           :page="currentPage"
           :last-page="lastPage"
@@ -297,18 +370,41 @@ const links = OWNER_NAV_LINKS
         leave-from-class="transform translate-y-0 opacity-100"
         leave-to-class="transform translate-y-full opacity-0"
       >
-        <div v-if="selectedUuids.size > 0" class="sticky bottom-6 z-40 mt-6 mx-auto w-fit max-w-full bg-white rounded-2xl shadow-2xl border border-[#EEDFC4] p-3 flex items-center gap-4 min-w-[320px]">
-          <div class="px-3 py-1 bg-[#F5F5F5] rounded-lg text-[#7D5A50] font-bold text-sm whitespace-nowrap">
+        <div v-if="selectedUuids.size > 0" role="toolbar" aria-label="Bulk actions" class="sticky bottom-6 z-40 mt-6 mx-auto w-fit max-w-full bg-white rounded-2xl shadow-2xl border border-[#EEDFC4] p-2.5 flex flex-wrap items-center gap-2.5">
+          <span class="px-3 py-1.5 bg-[#FAF4ED] border border-[#EEDFC4] rounded-lg text-[#3B1F0E] font-bold text-sm whitespace-nowrap tabular-nums">
             {{ selectedUuids.size }} selected
-          </div>
-          <div class="h-6 w-[1px] bg-[#EEDFC4]"></div>
-          <div class="flex items-center gap-2">
-            <button @click="confirmBulkAction('retire')" :disabled="isBulkLoading" class="px-4 py-2 text-sm font-bold text-[#9E7060] hover:bg-[#FDF8F3] rounded-xl transition-colors disabled:opacity-50">Retire</button>
-            <button @click="confirmBulkAction('restore')" :disabled="isBulkLoading" class="px-4 py-2 text-sm font-bold text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors disabled:opacity-50">Restore</button>
-            <button @click="confirmBulkAction('delete')" :disabled="isBulkLoading" class="px-4 py-2 text-sm font-bold text-[#D9534F] hover:bg-[#FDE8E8] rounded-xl transition-colors disabled:opacity-50">Delete</button>
-          </div>
-          <div class="h-6 w-[1px] bg-[#EEDFC4]"></div>
-          <button @click="selectedUuids.clear()" class="inline-flex items-center justify-center p-2 text-[#B4846C] hover:bg-[#F5F5F5] rounded-xl transition-colors" title="Clear selection">
+          </span>
+          <span class="h-6 w-px bg-[#EEDFC4]" aria-hidden="true"></span>
+          <button
+            type="button"
+            :disabled="isBulkLoading || !bulkTargets.retire.length"
+            class="h-9 px-3.5 rounded-xl border border-[#D8C7B5] bg-white text-sm font-bold text-[#5C4037] inline-flex items-center gap-1.5 hover:bg-[#FAF4ED] transition-colors disabled:opacity-40 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+            @click="confirmBulkAction('retire')"
+          >
+            <Icon name="heroicons:archive-box-arrow-down" class="w-4 h-4" />
+            Retire<span v-if="bulkTargets.retire.length && bulkTargets.retire.length !== selectedUuids.size" class="tabular-nums">({{ bulkTargets.retire.length }})</span>
+          </button>
+          <button
+            type="button"
+            :disabled="isBulkLoading || !bulkTargets.restore.length"
+            class="h-9 px-3.5 rounded-xl border border-emerald-200 bg-white text-sm font-bold text-emerald-700 inline-flex items-center gap-1.5 hover:bg-emerald-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+            @click="confirmBulkAction('restore')"
+          >
+            <Icon name="heroicons:arrow-uturn-left" class="w-4 h-4" />
+            Restore<span v-if="bulkTargets.restore.length && bulkTargets.restore.length !== selectedUuids.size" class="tabular-nums">({{ bulkTargets.restore.length }})</span>
+          </button>
+          <button
+            type="button"
+            :disabled="isBulkLoading"
+            class="h-9 px-3.5 rounded-xl border border-red-200 bg-white text-sm font-bold text-red-600 inline-flex items-center gap-1.5 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+            @click="confirmBulkAction('delete')"
+          >
+            <Icon name="heroicons:trash" class="w-4 h-4" />
+            Delete
+          </button>
+          <Icon v-if="isBulkLoading" name="heroicons:arrow-path" class="w-4 h-4 text-[#7D5A50] animate-spin" aria-label="Working" />
+          <span class="h-6 w-px bg-[#EEDFC4]" aria-hidden="true"></span>
+          <button type="button" @click="selectedUuids.clear()" :disabled="isBulkLoading" class="inline-flex items-center justify-center w-9 h-9 text-[#7D5A50] hover:bg-[#FAF4ED] rounded-xl transition-colors disabled:opacity-40 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40" aria-label="Clear selection" title="Clear selection">
             <Icon name="heroicons:x-mark" class="w-5 h-5" />
           </button>
         </div>

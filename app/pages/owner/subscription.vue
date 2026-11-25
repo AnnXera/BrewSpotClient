@@ -197,16 +197,44 @@ function cycleUnit(cycle?: string | null): string {
 
 function getActivePlanPrice(): string {
   if (!currentPlan.value?.plan) return '0.00'
-  const isYearly = currentPlan.value?.billing_cycle === 'yearly'
-  const price = isYearly ? (currentPlan.value.plan.yearly_price ?? currentPlan.value.plan.price) : currentPlan.value.plan.price
+  const price = termPrice(currentPlan.value.plan, currentPlan.value?.billing_cycle === 'yearly')
   const num = typeof price === 'string' ? parseFloat(price) : price
   return isNaN(num) ? '0.00' : num.toFixed(2)
 }
 
+// A yearly price of 0 means "no yearly option" (as on the daily test plan), not "free per year".
+function termPrice(plan: any, yearly: boolean) {
+  return yearly && Number(plan?.yearly_price) > 0 ? plan.yearly_price : plan?.price
+}
+
 function getDisplayPrice(plan: SubscriptionPlanItem, cycle: 'monthly'|'yearly'): string {
-  const price = cycle === 'yearly' ? (plan.yearly_price ?? plan.price) : plan.price
+  const price = termPrice(plan, cycle === 'yearly')
   const num = typeof price === 'string' ? parseFloat(price) : price
   return isNaN(num) ? '0.00' : num.toFixed(2)
+}
+
+// A plan with no yearly price falls back to its regular price, so in the yearly view that price
+// is still per its own term, not per year.
+function hasYearlyPrice(plan: SubscriptionPlanItem): boolean {
+  return Number(plan.yearly_price) > 0
+}
+
+// Same rule as SubscriptionCheckoutService: a plan named "...daily..." is billed per day.
+function isDailyPlan(plan: SubscriptionPlanItem): boolean {
+  return /daily/i.test(plan.sub_name ?? '') || Number(plan.duration_days) === 1
+}
+
+// The unit after a plan's price: a daily plan is per day, whatever the toggle says.
+function planPriceUnit(plan: SubscriptionPlanItem, cycle: 'monthly'|'yearly'): string {
+  if (isDailyPlan(plan)) return 'day'
+  if (cycle === 'yearly' && hasYearlyPrice(plan)) return 'year'
+  return 'month'
+}
+
+// The plan's own features, minus multi-branch: the first line of every card already says
+// "Multi-branch management" or "Single branch only", so listing it again doubles it up.
+function cardFeatures(plan: SubscriptionPlanItem) {
+  return planFeatures(plan).filter((f: { key: string }) => f.key !== 'multi_branch')
 }
 
 function planFeatures(plan: any) {
@@ -253,8 +281,7 @@ const nextPlanFeatures = computed(() => planFeatures(currentPlan.value?.pending_
 function getNextPlanPrice(): string {
   const plan = currentPlan.value?.pending_plan
   if (!plan) return '0.00'
-  const isYearly = (currentPlan.value?.pending_billing_cycle ?? currentPlan.value?.billing_cycle) === 'yearly'
-  const price = isYearly ? (plan.yearly_price ?? plan.price) : plan.price
+  const price = termPrice(plan, (currentPlan.value?.pending_billing_cycle ?? currentPlan.value?.billing_cycle) === 'yearly')
   const num = typeof price === 'string' ? parseFloat(price) : price
   return isNaN(num) ? '0.00' : num.toFixed(2)
 }
@@ -270,9 +297,21 @@ function openCheckout(plan: SubscriptionPlanItem) {
  * The offer carries its own cycle, since a booked change may have switched it — the browse
  * toggle is realigned to it so the checkout modal prices the right term.
  */
+// A trial that ran out has nothing to renew: checkout refuses a second trial. The server flags
+// it as trial_ended; an older server still sends the trial plan, so that is caught here too.
+const offerIsEndedTrial = computed(() => {
+  const offer = renewalOffer.value
+  if (!offer) return false
+  if (offer.trial_ended) return true
+  const plan = offer.plan
+  return !offer.was_scheduled && !!plan && (
+    offer.billing_cycle === 'trial' || /trial/i.test(plan.sub_name ?? '') || Number(plan.price ?? 0) <= 0
+  )
+})
+
 function payRenewalOffer() {
   const offer = renewalOffer.value
-  if (!offer?.plan) return
+  if (!offer?.plan || offerIsEndedTrial.value) return
 
   browseBillingCycle.value = offer.billing_cycle === 'yearly' ? 'yearly' : 'monthly'
   openCheckout(offer.plan)
@@ -411,10 +450,16 @@ function payNextTerm() {
  * Nothing is chargeable before this point — not a renewal, not an upgrade — so the plan
  * buttons stay inert until it flips, and then they become the way to pay for what's next.
  */
+// Ticks so renewal opens on a page left open past renewal_opens_at, instead of only after a reload.
+const now = ref(Date.now())
+let clock: ReturnType<typeof setInterval> | undefined
+onMounted(() => { clock = setInterval(() => { now.value = Date.now() }, 60_000) })
+onBeforeUnmount(() => clearInterval(clock))
+
 const isRenewalOpen = computed(() => {
   const opensAt = currentPlan.value?.renewal_opens_at
   if (!opensAt) return false
-  return new Date(opensAt).getTime() <= Date.now()
+  return new Date(opensAt).getTime() <= now.value
 })
 
 /**
@@ -551,6 +596,7 @@ function handleCheckoutReturn() {
   if (outcome === 'success') {
     viewMode.value = 'current'
     showNotice('Payment received. Your subscription will activate as soon as PayMongo confirms the payment — this usually takes a few seconds.', 'info')
+    watchForActivation()
   } else if (outcome === 'cancelled') {
     showNotice('Checkout was cancelled. You have not been charged.', 'info')
   } else {
@@ -562,7 +608,51 @@ function handleCheckoutReturn() {
   navigateTo({ query: rest }, { replace: true })
 }
 
-onBeforeUnmount(() => clearTimeout(noticeTimer))
+/**
+ * The webhook activates a paid term a few seconds after the redirect, so re-read the
+ * subscription a handful of times until it changes, instead of leaving the old plan on
+ * screen until the owner thinks to reload.
+ */
+const ACTIVATION_CHECKS = 6
+const ACTIVATION_INTERVAL_MS = 4000
+let activationTimer: ReturnType<typeof setTimeout> | undefined
+
+function subscriptionSignature() {
+  const sub = currentPlan.value
+  return sub ? `${sub.uuid}|${sub.status}|${sub.end_date}|${sub.plan?.uuid}|${sub.billing_cycle}` : 'none'
+}
+
+function watchForActivation() {
+  const before = subscriptionSignature()
+  let checks = 0
+  const tick = async () => {
+    checks++
+    await refreshCurrentPlan()
+    if (subscriptionSignature() !== before) {
+      showNotice('Payment confirmed. Your subscription is up to date.', 'success')
+      // A new payment row belongs in the history too.
+      const res = await subService.getPlanHistory({ per_page: 20 }).catch(() => null)
+      if (res?.success && res.history?.data) {
+        history.value = res.history.data.map((item: any) => ({
+          transaction_id: item.transaction_id,
+          date: item.date,
+          description: item.description,
+          amount: item.amount,
+          status: item.status,
+          payment_gateway: item.payment_gateway,
+        }))
+      }
+      return
+    }
+    if (checks < ACTIVATION_CHECKS) activationTimer = setTimeout(tick, ACTIVATION_INTERVAL_MS)
+  }
+  activationTimer = setTimeout(tick, ACTIVATION_INTERVAL_MS)
+}
+
+onBeforeUnmount(() => {
+  clearTimeout(noticeTimer)
+  clearTimeout(activationTimer)
+})
 
 /**
  * Renewal links from the expiration reminder email arrive as
@@ -576,6 +666,11 @@ onBeforeUnmount(() => clearTimeout(noticeTimer))
 function openRenewalFromQuery() {
   const renewUuid = route.query.renew
   if (typeof renewUuid !== 'string' || !renewUuid) return
+  const cycle = route.query.cycle
+
+  // Handled once: left in the URL, a reload would pop checkout open again.
+  const { renew: _renew, cycle: _cycle, ...rest } = route.query
+  navigateTo({ query: rest }, { replace: true })
 
   const plan = availablePlans.value.find(p => p.uuid === renewUuid)
   if (!plan) return
@@ -585,7 +680,6 @@ function openRenewalFromQuery() {
     return
   }
 
-  const cycle = route.query.cycle
   if (cycle === 'yearly' || cycle === 'monthly') {
     browseBillingCycle.value = cycle
   }
@@ -609,15 +703,17 @@ onMounted(async () => {
     <main class="flex-1 min-w-0 overflow-y-auto overflow-x-auto px-4 py-6 sm:px-6 md:px-10 md:py-10 xl:px-12">
       <div class="mx-auto max-w-[1360px] w-full">
       <!-- Title -->
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 class="font-display text-2xl md:text-3xl font-bold text-[#3D2B24]">
-            {{ viewMode === 'current' ? 'My Subscription & Billing' : 'Browse Plans' }}
+      <!-- Same format as the Servings header: big tight title, icon-led subtitle line -->
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+        <div class="min-w-0">
+          <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">
+            {{ viewMode === 'current' ? 'Subscription & Billing' : 'Browse Plans' }}
           </h1>
-          <p class="font-sans text-sm text-[#8B6656] mt-1">
-            {{ viewMode === 'current' 
-               ? 'Manage your cafe subscription plan and view payment transaction history.' 
-               : 'Select a premium plan below to unlock powerful features for your cafe.' }}
+          <p class="mt-1.5 flex items-center gap-1.5 text-[13px] text-[#8B6656]">
+            <Icon :name="viewMode === 'current' ? 'heroicons:credit-card' : 'heroicons:sparkles'" class="h-3.5 w-3.5 shrink-0 text-[#B4846C]" />
+            <span>{{ viewMode === 'current'
+              ? 'Manage your cafe subscription plan and view payment transaction history.'
+              : 'Pick the plan that fits your cafe. Prices and features come straight from each plan.' }}</span>
           </p>
         </div>
         <div class="shrink-0">
@@ -735,9 +831,18 @@ onMounted(async () => {
             >
               <Icon :name="isRenewalOpen ? 'heroicons:bell-alert' : 'heroicons:information-circle'" class="w-5 h-5 shrink-0 mt-0.5" />
               <div class="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div v-if="isRenewalOpen">
+                <!-- A free trial has no paid days, so it gets its own wording -->
+                <div v-if="isRenewalOpen && isOnTrial">
+                  Your free trial is almost over — you have until <strong>{{ formatDate(currentPlan?.end_date) }}</strong> to pick
+                  a paid plan and keep using every feature without a break.
+                </div>
+                <div v-else-if="isRenewalOpen">
                   Your paid days are used up — you have until <strong>{{ formatDate(currentPlan?.end_date) }}</strong> to pay
                   for your next term. Your remaining day carries over, so you lose nothing by renewing now.
+                </div>
+                <div v-else-if="isOnTrial">
+                  You're on a free trial, so nothing is charged. Payment for a paid plan opens on
+                  <strong>{{ formatDate(currentPlan?.renewal_opens_at) }}</strong>, near the end of your trial.
                 </div>
                 <div v-else>
                   You're not charged automatically. Renewal opens on
@@ -939,6 +1044,32 @@ onMounted(async () => {
           </button>
         </div>
 
+        <!-- Free trial ended: nothing to renew, so the way forward is picking a paid plan -->
+        <div
+          v-else-if="renewalOffer && offerIsEndedTrial"
+          data-walkthrough="sub-current-card"
+          class="bg-[#FFF8EA] border border-[#D9B98D] rounded-2xl p-6 md:p-8 mb-8 shadow-sm"
+        >
+          <span class="inline-flex items-center gap-1.5 font-sans text-xs uppercase font-bold text-[#8F5B12] tracking-wider mb-2">
+            <Icon name="heroicons:clock" class="w-4 h-4" />
+            Free Trial Ended
+          </span>
+          <h2 class="font-display text-2xl font-bold text-[#3B1F0E]">
+            Your free trial has ended
+          </h2>
+          <p class="font-sans text-sm text-[#7D5A50] mt-2 mb-6 max-w-2xl">
+            Your {{ renewalOffer.previous_plan || 'free trial' }} ended on
+            <strong>{{ formatDate(renewalOffer.ended_on) }}</strong>. Choose a paid plan to keep using Brewspot.
+          </p>
+          <button
+            @click="viewMode = 'browse'"
+            class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#3B1F0E] text-[#FDF3E7] font-display font-semibold hover:bg-[#2A150A] transition-colors shadow-sm"
+          >
+            <Icon name="heroicons:sparkles" class="w-5 h-5" />
+            Choose a Plan
+          </button>
+        </div>
+
         <!-- Term Ended — pick up where the owner left off -->
         <div
           v-else-if="renewalOffer"
@@ -1056,7 +1187,8 @@ onMounted(async () => {
         >
           <span>
             You're on <strong class="text-[#3B1F0E]">{{ currentPlan.plan?.sub_name }}</strong>
-            <span class="text-[#8B6656]">· {{ cycleLabel(currentPlan.billing_cycle) }}</span>
+            <!-- Vue drops the line break between the tags, so the space before the dot is explicit -->
+            <span class="text-[#8B6656]">&nbsp;· {{ cycleLabel(currentPlan.billing_cycle) }}</span>
           </span>
           <span>
             {{ isCancelled ? 'Ends' : 'Runs until' }}
@@ -1165,8 +1297,11 @@ onMounted(async () => {
             <div class="mb-8">
               <div class="flex items-baseline gap-1">
                 <span class="font-display text-4xl font-bold text-[#3B1F0E]">₱{{ getDisplayPrice(plan, browseBillingCycle) }}</span>
-                <span class="font-sans text-sm text-[#8B6656] font-medium">/ {{ browseBillingCycle === 'yearly' ? 'year' : 'month' }}</span>
+                <span class="font-sans text-sm text-[#8B6656] font-medium">/ {{ planPriceUnit(plan, browseBillingCycle) }}</span>
               </div>
+              <p v-if="browseBillingCycle === 'yearly' && !hasYearlyPrice(plan) && !isDailyPlan(plan)" class="mt-1 font-sans text-xs text-[#8B6656]">
+                No yearly price for this plan.
+              </p>
             </div>
 
             <!-- Features -->
@@ -1178,13 +1313,13 @@ onMounted(async () => {
                   <span>{{ plan.has_multi_branch ? 'Multi-branch management' : 'Single branch only' }}</span>
                 </li>
                 <!-- Dynamic features -->
-                <li 
-                  v-for="feat in (plan.feature_details?.length ? plan.feature_details : plan.features)" 
-                  :key="typeof feat === 'string' ? feat : feat.key"
+                <li
+                  v-for="feat in cardFeatures(plan)"
+                  :key="feat.key"
                   class="flex items-start gap-3"
                 >
                   <Icon name="heroicons:check-circle" class="w-5 h-5 text-[#3B1F0E] shrink-0" />
-                  <span>{{ typeof feat === 'string' ? feat.replace(/_/g, ' ') : (feat.name || feat.key.replace(/_/g, ' ')) }}</span>
+                  <span>{{ feat.name }}</span>
                 </li>
               </ul>
             </div>

@@ -7,6 +7,8 @@ const props = defineProps<{
   placeholder?: string
   ariaLabel?: string
   clearable?: boolean
+  // White field for use on cream cards (e.g. inside modals)
+  white?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -34,7 +36,8 @@ function clear() {
       :placeholder="placeholder"
       :aria-label="ariaLabel ?? placeholder"
       :class="[
-        'w-full h-11 rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] pl-10 font-sans text-sm text-[#3D2B24] placeholder:text-[#7D5A50]/40 hover:border-[#D9C4B8] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40 transition-colors',
+        'w-full h-11 rounded-xl border pl-10 font-sans text-sm text-[#3D2B24] placeholder:text-[#7D5A50]/40 hover:border-[#D9C4B8] focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40 transition-colors',
+        white ? 'bg-white border-[#D8C7B5] shadow-2xs' : 'bg-[#FFF8EA] border-[#EDD8CC]',
         clearable && modelValue ? 'pr-10' : 'pr-3',
       ]"
       @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"

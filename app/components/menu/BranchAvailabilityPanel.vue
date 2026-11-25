@@ -199,7 +199,7 @@ watch(() => props.sourceKey, () => {
   <aside
     :class="[
       'flex flex-col bg-white rounded-2xl border border-[#EEDFC4] shadow-sm overflow-hidden',
-      isCard ? 'w-full' : 'w-full lg:w-64 shrink-0 self-start order-first lg:order-none lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]'
+      isCard ? 'w-full' : 'w-full lg:w-72 shrink-0 self-start order-first lg:order-none lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]'
     ]"
   >
     <header
@@ -220,11 +220,11 @@ watch(() => props.sourceKey, () => {
             isExpanded ? 'pt-4 pb-1' : 'py-4'
           ]"
         >
-          <span class="font-display font-bold text-lg text-[#3B1F0E]">Branches</span>
+          <span class="font-display font-bold text-lg text-[#3B1F0E]">Branch Availability</span>
           <span class="flex items-center gap-2">
             <span v-if="loadError" class="text-xs font-semibold text-red-700 whitespace-nowrap">Couldn't load</span>
             <span v-else-if="!isLoading && branches.length > 0 && !isExpanded" class="text-xs font-semibold text-[#7D5A50] whitespace-nowrap tabular-nums">
-              {{ activeCount }} of {{ branches.length }} shown
+              {{ activeCount }} of {{ branchCountLabel(branches.length) }}
             </span>
             <Icon
               name="heroicons:chevron-down"
@@ -236,22 +236,23 @@ watch(() => props.sourceKey, () => {
 
       <!-- lg and up (always for card): static heading -->
       <div :class="[isCard ? 'flex' : 'hidden lg:flex', 'items-baseline justify-between gap-2 px-5 pt-4']">
-        <h2 class="font-display font-bold text-lg text-[#3B1F0E]">Branches</h2>
+        <h2 class="font-display font-bold text-lg text-[#3B1F0E]">Branch Availability</h2>
         <button
           type="button"
           :disabled="isLoading || exceptionCount === 0 || isBulkPending || confirming !== null"
+          :title="`Set every branch back to the ${subject}'s default visibility`"
           @click="canEditMenu() && (confirming = 'reset')"
-          class="text-sm font-semibold text-[#3B1F0E] rounded-sm hover:text-[#7D5A50] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:text-[#B4846C] disabled:cursor-not-allowed"
+          class="shrink-0 text-xs font-semibold text-[#3B1F0E] rounded-sm hover:text-[#7D5A50] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:text-[#B4846C] disabled:cursor-not-allowed"
         >
-          Reset all
+          Reset to default
         </button>
       </div>
 
       <div :id="controlsId" :class="[showBody ? 'block' : 'hidden lg:block', 'px-5 pb-3 lg:pt-1']">
-        <p v-if="sourceDefault === null || isLoading || branches.length === 0" class="text-xs text-[#7D5A50]">Choose where this {{ subject }} is shown.</p>
-        <div v-else class="flex items-baseline justify-between gap-2">
-          <p class="text-xs font-semibold text-[#7D5A50] tabular-nums">
-            {{ activeCount }} of {{ branches.length }} shown
+        <p class="text-xs text-[#7D5A50]">Choose which branches show this {{ subject }} on their menu.</p>
+        <div v-if="sourceDefault !== null && !isLoading && branches.length > 0" class="mt-1.5 flex items-baseline justify-between gap-2">
+          <p class="text-xs font-semibold text-[#3B1F0E] tabular-nums">
+            Shown at {{ activeCount }} of {{ branchCountLabel(branches.length) }}
           </p>
           <!-- Below lg the sidebar's heading (with "Reset all") is replaced by the summary row -->
           <button
@@ -259,9 +260,9 @@ watch(() => props.sourceKey, () => {
             type="button"
             :disabled="exceptionCount === 0 || isBulkPending || confirming !== null"
             @click="canEditMenu() && (confirming = 'reset')"
-            class="lg:hidden text-sm font-semibold text-[#3B1F0E] rounded-sm hover:text-[#7D5A50] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:text-[#B4846C] disabled:cursor-not-allowed"
+            class="lg:hidden text-xs font-semibold text-[#3B1F0E] rounded-sm hover:text-[#7D5A50] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:text-[#B4846C] disabled:cursor-not-allowed"
           >
-            Reset all
+            Reset to default
           </button>
         </div>
 
@@ -401,7 +402,7 @@ watch(() => props.sourceKey, () => {
             @click="toggleBranch(branch)"
             class="w-full min-h-11 flex items-center justify-between gap-3 px-5 py-2.5 text-left [@media(hover:hover)]:hover:bg-[#FBF2E1] active:bg-[#FBF2E1] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#7D5A50] aria-disabled:cursor-wait"
           >
-            <span class="min-w-0 text-[16px] [overflow-wrap:anywhere]">
+            <span class="min-w-0 text-sm [overflow-wrap:anywhere]">
               <span :class="branch.is_available ? 'font-medium text-[#3B1F0E]' : 'font-medium text-[#7D5A50]'">
                 {{ branch.branch_name }}
               </span>

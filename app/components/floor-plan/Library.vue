@@ -51,8 +51,8 @@ function onDragStart(e: DragEvent, spec: PlaceSpec) {
 <template>
   <section class="bg-[#FFFDF9] border border-[#EDD8CC] rounded-[14px] p-[15px] flex flex-col gap-3">
     <header>
-      <h2 class="font-bold text-[14px] text-[#2D2521]">Objects</h2>
-      <p class="text-[11px] leading-[1.4] text-[#736761]">Drag an item onto the plan to add it.</p>
+      <h2 class="font-bold text-[14px] text-[#2D2521]">Add items</h2>
+      <p class="text-[11px] leading-[1.4] text-[#736761]">Click an item to add it, or drag it to where you want it on the plan.</p>
     </header>
 
     <div class="flex gap-2" role="tablist" aria-label="Object categories">

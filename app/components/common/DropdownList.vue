@@ -19,6 +19,7 @@ const props = withDefaults(defineProps<{
   size?: 'md' | 'sm' | 'xs' // md: 48px form field, sm: 44px toolbar/compact field, xs: 36px side panel
   bare?: boolean // no box of its own, for a dropdown sitting inside a styled wrapper (a sort pill, a phone prefix)
   white?: boolean // plain white box with a gray border, to match plain form inputs (e.g. registration)
+  card?: boolean // white box with the brand border, to match inputs on cream cards inside modals
   align?: 'left' | 'right' // which edge the open list lines up with
   title?: string
   ariaLabel?: string
@@ -160,7 +161,17 @@ defineExpose({ focus: () => button.value?.focus() })
         'block w-full text-left focus:outline-none transition-shadow disabled:opacity-60 disabled:cursor-not-allowed',
         bare
           ? 'bg-transparent text-inherit pr-6 rounded-md focus-visible:ring-2 focus-visible:ring-[#B4846C]'
-          : [
+          : card
+            ? [
+                'bg-white border rounded-xl pr-10 shadow-2xs focus:ring-2',
+                icon ? 'pl-10' : 'pl-3.5',
+                sizeClass,
+                invalid
+                  ? 'border-red-400 bg-red-50/30 focus:ring-red-400/30'
+                  : 'border-[#D8C7B5] focus:border-[#3B1F0E] focus:ring-[#3B1F0E]/15',
+                selected ? 'font-semibold text-[#2D201B]' : 'text-[#A8988B]'
+              ]
+            : [
               white
                 ? 'bg-white border rounded-md pr-10 focus:ring-2'
                 : 'bg-[#fef8f0] border rounded-xl pr-10 focus:ring-2 focus:border-transparent',
@@ -199,7 +210,7 @@ defineExpose({ focus: () => button.value?.focus() })
         role="listbox"
         :style="listStyle"
         :class="[
-          'fixed z-[100] max-h-64 overflow-y-auto bg-white border border-[#EEDFC4] rounded-xl shadow-lg py-1 font-sans font-normal',
+          'fixed z-[9999] max-h-64 overflow-y-auto bg-white border border-[#EEDFC4] rounded-xl shadow-lg py-1 font-sans font-normal',
           bare ? 'w-max max-w-xs' : ''
         ]"
       >

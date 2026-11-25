@@ -135,6 +135,7 @@ const links = OWNER_NAV_LINKS
         title="Menu Items"
         subtitle="View and manage all items across all categories."
         :breadcrumbs="breadcrumbs"
+        icon="heroicons:squares-2x2"
       />
 
       <div :class="['bg-white border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm', filteredAndSortedItems.length > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">

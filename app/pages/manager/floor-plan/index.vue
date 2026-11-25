@@ -14,7 +14,6 @@ import BranchPicker from '~/components/common/BranchPicker.vue'
 import {
   DOOR_ASSETS,
   DRAWN,
-  FLOOR_TAB_LIMIT,
   doorAsset,
   tableAsset,
   assetFor,
@@ -50,7 +49,29 @@ function showAlert(title: string, message: string) {
   })
 }
 
-const manyFloors = computed(() => plans.value.length > FLOOR_TAB_LIMIT)
+// Table count on a floor tab: the open floor shows its live (maybe unsaved) count.
+function floorTableCount(p: FloorPlan) {
+  return p.uuid === plan.value?.uuid ? tables.value.length : (p.tables_count ?? 0)
+}
+
+// The floor last opened on this branch, so coming back lands where you left off (per browser only).
+const LAST_FLOOR_KEY = 'brewspot:floor-plan:last'
+function readLastFloor(): string | null {
+  try {
+    return JSON.parse(localStorage.getItem(LAST_FLOOR_KEY) ?? '{}')[branchUuid.value] ?? null
+  } catch {
+    return null
+  }
+}
+function rememberFloor(uuid: string) {
+  try {
+    const all = JSON.parse(localStorage.getItem(LAST_FLOOR_KEY) ?? '{}')
+    all[branchUuid.value] = uuid
+    localStorage.setItem(LAST_FLOOR_KEY, JSON.stringify(all))
+  } catch {
+    // Storage blocked (private window): just open the default floor next time.
+  }
+}
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
@@ -486,6 +507,39 @@ async function setZoom(next: number, at?: { x: number; y: number }) {
   el.scrollTop += after.top + py * z - cy
 }
 
+// Scales the whole floor to the visible canvas area, so the full layout is in view at once.
+const FIT_MAX = 2 // a small floor shouldn't blow up past this
+async function fitToScreen() {
+  await nextTick()
+  const el = scrollEl.value
+  if (!el || !canvasW.value || !canvasH.value) return
+  const pad = 36 // the scroll area's padding on both sides
+  const fit = Math.min((el.clientWidth - pad) / canvasW.value, (el.clientHeight - pad) / canvasH.value)
+  await setZoom(Math.min(fit, FIT_MAX))
+  el.scrollLeft = 0
+  el.scrollTop = 0
+}
+
+// Expanded editor: the canvas fills the window, over the sidebar and page header. The layout being
+// edited is the same either way, so switching never touches unsaved work.
+const expanded = ref(false)
+const sideCollapsed = ref(false) // the Add items / Edit selected panel, folded to a strip (expanded only)
+
+function toggleExpanded() {
+  expanded.value = !expanded.value
+}
+
+watch(expanded, (on) => {
+  document.documentElement.style.overflow = on ? 'hidden' : '' // the page behind mustn't scroll
+  if (on) fitToScreen()
+  else sideCollapsed.value = false
+})
+
+// Picking something on the plan reopens a folded panel, so its properties are visible.
+watch(selected, (now) => {
+  if (now && sideCollapsed.value) sideCollapsed.value = false
+})
+
 // ── Joining walls ────────────────────────────────────────────────────────
 // Grid snapping puts a wall's *edge* on a grid line, so its 8px-thick centre line is 4px off
 // and ends miss each other. While snap is on, a wall end that comes within MAGNET px of another
@@ -649,9 +703,19 @@ function onDrop(e: DragEvent) {
 
 function onKeydown(e: KeyboardEvent) {
   if (dialogSpec.value) return // a dialog is open: Delete and Ctrl+Z must not touch the plan behind it
+  if (panel.value) {
+    // The floor modal is open: Escape closes it, and no shortcut reaches the plan behind it.
+    if (e.key === 'Escape' && !formBusy.value) panel.value = null
+    return
+  }
   const el = e.target as HTMLElement | null
   if (el && ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)) return
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+  if (e.key === 'Escape' && expanded.value) {
+    expanded.value = false
+  } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey && plan.value) {
+    e.preventDefault()
+    toggleExpanded()
+  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
     e.preventDefault()
     undo()
   } else if ((e.key === 'Delete' || e.key === 'Backspace') && selected.value && !preview.value) {
@@ -669,7 +733,14 @@ function failure(e: any, fallback: string) {
 async function loadPlans(preferUuid?: string) {
   const res = await service.list(branchUuid.value)
   plans.value = res.floor_plans
+  // The asked-for floor, else the last one opened here, else the busiest floor on the register,
+  // so the editor doesn't open on an empty floor while the real layout sits on another tab.
+  const byTables = [...res.floor_plans].sort((a, b) => (b.tables_count ?? 0) - (a.tables_count ?? 0))
+  const last = readLastFloor()
   const target = res.floor_plans.find((p) => p.uuid === preferUuid)
+    ?? res.floor_plans.find((p) => p.uuid === last)
+    ?? byTables.find((p) => p.is_active && (p.tables_count ?? 0) > 0)
+    ?? byTables.find((p) => (p.tables_count ?? 0) > 0)
     ?? res.floor_plans.find((p) => p.is_active)
     ?? res.floor_plans[0]
   if (target) await openPlan(target.uuid)
@@ -687,6 +758,7 @@ async function openPlan(uuid: string) {
   applyPlan(res.floor_plan)
   selected.value = null
   preview.value = false
+  rememberFloor(uuid)
 }
 
 // Unsaved work: keep editing, throw it away, or save first. Escape and the scrim mean "keep editing".
@@ -904,8 +976,8 @@ async function deletePlan() {
     message: `Its ${contents} will be removed for good.${p.is_active ? ' This floor is shown on the register, so it will disappear from there too.' : ''}`,
     focus: 'keep',
     actions: [
-      { id: 'keep', label: 'Keep plan', variant: 'quiet' },
-      { id: 'delete', label: 'Delete plan', variant: 'danger' },
+      { id: 'keep', label: 'Keep floor', variant: 'quiet' },
+      { id: 'delete', label: 'Delete floor', variant: 'danger' },
     ],
   })
   if (answer !== 'delete') return
@@ -919,7 +991,7 @@ async function deletePlan() {
     await openDialog({
       tone: 'warn',
       icon: 'heroicons:calendar-days',
-      title: "This plan can't be deleted yet",
+      title: "This floor can't be deleted yet",
       message: formError.value,
       actions: [{ id: 'ok', label: 'Got it', variant: 'primary' }],
     })
@@ -975,6 +1047,7 @@ onBeforeRouteLeave(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('beforeunload', onBeforeUnload)
+  document.documentElement.style.overflow = '' // leaving while expanded must not lock the next page's scroll
   endDrag()
   endResize()
   endRotate()
@@ -999,7 +1072,7 @@ const isSelected = (type: 'table' | 'element', uid: string) => selected.value?.t
 const doorSrc = (key: string | null) => doorAsset(key)?.src
 
 const iconBtn = 'flex items-center gap-2 rounded-[10px] px-4 py-[11px] text-[13px] text-[#2D2521] transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
-const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py-[8px] text-[12px] text-[#2D2521] outline-none focus:border-[#A96746]'
+const inputCls = 'h-10 bg-white border border-[#D8C7B5] rounded-xl px-3 text-sm font-semibold text-[#2D201B] shadow-2xs outline-none focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 transition-all'
 </script>
 
 <template>
@@ -1007,12 +1080,24 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
     <NavBar :links="links" />
     <main class="flex-1 min-w-0 p-6 lg:px-[48px] lg:py-[48px] flex flex-col gap-5">
       <!-- Header -->
-      <header class="flex flex-col lg:flex-row lg:items-start justify-between gap-4 border-b border-[#EDD8CC] pb-4">
-        <div class="flex flex-col gap-1">
-          <h1 class="font-display font-bold text-[36px] leading-[39px] text-[#3D2B24]">Floor Plan</h1>
-          <p class="font-display text-[12px] text-[#7D5A50]">Arrange your cafe, set capacities, and prepare tables for reservations.</p>
+      <!-- Same format as the Servings header: big tight title, icon-led subtitle line -->
+      <header class="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+        <div class="min-w-0">
+          <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">Floor Plan</h1>
+          <p class="mt-1.5 flex items-center gap-1.5 text-[13px] text-[#8B6656]">
+            <Icon name="heroicons:map" class="h-3.5 w-3.5 shrink-0 text-[#B4846C]" />
+            <span>Arrange your cafe, set capacities, and prepare tables for reservations.</span>
+          </p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
+          <span
+            v-if="dirty && !saving"
+            class="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[12px] font-semibold text-amber-800"
+            role="status"
+          >
+            <span class="size-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+            Unsaved changes
+          </span>
           <BranchPicker
             v-if="showBranchPicker"
             v-model="branchUuid"
@@ -1059,46 +1144,105 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
 
       <SubscriptionLockedState v-else-if="planLock" :lock="planLock" :audience="lockAudience" />
 
-      <div v-else-if="!planLocked && branchUuid" class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_270px] gap-5 items-start">
+      <!-- Expanded: the same editor pinned over the whole window (sidebar and page header stay underneath) -->
+      <div
+        v-else-if="!planLocked && branchUuid"
+        class="grid"
+        :class="expanded
+          ? 'fixed inset-0 z-[900] bg-[#FFF8EA] p-3 gap-3 grid-cols-[minmax(0,1fr)_auto] items-stretch'
+          : 'grid-cols-1 xl:grid-cols-[minmax(0,1fr)_270px] gap-5 items-start'"
+      >
         <!-- Canvas card -->
         <section
           data-walkthrough="floorplan-workspace"
           class="bg-white border border-[#F4E6DE] rounded-2xl overflow-hidden min-w-0"
+          :class="expanded ? 'flex flex-col min-h-0 shadow-sm' : ''"
         >
-          <div class="flex flex-wrap items-center justify-between gap-2 px-[18px] py-3 border-b border-[#F4E6DE]">
-            <div class="flex flex-wrap items-center gap-[6px]" :role="manyFloors ? undefined : 'tablist'" :aria-label="manyFloors ? undefined : 'Floor plans'">
-              <!-- Four or more floors: one switcher instead of a row of tabs that would overflow -->
-              <FloorPlanSwitcher v-if="manyFloors" :plans="plans" :current-uuid="plan?.uuid" @select="selectPlan" />
+          <!-- Floors: every floor is a tab (the row scrolls when there are many), so they're all one click away -->
+          <div class="flex items-center gap-2 px-[18px] pt-3 pb-2.5 border-b border-[#F4E6DE] bg-[#FDFBF7]">
+            <span class="hidden sm:block shrink-0 text-[11px] font-extrabold uppercase tracking-wider text-[#7D5A50]">Floors</span>
+            <div class="floor-tabs flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-0.5" role="tablist" aria-label="Floor plans">
               <button
-                v-for="p in (manyFloors ? [] : plans)"
+                v-for="p in plans"
                 :key="p.uuid"
                 type="button"
                 role="tab"
                 :aria-selected="p.uuid === plan?.uuid"
-                class="relative rounded-[8px] px-5 py-[9px] text-[12px] font-semibold border border-[#3D2B24] transition-colors"
-                :class="p.uuid === plan?.uuid ? 'bg-[#3D2B24] text-white' : 'bg-white text-[#3D2B24] hover:bg-[#F1E9DE]'"
+                class="group shrink-0 flex items-center gap-2 rounded-xl border px-3 py-1.5 text-left transition-all outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                :class="p.uuid === plan?.uuid
+                  ? 'border-[#3B1F0E] bg-[#3B1F0E] text-white shadow-sm'
+                  : 'border-[#E3CFB4] bg-white text-[#3B1F0E] hover:border-[#B4846C] hover:bg-[#FAF6F0]'"
                 @click="selectPlan(p.uuid)"
               >
-                {{ p.floorplan_name }}
-                <span v-if="p.is_active" class="ml-2 inline-block size-[6px] rounded-full bg-[#4CAF7D] align-middle" title="Shown on the register">
-                  <span class="sr-only">(active)</span>
+                <span class="flex flex-col leading-tight">
+                  <span class="text-[13px] font-bold whitespace-nowrap">{{ p.floorplan_name }}</span>
+                  <span class="text-[11px] whitespace-nowrap" :class="p.uuid === plan?.uuid ? 'text-white/70' : 'text-[#8A6E64]'">
+                    {{ plural(floorTableCount(p), 'table') }}
+                  </span>
+                </span>
+                <span
+                  class="size-2 rounded-full shrink-0"
+                  :class="p.is_active ? 'bg-[#4CAF7D]' : p.uuid === plan?.uuid ? 'bg-white/30' : 'bg-[#D8CBBE]'"
+                  :title="p.is_active ? 'Shown on the register' : 'Hidden from the register'"
+                >
+                  <span class="sr-only">{{ p.is_active ? '(on the register)' : '(hidden from the register)' }}</span>
                 </span>
               </button>
-              <button
-                type="button"
-                class="size-[35px] rounded-[6px] border border-[#3D2B24] flex items-center justify-center hover:bg-[#F1E9DE] transition-colors"
-                aria-label="New floor plan"
-                :aria-expanded="panel === 'new'"
-                @click="openPanel('new')"
-              >
-                <Icon name="heroicons:plus" class="size-4" />
-              </button>
             </div>
-            <div v-if="plan" class="flex items-center gap-[6px]">
+            <button
+              type="button"
+              class="shrink-0 h-[42px] px-3 rounded-xl border border-dashed border-[#B4846C] text-[#7D5A50] text-[13px] font-bold flex items-center gap-1.5 hover:bg-[#FAF4ED] hover:text-[#3B1F0E] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+              :class="panel === 'new' ? 'bg-[#FAF4ED]' : 'bg-white'"
+              :aria-expanded="panel === 'new'"
+              @click="openPanel('new')"
+            >
+              <Icon name="heroicons:plus" class="size-4" />
+              <span>Add floor</span>
+            </button>
+          </div>
+
+          <!-- Tools for the open floor -->
+          <div v-if="plan" class="flex flex-wrap items-center justify-between gap-2 px-[18px] py-2.5 border-b border-[#F4E6DE]">
+            <p class="text-[12px] text-[#8A6E64]">
+              <span class="font-bold text-[#3B1F0E]">{{ plan.floorplan_name }}</span>
+              · {{ plan.canvas_width }} × {{ plan.canvas_height }}
+              · <span :class="plan.is_active ? 'text-[#2F7D55] font-semibold' : ''">{{ plan.is_active ? 'On the register' : 'Hidden from the register' }}</span>
+            </p>
+            <div class="flex flex-wrap items-center gap-[6px]">
+              <!-- Expanded: the page header is hidden, so its Undo / Save live here -->
+              <template v-if="expanded">
+                <span
+                  v-if="dirty && !saving"
+                  class="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[12px] font-semibold text-amber-800"
+                  role="status"
+                >
+                  <span class="size-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+                  Unsaved changes
+                </span>
+                <button
+                  type="button"
+                  class="h-[35px] px-3 rounded-[10px] border border-[#DED4CA] bg-white text-[#3B1F0E] flex items-center gap-2 text-[12px] font-semibold hover:bg-[#F1E9DE] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  :disabled="!undoStack.length || preview"
+                  @click="undo"
+                >
+                  <Icon name="heroicons:arrow-uturn-left" class="size-4" />
+                  Undo
+                </button>
+                <button
+                  type="button"
+                  class="h-[35px] px-3 rounded-[10px] bg-[#3A2923] text-white flex items-center gap-2 text-[12px] font-semibold hover:bg-[#2C1E19] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  :disabled="!dirty || saving"
+                  @click="saveLayout"
+                >
+                  <Icon name="heroicons:arrow-down-tray" class="size-4" />
+                  {{ saving ? 'Saving...' : 'Save layout' }}
+                </button>
+                <span class="h-6 w-px bg-[#EADCC7] mx-0.5" aria-hidden="true" />
+              </template>
               <button
                 type="button"
-                class="h-[35px] px-3 rounded-[6px] border border-[#3A2923] flex items-center gap-2 text-[12px] transition-colors"
-                :class="panMode ? 'bg-[#3A2923] text-white' : 'hover:bg-[#F1E9DE]'"
+                class="h-[35px] px-3 rounded-[10px] border flex items-center gap-2 text-[12px] font-semibold transition-colors"
+                :class="panMode ? 'border-[#3A2923] bg-[#3A2923] text-white' : 'border-[#DED4CA] bg-white text-[#3B1F0E] hover:bg-[#F1E9DE]'"
                 :aria-pressed="panMode"
                 title="Drag the canvas to scroll it (middle mouse button also works)"
                 @click="togglePan"
@@ -1108,8 +1252,8 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
               </button>
               <button
                 type="button"
-                class="h-[35px] px-3 rounded-[6px] border border-[#3A2923] flex items-center gap-2 text-[12px] transition-colors"
-                :class="snapOn ? 'bg-[#3A2923] text-white' : 'hover:bg-[#F1E9DE]'"
+                class="h-[35px] px-3 rounded-[10px] border flex items-center gap-2 text-[12px] font-semibold transition-colors"
+                :class="snapOn ? 'border-[#3A2923] bg-[#3A2923] text-white' : 'border-[#DED4CA] bg-white text-[#3B1F0E] hover:bg-[#F1E9DE]'"
                 :aria-pressed="snapOn"
                 :title="`Snap objects to a ${GRID}px grid`"
                 @click="snapOn = !snapOn"
@@ -1119,65 +1263,37 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
               </button>
               <button
                 type="button"
-                class="size-[35px] rounded-[6px] border border-[#3A2923] flex items-center justify-center hover:bg-[#F1E9DE] transition-colors"
-                aria-label="Floor plan settings"
+                class="h-[35px] px-3 rounded-[10px] border flex items-center gap-2 text-[12px] font-semibold transition-colors"
+                :class="panel === 'settings' ? 'border-[#3A2923] bg-[#3A2923] text-white' : 'border-[#DED4CA] bg-white text-[#3B1F0E] hover:bg-[#F1E9DE]'"
                 :aria-expanded="panel === 'settings'"
                 @click="openPanel('settings')"
               >
                 <Icon name="heroicons:cog-6-tooth" class="size-4" />
+                Floor settings
+              </button>
+              <button
+                type="button"
+                class="h-[35px] px-3 rounded-[10px] border flex items-center gap-2 text-[12px] font-semibold transition-colors"
+                :class="expanded ? 'border-[#3A2923] bg-[#3A2923] text-white hover:bg-[#2C1E19]' : 'border-[#DED4CA] bg-white text-[#3B1F0E] hover:bg-[#F1E9DE]'"
+                :aria-pressed="expanded"
+                :title="expanded ? 'Back to the normal page (Esc or F)' : 'Give the floor the whole screen (F)'"
+                @click="toggleExpanded"
+              >
+                <Icon :name="expanded ? 'heroicons:arrows-pointing-in' : 'heroicons:arrows-pointing-out'" class="size-4" />
+                {{ expanded ? 'Exit' : 'Expand' }}
               </button>
             </div>
           </div>
 
           <!-- New / settings form -->
-          <form
-            v-if="panel"
-            class="flex flex-wrap items-end gap-3 px-[18px] py-3 bg-[#FFFDF9] border-b border-[#F4E6DE]"
-            @submit.prevent="submitPanel"
-          >
-            <label class="flex flex-col gap-1 text-[10px] text-[#736761]">
-              Name
-              <input v-model="form.name" required maxlength="60" type="text" :class="[inputCls, 'w-44']" placeholder="e.g. Indoor">
-            </label>
-            <label class="flex flex-col gap-1 text-[10px] text-[#736761]">
-              Width
-              <input v-model.number="form.width" required type="number" :min="limits?.canvas_min ?? 100" :max="limits?.canvas_max ?? 10000" :class="[inputCls, 'w-24']">
-            </label>
-            <label class="flex flex-col gap-1 text-[10px] text-[#736761]">
-              Height
-              <input v-model.number="form.height" required type="number" :min="limits?.canvas_min ?? 100" :max="limits?.canvas_max ?? 10000" :class="[inputCls, 'w-24']">
-            </label>
-            <button type="submit" :disabled="formBusy" class="bg-[#3A2923] text-white rounded-[8px] px-4 py-2 text-[12px] disabled:opacity-50">
-              {{ panel === 'new' ? 'Create plan' : 'Save details' }}
-            </button>
-            <template v-if="panel === 'settings' && plan">
-              <button
-                type="button"
-                :disabled="formBusy"
-                :aria-pressed="plan.is_active"
-                class="flex items-center gap-2 border border-[#DED4CA] rounded-[8px] px-4 py-2 text-[12px] text-[#2D2521] hover:bg-[#F1E9DE] disabled:opacity-50"
-                @click="toggleOnRegister"
-              >
-                <span class="size-[7px] rounded-full" :class="plan.is_active ? 'bg-[#4CAF7D]' : 'bg-[#C9BDB3]'" />
-                {{ plan.is_active ? 'Hide from register' : 'Show on register' }}
-              </button>
-              <button type="button" class="bg-[#F3DFDC] text-[#A85F57] rounded-[8px] px-4 py-2 text-[12px] hover:bg-[#EBCFCB]" @click="deletePlan">
-                Delete plan
-              </button>
-            </template>
-            <p v-if="panel === 'new' && plans.length" class="basis-full text-[11px] text-[#736761]">
-              A new floor stays off the register until you show it, so you can finish arranging it first.
-            </p>
-            <p v-if="formError" role="alert" class="basis-full text-[12px] text-[#B31E1E]">{{ formError }}</p>
-          </form>
 
           <!-- Canvas -->
-          <div v-if="plan" class="relative">
+          <div v-if="plan" class="relative" :class="expanded ? 'flex-1 min-h-0' : ''">
           <div
             ref="scrollEl"
             class="overflow-auto p-[18px] bg-white"
             :class="panning ? 'cursor-grabbing' : panMode ? 'cursor-grab touch-none' : ''"
-            :style="{ height: `min(${canvasH + 36}px, 78vh)` }"
+            :style="{ height: expanded ? '100%' : `min(${canvasH + 36}px, 78vh)` }"
             @pointerdown="startPan"
           >
             <!-- Takes up the scaled size so the scroll area matches the zoomed canvas.
@@ -1296,9 +1412,13 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
 
               <p
                 v-if="!tables.length && !elements.length"
-                class="absolute inset-0 flex items-center justify-center text-[13px] text-[#9E7060] pointer-events-none"
+                class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center pointer-events-none"
               >
-                Drag an object from the library to start your layout.
+                <span class="size-12 rounded-full bg-[#FDF3E7] border border-[#E3CFB4] flex items-center justify-center text-[#9E7060]">
+                  <Icon name="heroicons:squares-plus" class="size-6" />
+                </span>
+                <span class="font-display text-[15px] font-semibold text-[#3B1F0E]">{{ plan?.floorplan_name ?? 'This floor' }} is empty</span>
+                <span class="text-[13px] text-[#8B6656]">Click or drag a table from <strong class="font-semibold text-[#5C4037]">Add items</strong> on the right to start the layout.</span>
               </p>
             </div>
             </div>
@@ -1312,7 +1432,16 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
           >
             <button
               type="button"
-              class="h-full px-2 flex items-center rounded-l-[8px] hover:bg-[#F1E9DE] disabled:opacity-40 transition-colors"
+              class="h-full px-2.5 flex items-center gap-1.5 rounded-l-[8px] border-r border-[#DED4CA] font-semibold hover:bg-[#F1E9DE] transition-colors"
+              title="Fit the whole floor on screen"
+              @click="fitToScreen"
+            >
+              <Icon name="heroicons:viewfinder-circle" class="size-4" />
+              Fit
+            </button>
+            <button
+              type="button"
+              class="h-full px-2 flex items-center hover:bg-[#F1E9DE] disabled:opacity-40 transition-colors"
               aria-label="Zoom out"
               :disabled="zoom <= ZOOM_MIN"
               @click="setZoom(zoom / ZOOM_STEP)"
@@ -1348,17 +1477,47 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
             </button>
           </div>
           </div>
-          <p v-else class="p-10 text-center text-[14px] text-[#9E7060]">
-            Create your first floor plan to start arranging tables.
-          </p>
+          <div v-else class="flex flex-col items-center gap-3 p-10 text-center">
+            <p class="text-[14px] text-[#8B6656]">Create your first floor to start arranging tables.</p>
+            <button
+              type="button"
+              class="h-10 px-4 rounded-xl bg-[#3B1F0E] hover:bg-[#2A150A] text-[#FFF8EA] text-sm font-bold flex items-center gap-1.5 shadow-md transition-colors"
+              @click="openPanel('new')"
+            >
+              <Icon name="heroicons:plus" class="size-4" />
+              Add floor
+            </button>
+          </div>
         </section>
 
         <!-- Side panels -->
+        <!-- Expanded with the panel folded: a thin strip that brings it back -->
+        <button
+          v-if="expanded && sideCollapsed && !preview"
+          type="button"
+          class="w-11 rounded-2xl border border-[#EDD8CC] bg-[#FFFDF9] flex flex-col items-center gap-3 py-4 text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+          title="Show the Add items panel"
+          @click="sideCollapsed = false"
+        >
+          <Icon name="heroicons:chevron-double-left" class="size-4" />
+          <span class="text-[12px] font-bold [writing-mode:vertical-rl] rotate-180">Add items</span>
+        </button>
         <aside
-          v-if="!preview"
+          v-else-if="!preview"
           data-walkthrough="floorplan-objects"
           class="flex flex-col gap-3"
+          :class="expanded ? 'w-[260px] min-h-0 overflow-y-auto' : ''"
         >
+          <button
+            v-if="expanded"
+            type="button"
+            class="self-end inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold text-[#7D5A50] hover:bg-[#F1E9DE] hover:text-[#3B1F0E] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+            title="Fold the panel away for more room"
+            @click="sideCollapsed = true"
+          >
+            Hide panel
+            <Icon name="heroicons:chevron-double-right" class="size-3.5" />
+          </button>
           <div class="grid grid-cols-2 gap-1 rounded-[12px] bg-[#F1E9DE] p-1" role="tablist" aria-label="Side panel">
             <button
               id="fp-tab-objects"
@@ -1370,7 +1529,7 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
               :class="sideTab === 'objects' ? 'bg-[#FFFDF9] text-[#2D2521] shadow-[0_1px_2px_rgba(58,41,35,0.12)]' : 'text-[#736761] hover:text-[#2D2521]'"
               @click="sideTab = 'objects'"
             >
-              Objects
+              Add items
             </button>
             <button
               id="fp-tab-selected"
@@ -1384,7 +1543,7 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
               :class="sideTab === 'selected' ? 'bg-[#FFFDF9] text-[#2D2521] shadow-[0_1px_2px_rgba(58,41,35,0.12)]' : 'text-[#736761] hover:text-[#2D2521] disabled:hover:text-[#A39891]'"
               @click="sideTab = 'selected'"
             >
-              Selected
+              Edit selected
             </button>
           </div>
 
@@ -1407,13 +1566,166 @@ const inputCls = 'bg-[#FFFDF9] border border-[#DED4CA] rounded-[6px] px-[9px] py
             />
           </div>
         </aside>
-        <aside v-else class="bg-[#FFFDF9] border border-[#EDD8CC] rounded-[14px] p-[15px] text-[12px] text-[#736761] flex flex-col gap-2">
+        <aside v-else class="bg-[#FFFDF9] border border-[#EDD8CC] rounded-[14px] p-[15px] text-[12px] text-[#736761] flex flex-col gap-2" :class="expanded ? 'w-[260px] self-start' : ''">
           <h2 class="font-bold text-[14px] text-[#2D2521]">Preview</h2>
           <p>Tables are coloured by their current status, as on the register.</p>
           <p class="text-[#7D5A50]">Pick Edit to keep arranging.</p>
         </aside>
       </div>
     </main>
+
+    <!-- Add floor / Floor settings -->
+    <Teleport to="body">
+      <div v-if="panel" class="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+        <div class="fixed inset-0 bg-black/45 backdrop-blur-sm" aria-hidden="true" @click="!formBusy && (panel = null)"></div>
+
+        <form
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="floor-modal-title"
+          class="relative bg-white rounded-3xl w-full max-w-[520px] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] flex flex-col shadow-[0_24px_50px_-12px_rgba(59,31,14,0.22)] border border-[#EEDFC4] overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150"
+          @submit.prevent="submitPanel"
+        >
+          <!-- Header -->
+          <div class="flex items-center justify-between gap-4 px-6 pt-5 pb-4 border-b border-[#EEDFC4] bg-[#FDFBF7] shrink-0">
+            <div class="flex items-center gap-3.5 min-w-0">
+              <div class="w-10 h-10 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0 shadow-2xs">
+                <Icon :name="panel === 'new' ? 'heroicons:plus' : 'heroicons:cog-6-tooth'" class="w-5 h-5" />
+              </div>
+              <div class="min-w-0">
+                <h2 id="floor-modal-title" class="text-xl font-display font-extrabold text-[#3B1F0E] truncate">
+                  {{ panel === 'new' ? 'Add a floor' : `Floor settings: ${plan?.floorplan_name ?? ''}` }}
+                </h2>
+                <p class="text-xs text-[#8A6E64] mt-0.5">
+                  {{ panel === 'new' ? 'Name the area and set how big its canvas is.' : 'Rename or resize this floor, or choose whether the register shows it.' }}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="Close"
+              :disabled="formBusy"
+              class="w-9 h-9 rounded-xl bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 disabled:opacity-50"
+              @click="panel = null"
+            >
+              <Icon name="heroicons:x-mark" class="w-4 h-4" />
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
+            <!-- Details -->
+            <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5">
+              <div class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+                <span>Floor Details</span>
+              </div>
+
+              <label class="block">
+                <span class="block text-xs font-bold text-[#3B1F0E] mb-1">Name <span class="text-red-500">*</span></span>
+                <input v-model="form.name" required maxlength="60" type="text" :class="[inputCls, 'w-full h-11']" placeholder="e.g. Indoor, Balcony, 2nd Floor">
+              </label>
+
+              <div>
+                <div class="grid grid-cols-2 gap-3.5">
+                  <label class="block min-w-0">
+                    <span class="block text-xs font-bold text-[#3B1F0E] mb-1">Width <span class="text-red-500">*</span></span>
+                    <span class="relative block">
+                      <input v-model.number="form.width" required type="number" :min="limits?.canvas_min ?? 100" :max="limits?.canvas_max ?? 10000" :class="[inputCls, 'w-full h-11 pr-10 tabular-nums']">
+                      <span class="pointer-events-none absolute inset-y-0 right-0 pr-3.5 flex items-center text-xs font-semibold text-[#A8988B]">px</span>
+                    </span>
+                  </label>
+                  <label class="block min-w-0">
+                    <span class="block text-xs font-bold text-[#3B1F0E] mb-1">Height <span class="text-red-500">*</span></span>
+                    <span class="relative block">
+                      <input v-model.number="form.height" required type="number" :min="limits?.canvas_min ?? 100" :max="limits?.canvas_max ?? 10000" :class="[inputCls, 'w-full h-11 pr-10 tabular-nums']">
+                      <span class="pointer-events-none absolute inset-y-0 right-0 pr-3.5 flex items-center text-xs font-semibold text-[#A8988B]">px</span>
+                    </span>
+                  </label>
+                </div>
+                <p class="text-[11px] text-[#8A6E64] mt-1.5">
+                  The canvas size, {{ limits?.canvas_min ?? 100 }} to {{ limits?.canvas_max ?? 10000 }} px each way. Make it bigger if your tables don't fit.
+                </p>
+              </div>
+            </div>
+
+            <!-- Register (settings only) -->
+            <button
+              v-if="panel === 'settings' && plan"
+              type="button"
+              role="switch"
+              :aria-checked="plan.is_active"
+              :disabled="formBusy"
+              class="w-full flex items-center justify-between gap-3 rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] px-4 py-3.5 sm:px-5 text-left shadow-2xs hover:bg-[#FAF6F0] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 disabled:opacity-60"
+              @click="toggleOnRegister"
+            >
+              <span class="min-w-0">
+                <span class="block text-xs font-bold text-[#3B1F0E]">Shown on the register</span>
+                <span class="block text-[11px] text-[#8A6E64] mt-0.5">
+                  {{ plan.is_active ? 'Cashiers and reservations can use this floor\'s tables.' : 'Hidden from cashiers and reservations until you turn it on.' }}
+                </span>
+              </span>
+              <span
+                aria-hidden="true"
+                :class="[
+                  'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors',
+                  plan.is_active ? 'border-[#3B1F0E] bg-[#3B1F0E]' : 'border-[#B4846C] bg-white'
+                ]"
+              >
+                <span
+                  :class="[
+                    'rounded-full transition-[transform,width,height,background-color]',
+                    plan.is_active ? 'h-4 w-4 translate-x-[17px] bg-white shadow-sm' : 'h-3.5 w-3.5 translate-x-[2px] bg-[#B4846C]'
+                  ]"
+                ></span>
+              </span>
+            </button>
+
+            <p v-if="panel === 'new' && plans.length" class="flex items-start gap-2 rounded-xl border border-[#EEDFC4] bg-[#FAF4ED] px-3 py-2.5 text-[11px] text-[#7D5A50]">
+              <Icon name="heroicons:information-circle" class="w-4 h-4 shrink-0 text-[#B4846C]" />
+              <span>A new floor stays off the register until you show it, so you can finish arranging it first.</span>
+            </p>
+
+            <p v-if="formError" role="alert" class="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700">
+              <Icon name="heroicons:exclamation-triangle" class="w-4 h-4 shrink-0" />
+              <span>{{ formError }}</span>
+            </p>
+          </div>
+
+          <!-- Footer: Cancel (and Delete) on the left, the main action on the right -->
+          <div class="flex items-center justify-between gap-3 px-6 py-3.5 border-t border-[#EEDFC4] bg-[#FAF8F5] rounded-b-3xl shrink-0">
+            <div class="flex items-center gap-2.5">
+              <button
+                type="button"
+                :disabled="formBusy"
+                class="px-5 py-2 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 disabled:opacity-50"
+                @click="panel = null"
+              >
+                Cancel
+              </button>
+              <button
+                v-if="panel === 'settings' && plan"
+                type="button"
+                :disabled="formBusy"
+                class="px-4 py-2 rounded-xl border border-red-200 bg-white text-red-600 text-xs sm:text-sm font-bold flex items-center gap-1.5 hover:bg-red-50 active:scale-95 transition-all cursor-pointer disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                @click="deletePlan"
+              >
+                <Icon name="heroicons:trash" class="w-4 h-4" />
+                <span>Delete floor</span>
+              </button>
+            </div>
+            <button
+              type="submit"
+              :disabled="formBusy"
+              class="px-6 py-2 rounded-xl bg-[#3B1F0E] hover:bg-[#2A150A] text-[#FFF8EA] text-xs sm:text-sm font-bold active:scale-95 transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+            >
+              <Icon v-if="formBusy" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
+              <span>{{ panel === 'new' ? 'Create floor' : 'Save details' }}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </Teleport>
 
     <FloorPlanDialog :spec="dialogSpec" @close="closeDialog" />
     <FloorPlanToast :show="savedToast" message="Layout saved" @close="savedToast = false" />

@@ -55,15 +55,22 @@ async function fetchData() {
 
 onMounted(fetchData)
 
-const isModalOpen = computed(() =>
-  route.query.action === 'add-addon' || route.query.action === 'edit-addon'
-)
-
 const addonToEdit = computed(() => {
   if (route.query.action === 'edit-addon' && route.query.addon) {
     return addons.value.find(a => a.uuid === route.query.addon) || null
   }
   return null
+})
+
+// The edit modal waits for its add-on: opened from a link before the list loads,
+// it would otherwise start blank and saving would wipe the recipe and items.
+const isModalOpen = computed(() =>
+  route.query.action === 'add-addon' || !!addonToEdit.value
+)
+
+// An edit link for an add-on that no longer exists just drops back to the list.
+watch([isLoading, () => route.query.addon], ([loading]) => {
+  if (!loading && route.query.action === 'edit-addon' && !addonToEdit.value) closeModal()
 })
 
 function handleAddAction() {
@@ -106,6 +113,7 @@ const links = OWNER_NAV_LINKS
         title="Add-ons"
         subtitle="Extras customers can add to a drink, like Oreo crumbles or an extra shot."
         :breadcrumbs="breadcrumbs"
+        icon="heroicons:sparkles"
       />
 
       <div class="bg-white border border-[#EEDFC4] rounded-2xl overflow-hidden flex flex-col shadow-sm">

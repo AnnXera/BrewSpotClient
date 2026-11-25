@@ -429,17 +429,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         @submit.prevent="submit"
       >
         <!-- Header -->
-        <div class="flex items-start justify-between gap-4 px-6 md:px-8 pt-6 pb-5 border-b border-[#EEDFC4] bg-[#FDFBF7]">
-          <div class="flex items-center gap-4 min-w-0">
-            <div class="w-11 h-11 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0 shadow-2xs">
+        <div class="flex items-center justify-between gap-4 px-6 md:px-8 pt-5 pb-4 border-b border-[#EEDFC4] bg-[#FDFBF7] shrink-0">
+          <div class="flex items-center gap-3.5 min-w-0">
+            <div class="w-10 h-10 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0 shadow-2xs">
               <Icon :name="isEdit ? 'heroicons:user-circle' : 'heroicons:user-plus'" class="w-5 h-5" />
             </div>
             <div>
-              <h2 id="employee-form-title" class="text-xl md:text-2xl font-display font-extrabold text-[#3B1F0E]">
-                {{ isEdit ? 'Edit Employee Information' : 'Add Employee Information' }}
+              <h2 id="employee-form-title" class="text-xl font-display font-extrabold text-[#3B1F0E]">
+                {{ isEdit ? 'Edit Employee' : 'Add New Employee' }}
               </h2>
-              <p class="text-[13px] text-[#8A6E64] mt-0.5">
-                {{ isEdit ? 'Update employee profile, branch assignment, and work schedule' : 'Register a new team member, assign their role, and configure schedule' }}
+              <p class="text-xs text-[#8A6E64] mt-0.5">
+                {{ isEdit ? 'Update the employee profile, role, and work schedule.' : 'Register a new team member, assign their role, and set their schedule.' }}
               </p>
             </div>
           </div>
@@ -455,15 +455,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
 
         <!-- Steps -->
-        <nav aria-label="Form steps" class="px-6 md:px-8 py-3 border-b border-[#F0E4D3] bg-[#FCFAF6] select-none">
+        <nav aria-label="Form steps" class="px-6 md:px-8 py-3 border-b border-[#F0E4D3] bg-[#FCFAF6] select-none shrink-0">
           <ol class="flex items-center gap-3">
             <li v-for="(step, i) in steps" :key="step.key" class="flex items-center gap-3" :class="i === 0 ? '' : 'flex-1 sm:flex-none'">
               <span v-if="i > 0" class="h-px w-6 shrink-0 bg-[#E3D3BF] sm:w-10" aria-hidden="true" />
               <button
                 type="button"
-                class="group inline-flex items-center gap-2.5 rounded-xl py-1 pr-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                class="group inline-flex items-center gap-2.5 rounded-xl py-1 pr-2 text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
                 :aria-current="activeTab === step.key ? 'step' : undefined"
-                @click="activeTab = step.key"
+                @click="step.key === 'employment' ? goToEmploymentTab() : activeTab = step.key"
               >
                 <span
                   class="flex size-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold transition-colors"
@@ -487,280 +487,287 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           </ol>
         </nav>
 
-        <!-- Body with Generous, Breathable Input Spacing -->
-        <div class="custom-form-scroll flex-1 min-h-0 px-6 md:px-8 py-6 overflow-y-auto overscroll-contain divide-y divide-[#F0E4D3]">
-          <!-- TAB 1: PERSONAL DETAILS -->
-          <template v-if="activeTab === 'personal'">
-            <!-- Card 1: Basic Identity -->
-            <section class="space-y-4 py-6 first:pt-0 last:pb-0">
-              <div class="flex items-center gap-2">
-                <h3 class="font-display text-[16px] font-semibold text-[#3B1F0E]">
-                  Basic Information
-                </h3>
+        <!-- Body: only this part scrolls -->
+        <div class="custom-form-scroll flex-1 min-h-0 px-6 md:px-8 py-4 overflow-y-auto overscroll-contain">
+          <!-- STEP 1: Personal details -->
+          <div v-if="activeTab === 'personal'" class="space-y-4">
+            <!-- Card 1: Basic Information -->
+            <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5">
+              <div class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+                <span>Basic Information</span>
               </div>
 
-              <!-- Names Grid (3 Columns) with spacious gap & height -->
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 <!-- First Name -->
-                <label class="flex flex-col gap-2 min-w-0">
-                  <span class="text-[13px] font-bold text-[#482D25]">First Name *</span>
+                <label class="block min-w-0">
+                  <span class="block text-xs font-bold text-[#3B1F0E] mb-1">First Name <span class="text-red-500">*</span></span>
                   <input
                     v-model="form.firstname"
                     type="text"
                     autocomplete="given-name"
                     maxlength="100"
                     placeholder="e.g. Juan"
-                    class="h-12 rounded-xl bg-white border px-4 text-[14.5px] font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal shadow-2xs focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/12 outline-none transition-all"
-                    :class="errors.firstname ? 'border-red-400 bg-red-50/40' : 'border-[#E0D0BE] hover:border-[#D4C3B2]'"
+                    class="w-full h-11 px-3.5 rounded-xl border bg-white text-sm font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 outline-none transition-all shadow-2xs"
+                    :class="errors.firstname ? 'border-red-400 bg-red-50/30' : 'border-[#D8C7B5]'"
                   />
-                  <span v-if="errors.firstname" class="text-xs font-bold text-red-600">{{ errors.firstname }}</span>
+                  <span v-if="errors.firstname" class="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+                    <Icon name="heroicons:exclamation-circle" class="w-3.5 h-3.5 shrink-0" />
+                    <span>{{ errors.firstname }}</span>
+                  </span>
                 </label>
 
                 <!-- Middle Name -->
-                <label class="flex flex-col gap-2 min-w-0">
-                  <span class="text-[13px] font-semibold text-[#8A6E64]">Middle Name (Optional)</span>
+                <label class="block min-w-0">
+                  <span class="block text-xs font-bold text-[#3B1F0E] mb-1">Middle Name <span class="font-semibold text-[#8A6E64]">(Optional)</span></span>
                   <input
                     v-model="form.middlename"
                     type="text"
                     autocomplete="additional-name"
                     maxlength="100"
                     placeholder="e.g. Santos"
-                    class="h-12 rounded-xl bg-white border border-[#E0D0BE] hover:border-[#D4C3B2] px-4 text-[14.5px] font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal shadow-2xs focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/12 outline-none transition-all"
+                    class="w-full h-11 px-3.5 rounded-xl border bg-white text-sm font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 outline-none transition-all shadow-2xs"
+                    :class="errors.middlename ? 'border-red-400 bg-red-50/30' : 'border-[#D8C7B5]'"
                   />
-                  <span v-if="errors.middlename" class="text-xs font-bold text-red-600">{{ errors.middlename }}</span>
+                  <span v-if="errors.middlename" class="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+                    <Icon name="heroicons:exclamation-circle" class="w-3.5 h-3.5 shrink-0" />
+                    <span>{{ errors.middlename }}</span>
+                  </span>
                 </label>
 
                 <!-- Last Name -->
-                <label class="flex flex-col gap-2 min-w-0">
-                  <span class="text-[13px] font-bold text-[#482D25]">Last Name *</span>
+                <label class="block min-w-0">
+                  <span class="block text-xs font-bold text-[#3B1F0E] mb-1">Last Name <span class="text-red-500">*</span></span>
                   <input
                     v-model="form.lastname"
                     type="text"
                     autocomplete="family-name"
                     maxlength="100"
                     placeholder="e.g. Dela Cruz"
-                    class="h-12 rounded-xl bg-white border px-4 text-[14.5px] font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal shadow-2xs focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/12 outline-none transition-all"
-                    :class="errors.lastname ? 'border-red-400 bg-red-50/40' : 'border-[#E0D0BE] hover:border-[#D4C3B2]'"
+                    class="w-full h-11 px-3.5 rounded-xl border bg-white text-sm font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 outline-none transition-all shadow-2xs"
+                    :class="errors.lastname ? 'border-red-400 bg-red-50/30' : 'border-[#D8C7B5]'"
                   />
-                  <span v-if="errors.lastname" class="text-xs font-bold text-red-600">{{ errors.lastname }}</span>
+                  <span v-if="errors.lastname" class="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+                    <Icon name="heroicons:exclamation-circle" class="w-3.5 h-3.5 shrink-0" />
+                    <span>{{ errors.lastname }}</span>
+                  </span>
                 </label>
               </div>
-            </section>
+            </div>
 
-            <!-- Card 2: Contact & Address -->
-            <section class="space-y-4 py-6 first:pt-0 last:pb-0">
-              <div class="flex items-center gap-2">
-                <h3 class="font-display text-[16px] font-semibold text-[#3B1F0E]">
-                  Contact & Residential Details
-                </h3>
+            <!-- Card 2: Contact & Residential Details -->
+            <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5">
+              <div class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+                <span>Contact & Residential Details</span>
               </div>
 
-              <!-- Contact Grid -->
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-                <!-- Phone Number -->
-                <label class="flex flex-col gap-2 min-w-0">
-                  <span class="text-[13px] font-bold text-[#482D25]">Mobile Number *</span>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <!-- Mobile Number with +63 prefix -->
+                <label class="block min-w-0">
+                  <span class="block text-xs font-bold text-[#3B1F0E] mb-1">Mobile Number <span class="text-red-500">*</span></span>
                   <div
-                    class="flex h-12 items-center rounded-xl border bg-white shadow-2xs transition-all overflow-hidden focus-within:border-[#3B1F0E] focus-within:ring-2 focus-within:ring-[#3B1F0E]/12"
-                    :class="errors.phone_number ? 'border-red-400 bg-red-50/40' : 'border-[#E0D0BE] hover:border-[#D4C3B2]'"
+                    class="h-11 rounded-xl border bg-white flex items-center overflow-hidden transition-all shadow-2xs focus-within:border-[#3B1F0E] focus-within:ring-2 focus-within:ring-[#3B1F0E]/15"
+                    :class="errors.phone_number ? 'border-red-400 bg-red-50/30' : 'border-[#D8C7B5]'"
                   >
-                    <div class="h-full flex items-center gap-1.5 px-4 bg-[#FAF6F0] border-r border-[#E0D0BE] text-xs font-bold text-[#7D5A50] select-none shrink-0">
-                      <Icon name="heroicons:phone" class="w-4 h-4 text-[#8A6E64]" />
-                      <span>+63</span>
-                    </div>
+                    <span class="bg-[#F5EFE6] border-r border-[#E0D0BE] text-[#3B1F0E] font-bold text-xs px-3.5 h-full flex items-center shrink-0 select-none">
+                      +63
+                    </span>
                     <input
                       :value="form.phone_number"
                       type="tel"
                       inputmode="numeric"
                       autocomplete="tel-national"
                       placeholder="9123456789"
-                      class="flex-1 min-w-0 h-full bg-transparent px-4 text-[14.5px] font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal focus:outline-none"
+                      class="w-full h-full px-3 text-sm font-bold text-[#2D201B] bg-transparent outline-none tracking-wider placeholder:text-[#A8988B] placeholder:font-normal"
                       @input="onPhoneInput"
                     />
                   </div>
-                  <span v-if="errors.phone_number" class="text-xs font-bold text-red-600">{{ errors.phone_number }}</span>
+                  <span v-if="errors.phone_number" class="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+                    <Icon name="heroicons:exclamation-circle" class="w-3.5 h-3.5 shrink-0" />
+                    <span>{{ errors.phone_number }}</span>
+                  </span>
                 </label>
 
                 <!-- Email -->
-                <label class="flex flex-col gap-2 min-w-0">
-                  <span class="text-[13px] font-bold text-[#482D25]">Email Address *</span>
-                  <div
-                    class="flex h-12 items-center gap-3 px-4 rounded-xl border bg-white shadow-2xs transition-all focus-within:border-[#3B1F0E] focus-within:ring-2 focus-within:ring-[#3B1F0E]/12"
-                    :class="errors.email ? 'border-red-400 bg-red-50/40' : 'border-[#E0D0BE] hover:border-[#D4C3B2]'"
-                  >
-                    <Icon name="heroicons:envelope" class="w-[18px] h-[18px] text-[#8A6E64] shrink-0" />
-                    <input
-                      v-model="form.email"
-                      type="email"
-                      autocomplete="email"
-                      maxlength="255"
-                      placeholder="employee@brewspot.com"
-                      class="flex-1 min-w-0 h-full bg-transparent text-[14.5px] font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal focus:outline-none"
-                    />
-                  </div>
-                  <span v-if="errors.email" class="text-xs font-bold text-red-600">{{ errors.email }}</span>
+                <label class="block min-w-0">
+                  <span class="block text-xs font-bold text-[#3B1F0E] mb-1">Email Address <span class="text-red-500">*</span></span>
+                  <input
+                    v-model="form.email"
+                    type="email"
+                    autocomplete="email"
+                    maxlength="255"
+                    placeholder="employee@brewspot.com"
+                    class="w-full h-11 px-3.5 rounded-xl border bg-white text-sm font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 outline-none transition-all shadow-2xs"
+                    :class="errors.email ? 'border-red-400 bg-red-50/30' : 'border-[#D8C7B5]'"
+                  />
+                  <span v-if="errors.email" class="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+                    <Icon name="heroicons:exclamation-circle" class="w-3.5 h-3.5 shrink-0" />
+                    <span>{{ errors.email }}</span>
+                  </span>
                 </label>
               </div>
 
               <!-- Address -->
-              <label class="flex flex-col gap-2">
-                <span class="text-[13px] font-bold text-[#482D25]">Residential Address *</span>
-                <div
-                  class="flex h-12 items-center gap-3 px-4 rounded-xl border bg-white shadow-2xs transition-all focus-within:border-[#3B1F0E] focus-within:ring-2 focus-within:ring-[#3B1F0E]/12"
-                  :class="errors.address ? 'border-red-400 bg-red-50/40' : 'border-[#E0D0BE] hover:border-[#D4C3B2]'"
-                >
-                  <Icon name="heroicons:map-pin" class="w-[18px] h-[18px] text-[#8A6E64] shrink-0" />
-                  <input
-                    v-model="form.address"
-                    type="text"
-                    autocomplete="street-address"
-                    maxlength="255"
-                    placeholder="Street, Barangay, City, Province"
-                    class="flex-1 min-w-0 h-full bg-transparent text-[14.5px] font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal focus:outline-none"
-                  />
-                </div>
-                <span v-if="errors.address" class="text-xs font-bold text-red-600">{{ errors.address }}</span>
+              <label class="block">
+                <span class="block text-xs font-bold text-[#3B1F0E] mb-1">Residential Address <span class="text-red-500">*</span></span>
+                <input
+                  v-model="form.address"
+                  type="text"
+                  autocomplete="street-address"
+                  maxlength="255"
+                  placeholder="Street, Barangay, City, Province"
+                  class="w-full h-11 px-3.5 rounded-xl border bg-white text-sm font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 outline-none transition-all shadow-2xs"
+                  :class="errors.address ? 'border-red-400 bg-red-50/30' : 'border-[#D8C7B5]'"
+                />
+                <span v-if="errors.address" class="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+                  <Icon name="heroicons:exclamation-circle" class="w-3.5 h-3.5 shrink-0" />
+                  <span>{{ errors.address }}</span>
+                </span>
               </label>
-            </section>
-          </template>
+            </div>
+          </div>
 
-          <!-- TAB 2: ROLE & SCHEDULE -->
-          <template v-else>
-            <!-- Card 1: Role & Credentials -->
-            <section class="space-y-4 py-6 first:pt-0 last:pb-0">
-              <div class="flex items-center gap-2">
-                <h3 class="font-display text-[16px] font-semibold text-[#3B1F0E]">
-                  Role & Branch Assignment
-                </h3>
+          <!-- STEP 2: Role & schedule -->
+          <div v-else class="space-y-4">
+            <!-- Card 1: Role & Branch Assignment -->
+            <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5">
+              <div class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+                <span>Role & Branch Assignment</span>
               </div>
 
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5" :class="usesPin ? 'lg:grid-cols-3' : ''">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5" :class="usesPin ? 'lg:grid-cols-3' : ''">
                 <!-- Position -->
-                <div class="flex flex-col gap-2 min-w-0">
-                  <span class="text-[13px] font-bold text-[#482D25]">Position *</span>
+                <div class="min-w-0">
+                  <span class="block text-xs font-bold text-[#3B1F0E] mb-1">Position <span class="text-red-500">*</span></span>
                   <DropdownList
                     v-model="form.role"
                     :options="positionSelectOptions"
                     placeholder="Select position"
-                    icon="heroicons:user-circle"
                     size="md"
                     :invalid="!!errors.role"
                     :disabled="isManager && isEdit"
                   />
-                  <span v-if="errors.role" class="text-xs font-bold text-red-600">{{ errors.role }}</span>
-                  <span v-else-if="isManager && isEdit" class="text-xs text-[#8A6E64]">Only owners can reassign roles.</span>
+                  <span v-if="errors.role" class="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+                    <Icon name="heroicons:exclamation-circle" class="w-3.5 h-3.5 shrink-0" />
+                    <span>{{ errors.role }}</span>
+                  </span>
+                  <span v-else-if="isManager && isEdit" class="block text-[11px] text-[#8A6E64] mt-1">Only owners can reassign roles.</span>
                 </div>
 
-                <!-- Hired At -->
-                <div class="flex flex-col gap-2 min-w-0">
-                  <span class="text-[13px] font-bold text-[#482D25]">Date Hired *</span>
+                <!-- Date Hired -->
+                <div class="min-w-0">
+                  <span class="block text-xs font-bold text-[#3B1F0E] mb-1">Date Hired <span class="text-red-500">*</span></span>
                   <EmilCalendar
                     v-model="form.hired_at"
+                    class="sm:!w-full"
                     placeholder="Select hired date"
                     align="left"
                     :invalid="!!errors.hired_at"
-                    button-class="w-full h-12 rounded-xl text-[14.5px] font-semibold"
+                    button-class="w-full h-11 px-3.5 rounded-xl border border-[#D8C7B5] bg-white text-sm font-semibold text-[#2D201B] shadow-2xs hover:border-[#3B1F0E]"
                   />
-                  <span v-if="errors.hired_at" class="text-xs font-bold text-red-600">{{ errors.hired_at }}</span>
+                  <span v-if="errors.hired_at" class="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+                    <Icon name="heroicons:exclamation-circle" class="w-3.5 h-3.5 shrink-0" />
+                    <span>{{ errors.hired_at }}</span>
+                  </span>
                 </div>
 
-                <!-- Cashier PIN (Only when role is Cashier) -->
-                <label v-if="usesPin" class="flex flex-col gap-2 min-w-0">
-                  <span class="text-[13px] font-bold text-[#482D25]">
-                    {{ pinRequired ? 'Cashier PIN (6 Digits) *' : 'New PIN (Optional)' }}
+                <!-- Cashier PIN (only when role is Cashier) -->
+                <label v-if="usesPin" class="block min-w-0">
+                  <span class="block text-xs font-bold text-[#3B1F0E] mb-1">
+                    <template v-if="pinRequired">Cashier PIN (6 Digits) <span class="text-red-500">*</span></template>
+                    <template v-else>New PIN <span class="font-semibold text-[#8A6E64]">(Optional)</span></template>
                   </span>
-                  <div
-                    class="flex h-12 items-center gap-3 px-4 rounded-xl border bg-white shadow-2xs transition-all focus-within:border-[#3B1F0E] focus-within:ring-2 focus-within:ring-[#3B1F0E]/12"
-                    :class="errors.pin ? 'border-red-400 bg-red-50/40' : 'border-[#E0D0BE] hover:border-[#D4C3B2]'"
-                  >
-                    <Icon name="heroicons:finger-print" class="w-[18px] h-[18px] text-[#8A6E64] shrink-0" />
-                    <input
-                      :value="form.pin"
-                      type="password"
-                      inputmode="numeric"
-                      autocomplete="off"
-                      maxlength="6"
-                      :placeholder="pinRequired ? '6-digit PIN' : 'Keep current PIN'"
-                      class="flex-1 min-w-0 h-full bg-transparent text-[15px] font-bold tracking-widest text-[#2D201B] placeholder:text-[#A8988B] placeholder:tracking-normal placeholder:font-normal focus:outline-none"
-                      @input="onPinInput"
-                    />
-                  </div>
-                  <span v-if="errors.pin" class="text-xs font-bold text-red-600">{{ errors.pin }}</span>
+                  <input
+                    :value="form.pin"
+                    type="password"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    maxlength="6"
+                    :placeholder="pinRequired ? '6-digit PIN' : 'Keep current PIN'"
+                    class="w-full h-11 px-3.5 rounded-xl border bg-white text-sm font-bold tracking-widest text-[#2D201B] placeholder:text-[#A8988B] placeholder:tracking-normal placeholder:font-normal focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 outline-none transition-all shadow-2xs"
+                    :class="errors.pin ? 'border-red-400 bg-red-50/30' : 'border-[#D8C7B5]'"
+                    @input="onPinInput"
+                  />
+                  <span v-if="errors.pin" class="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+                    <Icon name="heroicons:exclamation-circle" class="w-3.5 h-3.5 shrink-0" />
+                    <span>{{ errors.pin }}</span>
+                  </span>
                 </label>
               </div>
 
-              <!-- Position Hint Callout -->
+              <!-- Position hint -->
               <div v-if="positionHint" class="flex items-start gap-2.5 p-3 rounded-xl bg-[#FAF4ED] border border-[#EEDFC4] text-xs text-[#7D5A50] leading-relaxed">
-                <Icon name="heroicons:information-circle" class="w-[18px] h-[18px] text-[#B4846C] shrink-0 mt-0.5" />
+                <Icon name="heroicons:information-circle" class="w-4 h-4 text-[#B4846C] shrink-0 mt-0.5" />
                 <span>{{ positionHint }}</span>
               </div>
 
-              <!-- Employment Status (Edit Mode Only) -->
-              <div v-if="isEdit" class="flex flex-col gap-2 sm:max-w-[280px]">
-                <span class="text-[13px] font-bold text-[#482D25]">Employment Status *</span>
+              <!-- Employment Status (edit only) -->
+              <div v-if="isEdit" class="sm:max-w-[280px]">
+                <span class="block text-xs font-bold text-[#3B1F0E] mb-1">Employment Status <span class="text-red-500">*</span></span>
                 <DropdownList
                   v-model="form.employment_status"
                   :options="statusOptions"
-                  icon="heroicons:signal"
                   size="md"
                   :invalid="!!errors.employment_status"
                 />
-                <span v-if="errors.employment_status" class="text-xs font-bold text-red-600">{{ errors.employment_status }}</span>
+                <span v-if="errors.employment_status" class="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+                  <Icon name="heroicons:exclamation-circle" class="w-3.5 h-3.5 shrink-0" />
+                  <span>{{ errors.employment_status }}</span>
+                </span>
               </div>
-            </section>
+            </div>
 
-            <!-- Card 2: Weekly Schedule -->
-            <section class="space-y-4 py-6 first:pt-0 last:pb-0">
-              <div class="flex items-center justify-between gap-2 flex-wrap">
-                <div class="flex items-center gap-2">
-                  <div>
-                    <h3 class="font-display text-[16px] font-semibold text-[#3B1F0E]">
-                      Weekly Work Schedule
-                    </h3>
-                    <p class="text-[13px] text-[#8A6E64] mt-0.5">
-                      Configure daily shift hours or assign off days for this employee.
-                    </p>
-                  </div>
+            <!-- Card 2: Weekly Work Schedule -->
+            <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5">
+              <div>
+                <div class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+                  <span>Weekly Work Schedule</span>
                 </div>
+                <p class="text-[11px] text-[#8A6E64] mt-1">
+                  Set daily shift hours or mark days off for this employee.
+                </p>
               </div>
 
               <EmployeesScheduleEditor v-model="form.schedule" :errors="scheduleErrors" :disabled="saving" />
-            </section>
-          </template>
+            </div>
+          </div>
         </div>
 
         <!-- Global Server Error Banner -->
-        <div v-if="serverError" class="px-6 md:px-8 py-2.5 bg-red-50 border-t border-red-100 flex items-center gap-2">
+        <div v-if="serverError" role="alert" class="px-6 md:px-8 py-2.5 bg-red-50 border-t border-red-100 flex items-center gap-2 shrink-0">
           <Icon name="heroicons:exclamation-circle" class="w-4 h-4 text-red-600 shrink-0" />
           <p class="text-xs font-bold text-red-700 whitespace-pre-line">{{ serverError }}</p>
         </div>
 
         <!-- Footer: Cancel stays on the left; back and the main action on the right -->
-        <div class="flex flex-col-reverse gap-2.5 px-6 md:px-8 py-4 border-t border-[#EEDFC4] bg-[#FAF8F5] sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-center justify-between px-6 md:px-8 py-3.5 border-t border-[#EEDFC4] bg-[#FAF8F5] rounded-b-3xl shrink-0">
           <button
             type="button"
-            class="h-11 rounded-xl px-4 text-sm font-semibold text-[#8A6E64] whitespace-nowrap transition-colors hover:bg-[#F3ECE3] hover:text-[#3B1F0E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+            class="px-5 py-2 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
             @click="close"
           >
             Cancel
           </button>
 
-          <div class="flex flex-col-reverse gap-2.5 sm:flex-row sm:items-center">
+          <div class="flex items-center gap-3">
             <template v-if="activeTab === 'personal'">
               <button
                 v-if="isEdit"
                 type="submit"
                 :disabled="saving"
-                class="h-11 rounded-xl border border-[#D8C7B5] bg-white px-5 text-sm font-semibold text-[#3B1F0E] whitespace-nowrap transition-colors hover:bg-[#FAF4ED] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                class="px-5 py-2 rounded-xl border border-[#D8C7B5] bg-white text-[#3B1F0E] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
               >
-                Save changes
+                Save Changes
               </button>
               <button
                 type="button"
-                class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#3B1F0E] px-5 text-sm font-semibold text-[#FFF8EA] whitespace-nowrap transition-colors hover:bg-[#2A150A] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#3B1F0E]"
+                class="px-6 py-2 rounded-xl bg-[#3B1F0E] hover:bg-[#2A150A] text-[#FFF8EA] text-xs sm:text-sm font-bold active:scale-95 transition-all shadow-md flex items-center gap-2 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
                 @click="goToEmploymentTab"
               >
-                Next: Role & schedule
+                <span>Continue to Role & Schedule</span>
                 <Icon name="heroicons:arrow-right" class="w-4 h-4" />
               </button>
             </template>
@@ -768,19 +775,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             <template v-else>
               <button
                 type="button"
-                class="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border border-[#D8C7B5] bg-white px-4 text-sm font-semibold text-[#5C4037] whitespace-nowrap transition-colors hover:bg-[#FAF4ED] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                class="px-4 py-2 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
                 @click="activeTab = 'personal'"
               >
                 <Icon name="heroicons:arrow-left" class="w-4 h-4" />
-                Back
+                <span>Back</span>
               </button>
               <button
                 type="submit"
                 :disabled="saving"
-                class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#3B1F0E] px-6 text-sm font-semibold text-[#FFF8EA] whitespace-nowrap transition-colors hover:bg-[#2A150A] active:scale-[0.98] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#3B1F0E]"
+                class="px-6 py-2 rounded-xl bg-[#3B1F0E] hover:bg-[#2A150A] text-[#FFF8EA] text-xs sm:text-sm font-bold active:scale-95 transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
               >
                 <Icon v-if="saving" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
-                {{ saving ? 'Saving…' : isEdit ? 'Save changes' : 'Save employee' }}
+                <span>{{ saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Employee' }}</span>
               </button>
             </template>
           </div>
