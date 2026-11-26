@@ -10,11 +10,10 @@ import ManagerTotals from '~/components/manager/ManagerTotals.vue'
 import ManagerIncomeChart from '~/components/manager/ManagerIncomeChart.vue'
 import ManagerReservationsCard from '~/components/manager/ManagerReservationsCard.vue'
 import ManagerEmployeesCard from '~/components/manager/ManagerEmployeesCard.vue'
-import ManagerTransactionsCard from '~/components/manager/ManagerTransactionsCard.vue'
+import TransactionLog, { type TransactionLogSource } from '~/components/analytics/TransactionLog.vue'
 import ManagerTrendingItems from '~/components/manager/ManagerTrendingItems.vue'
 import ManagerTopCategories from '~/components/manager/ManagerTopCategories.vue'
 import ManagerPeakHours from '~/components/manager/ManagerPeakHours.vue'
-import ManagerTransactionModal from '~/components/manager/ManagerTransactionModal.vue'
 
 definePageMeta({
   role: 'Manager',
@@ -49,26 +48,18 @@ function lockFromError(err: any): PlanLock | null {
 // Initialize scroll reveal observer that only activates when scrolling into view
 useScrollReveal(stats)
 
-// Transaction receipt modal
-const selectedTxUuid = ref<string | null>(null)
-const showTxModal = ref(false)
+// Transaction log: the owner dashboard's log, scoped to this branch
+const transactionLog = ref<InstanceType<typeof TransactionLog> | null>(null)
 
-function openTransactionModal(uuid: string) {
-  selectedTxUuid.value = uuid
-  showTxModal.value = true
+const logSource: TransactionLogSource = {
+  list: (filters, query) => service.getTransactionLog(branchUuid.value, filters, query),
+  receipt: uuid => service.getTransactionLogReceipt(branchUuid.value, uuid),
 }
-
-function closeTransactionModal() {
-  showTxModal.value = false
-  selectedTxUuid.value = null
-}
-
-const transactionsCard = ref<InstanceType<typeof ManagerTransactionsCard> | null>(null)
 
 function refreshAll() {
   loadStats()
   refreshPlanAccess()
-  transactionsCard.value?.refresh()
+  transactionLog.value?.refresh()
 }
 
 let requestId = 0
@@ -137,6 +128,16 @@ onMounted(() => {
   refreshPlanAccess()
 })
 useAutoRefresh(refreshAll)
+
+// The dashboard period runs to the end of the week/month, but the log rejects
+// future dates (to <= today), so it stops at today.
+const logFilters = computed(() => {
+  if (!stats.value) return null
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const { from, to } = stats.value.period
+  return { from, to: to > today ? today : to }
+})
 
 const span = computed(() => (stats.value ? formatSpan(stats.value.period.from, stats.value.period.to) : ''))
 const updatedAt = computed(() =>
@@ -285,13 +286,13 @@ const { isOpenNow } = useOperatingHours()
               />
             </div>
 
-            <!-- 4. Branch Transaction History (Live Search, Filter Tabs, Pagination) -->
-            <div class="scroll-reveal">
-              <ManagerTransactionsCard
-                v-if="branchUuid"
-                ref="transactionsCard"
-                :branch-uuid="branchUuid"
-                @view-receipt="openTransactionModal"
+            <!-- 4. Transaction Log (same as the owner dashboard, this branch only) -->
+            <div v-if="branchUuid && logFilters" class="scroll-reveal" data-walkthrough="feat-transactions">
+              <TransactionLog
+                ref="transactionLog"
+                :filters="logFilters"
+                :source="logSource"
+                :note="`Every sale for ${span}, with who handled it. Refunds and voids stay listed with who approved them.`"
               />
             </div>
           </div>
@@ -299,14 +300,6 @@ const { isOpenNow } = useOperatingHours()
 
       </div>
     </main>
-
-    <!-- Receipt Modal Detail -->
-    <ManagerTransactionModal
-      :show="showTxModal"
-      :transaction-uuid="selectedTxUuid"
-      :branch-uuid="branchUuid"
-      @close="closeTransactionModal"
-    />
   </div>
 </template>
 

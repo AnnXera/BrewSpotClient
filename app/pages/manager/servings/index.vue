@@ -9,6 +9,7 @@ import ServingsIngredientsUsedPanel from '~/components/servings/IngredientsUsedP
 import ServingsServingLogPanel from '~/components/servings/ServingLogPanel.vue'
 import ServingsLogIngredientsModal from '~/components/servings/LogIngredientsModal.vue'
 import BranchPicker from '~/components/common/BranchPicker.vue'
+import LiveClock from '~/components/common/LiveClock.vue'
 import type {
   IngredientUsage,
   IngredientUsageSort,
@@ -40,7 +41,6 @@ const REFRESH_MS = 30_000
 const service = useServingService(workspace.scope)
 
 // Live clock in the header
-const { timeLabel, dateLabel } = useNowClock()
 
 // Categories
 const categorySearch = ref('')
@@ -80,6 +80,18 @@ useScrollReveal(categories)
 
 // Refresh trigger counter to animate circle graphs and panels on refresh
 const refreshKey = ref(0)
+
+// Export today: every list for the selected branch as an Excel file.
+const { exporting, exportToday } = useServingsExport(service)
+async function handleExport() {
+  if (!branchUuid.value || exporting.value) return
+  try {
+    await exportToday(branchUuid.value, workspace.branchName.value || 'Branch')
+  } catch (e: any) {
+    console.warn('Servings export error:', e)
+    errorMessage.value = e?.data?.message ?? 'The Excel file could not be created. Please try again.'
+  }
+}
 
 function failure(e: any, fallback: string) {
   planLock.value = planLockFromError(e)
@@ -232,11 +244,13 @@ onBeforeUnmount(() => {
   <div class="dashboard flex min-h-screen flex-col bg-[#FDF3E7] md:flex-row">
     <NavBar :links="links" />
 
-    <main class="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10 xl:px-12">
+    <!-- Extra bottom room so the floating clock never covers the last card -->
+    <main class="flex-1 overflow-x-hidden px-4 pt-6 pb-24 sm:px-6 md:px-10 md:pt-10 md:pb-24 xl:px-12">
       <div class="mx-auto max-w-[1360px] space-y-6">
         
         <!-- Header: Consistent Editorial Aesthetic -->
-        <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between pb-2">
+        <!-- Wraps: the controls drop below the title only when they can't fit beside it -->
+        <header class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 pb-2">
           <div class="min-w-0">
             <!-- Title + Badge -->
             <div class="flex flex-wrap items-baseline gap-3">
@@ -266,21 +280,25 @@ onBeforeUnmount(() => {
             </p>
           </div>
 
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center shrink-0 self-start sm:self-auto">
+          <!-- Right side: branch + export beside the title (the clock floats bottom-right) -->
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
           <BranchPicker v-if="showBranchPicker" v-model="branchUuid" :options="branchOptions" />
 
-          <!-- Live Time Pill with Pulsing Indicator (Auto-updates every 30s) -->
-          <div class="inline-flex items-center gap-2 rounded-xl border border-[#E3CFB4] bg-white px-3.5 py-2 text-[13px] font-medium text-[#7D5A50] shadow-2xs shrink-0 self-start sm:self-auto">
-            <span class="relative flex h-2 w-2">
-              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-            </span>
-            <span class="tabular-nums font-mono">{{ timeLabel }}</span>
-            <span class="text-[#D9C3A5]">/</span>
-            <span>{{ dateLabel }}</span>
-          </div>
+          <button
+            v-if="!planLocked && branchUuid"
+            type="button"
+            class="inline-flex h-11 shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-[#E3CFB4] bg-white px-4 text-[13px] font-bold text-[#3B1F0E] shadow-[0_1px_2px_rgba(59,31,14,0.04)] transition-colors hover:border-[#B4846C] hover:bg-[#FAF4ED] outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
+            :disabled="loading || exporting"
+            :title="`Excel file of today's servings, items, serving log, ingredients and spoilage${workspace.branchName.value ? ` at ${workspace.branchName.value}` : ''}`"
+            @click="handleExport"
+          >
+            <Icon :name="exporting ? 'heroicons:arrow-path' : 'heroicons:arrow-down-tray'" class="h-[18px] w-[18px]" :class="{ 'animate-spin': exporting }" />
+            {{ exporting ? 'Preparing…' : 'Export today' }}
+          </button>
           </div>
         </header>
+
+        <LiveClock floating />
 
         <!-- Error Message Alert -->
         <div

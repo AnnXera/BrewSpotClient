@@ -1,6 +1,7 @@
 <!-- app/components/manager/ManagerIncomeChart.vue -->
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch } from 'vue'
+import DropdownList from '~/components/common/DropdownList.vue'
 import type { DashboardRange } from '~/services/OwnerProfileService'
 import type { ManagerDashboardStats } from '~/services/ManagerDashboardService'
 import {
@@ -32,14 +33,7 @@ const service = useManagerDashboardService()
 // Chart display mode: 'bar' or 'line'
 const chartType = ref<'bar' | 'line'>('bar')
 
-// Year and Date filtering
-const currentYear = new Date().getFullYear().toString()
-const selectedYear = ref<string>(currentYear)
-const availableYears = ['2026', '2025', '2024', '2023', '2022', '2021']
-
-// Dropdown & Date Picker states
-const showTimeDropdown = ref(false)
-const dropdownRef = ref<HTMLElement | null>(null)
+// Single-date inspection state
 const pickedDate = ref('')
 const inspectingDate = ref(false)
 const inspectedDateInfo = ref<{
@@ -63,7 +57,7 @@ const customRangeData = ref<{
 // Animation key to re-trigger bar/line entrances smoothly
 const chartAnimationKey = ref(0)
 watch(
-  [() => props.range, chartType, selectedYear],
+  [() => props.range, chartType],
   () => {
     chartAnimationKey.value++
     active.value = null
@@ -78,37 +72,15 @@ const ranges: { value: DashboardRange; label: string; compare: string; none: str
 
 const currentRange = computed(() => ranges.find(r => r.value === props.range))
 
-// Close dropdown on outside click
-function handleClickOutside(event: MouseEvent) {
-  const target = event.target as HTMLElement | null
-  // Don't close if interacting with a teleported dialog / calendar
-  if (target?.closest?.('[role="dialog"]') || target?.closest?.('.emil-calendar-popover')) {
-    return
-  }
-  if (dropdownRef.value && !dropdownRef.value.contains(event.target as Node)) {
-    showTimeDropdown.value = false
-  }
-}
+// Period dropdown, the same as the owner's Performance overview.
+const periodOptions = ranges.map(r => ({ value: r.value, label: r.label }))
 
-onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
-})
-
-// Filtered series: custom date range takes precedence, then monthly year filter
+// A custom date range takes precedence over the period's series.
 const displaySeries = computed(() => {
   if (customRangeData.value?.series && customRangeData.value.series.length > 0) {
     return customRangeData.value.series
   }
-  if (!props.series || props.series.length === 0) return []
-  if (props.range === 'monthly' && selectedYear.value !== 'all') {
-    const filtered = props.series.filter(p => p.start.startsWith(selectedYear.value))
-    if (filtered.length > 0) return filtered
-  }
-  return props.series
+  return props.series ?? []
 })
 
 const max = computed(() => niceMax(Math.max(0, ...displaySeries.value.map(p => p.revenue))))
@@ -189,8 +161,6 @@ function tooltipAlign(i: number) {
 // ----------------------------------------------------
 const SVG_WIDTH = 1000
 const SVG_HEIGHT = 200
-const PAD_TOP = 14
-const PAD_BOTTOM = 14
 
 interface SvgPoint {
   x: number
@@ -204,20 +174,23 @@ const svgPoints = computed<SvgPoint[]>(() => {
   if (n === 0) return []
 
   const colWidth = SVG_WIDTH / n
-  const usableHeight = SVG_HEIGHT - PAD_TOP - PAD_BOTTOM
 
+  // Same scale as the bars and the 0-100% axis: zero sits on the baseline, max on the top line.
   return displaySeries.value.map((point, i) => {
     const x = (i + 0.5) * colWidth
     const ratio = max.value > 0 ? point.revenue / max.value : 0
     const clampedRatio = Math.max(0, Math.min(1, ratio))
-    const y = SVG_HEIGHT - PAD_BOTTOM - clampedRatio * usableHeight
+    const y = SVG_HEIGHT - clampedRatio * SVG_HEIGHT
     return { x, y, point, index: i }
   })
 })
 
+// The line stops at the current bucket; upcoming ones have no sales yet.
+const linePoints = computed(() => svgPoints.value.filter(p => !p.point.upcoming))
+
 // Catmull-Rom or smooth cubic spline for SVG line
 const linePath = computed(() => {
-  const pts = svgPoints.value
+  const pts = linePoints.value
   if (pts.length === 0) return ''
   if (pts.length === 1) return `M ${pts[0]!.x},${pts[0]!.y}`
 
@@ -233,7 +206,7 @@ const linePath = computed(() => {
 
 // Area closed path for gradient fill
 const areaPath = computed(() => {
-  const pts = svgPoints.value
+  const pts = linePoints.value
   if (pts.length === 0) return ''
   const first = pts[0]!
   const last = pts[pts.length - 1]!
@@ -267,8 +240,8 @@ async function handleDatePicked() {
       if (res?.success) {
         inspectedDateInfo.value = {
           date: target,
-          revenue: res.today_stats?.completed_amount ?? 0,
-          orders: res.today_stats?.completed_count ?? 0,
+          revenue: res.period_stats?.completed_amount ?? 0,
+          orders: res.period_stats?.completed_count ?? 0,
         }
       }
     } catch (err) {
@@ -291,7 +264,6 @@ async function handleRangeSelected(range: { from: string; to: string }) {
   pickedRange.value = range
   inspectedDateInfo.value = null
   pickedDate.value = ''
-  showTimeDropdown.value = false
 
   if (!props.branchUuid) return
 
@@ -400,23 +372,11 @@ function clearCustomRange() {
   active.value = null
 }
 
-async function onCalendarDateSelect(date: string) {
-  pickedDate.value = date
-  await handleDatePicked()
-  showTimeDropdown.value = false
-}
-
-function selectTimeframe(val: DashboardRange) {
+// Picking a period leaves any custom date range.
+function selectPeriod(val: DashboardRange) {
+  clearCustomRange()
+  clearInspectedDate()
   emit('update:range', val)
-  showTimeDropdown.value = false
-}
-
-function selectYear(yr: string) {
-  selectedYear.value = yr
-  if (props.range !== 'monthly') {
-    emit('update:range', 'monthly')
-  }
-  showTimeDropdown.value = false
 }
 </script>
 
@@ -459,8 +419,8 @@ function selectYear(yr: string) {
         </p>
       </div>
 
-      <!-- Right Header Controls: Graph Mode Toggles + Year/Period Dropdown -->
-      <div class="flex items-center gap-2.5">
+      <!-- Right header controls: line/bar switcher, date range, period -->
+      <div class="flex flex-wrap items-center gap-2.5">
         <!-- Line / Bar Switcher -->
         <div
           role="group"
@@ -511,121 +471,45 @@ function selectYear(yr: string) {
           @clear="clearCustomRange"
         >
           <template #trigger="{ open, toggle }">
+            <!-- White card style, same height as the period dropdown -->
             <button
               type="button"
-              class="inline-flex items-center gap-1.5 rounded-xl border border-[#E3CFB4] bg-[#FAF5EE] px-3 py-1.5 text-[13px] font-semibold text-[#3B1F0E] transition-all duration-150 hover:bg-[#F3E5D0] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
-              :class="{ 'border-[#7D5A50] bg-[#F3E5D0] ring-2 ring-[#7D5A50]/20': open || pickedRange }"
-              title="Pick a date range to inspect income (e.g. 2023 Jan to Mar)"
+              class="inline-flex h-9 items-center gap-2 rounded-xl border bg-white pl-3 text-xs font-semibold text-[#2D201B] shadow-2xs transition-colors hover:border-[#B4846C] hover:bg-[#FDFBF7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B1F0E]/15"
+              :class="[open || pickedRange ? 'border-[#3B1F0E]' : 'border-[#D8C7B5]', pickedRange ? 'pr-1.5' : 'pr-3']"
+              title="Pick dates to see their income"
+              :aria-expanded="open"
               @click="toggle"
             >
-              <Icon name="heroicons:calendar-days" class="h-4 w-4 text-[#7D5A50]" />
-              <span class="hidden sm:inline">{{ pickedRange ? formatSpan(pickedRange.from, pickedRange.to) : 'Date Range (e.g. 2023 Jan–Mar)' }}</span>
-              <span class="sm:hidden">{{ pickedRange ? 'Range' : 'Calendar' }}</span>
+              <Icon name="heroicons:calendar-date-range" class="h-4 w-4 text-[#7D5A50]" />
+              <span v-if="pickedRange" class="tabular-nums">{{ formatSpan(pickedRange.from, pickedRange.to) }}</span>
+              <span v-else class="text-[#8B6656]">Pick dates</span>
               <span
                 v-if="pickedRange"
-                class="ml-0.5 inline-flex items-center justify-center rounded-full size-4 text-[10px] text-[#7D5A50] hover:bg-[#EDD8CC] transition-colors"
-                title="Clear custom range"
+                role="button"
+                tabindex="0"
+                aria-label="Clear date range"
+                class="inline-flex size-6 items-center justify-center rounded-lg text-[#8B6656] transition-colors hover:bg-[#F6ECDD] hover:text-[#3B1F0E]"
                 @click.stop="clearCustomRange"
+                @keydown.enter.stop.prevent="clearCustomRange"
               >
-                ✕
+                <Icon name="heroicons:x-mark-20-solid" class="h-3.5 w-3.5" />
               </span>
             </button>
           </template>
         </EmilCalendar>
 
-        <!-- Year & Date Range Selector Dropdown -->
-        <div ref="dropdownRef" class="relative">
-          <button
-            type="button"
-            class="inline-flex items-center gap-1.5 rounded-xl border border-[#E3CFB4] bg-[#FAF5EE] px-3 py-1.5 text-[13px] font-semibold text-[#3B1F0E] transition-all duration-150 hover:bg-[#F3E5D0] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
-            :aria-expanded="showTimeDropdown"
-            @click="showTimeDropdown = !showTimeDropdown"
-          >
-            <!-- Clock/Calendar Icon -->
-            <svg class="h-4 w-4 text-[#8B6656]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>
-              {{ customRangeData ? formatSpan(customRangeData.from, customRangeData.to) : range === 'monthly' ? `${selectedYear} (1 Year)` : currentRange?.label }}
-            </span>
-            <svg class="h-3.5 w-3.5 text-[#8B6656] transition-transform duration-150" :class="{ 'rotate-180': showTimeDropdown }" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-            </svg>
-          </button>
-
-          <!-- Dropdown Menu -->
-          <div
-            v-if="showTimeDropdown"
-            class="dropdown-popover absolute right-0 top-full z-40 mt-1.5 w-64 rounded-2xl border border-[#E3CFB4] bg-white p-2.5 shadow-[0_12px_28px_rgba(59,31,14,0.12)]"
-          >
-            <!-- Section 1: Time Range -->
-            <div class="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-[#A88879]">
-              Time Period
-            </div>
-            <div class="space-y-0.5">
-              <button
-                v-for="r in ranges"
-                :key="r.value"
-                type="button"
-                class="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-colors"
-                :class="!customRangeData && range === r.value ? 'bg-[#F6ECDD] font-bold text-[#3B1F0E]' : 'text-[#6D4C42] hover:bg-[#FAF5EE]'"
-                @click="clearCustomRange(); selectTimeframe(r.value)"
-              >
-                <span>{{ r.label }} Overview</span>
-                <span v-if="!customRangeData && range === r.value" class="text-[#3B1F0E]">✓</span>
-              </button>
-            </div>
-
-            <!-- Section 2: Year Filter -->
-            <div class="mt-2.5 border-t border-[#F3E5D0] pt-2">
-              <div class="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-[#A88879]">
-                Select Year
-              </div>
-              <div class="grid grid-cols-3 gap-1 px-1">
-                <button
-                  v-for="yr in availableYears"
-                  :key="yr"
-                  type="button"
-                  class="rounded-lg py-1 text-center text-xs font-semibold transition-all"
-                  :class="!customRangeData && selectedYear === yr && range === 'monthly' ? 'bg-[#3B1F0E] text-white' : 'bg-[#FAF5EE] text-[#5A3828] hover:bg-[#F3E5D0]'"
-                  @click="clearCustomRange(); selectYear(yr)"
-                >
-                  {{ yr }}
-                </button>
-              </div>
-            </div>
-
-            <!-- Section 3: Inspect Date Range via EmilCalendar -->
-            <div class="mt-2.5 border-t border-[#F3E5D0] pt-2">
-              <div class="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-[#A88879]">
-                Inspect Date Range
-              </div>
-              <div class="mt-1 px-1">
-                <EmilCalendar
-                  mode="range"
-                  :range-value="pickedRange"
-                  align="right"
-                  @select-range="handleRangeSelected"
-                  @clear="clearCustomRange"
-                >
-                  <template #trigger="{ open, toggle }">
-                    <button
-                      type="button"
-                      class="flex w-full items-center justify-between gap-2 rounded-xl border border-[#E3CFB4] bg-[#FAF5EE] px-2.5 py-1.5 text-xs font-medium text-[#3B1F0E] transition-all hover:bg-[#F3E5D0] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
-                      :class="{ 'border-[#7D5A50] ring-2 ring-[#7D5A50]/20 bg-[#F3E5D0]': open || pickedRange }"
-                      @click="toggle"
-                    >
-                      <div class="flex items-center gap-2 min-w-0">
-                        <Icon name="heroicons:calendar-days" class="size-4 shrink-0 text-[#7D5A50]" />
-                        <span class="truncate">{{ pickedRange ? formatSpan(pickedRange.from, pickedRange.to) : 'Custom Range (e.g. 2023 Jan–Mar)' }}</span>
-                      </div>
-                      <Icon name="heroicons:chevron-down" class="size-3.5 shrink-0 text-[#8B6656] transition-transform duration-150" :class="{ 'rotate-180': open }" />
-                    </button>
-                  </template>
-                </EmilCalendar>
-              </div>
-            </div>
-          </div>
+        <!-- Period dropdown: the same as the owner's (the app's dropdown, white card style) -->
+        <div class="w-[136px]">
+          <DropdownList
+            :model-value="range"
+            :options="periodOptions"
+            size="xs"
+            card
+            align="right"
+            icon="heroicons:calendar-days"
+            aria-label="Chart period"
+            @update:model-value="v => selectPeriod(v)"
+          />
         </div>
       </div>
     </header>
@@ -889,7 +773,7 @@ function selectYear(yr: string) {
 
                 <!-- Area Fill -->
                 <path
-                  v-if="svgPoints.length > 1"
+                  v-if="linePoints.length > 1"
                   :d="areaPath"
                   fill="url(#incomeAreaGradient)"
                   class="transition-opacity duration-300"
@@ -897,7 +781,7 @@ function selectYear(yr: string) {
 
                 <!-- Stroke Line with animated draw -->
                 <path
-                  v-if="svgPoints.length > 1"
+                  v-if="linePoints.length > 1"
                   :d="linePath"
                   fill="none"
                   stroke="#3B1F0E"
@@ -920,10 +804,10 @@ function selectYear(yr: string) {
                 />
 
                 <!-- Data point markers -->
-                <g v-for="(pt, idx) in svgPoints" :key="idx">
+                <g v-for="pt in linePoints" :key="pt.index">
                   <!-- Inactive dot -->
                   <circle
-                    v-if="active !== idx"
+                    v-if="active !== pt.index"
                     :cx="pt.x"
                     :cy="pt.y"
                     r="3.5"
@@ -962,8 +846,9 @@ function selectYear(yr: string) {
                 <div
                   v-for="(point, i) in displaySeries"
                   :key="point.start"
-                  class="group relative flex h-full flex-col items-center justify-end cursor-pointer outline-none"
-                  @mouseenter="active = i"
+                  class="group relative flex h-full flex-col items-center justify-end outline-none"
+                  :class="point.upcoming ? '' : 'cursor-pointer'"
+                  @mouseenter="active = point.upcoming ? null : i"
                   @mouseleave="active = null"
                   @focus="active = i"
                   @blur="active = null"
@@ -1115,29 +1000,12 @@ function selectYear(yr: string) {
   transform: scale(0.985);
 }
 
-@keyframes popoverIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.dropdown-popover {
-  animation: popoverIn 160ms cubic-bezier(0.23, 1, 0.32, 1) both;
-  transform-origin: top right;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .manager-bar,
   .chart-line-path,
   .skeleton,
   .animate-summary-enter,
   .chart-tooltip,
-  .dropdown-popover,
   .chart-fade-enter-active,
   .chart-fade-leave-active {
     animation: none !important;

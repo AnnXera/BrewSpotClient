@@ -6,6 +6,8 @@ import DialogShell from '~/components/common/DialogShell.vue'
 import DropdownList from '~/components/common/DropdownList.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
 import CommonPagination from '~/components/common/Pagination.vue'
+import LiveClock from '~/components/common/LiveClock.vue'
+import MenuBreadcrumbs from '~/components/menu/MenuBreadcrumbs.vue'
 import ServingsItemCard from '~/components/servings/ItemCard.vue'
 import type {
   CategoryServingChange,
@@ -26,11 +28,16 @@ const PER_PAGE = 6
 
 const route = useRoute()
 const service = useServingService(workspace.scope)
-const { timeLabel, dateLabel } = useNowClock()
 
 const categoryUuid = computed(() => route.params.uuid as string)
 
 const categoryName = ref('')
+
+// Back to the list keeps the owner's selected branch.
+const breadcrumbs = computed(() => [
+  { label: 'Servings Management', to: workspace.isOwner && branchUuid.value ? `${basePath}/servings?branch=${branchUuid.value}` : `${basePath}/servings` },
+  { label: categoryName.value || 'Loading...' },
+])
 const items = ref<CategoryServingItem[]>([])
 const lowStockThresholdPercent = ref<number | null>(null)
 const page = ref(1)
@@ -289,24 +296,15 @@ onBeforeUnmount(() => {
   <div class="dashboard flex min-h-screen flex-col bg-[#FDF3E7] md:flex-row">
     <NavBar :links="links" />
 
-    <main class="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10 xl:px-12">
+    <!-- Extra bottom room so the floating clock never covers the last card -->
+    <main class="flex-1 overflow-x-hidden px-4 pt-6 pb-24 sm:px-6 md:px-10 md:pt-10 md:pb-24 xl:px-12">
       <div class="mx-auto max-w-[1360px] space-y-6">
         
         <!-- Header: Breadcrumbs, Category Title, Time -->
         <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between pb-2">
           <div class="min-w-0">
-            <!-- Breadcrumb Navigation -->
-            <nav aria-label="Breadcrumb" class="flex items-center gap-2 text-[13px] font-medium mb-1.5">
-              <NuxtLink
-                :to="`${basePath}/servings`"
-                class="inline-flex items-center gap-1.5 text-[#8B6656] hover:text-[#3B1F0E] transition-colors duration-160"
-              >
-                <Icon name="heroicons:arrow-left" class="w-3.5 h-3.5 text-[#B4846C]" />
-                <span>Servings Management</span>
-              </NuxtLink>
-              <span class="text-[#D9C3A5]">/</span>
-              <span class="text-[#3B1F0E] font-semibold truncate">{{ categoryName || 'Loading...' }}</span>
-            </nav>
+            <!-- Breadcrumbs, the same as Menu and Cafe Management's -->
+            <MenuBreadcrumbs :items="breadcrumbs" class="mb-1.5" />
 
             <!-- Title & Status Tag -->
             <div class="flex flex-wrap items-baseline gap-3">
@@ -334,17 +332,9 @@ onBeforeUnmount(() => {
             </p>
           </div>
 
-          <!-- Live Time Pill -->
-          <div class="inline-flex items-center gap-2 rounded-xl border border-[#E3CFB4] bg-white px-3.5 py-2 text-[13px] font-medium text-[#7D5A50] shadow-2xs shrink-0 self-start sm:self-auto">
-            <span class="relative flex h-2 w-2">
-              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-            </span>
-            <span class="tabular-nums font-mono">{{ timeLabel }}</span>
-            <span class="text-[#D9C3A5]">/</span>
-            <span>{{ dateLabel }}</span>
-          </div>
         </header>
+
+        <LiveClock floating />
 
         <!-- Error Notification -->
         <div

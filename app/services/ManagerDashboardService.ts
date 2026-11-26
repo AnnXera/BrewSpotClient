@@ -2,6 +2,7 @@
 import { BaseService } from './BaseService'
 import type { DashboardRange, DashboardSeriesPoint, DashboardTrendingItem, DashboardCategory } from './OwnerProfileService'
 import type { Paginated } from './OwnerManagementService'
+import type { AnalyticsFilters, OwnerTransactionDetail, TransactionLog, TransactionLogQuery } from './OwnerAnalyticsService'
 
 export interface ManagedBranchInfo {
     uuid: string
@@ -155,15 +156,18 @@ export interface ManagerTransactionDetail {
     items: ManagerTransactionDetailItem[]
 }
 
+export interface ManagerTransactionTotals {
+    total_count: number
+    completed_count: number
+    void_count: number
+    refunded_count: number
+    completed_amount: number
+}
+
 export interface ManagerTransactionsResponse {
     success: boolean
-    today_stats: {
-        total_count: number
-        completed_count: number
-        void_count: number
-        refunded_count: number
-        completed_amount: number
-    }
+    today_stats: ManagerTransactionTotals
+    period_stats: ManagerTransactionTotals // the requested from..to (default: today)
     transactions: Paginated<ManagerTransactionItem>
 }
 
@@ -188,5 +192,20 @@ export class ManagerDashboardService extends BaseService {
 
     getTransaction(branchUuid: string, transactionUuid: string) {
         return this.get<{ success: boolean; transaction: ManagerTransactionDetail }>(`/manager/branches/${branchUuid}/transactions/${transactionUuid}`)
+    }
+
+    // The owner dashboard's transaction log, for this branch only. Dates are Y-m-d, inclusive, to <= today.
+    getTransactionLog(branchUuid: string, filters: AnalyticsFilters, query: TransactionLogQuery = {}) {
+        const p: Record<string, string | number> = { from: filters.from, to: filters.to }
+        if (query.status) p.status = query.status
+        if (query.search?.trim()) p.search = query.search.trim()
+        if (query.page) p.page = query.page
+        if (query.per_page) p.per_page = query.per_page
+        return this.get<TransactionLog>(`/manager/branches/${branchUuid}/transaction-log`, p)
+    }
+
+    // A receipt with the refund approver and reason, as the transaction log opens it.
+    getTransactionLogReceipt(branchUuid: string, transactionUuid: string) {
+        return this.get<{ success: boolean; transaction: OwnerTransactionDetail }>(`/manager/branches/${branchUuid}/transaction-log/${transactionUuid}`)
     }
 }

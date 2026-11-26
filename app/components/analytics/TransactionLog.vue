@@ -5,8 +5,15 @@ import DropdownList from '~/components/common/DropdownList.vue'
 import Pagination from '~/components/common/Pagination.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
 import ManagerTransactionModal from '~/components/manager/ManagerTransactionModal.vue'
-import type { AnalyticsFilters, TransactionLog, TransactionLogRow, TransactionLogStatus } from '~/services/OwnerAnalyticsService'
+import type { AnalyticsFilters, OwnerTransactionDetail, TransactionLog, TransactionLogQuery, TransactionLogRow, TransactionLogStatus } from '~/services/OwnerAnalyticsService'
 import { formatCount, formatMethod, formatOrderType, formatPesoCents } from '~/utils/dashboardFormat'
+
+// Where the log and its receipts come from. Defaults to the owner's analytics API;
+// the manager dashboard passes its branch-scoped endpoints, which answer in the same shape.
+export interface TransactionLogSource {
+  list: (filters: AnalyticsFilters, query: TransactionLogQuery) => Promise<TransactionLog>
+  receipt: (uuid: string) => Promise<{ success: boolean; transaction: OwnerTransactionDetail }>
+}
 
 // Every sale in the Sales tab's period, refunds and voids included, newest first.
 // Pages, status and search are local to this panel; the period and branch come
@@ -16,11 +23,16 @@ const props = defineProps<{
   filters: AnalyticsFilters
   branches?: { value: string | null; label: string }[]
   note?: string
+  source?: TransactionLogSource
 }>()
 
 const PER_PAGE = 20
 
-const service = useOwnerAnalyticsService()
+const ownerService = useOwnerAnalyticsService()
+const service: TransactionLogSource = props.source ?? {
+  list: (filters, query) => ownerService.getTransactions(filters, query),
+  receipt: uuid => ownerService.getTransaction(uuid),
+}
 
 const branch = ref<string | null>(null)
 const effectiveFilters = computed<AnalyticsFilters>(() =>
@@ -50,7 +62,7 @@ async function load() {
   if (data.value) refreshing.value = true
   failed.value = false
   try {
-    const res = await service.getTransactions(effectiveFilters.value, {
+    const res = await service.list(effectiveFilters.value, {
       status: status.value,
       search: query.value,
       page: page.value,
@@ -137,7 +149,9 @@ function changeNote(t: TransactionLogRow) {
 
 // ── Receipt modal ──
 const openUuid = ref<string | null>(null)
-const loadReceipt = (uuid: string) => service.getTransaction(uuid)
+const loadReceipt = (uuid: string) => service.receipt(uuid)
+
+defineExpose({ refresh: load })
 </script>
 
 <template>
