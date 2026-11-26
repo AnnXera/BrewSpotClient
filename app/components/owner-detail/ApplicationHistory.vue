@@ -2,7 +2,7 @@
 <script lang="ts">
 export interface ApplicationHistoryEntry {
   uuid: string
-  kind: 'application' | 'resubmission' | 'branch' | 'branch_resubmission' | 'name_change'
+  kind: 'application' | 'resubmission' | 'branch' | 'branch_resubmission' | 'name_change' | 'address_change'
   status: 'pending_approval' | 'approved' | 'rejected' | 'withdrawn'
   branch_name: string | null
   reason: string | null
@@ -22,6 +22,7 @@ const KIND: Record<ApplicationHistoryEntry['kind'], { label: string; icon: strin
   branch: { label: 'Branch submission', icon: 'heroicons:building-storefront' },
   branch_resubmission: { label: 'Branch resubmission', icon: 'heroicons:arrow-path-rounded-square' },
   name_change: { label: 'Cafe name change', icon: 'heroicons:pencil-square' }, // branch_name holds "old → new"
+  address_change: { label: 'Branch address change', icon: 'heroicons:map-pin' }, // branch_name holds "branch → new address"
 }
 
 const DOT: Record<ApplicationHistoryEntry['status'], string> = {

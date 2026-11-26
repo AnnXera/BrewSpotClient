@@ -21,7 +21,7 @@ const ownerService = useOwnerManagementService()
 const cafeUpdateService = useCafeUpdateService()
 const route = useRoute()
 
-// 'cafe_update': owner requests to change registered cafe details (today, the cafe name)
+// 'cafe_update': owner requests to change registered cafe details (the cafe name, or a branch address)
 type RegistrationTab = 'owner' | 'branch' | 'cafe_update'
 // 'pending' and 'resubmitted' split what awaits review (the API's 'pending_approval')
 type StatusTab = 'general' | 'pending' | 'resubmitted' | 'approved' | 'rejected'
@@ -608,9 +608,18 @@ watch(() => route.query.uuid, async (uuid) => {
                   @click="openCafeUpdate(req.uuid, req)"
                 >
                   <td class="px-6 py-4 max-w-[320px]">
-                    <p class="font-sans text-[11px] font-semibold uppercase tracking-wide text-[#9E7060]">Name change</p>
-                    <p class="font-sans text-sm text-[#8B6656] truncate">{{ req.old_name }}</p>
-                    <p class="font-display text-[15px] font-bold text-[#3D2B24] truncate">→ {{ req.new_name }}</p>
+                    <template v-if="req.type === 'address_change'">
+                      <p class="font-sans text-[11px] font-semibold uppercase tracking-wide text-[#9E7060] truncate">
+                        Address change · {{ req.branch?.branch_name || 'Deleted branch' }}
+                      </p>
+                      <p class="font-sans text-sm text-[#8B6656] truncate" :title="req.old_address || undefined">{{ req.old_address }}</p>
+                      <p class="font-display text-[15px] font-bold text-[#3D2B24] truncate" :title="req.new_address || undefined">→ {{ req.new_address }}</p>
+                    </template>
+                    <template v-else>
+                      <p class="font-sans text-[11px] font-semibold uppercase tracking-wide text-[#9E7060]">Name change</p>
+                      <p class="font-sans text-sm text-[#8B6656] truncate">{{ req.old_name }}</p>
+                      <p class="font-display text-[15px] font-bold text-[#3D2B24] truncate">→ {{ req.new_name }}</p>
+                    </template>
                   </td>
                   <td class="px-6 py-4">
                     <p class="font-sans text-sm font-semibold text-[#3D2B24]">{{ req.owner?.name || '—' }}</p>
@@ -748,10 +757,15 @@ watch(() => route.query.uuid, async (uuid) => {
             />
             <span class="font-sans text-sm text-[#3B1F0E]">
               {{ decisionKind === 'cafe_update'
-                ? 'Let the owner request this name again'
+                ? `Let the owner request this ${cafeUpdate?.type === 'address_change' ? 'address' : 'name'} again`
                 : decisionKind === 'branch' ? 'Let the owner edit and resubmit this branch' : 'Let the applicant edit and resubmit' }}
               <span class="block text-xs text-[#3B1F0E]/60 mt-0.5">
-                <template v-if="decisionKind === 'cafe_update'">
+                <template v-if="decisionKind === 'cafe_update' && cafeUpdate?.type === 'address_change'">
+                  {{ allowResubmit
+                    ? 'They can fix the COR and send the same address back for review.'
+                    : 'This address is final. They can still request a different one.' }}
+                </template>
+                <template v-else-if="decisionKind === 'cafe_update'">
                   {{ allowResubmit
                     ? 'They can fix the CORs and send the same name back for review.'
                     : 'This name is final. They can still request a different name.' }}

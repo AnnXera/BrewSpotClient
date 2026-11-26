@@ -37,7 +37,7 @@ const today = new Date().toISOString().slice(0, 10)
 watch(() => props.show, (open) => {
   if (!open) return
   step.value = 1
-  newName.value = props.previous?.status === 'rejected' && props.previous.can_resubmit ? props.previous.new_name : ''
+  newName.value = props.previous?.status === 'rejected' && props.previous.can_resubmit ? (props.previous.new_name ?? '') : ''
   files.value = Object.fromEntries(props.branches.map(b => [b.uuid, null]))
   dates.value = Object.fromEntries(props.branches.map(b => [b.uuid, '']))
   errors.value = {}
