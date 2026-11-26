@@ -1,6 +1,7 @@
 // app/services/CafeUpdateService.ts
-// Cafe name changes: owners request them (Cafe Management), admins review them
-// (Approval Status > Cafe Updates). See server CafeUpdateService for the rules.
+// Cafe name and branch address changes: owners request them (Cafe Management and the
+// branch page), admins review them (Approval Status > Cafe Updates). See server
+// CafeUpdateService for the rules.
 import { BaseService } from './BaseService'
 import type { Paginated } from './OwnerManagementService'
 
@@ -25,12 +26,20 @@ export interface CafeUpdateDocument {
     } | null
 }
 
+export type CafeUpdateType = 'name_change' | 'address_change'
+
 export interface CafeUpdateRequest {
     uuid: string
-    type: 'name_change'
+    type: CafeUpdateType
     status: CafeUpdateStatus
-    old_name: string
-    new_name: string
+    cafe_name: string | null
+    // name_change only
+    old_name: string | null
+    new_name: string | null
+    // address_change only
+    old_address: string | null
+    new_address: string | null
+    branch: { uuid: string; branch_name: string; branch_type: 'main' | 'side'; status: string } | null
     reason: string | null
     can_resubmit: boolean
     submitted_at: string | null
@@ -47,6 +56,15 @@ export interface NameChangeBranch {
     branch_type: 'main' | 'side'
     status: string
     current_registered_at: string | null
+}
+
+export interface AddressChangeOverview {
+    success: boolean
+    address: string | null
+    current_registered_at: string | null
+    request: CafeUpdateRequest | null
+    // Why a new request can't be sent right now, or null when it can
+    blocked: string | null
 }
 
 export interface CafeUpdateStats {
@@ -85,6 +103,24 @@ export class CafeUpdateService extends BaseService {
         return this.delete<{ success: boolean; message: string }>(`/owner/cafe-name-change/${uuid}`)
     }
 
+    // ── Owner: branch address change ──
+
+    addressOverview(branchUuid: string) {
+        return this.get<AddressChangeOverview>(`/owner/branches/${branchUuid}/address-change`)
+    }
+
+    submitAddressChange(branchUuid: string, newAddress: string, file: File, registeredAt: string) {
+        const form = new FormData()
+        form.append('new_address', newAddress)
+        form.append('file', file)
+        form.append('registered_at', registeredAt)
+        return this.post<{ success: boolean; message: string; request: CafeUpdateRequest }>(`/owner/branches/${branchUuid}/address-change`, form)
+    }
+
+    withdrawAddressChange(branchUuid: string, uuid: string) {
+        return this.delete<{ success: boolean; message: string }>(`/owner/branches/${branchUuid}/address-change/${uuid}`)
+    }
+
     // ── Admin ──
 
     list(params: { status?: string; search?: string; page?: number; per_page?: number } = {}) {
@@ -99,7 +135,7 @@ export class CafeUpdateService extends BaseService {
         return this.get<{ success: boolean; request: CafeUpdateRequest }>(`/admin/cafe-updates/${uuid}`)
     }
 
-    /** allowResubmit applies to rejections: false stops the owner asking for this same name again */
+    /** allowResubmit applies to rejections: false stops the owner asking for this same name (or address) again */
     review(uuid: string, status: 'approved' | 'rejected', reason?: string, allowResubmit = true) {
         return this.patch<{ success: boolean; message: string; request: CafeUpdateRequest }>(`/admin/cafe-updates/${uuid}/status`, {
             status,

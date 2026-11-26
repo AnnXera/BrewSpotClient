@@ -1,44 +1,61 @@
 <!-- components/StatusBadge.vue -->
 <template>
   <span
-    class="inline-flex items-center gap-1.5 rounded-full px-2 min-[360px]:px-2.5 py-0.5 min-[360px]:py-1 font-display font-semibold text-xs min-[360px]:text-[13px] sm:text-[14px] shrink-0"
+    class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-sans font-semibold text-xs shrink-0 border shadow-2xs"
     :class="classes"
   >
+    <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="dotClass" />
     {{ label }}
   </span>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+
 interface Props {
-  status: string
+  status?: string | null
 }
 
 const props = defineProps<Props>()
 
+const normalizedStatus = computed(() => (props.status ?? '').trim())
+
 const label = computed(() =>
-  props.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  normalizedStatus.value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || '—'
+)
+
+const isApproved = computed(() =>
+  ['active', 'approved', 'succeeded', 'success'].includes(normalizedStatus.value.toLowerCase())
+)
+
+const isPending = computed(() =>
+  ['pending_approval', 'pending'].includes(normalizedStatus.value.toLowerCase())
+)
+
+const isResubmitted = computed(() =>
+  ['resubmitted'].includes(normalizedStatus.value.toLowerCase())
 )
 
 const classes = computed(() => {
-  switch (props.status) {
-    case 'active':
-    case 'approved':
-    case 'succeeded':
-    case 'success':
-      return 'bg-[#D4EDDA] text-[#28A745]'
-    case 'suspended':
-    case 'terminated':
-    case 'rejected':
-    case 'cancelled':
-    case 'failed':
-      return 'bg-[#FDE8E8] text-[#DC3545]'
-    case 'pending_approval':
-    case 'pending':
-      return 'bg-[#F0E8E5] text-[#B4846C]'
-    case 'resubmitted': // owner corrected a rejected application; still awaiting review
-      return 'bg-[#E3EEFB] text-[#2F6DB5]'
-    default: // inactive, expired, and anything else
-      return 'bg-[#F0E3CE] text-[#8B6656]'
+  if (isApproved.value) {
+    return 'bg-[#FAF4ED] text-[#7D5A50] border-[#EEDFC4]'
   }
+  if (isPending.value) {
+    return 'bg-[#FAF4ED] text-[#7D5A50] border-[#EEDFC4]'
+  }
+  if (isResubmitted.value) {
+    return 'bg-[#F7EFE6] text-[#8B6656] border-[#E8D9CB]'
+  }
+  return 'bg-[#F7EFE6] text-[#8B6656] border-[#E8D9CB]'
+})
+
+const dotClass = computed(() => {
+  if (isApproved.value) {
+    return 'bg-[#B4846C] animate-pulse'
+  }
+  if (isPending.value) {
+    return 'bg-[#B4846C]'
+  }
+  return 'bg-[#8B6656]'
 })
 </script>

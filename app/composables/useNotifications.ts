@@ -29,6 +29,8 @@ const KIND_STYLE: Record<NotificationKind, { icon: string; tone: NotificationTon
     branch_rejected: { icon: 'building-storefront', tone: 'bad' },
     cafe_name_approved: { icon: 'pencil-square', tone: 'good' },
     cafe_name_rejected: { icon: 'pencil-square', tone: 'bad' },
+    branch_address_approved: { icon: 'map-pin', tone: 'good' },
+    branch_address_rejected: { icon: 'map-pin', tone: 'bad' },
 
     payment_received: { icon: 'banknotes', tone: 'good' },
     payment_failed: { icon: 'exclamation-triangle', tone: 'bad' },

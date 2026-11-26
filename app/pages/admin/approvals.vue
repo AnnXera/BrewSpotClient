@@ -1,6 +1,7 @@
 <!--app/pages/admin/approvals.vue-->
 <script setup lang="ts">
 import SearchInput from '~/components/common/SearchInput.vue'
+import Pagination from '~/components/common/Pagination.vue'
 import type { ApprovalListItem, ApprovalStats, Paginated } from '~/services/OwnerManagementService'
 import type { CafeUpdateRequest } from '~/services/CafeUpdateService'
 
@@ -20,7 +21,7 @@ const ownerService = useOwnerManagementService()
 const cafeUpdateService = useCafeUpdateService()
 const route = useRoute()
 
-// 'cafe_update': owner requests to change registered cafe details (today, the cafe name)
+// 'cafe_update': owner requests to change registered cafe details (the cafe name, or a branch address)
 type RegistrationTab = 'owner' | 'branch' | 'cafe_update'
 // 'pending' and 'resubmitted' split what awaits review (the API's 'pending_approval')
 type StatusTab = 'general' | 'pending' | 'resubmitted' | 'approved' | 'rejected'
@@ -34,6 +35,11 @@ const stats = computed(() => statsByType.value[registrationTab.value])
 const approvals = ref<ApprovalListItem[]>([])
 const cafeUpdates = ref<CafeUpdateRequest[]>([])
 const loading = ref(false)
+const refreshing = ref(false)
+const loaded = ref(false)
+
+useScrollReveal(loaded)
+
 const isCafeUpdateTab = computed(() => registrationTab.value === 'cafe_update')
 const rowCount = computed(() => (isCafeUpdateTab.value ? cafeUpdates.value.length : approvals.value.length))
 
@@ -84,17 +90,18 @@ async function fetchCafeUpdates(silent = false) {
     cafeUpdates.value = []
   } finally {
     loading.value = false
+    loaded.value = true
   }
 }
 
 async function fetchApprovals(silent = false) {
-  if (isCafeUpdateTab.value) return fetchCafeUpdates(silent)
+  if (registrationTab.value === 'cafe_update') return fetchCafeUpdates(silent)
   if (!silent) loading.value = true
   try {
     const res = await ownerService.approvals({
       per_page: perPage,
       page: currentPage.value,
-      type: registrationTab.value,
+      type: registrationTab.value as 'owner' | 'branch',
       status: statusTab.value === 'general' ? undefined : statusTab.value,
       search: search.value || undefined,
     })
@@ -109,11 +116,14 @@ async function fetchApprovals(silent = false) {
     approvals.value = []
   } finally {
     loading.value = false
+    loaded.value = true
   }
 }
 
 async function refreshData() {
+  refreshing.value = true
   await Promise.all([fetchStats(), fetchApprovals()])
+  refreshing.value = false
 }
 
 function switchRegistrationTab(tab: RegistrationTab) {
@@ -365,92 +375,103 @@ watch(() => route.query.uuid, async (uuid) => {
   <div class="flex flex-col md:flex-row min-h-screen bg-[#FDF3E7]">
     <NavBar :links="links" />
 
-    <main class="flex-1 p-12">
+    <main class="flex-1 min-w-0 overflow-x-hidden p-3.5 min-[360px]:p-4 sm:p-6 md:p-10 max-w-[1400px]">
       <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 md:mb-8">
         <div>
-          <h1 class="font-display text-[26px] leading-[39px] font-bold text-[#3D2B24]">Approval Status</h1>
-          <p class="font-sans text-[14px] leading-[21px] text-[#9E7060] mt-[2px]">
+          <h1 class="font-display text-2xl font-black text-[#3D2B24] tracking-tight min-[360px]:text-3xl sm:text-[32px] sm:leading-tight">
+            Approval Status
+          </h1>
+          <p class="font-sans text-xs sm:text-sm text-[#9E7060] mt-1">
             Review and manage owner applications by approval status.
           </p>
         </div>
 
         <button
           type="button"
-          class="inline-flex items-center gap-2 px-[16px] py-[8px] rounded-[8px] bg-white border border-[#EDD8CC] text-[#7D5A50] font-display font-medium text-[14px] hover:bg-[#FBF2E1] transition-colors shadow-sm self-start sm:self-auto cursor-pointer"
-          :disabled="loading"
+          class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-semibold text-sm hover:bg-[#FDF3E7] hover:border-[#D9C4B8] hover:text-[#3D2B24] active:scale-95 transition-[transform,background-color,border-color] duration-160 ease-out shadow-xs self-start sm:self-auto cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
+          :disabled="loading || refreshing"
           @click="refreshData"
         >
-          <Icon name="heroicons:arrow-path" class="w-4 h-4" :class="{ 'animate-spin': loading }" />
+          <Icon name="heroicons:arrow-path" class="w-4 h-4 text-[#7D5A50]" :class="{ 'animate-spin': loading || refreshing }" />
           <span>Refresh</span>
         </button>
       </div>
 
-      <!-- Owner Registration / Branch Registration -->
-      <div class="relative flex items-center mb-6 border-b border-[#EEDFC4]">
+      <!-- Registration Category Tabs -->
+      <div class="scroll-reveal overflow-x-auto scrollbar-none flex items-center gap-1 sm:gap-2 mb-6 border-b border-[#EEDFC4]">
         <button
           type="button"
-          class="flex items-center gap-2 px-5 py-[10px] font-display text-[16px] transition-colors relative z-10"
-          :class="registrationTab === 'owner' ? 'text-[#3B1F0E] font-bold' : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
+          class="flex items-center gap-2 px-4 py-2.5 font-display text-sm sm:text-base transition-colors relative z-10 active:scale-[0.98] duration-140 cursor-pointer shrink-0"
+          :class="registrationTab === 'owner' ? 'text-[#3D2B24] font-bold' : 'text-[#9E7060] font-medium hover:text-[#3D2B24]'"
           @click="switchRegistrationTab('owner')"
         >
-          Owner Registration
+          <span>Owner Registration</span>
           <span
             v-if="statsByType.owner?.pending_approval"
             class="rounded-full px-2 py-0.5 text-[11px] font-bold font-sans"
-            :class="registrationTab === 'owner' ? 'bg-[#7D5A50] text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+            :class="registrationTab === 'owner' ? 'bg-[#7D5A50] text-[#FDF3E7]' : 'bg-[#FAF4ED] text-[#7D5A50] border border-[#EEDFC4]'"
             :title="`${statsByType.owner.pending_approval} pending`"
           >{{ statsByType.owner.pending_approval }}</span>
-          <span v-if="registrationTab === 'owner'" class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full" />
+          <span v-if="registrationTab === 'owner'" class="absolute left-0 right-0 -bottom-px h-[2.5px] bg-[#3D2B24] rounded-full" />
         </button>
 
         <button
           type="button"
-          class="flex items-center gap-2 px-5 py-[10px] font-display text-[16px] transition-colors relative z-10"
-          :class="registrationTab === 'branch' ? 'text-[#3B1F0E] font-bold' : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
+          class="flex items-center gap-2 px-4 py-2.5 font-display text-sm sm:text-base transition-colors relative z-10 active:scale-[0.98] duration-140 cursor-pointer shrink-0"
+          :class="registrationTab === 'branch' ? 'text-[#3D2B24] font-bold' : 'text-[#9E7060] font-medium hover:text-[#3D2B24]'"
           @click="switchRegistrationTab('branch')"
         >
-          Branch Registration
+          <span>Branch Registration</span>
           <span
             v-if="statsByType.branch?.pending_approval"
             class="rounded-full px-2 py-0.5 text-[11px] font-bold font-sans"
-            :class="registrationTab === 'branch' ? 'bg-[#7D5A50] text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+            :class="registrationTab === 'branch' ? 'bg-[#7D5A50] text-[#FDF3E7]' : 'bg-[#FAF4ED] text-[#7D5A50] border border-[#EEDFC4]'"
             :title="`${statsByType.branch.pending_approval} pending`"
           >{{ statsByType.branch.pending_approval }}</span>
-          <span v-if="registrationTab === 'branch'" class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full" />
+          <span v-if="registrationTab === 'branch'" class="absolute left-0 right-0 -bottom-px h-[2.5px] bg-[#3D2B24] rounded-full" />
         </button>
 
         <button
           type="button"
-          class="flex items-center gap-2 px-5 py-[10px] font-display text-[16px] transition-colors relative z-10"
-          :class="registrationTab === 'cafe_update' ? 'text-[#3B1F0E] font-bold' : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
+          class="flex items-center gap-2 px-4 py-2.5 font-display text-sm sm:text-base transition-colors relative z-10 active:scale-[0.98] duration-140 cursor-pointer shrink-0"
+          :class="registrationTab === 'cafe_update' ? 'text-[#3D2B24] font-bold' : 'text-[#9E7060] font-medium hover:text-[#3D2B24]'"
           @click="switchRegistrationTab('cafe_update')"
         >
-          Cafe Updates
+          <span>Cafe Updates</span>
           <span
             v-if="statsByType.cafe_update?.pending_approval"
             class="rounded-full px-2 py-0.5 text-[11px] font-bold font-sans"
-            :class="registrationTab === 'cafe_update' ? 'bg-[#7D5A50] text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+            :class="registrationTab === 'cafe_update' ? 'bg-[#7D5A50] text-[#FDF3E7]' : 'bg-[#FAF4ED] text-[#7D5A50] border border-[#EEDFC4]'"
             :title="`${statsByType.cafe_update.pending_approval} pending`"
           >{{ statsByType.cafe_update.pending_approval }}</span>
-          <span v-if="registrationTab === 'cafe_update'" class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full" />
+          <span v-if="registrationTab === 'cafe_update'" class="absolute left-0 right-0 -bottom-px h-[2.5px] bg-[#3D2B24] rounded-full" />
         </button>
       </div>
 
       <!-- Combined Search/Tabs + Table Card -->
-      <div :class="['bg-white border border-[#EEDFC4] overflow-hidden', rowCount > 0 ? 'rounded-t-2xl border-b-0' : 'rounded-2xl']">
-
+      <div
+        class="scroll-reveal bg-white border border-[#EEDFC4] rounded-[20px] shadow-sm overflow-hidden transition-[box-shadow,border-color,opacity] duration-200 ease-out"
+        :class="{ 'opacity-60': refreshing }"
+      >
         <!-- Search + Status Tabs Bar -->
-        <div class="flex items-center gap-[24px] px-[20px] py-[18px] border-b border-[#F3E7D2]">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 p-3.5 sm:p-5 border-b border-[#F3E7D2] bg-[#FCF8F3]/40">
           <!-- Search -->
-          <SearchInput v-model="search" :placeholder="isCafeUpdateTab ? 'Search cafe or owner' : 'Search owner'" class="flex-1 min-w-[220px]" />
+          <div class="flex-1 min-w-0 w-full lg:max-w-xs">
+            <SearchInput
+              v-model="search"
+              :placeholder="isCafeUpdateTab ? 'Search cafe or owner' : 'Search owner'"
+              clearable
+              class="w-full"
+            />
+          </div>
 
-          <!-- General / Pending / Approved / Rejected -->
-          <div class="inline-flex items-center bg-white border border-[#EDD8CC] rounded-xl gap-1 p-[8px] font-display font-medium text-[16px]">
+          <!-- General / Pending / Resubmitted / Approved / Rejected -->
+          <div class="flex flex-wrap items-center gap-1 sm:gap-1.5 p-1 bg-[#FAF4ED] border border-[#EDD8CC] rounded-xl font-sans text-xs sm:text-sm font-medium">
             <button
               type="button"
-              class="px-[20px] py-[8px] rounded-[8px] transition-colors"
-              :class="statusTab === 'general' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
+              class="px-3 py-1.5 rounded-lg active:scale-95 transition-[transform,background-color,color] duration-140 ease-out cursor-pointer"
+              :class="statusTab === 'general' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold shadow-xs' : 'text-[#7D5A50] hover:bg-white hover:text-[#3D2B24]'"
               @click="switchStatusTab('general')"
             >
               General
@@ -458,61 +479,63 @@ watch(() => route.query.uuid, async (uuid) => {
 
             <button
               type="button"
-              class="flex items-center gap-2 px-[20px] py-[8px] rounded-[8px] transition-colors"
-              :class="statusTab === 'pending' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg active:scale-95 transition-[transform,background-color,color] duration-140 ease-out cursor-pointer"
+              :class="statusTab === 'pending' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold shadow-xs' : 'text-[#7D5A50] hover:bg-white hover:text-[#3D2B24]'"
               @click="switchStatusTab('pending')"
             >
-              Pending
+              <span>Pending</span>
               <span
-                class="rounded-full px-2 py-0.5 text-[11px] font-bold"
-                :class="statusTab === 'pending' ? 'bg-[#FDF3E7]/20 text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+                class="rounded-full px-1.5 py-0.2 text-[10px] font-bold"
+                :class="statusTab === 'pending' ? 'bg-white/20 text-[#FDF3E7]' : 'bg-white text-[#7D5A50] border border-[#EDD8CC]'"
               >{{ stats?.pending ?? stats?.pending_approval ?? 0 }}</span>
             </button>
 
-            <!-- Owners correcting a rejected application or name change (side branches are never resubmitted) -->
+            <!-- Owners correcting a rejected application or name change -->
             <button
               v-if="registrationTab === 'owner' || registrationTab === 'cafe_update'"
               type="button"
-              class="flex items-center gap-2 px-[20px] py-[8px] rounded-[8px] transition-colors"
-              :class="statusTab === 'resubmitted' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg active:scale-95 transition-[transform,background-color,color] duration-140 ease-out cursor-pointer"
+              :class="statusTab === 'resubmitted' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold shadow-xs' : 'text-[#7D5A50] hover:bg-white hover:text-[#3D2B24]'"
               @click="switchStatusTab('resubmitted')"
             >
-              Resubmitted
+              <span>Resubmitted</span>
               <span
-                class="rounded-full px-2 py-0.5 text-[11px] font-bold"
-                :class="statusTab === 'resubmitted' ? 'bg-[#FDF3E7]/20 text-[#FDF3E7]' : 'bg-[#E3EEFB] text-[#2F6DB5]'"
+                class="rounded-full px-1.5 py-0.2 text-[10px] font-bold"
+                :class="statusTab === 'resubmitted' ? 'bg-white/20 text-[#FDF3E7]' : 'bg-white text-[#7D5A50] border border-[#EDD8CC]'"
               >{{ stats?.resubmitted ?? 0 }}</span>
             </button>
 
             <button
               type="button"
-              class="flex items-center gap-2 px-[20px] py-[8px] rounded-[8px] transition-colors"
-              :class="statusTab === 'approved' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg active:scale-95 transition-[transform,background-color,color] duration-140 ease-out cursor-pointer"
+              :class="statusTab === 'approved' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold shadow-xs' : 'text-[#7D5A50] hover:bg-white hover:text-[#3D2B24]'"
               @click="switchStatusTab('approved')"
             >
-              Approved
+              <span>Approved</span>
               <span
-                class="rounded-full px-2 py-0.5 text-[11px] font-bold"
-                :class="statusTab === 'approved' ? 'bg-[#FDF3E7]/20 text-[#FDF3E7]' : 'bg-[#D4EDDA] text-[#28A745]'"
+                class="rounded-full px-1.5 py-0.2 text-[10px] font-bold"
+                :class="statusTab === 'approved' ? 'bg-white/20 text-[#FDF3E7]' : 'bg-white text-[#7D5A50] border border-[#EDD8CC]'"
               >{{ stats?.approved ?? 0 }}</span>
             </button>
 
             <button
               type="button"
-              class="flex items-center gap-2 px-[20px] py-[8px] rounded-[8px] transition-colors"
-              :class="statusTab === 'rejected' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold' : 'text-[#7D5A50] hover:bg-[#FBF2E1]'"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg active:scale-95 transition-[transform,background-color,color] duration-140 ease-out cursor-pointer"
+              :class="statusTab === 'rejected' ? 'bg-[#7D5A50] text-[#FDF3E7] font-semibold shadow-xs' : 'text-[#7D5A50] hover:bg-white hover:text-[#3D2B24]'"
               @click="switchStatusTab('rejected')"
             >
-              Rejected
+              <span>Rejected</span>
               <span
-                class="rounded-full px-2 py-0.5 text-[11px] font-bold"
-                :class="statusTab === 'rejected' ? 'bg-[#FDF3E7]/20 text-[#FDF3E7]' : 'bg-[#FDE8E8] text-[#DC3545]'"
+                class="rounded-full px-1.5 py-0.2 text-[10px] font-bold"
+                :class="statusTab === 'rejected' ? 'bg-white/20 text-[#FDF3E7]' : 'bg-white text-[#7D5A50] border border-[#EDD8CC]'"
               >{{ stats?.rejected ?? 0 }}</span>
             </button>
           </div>
 
           <!-- Record count -->
-          <span class="ml-auto font-sans text-sm text-[#9E7060] whitespace-nowrap">{{ total }} record{{ total === 1 ? '' : 's' }}</span>
+          <span class="hidden xl:inline-block font-sans text-xs font-medium text-[#9E7060] whitespace-nowrap">
+            Showing <strong class="text-[#3D2B24] font-bold">{{ total }}</strong> {{ total === 1 ? 'record' : 'records' }}
+          </span>
         </div>
 
         <!-- Table -->
@@ -520,52 +543,60 @@ watch(() => route.query.uuid, async (uuid) => {
           <table class="w-full text-left">
             <!-- Owner Registration columns -->
             <thead v-if="registrationTab === 'owner'">
-              <tr class="bg-[#FBF2E1] border-b border-[#F3E7D2]">
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Owner</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Cafe</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Contacts</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Status</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Submitted At</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Actions</th>
+              <tr class="bg-[#FAF4ED] border-b border-[#EEDFC4]">
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Owner</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Cafe</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Contacts</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Status</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Submitted At</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Actions</th>
               </tr>
             </thead>
 
             <!-- Cafe Updates columns -->
             <thead v-else-if="isCafeUpdateTab">
-              <tr class="bg-[#FBF2E1] border-b border-[#F3E7D2]">
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Change</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Owner</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">CORs</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Status</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Submitted At</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Actions</th>
+              <tr class="bg-[#FAF4ED] border-b border-[#EEDFC4]">
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Change</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Owner</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">CORs</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Status</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Submitted At</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Actions</th>
               </tr>
             </thead>
 
             <!-- Branch Registration columns -->
             <thead v-else>
-              <tr class="bg-[#FBF2E1] border-b border-[#F3E7D2]">
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Cafe</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Owner</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Address</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Status</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Submitted At</th>
-                <th class="font-sans text-xs font-semibold tracking-wide text-[#3B1F0E]/50 uppercase px-6 py-3">Actions</th>
+              <tr class="bg-[#FAF4ED] border-b border-[#EEDFC4]">
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Cafe</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Owner</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Address</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Status</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Submitted At</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Actions</th>
               </tr>
             </thead>
 
             <tbody>
               <tr v-if="loading">
-                <td colspan="6" class="px-6 py-10 text-center">
-                  <div class="flex flex-col items-center justify-center gap-2 text-[#3B1F0E]/50">
-                    <Icon name="heroicons:arrow-path" class="w-5 h-5 animate-spin text-[#B4846C]" />
-                    <span class="font-sans text-sm">Loading applications…</span>
+                <td colspan="6" class="px-6 py-16 text-center">
+                  <div class="flex flex-col items-center justify-center gap-3">
+                    <div class="w-8 h-8 rounded-full border-2 border-[#EEDFC4] border-t-[#B4846C] animate-spin" />
+                    <span class="font-sans text-xs font-semibold text-[#9E7060]">Loading applications…</span>
                   </div>
                 </td>
               </tr>
               <tr v-else-if="!rowCount">
-                <td colspan="6" class="px-6 py-10 text-center font-sans text-sm text-[#3B1F0E]/50">
-                  {{ isCafeUpdateTab ? 'No cafe updates found.' : 'No applications found.' }}
+                <td colspan="6" class="px-6 py-16 text-center">
+                  <div class="max-w-xs mx-auto flex flex-col items-center justify-center text-center">
+                    <div class="w-12 h-12 rounded-2xl bg-[#F7EFE6] border border-[#E8D9CB] flex items-center justify-center text-[#7D5A50] mb-3 shadow-xs">
+                      <Icon name="heroicons:inbox" class="w-6 h-6" />
+                    </div>
+                    <h3 class="font-display font-bold text-base text-[#3D2B24]">No applications found</h3>
+                    <p class="font-sans text-xs text-[#9E7060] mt-1 leading-relaxed">
+                      {{ isCafeUpdateTab ? 'No cafe updates found for this filter.' : 'No applications found for this filter.' }}
+                    </p>
+                  </div>
                 </td>
               </tr>
 
@@ -573,32 +604,42 @@ watch(() => route.query.uuid, async (uuid) => {
                 <tr
                   v-for="req in cafeUpdates"
                   :key="req.uuid"
-                  class="border-b border-[#F3E7D2] last:border-b-0 hover:bg-[#FFFDF9] transition-colors cursor-pointer"
+                  class="border-b border-[#F3E7D2] last:border-b-0 hover:bg-[#FAF4ED]/60 transition-colors duration-150 ease-out cursor-pointer group font-sans"
                   @click="openCafeUpdate(req.uuid, req)"
                 >
                   <td class="px-6 py-4 max-w-[320px]">
-                    <p class="font-sans text-[11px] font-semibold uppercase tracking-wide text-[#9E7060]">Name change</p>
-                    <p class="font-sans text-sm text-[#8B6656] truncate">{{ req.old_name }}</p>
-                    <p class="font-display text-[15px] font-bold text-[#3B1F0E] truncate">→ {{ req.new_name }}</p>
+                    <template v-if="req.type === 'address_change'">
+                      <p class="font-sans text-[11px] font-semibold uppercase tracking-wide text-[#9E7060] truncate">
+                        Address change · {{ req.branch?.branch_name || 'Deleted branch' }}
+                      </p>
+                      <p class="font-sans text-sm text-[#8B6656] truncate" :title="req.old_address || undefined">{{ req.old_address }}</p>
+                      <p class="font-display text-[15px] font-bold text-[#3D2B24] truncate" :title="req.new_address || undefined">→ {{ req.new_address }}</p>
+                    </template>
+                    <template v-else>
+                      <p class="font-sans text-[11px] font-semibold uppercase tracking-wide text-[#9E7060]">Name change</p>
+                      <p class="font-sans text-sm text-[#8B6656] truncate">{{ req.old_name }}</p>
+                      <p class="font-display text-[15px] font-bold text-[#3D2B24] truncate">→ {{ req.new_name }}</p>
+                    </template>
                   </td>
                   <td class="px-6 py-4">
-                    <p class="font-sans text-sm font-semibold text-[#3B1F0E]">{{ req.owner?.name || '—' }}</p>
+                    <p class="font-sans text-sm font-semibold text-[#3D2B24]">{{ req.owner?.name || '—' }}</p>
                     <p class="font-sans text-xs text-[#9E7060]">{{ req.owner?.email }}</p>
                   </td>
-                  <td class="px-6 py-4 font-sans text-sm text-[#3B1F0E]">
+                  <td class="px-6 py-4 font-sans text-sm text-[#3D2B24]">
                     {{ req.documents.length }} {{ req.documents.length === 1 ? 'branch' : 'branches' }}
                   </td>
                   <td class="px-6 py-4"><StatusBadge :status="req.status" /></td>
-                  <td class="px-6 py-4 font-sans text-sm text-[#3B1F0E]/80 whitespace-nowrap">
+                  <td class="px-6 py-4 font-sans text-sm text-[#5E4A42] whitespace-nowrap">
                     {{ req.submitted_at ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(req.submitted_at)) : '—' }}
                   </td>
                   <td class="px-6 py-4">
                     <button
                       type="button"
-                      class="rounded-lg border border-[#EDD8CC] bg-white px-3 py-1.5 font-display text-sm font-medium text-[#7D5A50] hover:bg-[#FBF2E1] transition-colors"
+                      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-semibold text-xs hover:bg-[#FAF4ED] hover:border-[#D9C4B8] hover:text-[#3D2B24] active:scale-95 transition-[transform,background-color,border-color] duration-140 ease-out shadow-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
                       @click.stop="openCafeUpdate(req.uuid, req)"
                     >
-                      View
+                      <span>View</span>
+                      <Icon name="heroicons:arrow-right" class="w-3.5 h-3.5 text-[#B4846C]" />
                     </button>
                   </td>
                 </tr>
@@ -626,11 +667,11 @@ watch(() => route.query.uuid, async (uuid) => {
             </tbody>
           </table>
         </div>
-      </div>
 
-      <!-- Pagination (Separate Frame) -->
-      <div v-if="rowCount > 0" class="bg-white rounded-b-2xl border border-[#EEDFC4] overflow-hidden flex flex-col shadow-sm">
-        <CommonPagination :page="currentPage" :last-page="lastPage" @change="goToPage" />
+        <!-- Pagination: the shared component -->
+        <nav v-if="rowCount > 0" aria-label="Table pages" class="border-t border-[#F3E7D2]">
+          <Pagination :page="currentPage" :last-page="lastPage" @change="goToPage" />
+        </nav>
       </div>
     </main>
 
@@ -716,10 +757,15 @@ watch(() => route.query.uuid, async (uuid) => {
             />
             <span class="font-sans text-sm text-[#3B1F0E]">
               {{ decisionKind === 'cafe_update'
-                ? 'Let the owner request this name again'
+                ? `Let the owner request this ${cafeUpdate?.type === 'address_change' ? 'address' : 'name'} again`
                 : decisionKind === 'branch' ? 'Let the owner edit and resubmit this branch' : 'Let the applicant edit and resubmit' }}
               <span class="block text-xs text-[#3B1F0E]/60 mt-0.5">
-                <template v-if="decisionKind === 'cafe_update'">
+                <template v-if="decisionKind === 'cafe_update' && cafeUpdate?.type === 'address_change'">
+                  {{ allowResubmit
+                    ? 'They can fix the COR and send the same address back for review.'
+                    : 'This address is final. They can still request a different one.' }}
+                </template>
+                <template v-else-if="decisionKind === 'cafe_update'">
                   {{ allowResubmit
                     ? 'They can fix the CORs and send the same name back for review.'
                     : 'This name is final. They can still request a different name.' }}
@@ -765,3 +811,25 @@ watch(() => route.query.uuid, async (uuid) => {
     </Teleport>
   </div>
 </template>
+
+<style scoped>
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 600ms cubic-bezier(0.16, 1, 0.3, 1), transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+</style>

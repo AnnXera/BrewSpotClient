@@ -3,6 +3,7 @@
 import { useRoute } from 'vue-router'
 import DropdownList from '~/components/common/DropdownList.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
+import PaymentHistoryTable from '~/components/common/PaymentHistoryTable.vue'
 import type { ApplicationHistoryEntry } from '~/components/owner-detail/ApplicationHistory.vue'
 
 definePageMeta({
@@ -10,7 +11,7 @@ definePageMeta({
 })
 
 const route = useRoute()
-const uuid = route.params.uuid as string
+const uuid = computed(() => String(route.params.uuid ?? ''))
 
 const links = [
   { label: 'Dashboard', to: '/admin/dashboard', icon: 'squares-2x2' },
@@ -23,6 +24,7 @@ const links = [
 const ownerService = useOwnerManagementService()
 
 const loading = ref(true)
+const error = ref('')
 const owner = ref<any>(null)
 const ownerDocuments = ref<any[]>([])
 const cafes = ref<any[]>([])
@@ -30,8 +32,9 @@ const subscription = ref<any>(null)
 const paymentHistory = ref<any[]>([])
 const applicationHistory = ref<ApplicationHistoryEntry[]>([])
 
-type OwnerTab = 'profile' | 'branches' | 'history'
-const isOwnerTab = (v: unknown): v is OwnerTab => v === 'profile' || v === 'branches' || v === 'history'
+type OwnerTab = 'profile' | 'branches' | 'payments' | 'history'
+const isOwnerTab = (v: unknown): v is OwnerTab =>
+  v === 'profile' || v === 'branches' || v === 'payments' || v === 'history'
 
 const activeTab = ref<OwnerTab>(isOwnerTab(route.query.tab) ? route.query.tab : 'profile')
 
@@ -42,23 +45,39 @@ watch(() => route.query.tab, (newTab) => {
 })
 
 async function fetchOwner() {
+  if (!uuid.value) {
+    loading.value = false
+    error.value = 'Missing owner identifier.'
+    return
+  }
+
   loading.value = true
+  error.value = ''
   try {
-    const res = await ownerService.show(uuid)
-    if (res.success) {
+    const res = await ownerService.show(uuid.value)
+    if (res?.success && res.owner) {
       owner.value = res.owner
       ownerDocuments.value = res.owner_documents ?? []
       cafes.value = res.cafes ?? []
-      subscription.value = res.subscription
+      subscription.value = res.subscription ?? null
       paymentHistory.value = res.payment_history ?? []
       applicationHistory.value = res.application_history ?? []
+    } else {
+      owner.value = null
+      error.value = 'Unable to load owner details.'
     }
-  } catch (e) {
+  } catch (e: any) {
     console.error('Failed to load owner', e)
+    owner.value = null
+    error.value = e?.data?.message || e?.response?._data?.message || 'Unable to load owner details. Please try again.'
   } finally {
     loading.value = false
   }
 }
+
+watch(uuid, () => {
+  fetchOwner()
+})
 
 const primaryCafe = computed(() => cafes.value[0] ?? null)
 const primaryBranch = computed(() => primaryCafe.value?.branches?.[0] ?? null)
@@ -138,7 +157,7 @@ async function confirmStatusChange() {
   statusChangeLoading.value = true
 
   try {
-    const res = await ownerService.updateStatus(uuid, newStatus)
+    const res = await ownerService.updateStatus(uuid.value, newStatus)
     if (res.success) {
       await fetchOwner() // refresh owner + cascaded branch statuses
     }
@@ -156,10 +175,10 @@ onMounted(fetchOwner)
   <div class="flex flex-col min-h-screen bg-[#FDF3E7] md:flex-row">
     <NavBar :links="links" />
 
-    <main class="flex-1 p-3.5 min-[360px]:p-4 sm:p-6 md:p-12">
-      <div v-if="loading" class="flex flex-col items-center justify-center py-20 gap-3 text-[#3B1F0E]/50">
-        <Icon name="heroicons:arrow-path" class="w-6 h-6 animate-spin text-[#B4846C]" />
-        <span class="font-sans text-sm">Loading owner…</span>
+    <main class="flex-1 min-w-0 overflow-x-hidden p-3.5 min-[360px]:p-4 sm:p-6 md:p-10 max-w-[1400px]">
+      <div v-if="loading" class="flex flex-col items-center justify-center py-20 gap-3 text-[#7D5A50]">
+        <div class="w-8 h-8 rounded-full border-2 border-[#EEDFC4] border-t-[#B4846C] animate-spin" />
+        <span class="font-sans text-xs font-semibold text-[#9E7060]">Loading owner details…</span>
       </div>
 
       <template v-else-if="owner">
@@ -251,6 +270,27 @@ onMounted(fetchOwner)
             class="font-display transition-colors relative z-10 flex items-center gap-2
                    min-[360px]:px-5 min-[360px]:py-3.5 min-[360px]:text-[14px]
                    md:px-5 md:py-3.5 md:text-[16px]"
+            :class="activeTab === 'payments'
+              ? 'text-[#3B1F0E] font-bold'
+              : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
+            @click="activeTab = 'payments'"
+          >
+            Payments
+            <span
+              class="rounded-full px-2 py-0.5 text-[11px] font-bold"
+              :class="activeTab === 'payments' ? 'bg-[#3B1F0E] text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+            >{{ paymentHistory.length }}</span>
+            <span
+              v-if="activeTab === 'payments'"
+              class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full"
+            />
+          </button>
+
+          <button
+            type="button"
+            class="font-display transition-colors relative z-10 flex items-center gap-2
+                   min-[360px]:px-5 min-[360px]:py-3.5 min-[360px]:text-[14px]
+                   md:px-5 md:py-3.5 md:text-[16px]"
             :class="activeTab === 'history'
               ? 'text-[#3B1F0E] font-bold'
               : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
@@ -293,12 +333,14 @@ onMounted(fetchOwner)
             :cafe-documents="primaryCafe?.documents ?? []"
             @view="viewDocument"
           />
-
-          <OwnerDetailPaymentHistoryTable 
-            :history="paymentHistory"
-            :owner-name="owner ? `${owner.firstname} ${owner.lastname}` : undefined"
-          />
         </template>
+
+        <!-- PAYMENTS TAB: the same payment table as the admin Payment History page -->
+        <PaymentHistoryTable
+          v-else-if="activeTab === 'payments'"
+          :history="paymentHistory"
+          :owner-name="`${owner.firstname} ${owner.lastname}`"
+        />
 
         <!-- APPLICATION HISTORY TAB -->
         <OwnerDetailApplicationHistory v-else-if="activeTab === 'history'" :entries="applicationHistory" />
@@ -357,6 +399,34 @@ onMounted(fetchOwner)
           </div>
         </template>
       </template>
+
+      <div v-else class="max-w-lg mx-auto my-12 bg-white border border-[#EEDFC4] rounded-[20px] p-8 text-center shadow-sm">
+        <div class="w-12 h-12 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] flex items-center justify-center text-[#7D5A50] mx-auto mb-4 shadow-xs">
+          <Icon name="heroicons:exclamation-triangle" class="w-6 h-6 text-[#B4846C]" />
+        </div>
+        <h2 class="font-display text-xl font-bold text-[#3D2B24]">
+          Unable to load owner details
+        </h2>
+        <p class="font-sans text-sm text-[#9E7060] mt-2 leading-relaxed">
+          {{ error || 'This owner profile could not be loaded right now.' }}
+        </p>
+        <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#7D5A50] text-[#FDF3E7] font-sans font-semibold text-sm hover:bg-[#684940] active:scale-95 transition-[transform,background-color] duration-140 ease-out shadow-xs cursor-pointer"
+            @click="fetchOwner"
+          >
+            <Icon name="heroicons:arrow-path" class="w-4 h-4" />
+            <span>Try Again</span>
+          </button>
+          <NuxtLink
+            to="/admin/owners"
+            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-semibold text-sm hover:bg-[#FAF4ED] hover:text-[#3D2B24] active:scale-95 transition-[transform,background-color] duration-140 ease-out shadow-xs"
+          >
+            <span>Back to Owners</span>
+          </NuxtLink>
+        </div>
+      </div>
     </main>
 
     <OwnerDetailBranchDetailsModal

@@ -2,7 +2,7 @@
 <script lang="ts">
 export interface ApplicationHistoryEntry {
   uuid: string
-  kind: 'application' | 'resubmission' | 'branch' | 'branch_resubmission' | 'name_change'
+  kind: 'application' | 'resubmission' | 'branch' | 'branch_resubmission' | 'name_change' | 'address_change'
   status: 'pending_approval' | 'approved' | 'rejected' | 'withdrawn'
   branch_name: string | null
   reason: string | null
@@ -22,6 +22,7 @@ const KIND: Record<ApplicationHistoryEntry['kind'], { label: string; icon: strin
   branch: { label: 'Branch submission', icon: 'heroicons:building-storefront' },
   branch_resubmission: { label: 'Branch resubmission', icon: 'heroicons:arrow-path-rounded-square' },
   name_change: { label: 'Cafe name change', icon: 'heroicons:pencil-square' }, // branch_name holds "old → new"
+  address_change: { label: 'Branch address change', icon: 'heroicons:map-pin' }, // branch_name holds "branch → new address"
 }
 
 const DOT: Record<ApplicationHistoryEntry['status'], string> = {
@@ -51,14 +52,14 @@ const when = (iso: string | null) => (iso ? fmt.format(new Date(iso)) : null)
         <!-- Rail between entries -->
         <span v-if="i < entries.length - 1" class="absolute left-[17px] top-9 bottom-0 w-px bg-[#EEDFC4]" aria-hidden="true" />
 
-        <span class="relative z-10 w-9 h-9 rounded-full border flex items-center justify-center shrink-0" :class="DOT[e.status]">
-          <Icon :name="KIND[e.kind].icon" class="w-4 h-4" />
+        <span class="relative z-10 w-9 h-9 rounded-full border flex items-center justify-center shrink-0" :class="DOT[e.status] ?? 'bg-[#F0E3CE] text-[#8B6656] border-[#E3D2B8]'">
+          <Icon :name="KIND[e.kind]?.icon ?? 'heroicons:document-text'" class="w-4 h-4" />
         </span>
 
         <div class="min-w-0 flex-1 rounded-xl border border-[#F3E7D2] bg-[#FFFCF7] px-3.5 py-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="min-w-0">
-              <p class="font-display font-semibold text-[#3D2B24] text-sm sm:text-[15px]">{{ KIND[e.kind].label }}</p>
+              <p class="font-display font-semibold text-[#3D2B24] text-sm sm:text-[15px]">{{ KIND[e.kind]?.label ?? e.kind }}</p>
               <p v-if="e.branch_name" class="font-sans text-xs text-[#8B6656] truncate">{{ e.branch_name }}</p>
             </div>
             <StatusBadge :status="e.status" />
