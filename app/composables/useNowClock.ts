@@ -16,5 +16,5 @@ export function useNowClock() {
     now.value.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
   )
 
-  return { timeLabel, dateLabel }
+  return { now, timeLabel, dateLabel }
 }

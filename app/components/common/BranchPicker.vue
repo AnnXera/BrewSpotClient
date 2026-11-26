@@ -21,6 +21,7 @@ const model = defineModel<string>({ required: true })
       :title="title"
       icon="heroicons:building-storefront"
       size="sm"
+      card
       aria-label="Branch"
       placeholder="Choose a branch"
     />

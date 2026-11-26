@@ -2,7 +2,8 @@
 import { computed, ref, toRef } from 'vue'
 import AnalyticsPanel from './AnalyticsPanel.vue'
 import AnalyticsChange from './AnalyticsChange.vue'
-import AnalyticsBarChart, { type BarPoint } from './AnalyticsBarChart.vue'
+import type { BarPoint } from './AnalyticsBarChart.vue'
+import AnalyticsTrendChart from './AnalyticsTrendChart.vue'
 import AnalyticsHeatmap from './AnalyticsHeatmap.vue'
 import AnalyticsStatus from './AnalyticsStatus.vue'
 import TransactionLog from './TransactionLog.vue'
@@ -16,6 +17,7 @@ const service = useOwnerAnalyticsService()
 const { data, loading, refreshing, error, lock, reload } = useAnalyticsTab(toRef(props, 'filters'), f => service.getSales(f))
 
 const measure = ref<'revenue' | 'orders'>('revenue')
+const chartType = ref<'bar' | 'line'>('bar')
 
 const points = computed<BarPoint[]>(() => {
   const d = data.value
@@ -207,23 +209,64 @@ defineExpose({ excelReport, exportReady: computed(() => !!data.value) })
       :note="data ? `${measure === 'revenue' ? 'Income' : 'Orders'} per ${unit}, ${formatSpan(data.filters.from, data.filters.to)}` : undefined"
     >
       <template #actions>
-        <div role="radiogroup" aria-label="Trend measure" class="inline-flex gap-0.5 rounded-[10px] bg-[#F3E7D2] p-[3px]">
-          <button
-            v-for="m in (['revenue', 'orders'] as const)"
-            :key="m"
-            type="button"
-            role="radio"
-            :aria-checked="measure === m"
-            class="rounded-[8px] px-3 py-1 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
-            :class="measure === m ? 'bg-white text-[#3B1F0E] shadow-[0_1px_3px_rgba(59,31,14,0.18)]' : 'text-[#8B6656] hover:text-[#3B1F0E]'"
-            @click="measure = m"
-          >{{ m === 'revenue' ? 'Income' : 'Orders' }}</button>
+        <div class="flex items-center gap-2.5">
+          <!-- Line / Bar switcher, as on the dashboards' Performance overview -->
+          <div role="group" aria-label="Chart view type" class="inline-flex items-center rounded-xl bg-[#F6ECDD] p-1 text-[#8B6656]">
+            <button
+              type="button"
+              :aria-pressed="chartType === 'line'"
+              title="Line graph"
+              aria-label="Line graph"
+              class="flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+              :class="chartType === 'line' ? 'bg-white text-[#3B1F0E] shadow-[0_1px_3px_rgba(59,31,14,0.12)]' : 'text-[#8B6656] hover:text-[#3B1F0E]'"
+              @click="chartType = 'line'"
+            >
+              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 14l4-5 4 3 6-7" />
+                <circle cx="3" cy="14" r="1.5" fill="currentColor" />
+                <circle cx="7" cy="9" r="1.5" fill="currentColor" />
+                <circle cx="11" cy="12" r="1.5" fill="currentColor" />
+                <circle cx="17" cy="5" r="1.5" fill="currentColor" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              :aria-pressed="chartType === 'bar'"
+              title="Bar graph"
+              aria-label="Bar graph"
+              class="flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+              :class="chartType === 'bar' ? 'bg-white text-[#3B1F0E] shadow-[0_1px_3px_rgba(59,31,14,0.12)]' : 'text-[#8B6656] hover:text-[#3B1F0E]'"
+              @click="chartType = 'bar'"
+            >
+              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <rect x="3" y="10" width="3" height="7" rx="1" />
+                <rect x="8.5" y="4" width="3" height="13" rx="1" />
+                <rect x="14" y="7" width="3" height="10" rx="1" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Income / Orders -->
+          <div role="radiogroup" aria-label="Trend measure" class="inline-flex items-center rounded-xl bg-[#F6ECDD] p-1">
+            <button
+              v-for="m in (['revenue', 'orders'] as const)"
+              :key="m"
+              type="button"
+              role="radio"
+              :aria-checked="measure === m"
+              class="h-8 rounded-lg px-3 text-[13px] font-semibold transition-all duration-150 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+              :class="measure === m ? 'bg-white text-[#3B1F0E] shadow-[0_1px_3px_rgba(59,31,14,0.12)]' : 'text-[#8B6656] hover:text-[#3B1F0E]'"
+              @click="measure = m"
+            >{{ m === 'revenue' ? 'Income' : 'Orders' }}</button>
+          </div>
         </div>
       </template>
-      <div v-if="loading" class="skeleton h-[260px] rounded-xl" />
-      <AnalyticsBarChart
+      <div v-if="loading" class="skeleton h-[270px] rounded-xl" />
+      <AnalyticsTrendChart
         v-else
         :points="points"
+        :type="chartType"
+        :integer="measure === 'orders'"
         :caption="`${measure === 'revenue' ? 'Income' : 'Orders'} per ${unit}`"
         :format-axis="measure === 'revenue' ? formatPesoCompact : formatCount"
         :format-value="measure === 'revenue' ? formatPesoCents : (n: number) => `${formatCount(n)} orders`"
