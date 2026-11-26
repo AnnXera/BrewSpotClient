@@ -19,7 +19,7 @@ const links = [
     <!-- Sidebar Navigation -->
     <NavBar :links="links" />
 
-    <main class="flex-1 p-6 md:p-12">
+    <main class="flex-1 min-w-0 overflow-x-hidden p-3.5 min-[360px]:p-4 sm:p-6 md:p-10 max-w-[1400px]">
       <AdminPaymentHistory />
     </main>
   </div>

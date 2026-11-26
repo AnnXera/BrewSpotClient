@@ -24,7 +24,7 @@
 
               <div class="min-w-0">
                 <p class="text-xs min-[360px]:text-sm font-semibold text-[#3D2B24] capitalize truncate">
-                  {{ doc.id_type.replace(/_/g, ' ') }}
+                  {{ (doc.id_type ?? '').replace(/_/g, ' ') || 'ID Document' }}
                 </p>
                 <p class="text-[11px] min-[360px]:text-xs font-medium text-[#9E7060]">Uploaded {{ formatDate(doc.uploaded_at) }}</p>
               </div>
@@ -113,8 +113,8 @@ const emit = defineEmits<{
   view: [url: string, title: string]
 }>()
 
-function idTitle(idType: string, side: 'front' | 'back' | null) {
-  const name = idType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+function idTitle(idType?: string | null, side: 'front' | 'back' | null = null) {
+  const name = (idType ?? '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'ID Document'
   return side ? `${name} (${side})` : name
 }
 

@@ -26,6 +26,10 @@ const ownerService = useOwnerManagementService()
 const stats = ref<OwnerStats | null>(null)
 const owners = ref<OwnerListItem[]>([])
 const loading = ref(false)
+const refreshing = ref(false)
+const loaded = ref(false)
+
+useScrollReveal(loaded)
 
 const currentPage = ref(1)
 const lastPage = ref(1)
@@ -105,6 +109,7 @@ async function fetchOwners() {
     const start = (currentPage.value - 1) * perPage
     owners.value = filtered.slice(start, start + perPage)
     loading.value = false
+    loaded.value = true
     return
   }
 
@@ -127,11 +132,14 @@ async function fetchOwners() {
     owners.value = []
   } finally {
     loading.value = false
+    loaded.value = true
   }
 }
 
 async function refreshData() {
+  refreshing.value = true
   await Promise.all([fetchStats(), fetchOwners()])
+  refreshing.value = false
 }
 
 function resetFilters() {
@@ -241,14 +249,9 @@ onMounted(() => {
       <!-- Header -->
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 md:mb-8">
         <div>
-          <div class="flex items-center gap-2.5">
-            <h1 class="font-display text-2xl font-black text-[#3D2B24] tracking-tight min-[360px]:text-3xl sm:text-[32px] sm:leading-tight">
-              Owner Management
-            </h1>
-            <span v-if="stats" class="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FAF4ED] text-[#7D5A50] border border-[#EEDFC4]">
-              {{ stats.total_owners }} registered
-            </span>
-          </div>
+          <h1 class="font-display text-2xl font-black text-[#3D2B24] tracking-tight min-[360px]:text-3xl sm:text-[32px] sm:leading-tight">
+            Owner Management
+          </h1>
           <p class="font-sans text-xs sm:text-sm text-[#9E7060] mt-1">
             Manage, verify, and monitor all registered cafe owners across the platform.
           </p>
@@ -257,25 +260,46 @@ onMounted(() => {
         <button
           type="button"
           class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-semibold text-sm hover:bg-[#FDF3E7] hover:border-[#D9C4B8] hover:text-[#3D2B24] active:scale-95 transition-[transform,background-color,border-color] duration-160 ease-out shadow-xs self-start sm:self-auto cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-          :disabled="loading"
+          :disabled="loading || refreshing"
           @click="refreshData"
         >
-          <Icon name="heroicons:arrow-path" class="w-4 h-4 text-[#7D5A50]" :class="{ 'animate-spin': loading }" />
+          <Icon name="heroicons:arrow-path" class="w-4 h-4 text-[#7D5A50]" :class="{ 'animate-spin': loading || refreshing }" />
           <span>Refresh</span>
         </button>
       </div>
 
       <!-- Stat cards -->
-      <div class="grid grid-cols-2 gap-3 mb-6 sm:gap-4 md:grid-cols-3 md:gap-5 md:mb-8">
+      <div
+        class="scroll-reveal grid grid-cols-2 gap-3 mb-6 sm:gap-4 md:grid-cols-3 md:gap-5 md:mb-8 transition-opacity duration-200 ease-out"
+        :class="{ 'opacity-60': refreshing }"
+      >
         <div class="col-span-2 md:col-span-1">
-          <OwnerManagementStatCard :value="stats?.total_owners" label="Total Owners" />
+          <OwnerManagementStatCard
+            :value="stats?.total_owners"
+            label="Total Owners"
+            icon="heroicons:users"
+            description="Registered operators"
+          />
         </div>
-        <OwnerManagementStatCard :value="stats?.active" label="Active" color="#28A745" />
-        <OwnerManagementStatCard :value="stats?.inactive_or_suspended" label="Suspended/ Inactive" color="#D9622B" />
+        <OwnerManagementStatCard
+          :value="stats?.active"
+          label="Active"
+          icon="heroicons:check-circle"
+          description="Active on platform"
+        />
+        <OwnerManagementStatCard
+          :value="stats?.inactive_or_suspended"
+          label="Suspended/ Inactive"
+          icon="heroicons:no-symbol"
+          description="Suspended or inactive"
+        />
       </div>
 
       <!-- Main Content Card -->
-      <div class="bg-white border border-[#EEDFC4] rounded-[20px] shadow-sm overflow-hidden transition-[box-shadow,border-color] duration-200">
+      <div
+        class="scroll-reveal bg-white border border-[#EEDFC4] rounded-[20px] shadow-sm overflow-hidden transition-[box-shadow,border-color,opacity] duration-200 ease-out"
+        :class="{ 'opacity-60': refreshing }"
+      >
         <!-- Filter Toolbar -->
         <OwnerManagementFilterBar
           v-model:search="search"
@@ -431,3 +455,25 @@ onMounted(() => {
     />
   </div>
 </template>
+
+<style scoped>
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 600ms cubic-bezier(0.16, 1, 0.3, 1), transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+</style>

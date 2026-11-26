@@ -24,20 +24,20 @@ const statusMeta = computed(() => {
   if (s === 'active') {
     return {
       label: 'Active',
-      badgeClass: 'bg-[#E8F7EE] text-[#28A745] border border-[#C3ECD3]',
-      dotClass: 'bg-[#28A745] animate-pulse',
+      badgeClass: 'bg-[#FAF4ED] text-[#7D5A50] border border-[#EEDFC4]',
+      dotClass: 'bg-[#B4846C] animate-pulse',
     }
   }
   if (s === 'suspended') {
     return {
       label: 'Suspended',
-      badgeClass: 'bg-[#FDE8E8] text-[#DC3545] border border-[#F8B4B4]',
-      dotClass: 'bg-[#DC3545]',
+      badgeClass: 'bg-[#F7EFE6] text-[#8B6656] border border-[#E8D9CB]',
+      dotClass: 'bg-[#8B6656]',
     }
   }
   return {
     label: s ? s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Inactive',
-    badgeClass: 'bg-[#F0E3CE] text-[#8B6656] border border-[#E4D1B8]',
+    badgeClass: 'bg-[#F7EFE6] text-[#8B6656] border border-[#E8D9CB]',
     dotClass: 'bg-[#8B6656]',
   }
 })
@@ -127,26 +127,26 @@ const statusMeta = computed(() => {
         <button
           v-if="owner.status === 'active'"
           type="button"
-          class="inline-flex items-center justify-center p-2 rounded-xl bg-white border border-[#FCDAD1] text-[#D9622B] hover:bg-[#FDF0EB] hover:text-[#B84E1D] active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#D9622B]/40"
+          class="inline-flex items-center justify-center p-2 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3D2B24] active:scale-90 transition-[transform,background-color,border-color] duration-140 ease-out shadow-xs disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40 cursor-pointer"
           :disabled="statusChangeLoading"
           title="Suspend Owner"
           aria-label="Suspend owner"
           @click="emit('status-change', owner, 'suspended')"
         >
-          <Icon v-if="statusChangeLoading" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
+          <Icon v-if="statusChangeLoading" name="heroicons:arrow-path" class="w-4 h-4 animate-spin text-[#7D5A50]" />
           <Icon v-else name="heroicons:no-symbol" class="w-4 h-4" />
         </button>
 
         <button
           v-else-if="owner.status === 'suspended'"
           type="button"
-          class="inline-flex items-center justify-center p-2 rounded-xl bg-white border border-[#CDEED9] text-[#2E9E5B] hover:bg-[#E8F7EE] hover:text-[#1E733F] active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#2E9E5B]/40"
+          class="inline-flex items-center justify-center p-2 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3D2B24] active:scale-90 transition-[transform,background-color,border-color] duration-140 ease-out shadow-xs disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40 cursor-pointer"
           :disabled="statusChangeLoading"
           title="Reactivate Owner"
           aria-label="Reactivate owner"
           @click="emit('status-change', owner, 'active')"
         >
-          <Icon v-if="statusChangeLoading" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
+          <Icon v-if="statusChangeLoading" name="heroicons:arrow-path" class="w-4 h-4 animate-spin text-[#7D5A50]" />
           <Icon v-else name="heroicons:check-circle" class="w-4 h-4" />
         </button>
       </div>

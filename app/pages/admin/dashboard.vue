@@ -157,32 +157,64 @@ useAutoRefresh(loadDashboardData)
 
     <main class="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10 xl:px-12">
       <div class="mx-auto max-w-[1360px] space-y-6">
-        <!-- Header: Clean 3-row layout (Greeting/Date, Title/Badge, Status/Refresh) -->
-        <DashboardHeader
-          title="Admin Dashboard"
-          badge="Platform"
-          :is-open="true"
-          status-main-text="Platform Operational"
-          :status-sub-text="activeSubscribersCount ? `${activeSubscribersCount} Active Subscribers` : 'Every cafe on Brewspot'"
-          :updated-at="updatedAt"
-          :loading="loading"
-          :refreshing="refreshing"
-          @refresh="loadDashboardData"
-        >
-          <template #extra>
+        <!-- Header: Consistent Admin Console Design (Emil Kowalski Philosophy) -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div class="flex flex-wrap items-center gap-2.5 sm:gap-3">
+              <h1 class="font-display text-2xl font-black text-[#3D2B24] tracking-tight min-[360px]:text-3xl sm:text-[32px] sm:leading-tight">
+                Admin Dashboard
+              </h1>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#FAF4ED] text-[#7D5A50] border border-[#EEDFC4] shadow-2xs">
+                <span class="w-2 h-2 rounded-full bg-[#B4846C] animate-pulse" />
+                <span>Platform Operational</span>
+              </span>
+            </div>
+            <p class="font-sans text-xs sm:text-sm text-[#9E7060] mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>Overview of cafe operations, subscriptions, and platform metrics.</span>
+              <span class="hidden sm:inline text-[#D9C3A5]">&bull;</span>
+              <span class="inline-flex items-center gap-1 font-medium text-[#7D5A50]">
+                <Icon name="heroicons:users" class="w-3.5 h-3.5 text-[#B4846C]" />
+                <span>{{ activeSubscribersCount }} active {{ activeSubscribersCount === 1 ? 'subscriber' : 'subscribers' }}</span>
+              </span>
+              <template v-if="updatedAt">
+                <span class="hidden sm:inline text-[#D9C3A5]">&bull;</span>
+                <span class="text-[11px] sm:text-xs text-[#9E7060]/80">Updated {{ updatedAt }}</span>
+              </template>
+            </p>
+          </div>
+
+          <!-- Actions toolbar -->
+          <div class="flex items-center gap-2.5 sm:gap-3 self-start sm:self-auto shrink-0">
+            <!-- Export Report -->
             <button
               type="button"
-              class="inline-flex h-7 sm:h-8 items-center gap-1.5 rounded-lg border border-[#D9C3A5] bg-white px-3 text-xs font-semibold text-[#3B1F0E] shadow-2xs transition-all hover:border-[#3B1F0E] hover:bg-[#FFFDF9] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-semibold text-sm hover:bg-[#FDF3E7] hover:border-[#D9C4B8] hover:text-[#3D2B24] active:scale-95 transition-[transform,background-color,border-color] duration-160 ease-out shadow-xs disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
               :disabled="loading || !transactionsList.length"
-              title="Export recent subscription payments to Excel"
+              title="Export platform transactions to Excel"
               @click="handleExportDashboardReport"
             >
-              <Icon name="heroicons:arrow-down-tray-20-solid" class="h-3.5 w-3.5 text-[#7D5A50]" aria-hidden="true" />
-              <span class="hidden sm:inline">Export report</span>
+              <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 text-[#7D5A50]" />
+              <span class="hidden sm:inline">Export Report</span>
               <span class="sm:hidden">Export</span>
             </button>
-          </template>
-        </DashboardHeader>
+
+            <!-- Refresh Button -->
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-semibold text-sm hover:bg-[#FDF3E7] hover:border-[#D9C4B8] hover:text-[#3D2B24] active:scale-95 transition-[transform,background-color,border-color] duration-160 ease-out shadow-xs disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
+              :disabled="loading || refreshing"
+              title="Refresh platform figures"
+              @click="loadDashboardData"
+            >
+              <Icon
+                name="heroicons:arrow-path"
+                class="w-4 h-4 text-[#7D5A50]"
+                :class="{ 'animate-spin': loading || refreshing }"
+              />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
 
         <!-- Error Alert -->
         <div

@@ -7,11 +7,16 @@ const subService = useSubscriptionService()
 const paymentService = usePaymentService()
 
 const loading = ref(true)
+const refreshing = ref(false)
+const loaded = ref(false)
 const transactions = ref<PaymentTransaction[]>([])
 const registeredSubscribers = ref(0)
 
+useScrollReveal(loaded)
+
 async function loadPaymentHistory() {
-  loading.value = true
+  if (loaded.value) refreshing.value = true
+  else loading.value = true
   const list: PaymentTransaction[] = []
 
   try {
@@ -75,6 +80,8 @@ async function loadPaymentHistory() {
     })
     transactions.value = Array.from(map.values())
     loading.value = false
+    refreshing.value = false
+    loaded.value = true
   }
 }
 
@@ -95,34 +102,67 @@ onMounted(loadPaymentHistory)
 <template>
   <div>
     <!-- Header Title & Refresh Button -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 md:mb-8">
       <div>
-        <h1 class="font-display text-2xl md:text-3xl font-bold text-[#3D2B24]">
+        <h1 class="font-display text-2xl font-black text-[#3D2B24] tracking-tight min-[360px]:text-3xl sm:text-[32px] sm:leading-tight">
           Payment History
         </h1>
-        <p class="font-sans text-sm text-[#8B6656] mt-1">
+        <p class="font-sans text-xs sm:text-sm text-[#9E7060] mt-1">
           Subscription transactions and billing history for registered cafe owners.
         </p>
       </div>
 
       <button
         type="button"
-        class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-display text-sm font-semibold bg-[#7D5A50] text-[#FFF0D1] hover:bg-[#684940] transition-colors self-start sm:self-auto shadow-sm"
+        class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-semibold text-sm hover:bg-[#FDF3E7] hover:border-[#D9C4B8] hover:text-[#3D2B24] active:scale-95 transition-[transform,background-color,border-color] duration-160 ease-out shadow-xs self-start sm:self-auto cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
+        :disabled="loading || refreshing"
         @click="loadPaymentHistory"
       >
-        <Icon name="heroicons:arrow-path" class="w-4 h-4" :class="{ 'animate-spin': loading }" />
-        <span>Refresh Data</span>
+        <Icon name="heroicons:arrow-path" class="w-4 h-4 text-[#7D5A50]" :class="{ 'animate-spin': loading || refreshing }" />
+        <span>Refresh</span>
       </button>
     </div>
 
     <!-- Analytics Cards Component -->
-    <PaymentAnalyticsCards
-      :total-transactions="transactions.length"
-      :total-revenue="totalRevenue"
-      :registered-subscribers="registeredSubscribers"
-    />
+    <div
+      class="scroll-reveal transition-opacity duration-200 ease-out"
+      :class="{ 'opacity-60': refreshing }"
+    >
+      <PaymentAnalyticsCards
+        :total-transactions="transactions.length"
+        :total-revenue="totalRevenue"
+        :registered-subscribers="registeredSubscribers"
+      />
+    </div>
 
     <!-- Payment History Table Component -->
-    <PaymentHistoryTable :history="transactions" :loading="loading" :show-controls="true" :show-owner-name="true" />
+    <div
+      class="scroll-reveal transition-opacity duration-200 ease-out"
+      :class="{ 'opacity-60': refreshing }"
+    >
+      <PaymentHistoryTable :history="transactions" :loading="loading" :show-controls="true" :show-owner-name="true" />
+    </div>
   </div>
 </template>
+
+<style scoped>
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 600ms cubic-bezier(0.16, 1, 0.3, 1), transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+</style>

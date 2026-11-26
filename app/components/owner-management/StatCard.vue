@@ -23,19 +23,15 @@ const meta = computed(() => {
 
   if (lbl.includes('active')) {
     return {
-      icon: props.icon || 'heroicons:check-badge',
+      icon: props.icon || 'heroicons:check-circle',
       description: props.description || 'Active on platform',
-      color: props.color || '#28A745',
-      badgeBg: 'bg-[#EAF7EE] text-[#28A745] border-[#C7EDD2]',
     }
   }
 
   if (lbl.includes('suspended') || lbl.includes('inactive')) {
     return {
-      icon: props.icon || 'heroicons:shield-exclamation',
-      description: props.description || 'Requires admin review',
-      color: props.color || '#D9622B',
-      badgeBg: 'bg-[#FDF0EC] text-[#D9622B] border-[#F8D2C2]',
+      icon: props.icon || 'heroicons:no-symbol',
+      description: props.description || 'Suspended or inactive',
     }
   }
 
@@ -43,8 +39,6 @@ const meta = computed(() => {
   return {
     icon: props.icon || 'heroicons:users',
     description: props.description || 'Registered operators',
-    color: props.color || '#3D2B24',
-    badgeBg: 'bg-[#F7EFE6] text-[#7D5A50] border-[#E8D9CB]',
   }
 })
 </script>
@@ -59,26 +53,24 @@ const meta = computed(() => {
         {{ label }}
       </span>
       <div
-        class="w-8 h-8 rounded-xl flex items-center justify-center border shrink-0"
-        :class="meta.badgeBg"
+        class="w-8 h-8 rounded-xl flex items-center justify-center border shrink-0 bg-[#FAF4ED] text-[#7D5A50] border-[#EEDFC4] shadow-2xs"
       >
-        <Icon :name="meta.icon" class="w-4 h-4" />
+        <Icon :name="meta.icon" class="w-4 h-4 text-[#7D5A50]" />
       </div>
     </div>
 
     <!-- Middle: Prominent counter value -->
     <div class="my-2">
       <p
-        class="font-display text-3xl sm:text-4xl font-black tracking-tight leading-none"
-        :style="{ color: meta.color }"
+        class="font-display text-3xl sm:text-4xl font-black tracking-tight leading-none text-[#3D2B24] tabular-nums"
       >
         {{ typeof value === 'number' ? value.toLocaleString() : (value ?? '—') }}
       </p>
     </div>
 
     <!-- Bottom row: Contextual sub-label -->
-    <div class="flex items-center gap-1.5 pt-1 border-t border-[#F7EFE6]">
-      <span class="w-1.5 h-1.5 rounded-full shrink-0" :style="{ backgroundColor: meta.color }" />
+    <div class="flex items-center gap-1.5 pt-2 border-t border-[#F7EFE6]">
+      <span class="w-1.5 h-1.5 rounded-full shrink-0 bg-[#B4846C]" />
       <span class="font-sans text-xs text-[#7D5A50]/80 truncate">
         {{ meta.description }}
       </span>

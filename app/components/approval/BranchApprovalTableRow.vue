@@ -26,44 +26,51 @@ function formatDate(value: string | null) {
 </script>
 
 <template>
-  <tr class="border-b border-[#EDD8CC] last:border-b-0 hover:bg-[#FFFAF0] transition-colors font-sans">
-    <td class="px-[20px] py-[14px]">
+  <tr class="border-b border-[#F3E7D2] last:border-b-0 hover:bg-[#FAF4ED]/60 transition-colors duration-150 ease-out cursor-default group font-sans">
+    <td class="px-6 py-4">
       <div class="flex items-center gap-3">
         <img
           v-if="approval.branch?.cafe_picture"
           :src="cafePictureUrl(approval.branch?.uuid) ?? ''"
-          class="w-[43px] h-[43px] rounded-[10px] object-cover shrink-0"
+          class="w-[38px] h-[38px] rounded-xl object-cover shrink-0 ring-2 ring-white shadow-xs"
         />
-        <div v-else class="w-[43px] h-[43px] rounded-[10px] bg-[#F0E3CE] shrink-0" />
+        <div v-else class="w-[38px] h-[38px] rounded-xl bg-[#FAF4ED] border border-[#EEDFC4] flex items-center justify-center shrink-0">
+          <Icon name="heroicons:building-storefront" class="w-4 h-4 text-[#B4846C]" />
+        </div>
 
-        <span class="text-base font-semibold text-[#3B1F0E]">
+        <span class="text-sm font-bold text-[#3D2B24] group-hover:text-[#8B5A3C] transition-colors truncate">
           {{ approval.cafe?.cafe_name ?? '—' }}
         </span>
       </div>
     </td>
 
-    <td class="px-[20px] py-[14px] text-base text-[#3B1F0E]">
+    <td class="px-6 py-4 text-sm font-semibold text-[#3D2B24]">
       {{ approval.user ? `${approval.user.firstname} ${approval.user.lastname}` : '—' }}
     </td>
 
-    <td class="px-[20px] py-[14px] text-base text-[#3B1F0E]">
-      {{ approval.branch?.address ?? '—' }}
+    <td class="px-6 py-4 text-xs text-[#7D5A50] max-w-[220px]">
+      <span class="truncate block">{{ approval.branch?.address ?? '—' }}</span>
     </td>
 
-    <td class="px-[20px] py-[14px]">
+    <td class="px-6 py-4">
       <StatusBadge :status="approval.status" />
     </td>
 
-    <td class="px-[20px] py-[14px] text-base text-[#3B1F0E]">{{ formatDate(approval.created_at) }}</td>
+    <td class="px-6 py-4">
+      <div class="inline-flex items-center gap-1.5 text-xs font-medium text-[#5E4A42]">
+        <Icon name="heroicons:calendar" class="w-3.5 h-3.5 text-[#B4846C] shrink-0" />
+        <span>{{ formatDate(approval.created_at) }}</span>
+      </div>
+    </td>
 
-    <td class="px-[20px] py-[14px]">
+    <td class="px-6 py-4">
       <button
         type="button"
-        class="inline-flex items-center gap-1.5 rounded-lg border border-[#7D5A50] px-3 py-2 font-display text-[13px] font-semibold text-[#7D5A50] hover:bg-[#7D5A50] hover:text-[#FFF0D1] hover:border-[#7D5A50] transition-colors"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-semibold text-xs hover:bg-[#FAF4ED] hover:border-[#D9C4B8] hover:text-[#3D2B24] active:scale-95 transition-[transform,background-color,border-color] duration-140 ease-out shadow-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
         @click="emit('view', approval)"
       >
-        View Details
-        <Icon name="heroicons:arrow-right" class="w-4 h-4" />
+        <span>View Details</span>
+        <Icon name="heroicons:arrow-right" class="w-3.5 h-3.5 text-[#B4846C]" />
       </button>
     </td>
   </tr>
