@@ -1,6 +1,7 @@
 <!--app/pages/admin/approvals.vue-->
 <script setup lang="ts">
 import SearchInput from '~/components/common/SearchInput.vue'
+import Pagination from '~/components/common/Pagination.vue'
 import type { ApprovalListItem, ApprovalStats, Paginated } from '~/services/OwnerManagementService'
 import type { CafeUpdateRequest } from '~/services/CafeUpdateService'
 
@@ -658,38 +659,10 @@ watch(() => route.query.uuid, async (uuid) => {
           </table>
         </div>
 
-        <!-- Integrated Pagination Footer -->
-        <div v-if="rowCount > 0" class="border-t border-[#F3E7D2] px-6 py-3.5 bg-[#FAF4ED]/50 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div class="font-sans text-xs text-[#9E7060]">
-            Showing <strong class="text-[#3D2B24] font-semibold">{{ ((currentPage - 1) * perPage) + 1 }}</strong> to <strong class="text-[#3D2B24] font-semibold">{{ Math.min(currentPage * perPage, total) }}</strong> of <strong class="text-[#3D2B24] font-semibold">{{ total }}</strong> applications
-          </div>
-
-          <div class="flex items-center gap-1.5">
-            <button
-              type="button"
-              class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#EDD8CC] bg-white text-[#7D5A50] hover:bg-[#FDF3E7] hover:text-[#3D2B24] disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs cursor-pointer"
-              :disabled="currentPage <= 1"
-              aria-label="Previous page"
-              @click="goToPage(currentPage - 1)"
-            >
-              <Icon name="heroicons:chevron-left" class="w-4 h-4" />
-            </button>
-
-            <span class="font-sans text-xs font-bold text-[#5C3A28] px-2.5">
-              Page {{ currentPage }} of {{ Math.max(1, lastPage) }}
-            </span>
-
-            <button
-              type="button"
-              class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#EDD8CC] bg-white text-[#7D5A50] hover:bg-[#FDF3E7] hover:text-[#3D2B24] disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs cursor-pointer"
-              :disabled="currentPage >= Math.max(1, lastPage)"
-              aria-label="Next page"
-              @click="goToPage(currentPage + 1)"
-            >
-              <Icon name="heroicons:chevron-right" class="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <!-- Pagination: the shared component -->
+        <nav v-if="rowCount > 0" aria-label="Table pages" class="border-t border-[#F3E7D2]">
+          <Pagination :page="currentPage" :last-page="lastPage" @change="goToPage" />
+        </nav>
       </div>
     </main>
 

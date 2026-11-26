@@ -3,6 +3,7 @@
 import { useRoute } from 'vue-router'
 import DropdownList from '~/components/common/DropdownList.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
+import PaymentHistoryTable from '~/components/common/PaymentHistoryTable.vue'
 import type { ApplicationHistoryEntry } from '~/components/owner-detail/ApplicationHistory.vue'
 
 definePageMeta({
@@ -31,8 +32,9 @@ const subscription = ref<any>(null)
 const paymentHistory = ref<any[]>([])
 const applicationHistory = ref<ApplicationHistoryEntry[]>([])
 
-type OwnerTab = 'profile' | 'branches' | 'history'
-const isOwnerTab = (v: unknown): v is OwnerTab => v === 'profile' || v === 'branches' || v === 'history'
+type OwnerTab = 'profile' | 'branches' | 'payments' | 'history'
+const isOwnerTab = (v: unknown): v is OwnerTab =>
+  v === 'profile' || v === 'branches' || v === 'payments' || v === 'history'
 
 const activeTab = ref<OwnerTab>(isOwnerTab(route.query.tab) ? route.query.tab : 'profile')
 
@@ -268,6 +270,27 @@ onMounted(fetchOwner)
             class="font-display transition-colors relative z-10 flex items-center gap-2
                    min-[360px]:px-5 min-[360px]:py-3.5 min-[360px]:text-[14px]
                    md:px-5 md:py-3.5 md:text-[16px]"
+            :class="activeTab === 'payments'
+              ? 'text-[#3B1F0E] font-bold'
+              : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
+            @click="activeTab = 'payments'"
+          >
+            Payments
+            <span
+              class="rounded-full px-2 py-0.5 text-[11px] font-bold"
+              :class="activeTab === 'payments' ? 'bg-[#3B1F0E] text-[#FDF3E7]' : 'bg-[#F0E3CE] text-[#8B6656]'"
+            >{{ paymentHistory.length }}</span>
+            <span
+              v-if="activeTab === 'payments'"
+              class="absolute left-0 right-0 -bottom-px h-[3px] bg-[#3B1F0E] rounded-full"
+            />
+          </button>
+
+          <button
+            type="button"
+            class="font-display transition-colors relative z-10 flex items-center gap-2
+                   min-[360px]:px-5 min-[360px]:py-3.5 min-[360px]:text-[14px]
+                   md:px-5 md:py-3.5 md:text-[16px]"
             :class="activeTab === 'history'
               ? 'text-[#3B1F0E] font-bold'
               : 'text-[#9E7060] font-medium hover:text-[#3B1F0E]'"
@@ -310,12 +333,14 @@ onMounted(fetchOwner)
             :cafe-documents="primaryCafe?.documents ?? []"
             @view="viewDocument"
           />
-
-          <OwnerDetailPaymentHistoryTable 
-            :history="paymentHistory"
-            :owner-name="owner ? `${owner.firstname} ${owner.lastname}` : undefined"
-          />
         </template>
+
+        <!-- PAYMENTS TAB: the same payment table as the admin Payment History page -->
+        <PaymentHistoryTable
+          v-else-if="activeTab === 'payments'"
+          :history="paymentHistory"
+          :owner-name="`${owner.firstname} ${owner.lastname}`"
+        />
 
         <!-- APPLICATION HISTORY TAB -->
         <OwnerDetailApplicationHistory v-else-if="activeTab === 'history'" :entries="applicationHistory" />

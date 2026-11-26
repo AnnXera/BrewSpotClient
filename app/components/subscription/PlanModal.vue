@@ -15,6 +15,9 @@ const emit = defineEmits<{
 
 const subService = useSubscriptionService()
 
+// Shared look for every text field: same border, fill and focus ring as the approval modals.
+const inputClass = 'w-full rounded-xl border border-[#EADCC7] bg-white px-4 py-2.5 font-sans text-sm text-[#3B1F0E] placeholder:text-[#3B1F0E]/40 focus:outline-none focus:border-[#B4846C] focus:ring-2 focus:ring-[#7D5A50]/20 transition-colors'
+
 const isSaving = ref(false)
 const errorMessage = ref('')
 const form = ref({
@@ -142,221 +145,224 @@ async function save() {
   <Teleport to="body">
     <div
       v-if="open"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-[#3B1F0E]/40 backdrop-blur-sm p-4"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-sm p-3 sm:p-5"
       @click.self="emit('close')"
     >
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-        <!-- Scrollable Content -->
-        <div class="flex-1 min-h-0 overflow-y-auto p-6">
-          <!-- Top Category & Close Header -->
+      <!-- Card: same frame as the Approval Status modals -->
+      <div
+        role="dialog"
+        aria-modal="true"
+        :aria-label="plan ? 'Edit Subscription Plan' : 'New Subscription Plan'"
+        class="relative bg-white rounded-3xl w-full max-w-[720px] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] flex flex-col shadow-[0_24px_50px_-12px_rgba(59,31,14,0.22)] border border-[#EEDFC4] overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+      >
+        <!-- Header: title, plan name, status and ID; stays put while the body scrolls -->
+        <div class="px-6 pt-6 shrink-0">
           <div class="flex items-center justify-between mb-[24px]">
             <p class="font-display text-[14px] leading-[16.5px] tracking-[0.77%] font-semibold text-[#9E7060] uppercase">
               {{ plan ? 'Edit Subscription Plan' : 'New Subscription Plan' }}
             </p>
 
-            <button type="button" class="cursor-pointer text-[#9E7060] hover:text-[#3B1F0E] transition-colors" @click="emit('close')">
-              <Icon name="heroicons:x-mark" class="w-6 h-6" />
+            <button type="button" class="cursor-pointer" aria-label="Close" @click="emit('close')">
+              <img src="@/assets/images/x-button.svg" class="w-[24px] h-[24px]" alt="" />
             </button>
           </div>
 
-          <!-- Top Banner & Plan Information -->
-          <div class="flex items-center gap-3 pb-[24px] mb-[24px] border-b border-[#B4846C]">
-            <div class="w-14 h-14 rounded-2xl bg-[#FFF8EA] border border-[#EDD8CC] flex items-center justify-center text-[#7D5A50] shrink-0">
+          <div class="flex items-center gap-3 pb-[24px] border-b border-[#B4846C]">
+            <div class="w-[56px] h-[56px] rounded-[12px] bg-[#F0E3CE] text-[#7D5A50] flex items-center justify-center shrink-0">
               <Icon name="heroicons:credit-card" class="w-7 h-7" />
             </div>
 
             <div class="flex-1 min-w-0">
-              <div class="flex items-center justify-between gap-2">
-                <p class="font-display text-[24px] font-bold text-[#3D2B24] truncate">
-                  {{ form.sub_name || 'Untitled Plan' }}
-                </p>
-
-                <span
-                  class="inline-flex items-center px-2.5 py-0.5 rounded-full font-display font-semibold text-xs whitespace-nowrap shrink-0"
-                  :class="form.is_active ? 'bg-[#D4EDDA] text-[#28A745]' : 'bg-[#FDE8E8] text-[#DC3545]'"
-                >
-                  {{ form.is_active ? 'Active' : 'Inactive' }}
-                </span>
+              <div class="flex items-center justify-between gap-3">
+                <p class="font-display text-[24px] font-bold text-[#3D2B24] truncate">{{ form.sub_name || 'Untitled Plan' }}</p>
+                <StatusBadge :status="form.is_active ? 'active' : 'inactive'" />
               </div>
 
-              <p class="font-display text-[12px] text-[#9E7060]">
-                {{ plan ? `ID: ${plan.uuid.slice(0, 8)}` : 'Draft Tier Configuration' }}
+              <p class="font-display text-[12px] text-[#9E7060] truncate">
+                {{ plan ? `ID: ${plan.uuid.slice(0, 8)}` : 'New plan, not saved yet' }}
               </p>
             </div>
           </div>
+        </div>
 
-          <!-- Error Alert -->
-          <div v-if="errorMessage" class="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 font-sans text-xs">
+        <!-- Body -->
+        <form
+          id="subscriptionPlanModalForm"
+          class="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4"
+          @submit.prevent="save"
+        >
+          <p v-if="errorMessage" class="rounded-lg bg-[#FDE8E8] px-3 py-2 font-sans text-sm text-[#B42318]" role="alert">
             {{ errorMessage }}
-          </div>
+          </p>
 
-          <form id="subscriptionPlanModalForm" @submit.prevent="save" class="space-y-5">
-            <!-- Section 1: Plan Details -->
-            <div>
-              <h3 class="font-display text-[18px] font-bold text-[#3D2B24] mb-[16px]">
-                Plan Details
-              </h3>
+          <!-- Plan details -->
+          <section class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs">
+            <h3 class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5 mb-3">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+              Plan Details
+            </h3>
 
-              <div class="space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label class="block font-sans text-xs font-semibold uppercase tracking-wide text-[#3B1F0E]/70 mb-1">
-                      Plan Name *
-                    </label>
-                    <input
-                      v-model="form.sub_name"
-                      type="text"
-                      required
-                      placeholder="e.g. Enterprise Plan"
-                      class="w-full rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] px-4 py-2.5 font-sans text-sm text-[#3B1F0E] placeholder:text-[#B4846C] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
-                    />
-                  </div>
+            <div class="space-y-3">
+              <div>
+                <label for="plan_name" class="block text-xs font-bold text-[#8A6E64] mb-1">Plan Name *</label>
+                <input
+                  id="plan_name"
+                  v-model="form.sub_name"
+                  type="text"
+                  required
+                  placeholder="e.g. Enterprise Plan"
+                  :class="inputClass"
+                />
+              </div>
+
+              <div>
+                <label for="plan_description" class="block text-xs font-bold text-[#8A6E64] mb-1">Description</label>
+                <textarea
+                  id="plan_description"
+                  v-model="form.description"
+                  rows="2"
+                  placeholder="Brief summary of who this plan is intended for..."
+                  :class="[inputClass, 'resize-none']"
+                />
+              </div>
+
+              <label class="flex items-start gap-3 pt-1 cursor-pointer select-none">
+                <input
+                  v-model="form.is_active"
+                  type="checkbox"
+                  class="mt-0.5 h-4 w-4 rounded border-[#EDD8CC] accent-[#7D5A50] focus:ring-[#7D5A50]/30 cursor-pointer"
+                />
+                <span class="font-sans text-sm text-[#3B1F0E]">
+                  Plan is active
+                  <span class="block text-xs text-[#3B1F0E]/60 mt-0.5">
+                    {{ form.is_active ? 'Cafe owners can select this plan.' : 'Hidden from cafe owners until you turn it back on.' }}
+                  </span>
+                </span>
+              </label>
+            </div>
+          </section>
+
+          <!-- Pricing -->
+          <section class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs">
+            <h3 class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5 mb-3">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+              Pricing
+            </h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+              <div>
+                <div class="flex items-center h-6 mb-1">
+                  <label for="plan_price" class="block text-xs font-bold text-[#8A6E64]">Monthly Price *</label>
                 </div>
-
-                <!-- Pricing Row (Monthly & Yearly) -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label class="block font-sans text-xs font-semibold uppercase tracking-wide text-[#3B1F0E]/70 mb-1">
-                      Monthly Price (₱) *
-                    </label>
-                    <input
-                      v-model.number="form.price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      required
-                      class="w-full rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] px-4 py-2.5 font-sans text-sm text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
-                    />
-                  </div>
-
-                  <div>
-                    <div class="flex items-center justify-between mb-1">
-                      <label class="block font-sans text-xs font-semibold uppercase tracking-wide text-[#3B1F0E]/70">
-                        Yearly Price (₱) *
-                      </label>
-                      <span
-                        v-if="yearlyDiscountPercent > 0"
-                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-[#D4EDDA] text-[#28A745]"
-                      >
-                        Save {{ yearlyDiscountPercent }}%
-                      </span>
-                    </div>
-                    <input
-                      v-model.number="form.yearly_price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      required
-                      class="w-full rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] px-4 py-2.5 font-sans text-sm text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
-                    />
-                    <p v-if="form.yearly_price > 0" class="font-sans text-[11px] text-[#9E7060] mt-1">
-                      Effective ₱{{ effectiveMonthlyRate }}/mo billed annually
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <label class="block font-sans text-xs font-semibold uppercase tracking-wide text-[#3B1F0E]/70 mb-1">
-                    Trial Duration (Days)
-                  </label>
+                <div class="relative">
+                  <span class="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center text-sm font-semibold text-[#B4846C]">₱</span>
                   <input
-                    v-model.number="form.duration_days"
+                    id="plan_price"
+                    v-model.number="form.price"
                     type="number"
-                    min="1"
-                    class="w-full rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] px-4 py-2.5 font-sans text-sm text-[#3B1F0E] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30"
-                  />
-                  <p class="font-sans text-[11px] text-[#9E7060] mt-1">
-                    Leave blank for paid plans. Only applies to trial subscriptions.
-                  </p>
-                </div>
-
-                <div>
-                  <label class="block font-sans text-xs font-semibold uppercase tracking-wide text-[#3B1F0E]/70 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    v-model="form.description"
-                    rows="2"
-                    placeholder="Brief summary of who this plan is intended for..."
-                    class="w-full rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] px-4 py-2.5 font-sans text-sm text-[#3B1F0E] placeholder:text-[#B4846C] focus:outline-none focus:ring-2 focus:ring-[#7D5A50]/30 resize-none"
+                    step="0.01"
+                    min="0"
+                    required
+                    :class="[inputClass, 'pl-8 tabular-nums']"
                   />
                 </div>
+              </div>
 
-                <div class="flex items-center gap-2 pt-1">
+              <div>
+                <div class="flex items-center justify-between gap-2 h-6 mb-1">
+                  <label for="plan_yearly" class="block text-xs font-bold text-[#8A6E64]">Yearly Price *</label>
+                  <span
+                    v-if="yearlyDiscountPercent > 0"
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-[#FAF4ED] text-[#7D5A50] border border-[#EEDFC4]"
+                  >
+                    Save {{ yearlyDiscountPercent }}%
+                  </span>
+                </div>
+                <div class="relative">
+                  <span class="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center text-sm font-semibold text-[#B4846C]">₱</span>
                   <input
-                    id="modal_plan_is_active"
-                    v-model="form.is_active"
-                    type="checkbox"
-                    class="w-4 h-4 rounded text-[#7D5A50] focus:ring-[#7D5A50] border-gray-300"
+                    id="plan_yearly"
+                    v-model.number="form.yearly_price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    :class="[inputClass, 'pl-8 tabular-nums']"
                   />
-                  <label for="modal_plan_is_active" class="font-sans text-xs font-medium text-[#3B1F0E] cursor-pointer">
-                    Plan is active and selectable by cafe owners
-                  </label>
                 </div>
+                <p v-if="form.yearly_price > 0" class="text-xs text-[#8A6E64] mt-1 tabular-nums">
+                  Works out to ₱{{ effectiveMonthlyRate }}/mo, billed annually
+                </p>
+              </div>
+
+              <div class="sm:col-span-2">
+                <label for="plan_days" class="block text-xs font-bold text-[#8A6E64] mb-1">Trial Duration (Days)</label>
+                <input
+                  id="plan_days"
+                  v-model.number="form.duration_days"
+                  type="number"
+                  min="1"
+                  :class="[inputClass, 'tabular-nums sm:max-w-[calc(50%-0.5rem)]']"
+                />
+                <p class="text-xs text-[#8A6E64] mt-1">Leave blank for paid plans. Only applies to trial subscriptions.</p>
               </div>
             </div>
+          </section>
 
+          <!-- Feature entitlements -->
+          <section class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs">
+            <div class="flex items-center justify-between gap-3 mb-1">
+              <h3 class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+                Feature Entitlements
+              </h3>
+              <span class="text-xs font-bold text-[#8A6E64] tabular-nums">{{ form.features.length }} selected</span>
+            </div>
+            <p class="text-xs text-[#8A6E64] mb-3">Choose which modules and tools cafe owners on this plan can use.</p>
 
-            <!-- Section 2: Included Features -->
-            <div class="pt-4 border-t border-[#F3E7D2]">
-              <div class="flex items-center justify-between mb-2">
-                <h3 class="font-display text-[18px] font-bold text-[#3D2B24]">
-                  Feature Entitlements
-                </h3>
-                <span class="font-display text-xs text-[#9E7060] font-semibold">
-                  {{ form.features.length }} selected
-                </span>
-              </div>
-
-              <p class="font-sans text-xs text-[#9E7060] mb-3">
-                Select which modules and tools cafe owners on this plan can access.
-              </p>
-
-              <div class="rounded-xl overflow-hidden border border-[#EDD8CC]">
-                <div
-                  v-for="(feat, idx) in activeFeatures"
-                  :key="feat.key"
-                  class="flex items-start gap-3 bg-[#FFF8EA] px-[20px] py-[12px] cursor-pointer transition-colors hover:bg-[#FFF2DE]"
-                  :class="{ 'border-t border-[#EDD8CC]': idx > 0 }"
-                  @click="toggleFeature(feat.key)"
+            <ul v-if="activeFeatures.length" class="space-y-2">
+              <li v-for="feat in activeFeatures" :key="feat.key">
+                <label
+                  class="flex items-center gap-3 px-3 py-2.5 border rounded-xl cursor-pointer select-none transition-colors"
+                  :class="form.features.includes(feat.key) ? 'border-[#B4846C] bg-[#FFFCF7]' : 'border-[#EADCC7] bg-white hover:bg-[#FAF4ED]'"
                 >
+                  <span class="w-9 h-9 rounded-lg bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0">
+                    <Icon name="heroicons:squares-2x2" class="w-[18px] h-[18px]" />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-sm font-semibold text-[#3D2B24] truncate">{{ feat.name }}</span>
+                    <span class="block text-xs text-[#8A6E64] truncate">{{ feat.description || feat.key }}</span>
+                  </span>
                   <input
                     type="checkbox"
                     :checked="form.features.includes(feat.key)"
-                    class="mt-1 w-4 h-4 rounded text-[#7D5A50] focus:ring-[#7D5A50] border-gray-300 pointer-events-none"
+                    class="h-4 w-4 rounded border-[#EDD8CC] accent-[#7D5A50] focus:ring-[#7D5A50]/30 cursor-pointer shrink-0"
+                    @change="toggleFeature(feat.key)"
                   />
-                  <div class="flex-1">
-                    <p class="font-display font-semibold text-[14px] text-[#3B1F0E]">{{ feat.name }}</p>
-                    <p class="font-sans text-xs text-[#9E7060] mt-0.5">{{ feat.description || feat.key }}</p>
-                  </div>
-                </div>
+                </label>
+              </li>
+            </ul>
 
-                <div v-if="activeFeatures.length === 0" class="p-6 text-center text-xs text-[#9E7060]">
-                  No active features found. Create features in the Features Catalog tab.
-                </div>
-              </div>
-            </div>
-          </form>
-        </div>
+            <p v-else class="rounded-xl border border-dashed border-[#EADCC7] bg-white px-4 py-6 text-center text-xs text-[#8A6E64]">
+              No active features found. Create features in the Features Catalog tab.
+            </p>
+          </section>
+        </form>
 
-        <!-- Modal Actions (Matching ApprovalDetailsModal Footer) -->
-        <div class="flex items-center justify-end gap-3 border-t border-[#F3E7D2] p-6 bg-white shrink-0">
+        <!-- Actions (same as the Approval Status modals) -->
+        <div class="flex items-center gap-3 border-t border-[#F3E7D2] p-6 bg-white shrink-0">
           <button
             type="button"
-            class="rounded-lg px-4 py-2 font-sans text-sm font-medium text-[#3B1F0E]/70 hover:bg-[#F3E7D2] transition-colors"
+            class="flex-1 rounded-xl border border-[#7D5A50] bg-white text-[#7D5A50] font-display font-semibold text-[14px] py-3 hover:bg-[#FFF8EA] transition-colors disabled:opacity-50"
+            :disabled="isSaving"
             @click="emit('close')"
-          >
-            Cancel
-          </button>
+          >Cancel</button>
           <button
             type="submit"
             form="subscriptionPlanModalForm"
+            class="flex-1 rounded-xl border border-[#7D5A50] bg-[#7D5A50] text-[#FFF0D1] font-display font-semibold text-[14px] py-3 hover:bg-[#65463D] hover:border-[#65463D] transition-colors disabled:opacity-50"
             :disabled="isSaving"
-            class="rounded-lg px-5 py-2 font-sans text-sm font-semibold bg-[#7D5A50] text-[#FDF3E7] hover:bg-[#684940] transition-colors disabled:opacity-50 shadow-sm"
-          >
-            <span v-if="isSaving">Saving...</span>
-            <span v-else>{{ plan ? 'Update Plan' : 'Save Plan' }}</span>
-          </button>
+          >{{ isSaving ? 'Saving…' : plan ? 'Update Plan' : 'Create Plan' }}</button>
         </div>
       </div>
     </div>
