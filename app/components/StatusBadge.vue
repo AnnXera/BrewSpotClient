@@ -20,9 +20,14 @@ const props = defineProps<Props>()
 
 const normalizedStatus = computed(() => (props.status ?? '').trim())
 
-const label = computed(() =>
-  normalizedStatus.value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || '—'
-)
+// Admin pages say just "Pending"; owners and managers keep "Pending Approval" for their own requests.
+const route = useRoute()
+const isAdminPage = computed(() => route.path.startsWith('/admin'))
+
+const label = computed(() => {
+  if (isAdminPage.value && normalizedStatus.value.toLowerCase() === 'pending_approval') return 'Pending'
+  return normalizedStatus.value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || '—'
+})
 
 const isApproved = computed(() =>
   ['active', 'approved', 'succeeded', 'success'].includes(normalizedStatus.value.toLowerCase())

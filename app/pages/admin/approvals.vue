@@ -549,7 +549,7 @@ watch(() => route.query.uuid, async (uuid) => {
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Contacts</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Status</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Submitted At</th>
-                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Actions</th>
+                <th class="w-12 px-4 py-3.5"><span class="sr-only">Open</span></th>
               </tr>
             </thead>
 
@@ -561,7 +561,7 @@ watch(() => route.query.uuid, async (uuid) => {
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">CORs</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Status</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Submitted At</th>
-                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Actions</th>
+                <th class="w-12 px-4 py-3.5"><span class="sr-only">Open</span></th>
               </tr>
             </thead>
 
@@ -573,7 +573,7 @@ watch(() => route.query.uuid, async (uuid) => {
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Address</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Status</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Submitted At</th>
-                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Actions</th>
+                <th class="w-12 px-4 py-3.5"><span class="sr-only">Open</span></th>
               </tr>
             </thead>
 
@@ -604,8 +604,12 @@ watch(() => route.query.uuid, async (uuid) => {
                 <tr
                   v-for="req in cafeUpdates"
                   :key="req.uuid"
-                  class="border-b border-[#F3E7D2] last:border-b-0 hover:bg-[#FAF4ED]/60 transition-colors duration-150 ease-out cursor-pointer group font-sans"
+                  class="border-b border-[#F3E7D2] last:border-b-0 hover:bg-[#FAF4ED]/60 transition-colors duration-150 ease-out cursor-pointer group font-sans outline-none focus-visible:bg-[#FAF4ED] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#B4846C]/40"
+                  tabindex="0"
+                  :aria-label="`Open ${req.type === 'address_change' ? 'address change' : 'name change'} request from ${req.owner?.name || 'owner'}`"
                   @click="openCafeUpdate(req.uuid, req)"
+                  @keydown.enter.prevent="openCafeUpdate(req.uuid, req)"
+                  @keydown.space.prevent="openCafeUpdate(req.uuid, req)"
                 >
                   <td class="px-6 py-4 max-w-[320px]">
                     <template v-if="req.type === 'address_change'">
@@ -632,15 +636,8 @@ watch(() => route.query.uuid, async (uuid) => {
                   <td class="px-6 py-4 font-sans text-sm text-[#5E4A42] whitespace-nowrap">
                     {{ req.submitted_at ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(req.submitted_at)) : '—' }}
                   </td>
-                  <td class="px-6 py-4">
-                    <button
-                      type="button"
-                      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-semibold text-xs hover:bg-[#FAF4ED] hover:border-[#D9C4B8] hover:text-[#3D2B24] active:scale-95 transition-[transform,background-color,border-color] duration-140 ease-out shadow-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-                      @click.stop="openCafeUpdate(req.uuid, req)"
-                    >
-                      <span>View</span>
-                      <Icon name="heroicons:arrow-right" class="w-3.5 h-3.5 text-[#B4846C]" />
-                    </button>
+                  <td class="w-12 px-4 py-4 text-right">
+                    <Icon name="heroicons:chevron-right" class="w-5 h-5 text-[#C2A592] transition-[color,transform] duration-150 group-hover:translate-x-0.5 group-hover:text-[#7D5A50]" aria-hidden="true" />
                   </td>
                 </tr>
               </template>
