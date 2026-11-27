@@ -588,7 +588,7 @@ onMounted(fetchBranch)
 
               <!-- POS Registers (full width, under both cards) -->
               <div v-if="isOperational" class="cafe-card cafe-card-3 lg:col-span-2">
-                <PosDevicesCard :branch-uuid="branch.uuid" scope="owner" />
+                <PosDevicesCard :branch-uuid="branch.uuid" :branch-name="branch.branch_name" scope="owner" />
               </div>
             </div>
 

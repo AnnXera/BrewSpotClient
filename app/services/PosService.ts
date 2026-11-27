@@ -118,6 +118,11 @@ export class PosService extends BaseService {
         return this.get<{ success: boolean; devices: BranchPosDevice[] }>(`/${scope}/branches/${branchUuid}/pos-devices`)
     }
 
+    // Revokes the register's token; the device must be set up again before it can take orders.
+    removeBranchDevice(scope: 'owner' | 'manager', branchUuid: string, deviceUuid: string) {
+        return this.delete<{ success: boolean; message: string }>(`/${scope}/branches/${branchUuid}/pos-devices/${deviceUuid}`)
+    }
+
     // ── Setup API (Uses Owner/Manager auth_token) ────────────────────────────────
 
     getSetupBranches() {

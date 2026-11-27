@@ -7,6 +7,7 @@ import type { BranchPosDevice } from '~/services/PosService'
 const props = defineProps<{
   branchUuid: string
   scope: 'owner' | 'manager'
+  branchName?: string
 }>()
 
 const posService = usePosService()
@@ -64,6 +65,47 @@ function formatDate(iso: string | null) {
 }
 
 const isQrModalOpen = ref(false)
+
+// ── Remove a register from the dashboard (lost/broken/retired device) ──
+const removing = ref<BranchPosDevice | null>(null)
+const removeBusy = ref(false)
+const removeError = ref('')
+const notice = ref('')
+let noticeTimer: ReturnType<typeof setTimeout> | null = null
+
+function askRemove(device: BranchPosDevice) {
+  removeError.value = ''
+  removing.value = device
+}
+
+function closeRemove() {
+  if (!removeBusy.value) removing.value = null
+}
+
+async function confirmRemove() {
+  const device = removing.value
+  if (!device || removeBusy.value) return
+  removeBusy.value = true
+  removeError.value = ''
+  try {
+    const res = await posService.removeBranchDevice(props.scope, props.branchUuid, device.uuid)
+    if (!res.success) {
+      removeError.value = res.message || 'The register could not be removed.'
+      return
+    }
+    devices.value = devices.value.filter(d => d.uuid !== device.uuid)
+    removing.value = null
+    notice.value = res.message || `Register "${device.name}" removed.`
+    if (noticeTimer) clearTimeout(noticeTimer)
+    noticeTimer = setTimeout(() => { notice.value = '' }, 5000)
+  } catch (e: any) {
+    removeError.value = e?.data?.message || 'The register could not be removed. Please try again.'
+  } finally {
+    removeBusy.value = false
+  }
+}
+
+onBeforeUnmount(() => { if (noticeTimer) clearTimeout(noticeTimer) })
 </script>
 
 <template>
@@ -96,6 +138,19 @@ const isQrModalOpen = ref(false)
         </button>
       </div>
     </div>
+
+    <!-- Success note after removing a register -->
+    <p
+      v-if="notice"
+      role="status"
+      class="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-[13px] font-medium text-emerald-800"
+    >
+      <Icon name="heroicons:check-circle" class="size-4 shrink-0 text-emerald-600" />
+      <span class="flex-1">{{ notice }}</span>
+      <button type="button" class="text-emerald-700 hover:text-emerald-900 cursor-pointer" aria-label="Dismiss" @click="notice = ''">
+        <Icon name="heroicons:x-mark" class="size-4" />
+      </button>
+    </p>
 
     <!-- Loading -->
     <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3" aria-hidden="true">
@@ -148,6 +203,16 @@ const isQrModalOpen = ref(false)
             <template v-if="device.created_at"> · Added {{ formatDate(device.created_at) }}<template v-if="device.registered_by"> by {{ device.registered_by }}</template></template>
           </p>
         </div>
+
+        <button
+          type="button"
+          class="-mr-1.5 -mt-1.5 size-9 shrink-0 rounded-lg flex items-center justify-center text-[#9E7060] hover:text-[#9E4F47] hover:bg-[#F3DFDC]/70 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9E4F47]"
+          :aria-label="`Remove register ${device.name}`"
+          title="Remove register"
+          @click="askRemove(device)"
+        >
+          <Icon name="heroicons:trash" class="size-[18px]" />
+        </button>
       </li>
     </ul>
 
@@ -180,8 +245,54 @@ const isQrModalOpen = ref(false)
       :show="isQrModalOpen"
       :scope="props.scope"
       :branch-uuid="props.branchUuid"
+      :branch-name="props.branchName"
       @close="isQrModalOpen = false"
     />
+
+    <!-- Remove register confirmation -->
+    <CommonDialogShell
+      :open="!!removing"
+      tone="danger"
+      icon="heroicons:trash"
+      :title="`Remove ${removing?.name ?? 'this register'}?`"
+      message="This device is signed out of the register right away. Someone will need to set it up again before it can take orders. Past sales stay in your records."
+      :busy="removeBusy"
+      @close="closeRemove"
+    >
+      <div class="space-y-2.5">
+        <p
+          v-if="removing?.active_staff"
+          class="flex items-start gap-2 rounded-xl border border-[#E5C5C0] bg-[#F3DFDC]/60 px-3.5 py-2.5 text-[12.5px] leading-snug text-[#7A3B34]"
+        >
+          <Icon name="heroicons:exclamation-triangle" class="mt-px size-4 shrink-0 text-[#9E4F47]" />
+          <span><strong class="font-semibold">{{ removing.active_staff.name }}</strong> is signed in on this register now. Removing it ends their session.</span>
+        </p>
+        <p v-if="removeError" role="alert" class="rounded-xl border border-[#E5C5C0] bg-[#F3DFDC]/60 px-3.5 py-2.5 text-xs font-semibold text-[#9E4F47]">
+          {{ removeError }}
+        </p>
+      </div>
+
+      <template #actions>
+        <button
+          type="button"
+          data-autofocus
+          :disabled="removeBusy"
+          class="whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold bg-transparent text-[#5E4A42] border border-[#DED4CA] hover:bg-[#F1E9DE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] transition-colors disabled:opacity-50"
+          @click="closeRemove"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          :disabled="removeBusy"
+          class="whitespace-nowrap rounded-[10px] px-4 py-[11px] text-[13px] font-semibold text-white bg-[#9E4F47] hover:bg-[#8A423B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#9E4F47] transition-colors disabled:opacity-60 inline-flex items-center justify-center gap-2"
+          @click="confirmRemove"
+        >
+          <Icon v-if="removeBusy" name="heroicons:arrow-path" class="size-4 animate-spin" />
+          {{ removeBusy ? 'Removing...' : 'Remove register' }}
+        </button>
+      </template>
+    </CommonDialogShell>
   </section>
 </template>
 
