@@ -189,11 +189,6 @@ onUnmounted(() => clearTimeout(successTimer))
               <p v-if="receiptData.branchAddress" class="text-[11px] text-[#8A6E64]">
                 {{ receiptData.branchAddress }}
               </p>
-              <div class="pt-1">
-                <span class="inline-block text-[10px] font-bold text-[#7B5A50] uppercase tracking-widest px-2 py-0.5 rounded bg-[#7B5A50]/10">
-                  Official Receipt
-                </span>
-              </div>
             </div>
 
             <!-- Dashed separator -->

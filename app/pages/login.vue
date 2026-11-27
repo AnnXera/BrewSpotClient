@@ -9,14 +9,6 @@ const route = useRoute()
 const notice = ref((route.query.notice as string) || '')
 watch(() => route.query.notice, (v) => { notice.value = (v as string) || '' })
 
-// The POS register also runs in a normal browser tab (the PWA is optional).
-// A browser that is already a register gets a shortcut to its PIN screen; any other browser
-// can be set up as one (the owner/manager signs in here, then picks the branch on /pos/setup).
-const posDeviceToken = usePosDeviceToken()
-const isPosRegister = computed(() => !!posDeviceToken.value)
-const isPosSetupLogin = computed(() => route.query.redirect === '/pos/setup')
-const POS_SETUP_NOTICE = 'Sign in with your Cafe Owner or Manager account to set up this browser as a POS register.'
-
 const form = reactive({
   email: '',
   password: '',
@@ -180,21 +172,6 @@ async function handleForgotPassword() {
           <p class="text-gray-600 text-sm mt-1">Sign in to your account</p>
         </div>
 
-        <!-- This browser is a registered POS register: staff go to the PIN screen, not this form -->
-        <NuxtLink
-          v-if="isPosRegister"
-          to="/pos"
-          class="group flex items-center gap-3 rounded-xl border border-[#7B5A50]/25 bg-white p-3.5 shadow-sm transition-colors hover:border-[#7B5A50]/60 hover:bg-[#FFFCF6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7B5A50]"
-        >
-          <span class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#7B5A50] text-white">
-            <Icon name="heroicons:computer-desktop" class="h-5 w-5" />
-          </span>
-          <span class="min-w-0 flex-1">
-            <span class="block text-sm font-bold text-[#2d201b]">Open POS register</span>
-            <span class="block text-xs text-gray-600">This browser is set up as a register. Staff sign in with their PIN.</span>
-          </span>
-          <Icon name="heroicons:arrow-right" class="h-4 w-4 shrink-0 text-[#7B5A50] transition-transform group-hover:translate-x-0.5" />
-        </NuxtLink>
 
         <!-- Info Notice Banner (e.g. "password already set up") -->
         <div
@@ -289,18 +266,6 @@ async function handleForgotPassword() {
             >
               Register Business
             </button>
-          </p>
-
-          <!-- Turn this browser into a register without installing the app -->
-          <p v-if="!isPosRegister && !isPosSetupLogin" class="border-t border-[#7B5A50]/10 pt-4 text-center text-sm text-gray-600">
-            Using this device at the counter?
-            <NuxtLink
-              :to="{ path: '/login', query: { redirect: '/pos/setup', notice: POS_SETUP_NOTICE } }"
-              replace
-              class="ml-1 font-semibold text-[#7B5A50] hover:underline"
-            >
-              Set up as POS register
-            </NuxtLink>
           </p>
         </form>
       </div>

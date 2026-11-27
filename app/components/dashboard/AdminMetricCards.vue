@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CardAction from '~/components/dashboard/CardAction.vue'
 import { computed } from 'vue'
 import { formatCount, formatPeso } from '~/utils/dashboardFormat'
 
@@ -30,23 +31,19 @@ const pendingTotal = computed(() => props.ownerPending + props.branchPending)
           <span v-if="loading" class="skeleton-dark inline-block h-[0.85em] w-14 rounded-md align-middle" />
           <template v-else>{{ formatCount(totalOwners) }}</template>
         </p>
-        <p class="mt-3 text-[13px] text-[#D9BFA8] min-h-[20px] flex flex-wrap items-center gap-x-3 gap-y-1">
+        <p class="mt-3 text-[13px] text-[#D9BFA8] min-h-[32px] flex items-center gap-3">
           <template v-if="!loading">
-            <span class="inline-flex items-center gap-1.5">
-              <span class="h-1.5 w-1.5 rounded-full bg-[#7FD49B]" aria-hidden="true" />
-              {{ formatCount(activeOwners) }} active
+            <span class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+              <span class="inline-flex items-center gap-1.5">
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+                {{ formatCount(activeOwners) }} active
+              </span>
+              <span v-if="suspendedOwners" class="inline-flex items-center gap-1.5">
+                <span class="h-1.5 w-1.5 rounded-full bg-amber-400" aria-hidden="true" />
+                {{ formatCount(suspendedOwners) }} suspended
+              </span>
             </span>
-            <span v-if="suspendedOwners" class="inline-flex items-center gap-1.5">
-              <span class="h-1.5 w-1.5 rounded-full bg-[#F2B66D]" aria-hidden="true" />
-              {{ formatCount(suspendedOwners) }} suspended
-            </span>
-            <NuxtLink
-              to="/admin/owners"
-              class="ml-auto inline-flex items-center gap-1 rounded text-[#FFF0D1] underline decoration-[#FFF0D1]/30 underline-offset-4 hover:decoration-[#FFF0D1] active:scale-[0.97] transition-transform duration-160 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFF0D1]/70"
-            >
-              Manage
-              <Icon name="heroicons:arrow-up-right-20-solid" class="h-3.5 w-3.5" />
-            </NuxtLink>
+            <CardAction to="/admin/owners" variant="dark" class="ml-auto">Manage</CardAction>
           </template>
         </p>
       </div>
@@ -58,20 +55,14 @@ const pendingTotal = computed(() => props.ownerPending + props.branchPending)
           <span v-if="loading" class="skeleton-dark inline-block h-[0.85em] w-14 rounded-md align-middle" />
           <template v-else>{{ formatCount(pendingTotal) }}</template>
         </p>
-        <p class="mt-3 text-[13px] text-[#D9BFA8] min-h-[20px] flex flex-wrap items-center gap-x-3 gap-y-1">
+        <p class="mt-3 text-[13px] text-[#D9BFA8] min-h-[32px] flex items-center gap-3">
           <template v-if="!loading">
             <template v-if="pendingTotal">
-              <span class="tabular-nums">{{ ownerPending }} {{ ownerPending === 1 ? 'owner' : 'owners' }} · {{ branchPending }} {{ branchPending === 1 ? 'branch' : 'branches' }}</span>
-              <NuxtLink
-                to="/admin/approvals"
-                class="ml-auto inline-flex items-center gap-1 rounded text-[#FFF0D1] underline decoration-[#FFF0D1]/30 underline-offset-4 hover:decoration-[#FFF0D1] active:scale-[0.97] transition-transform duration-160 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFF0D1]/70"
-              >
-                Review
-                <Icon name="heroicons:arrow-up-right-20-solid" class="h-3.5 w-3.5" />
-              </NuxtLink>
+              <span class="min-w-0 tabular-nums">{{ ownerPending }} {{ ownerPending === 1 ? 'owner' : 'owners' }} · {{ branchPending }} {{ branchPending === 1 ? 'branch' : 'branches' }}</span>
+              <CardAction to="/admin/approvals" variant="dark" class="ml-auto">Review</CardAction>
             </template>
             <span v-else class="inline-flex items-center gap-1.5">
-              <span class="h-1.5 w-1.5 rounded-full bg-[#7FD49B]" aria-hidden="true" />
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
               Nothing to review
             </span>
           </template>
@@ -85,16 +76,10 @@ const pendingTotal = computed(() => props.ownerPending + props.branchPending)
           <span v-if="loading" class="skeleton-dark inline-block h-[0.85em] w-14 rounded-md align-middle" />
           <template v-else>{{ formatCount(activeSubscriptions) }}</template>
         </p>
-        <p class="mt-3 text-[13px] text-[#D9BFA8] min-h-[20px] flex items-center">
+        <p class="mt-3 text-[13px] text-[#D9BFA8] min-h-[32px] flex items-center gap-3">
           <template v-if="!loading">
-            <span>On monthly or yearly plans</span>
-            <NuxtLink
-              to="/admin/subscriptions"
-              class="ml-auto inline-flex items-center gap-1 rounded text-[#FFF0D1] underline decoration-[#FFF0D1]/30 underline-offset-4 hover:decoration-[#FFF0D1] active:scale-[0.97] transition-transform duration-160 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFF0D1]/70"
-            >
-              Plans
-              <Icon name="heroicons:arrow-up-right-20-solid" class="h-3.5 w-3.5" />
-            </NuxtLink>
+            <span class="min-w-0">On monthly or yearly plans</span>
+            <CardAction to="/admin/subscriptions" variant="dark" class="ml-auto">Plans</CardAction>
           </template>
         </p>
       </div>
@@ -106,7 +91,7 @@ const pendingTotal = computed(() => props.ownerPending + props.branchPending)
           <span v-if="loading" class="skeleton-dark inline-block h-[0.85em] w-32 rounded-md align-middle" />
           <template v-else>{{ formatPeso(totalRevenue) }}</template>
         </p>
-        <p class="mt-3 text-[13px] text-[#D9BFA8] min-h-[20px]">
+        <p class="mt-3 text-[13px] text-[#D9BFA8] min-h-[32px] flex items-center">
           <template v-if="!loading">Gross billing, all time</template>
         </p>
       </div>
