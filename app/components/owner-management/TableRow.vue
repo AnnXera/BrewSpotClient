@@ -78,17 +78,11 @@ const statusMeta = computed(() => {
       <span v-else class="font-sans text-xs text-[#9E7060]/70 italic">—</span>
     </td>
 
-    <!-- Contact Info (Phone & Email) -->
+    <!-- Email -->
     <td class="px-6 py-4">
-      <div class="flex flex-col gap-0.5">
-        <div class="flex items-center gap-1.5 font-sans text-xs font-semibold text-[#3D2B24]">
-          <Icon name="heroicons:phone" class="w-3.5 h-3.5 text-[#B4846C] shrink-0" />
-          <span>{{ owner.phone_number || '—' }}</span>
-        </div>
-        <div class="flex items-center gap-1.5 font-sans text-xs text-[#7D5A50]">
-          <Icon name="heroicons:envelope" class="w-3.5 h-3.5 text-[#B4846C]/70 shrink-0" />
-          <span class="truncate max-w-[200px]">{{ owner.email }}</span>
-        </div>
+      <div class="flex items-center gap-1.5 font-sans text-xs font-semibold text-[#3D2B24]" :title="owner.email">
+        <Icon name="heroicons:envelope" class="w-3.5 h-3.5 text-[#B4846C] shrink-0" aria-hidden="true" />
+        <span class="truncate max-w-[220px]">{{ owner.email || '—' }}</span>
       </div>
     </td>
 

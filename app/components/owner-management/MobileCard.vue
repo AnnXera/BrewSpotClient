@@ -80,26 +80,14 @@ const statusMeta = computed(() => {
     <!-- Divider -->
     <div class="h-px bg-[#F3E7D2] my-3" />
 
-    <!-- Row 2: Contacts Grid (Phone & Email) -->
-    <div class="grid grid-cols-2 gap-3 text-xs">
-      <div class="min-w-0">
-        <span class="font-sans text-[10px] font-bold uppercase tracking-wider text-[#9E7060] block mb-0.5">
-          Phone
-        </span>
-        <div class="flex items-center gap-1 text-[#3D2B24] font-medium truncate">
-          <Icon name="heroicons:phone" class="w-3 h-3 text-[#B4846C] shrink-0" />
-          <span class="truncate">{{ owner.phone_number || '—' }}</span>
-        </div>
-      </div>
-
-      <div class="min-w-0">
-        <span class="font-sans text-[10px] font-bold uppercase tracking-wider text-[#9E7060] block mb-0.5">
-          Email
-        </span>
-        <div class="flex items-center gap-1 text-[#7D5A50] truncate">
-          <Icon name="heroicons:envelope" class="w-3 h-3 text-[#B4846C]/70 shrink-0" />
-          <span class="truncate">{{ owner.email }}</span>
-        </div>
+    <!-- Row 2: Email -->
+    <div class="text-xs min-w-0">
+      <span class="font-sans text-[10px] font-bold uppercase tracking-wider text-[#9E7060] block mb-0.5">
+        Email
+      </span>
+      <div class="flex items-center gap-1 text-[#3D2B24] font-medium min-w-0">
+        <Icon name="heroicons:envelope" class="w-3 h-3 text-[#B4846C] shrink-0" aria-hidden="true" />
+        <span class="truncate">{{ owner.email || '—' }}</span>
       </div>
     </div>
 
