@@ -3,7 +3,7 @@ import logoIcon from '~/assets/images/logo-icon.svg'
 import FloorPlanModal from '~/components/pos/FloorPlanModal.vue'
 import MenuItemCard from '~/components/pos/MenuItemCard.vue'
 import { formatOrderType } from '~/utils/dashboardFormat'
-import type { PosOrderType } from '~/services/PosService'
+import type { PosHoursStatus, PosOrderType } from '~/services/PosService'
 import { variantLabel, TEMPERATURE_LABELS, type Temperature } from '~/utils/variant'
 
 // POS Register uses its own auth via pos_device_token cookie
@@ -23,6 +23,42 @@ const device = ref<any>(null)
 const staffList = ref<any[]>([])
 
 const selectedStaff = ref<any>(null)
+
+// ── OPENING HOURS ──────────────────────────────────────────────────────────
+// The server refuses register actions outside the cafe's hours (423) and signs the
+// cashier out. Here we show a closed screen and re-check when the cafe opens or closes.
+const posClosed = usePosClosed()
+const recheckAt = ref<number | null>(null)
+
+function applyHours(hours?: PosHoursStatus) {
+  if (!hours) {
+    posClosed.value = null
+    recheckAt.value = null
+    return
+  }
+  posClosed.value = hours.is_open ? null : { opensAt: hours.opens_at }
+  const target = hours.is_open ? hours.closes_at : hours.opens_at
+  const t = target ? new Date(target).getTime() : NaN
+  // A second past the boundary; if this clock is ahead of the server's, retry in 30s.
+  // No boundary coming up (24/7, or no hours ahead): look again in 5 minutes in case hours change.
+  recheckAt.value = Number.isNaN(t) ? Date.now() + 5 * 60_000 : t > Date.now() ? t + 1000 : Date.now() + 30_000
+}
+
+const closedOpensText = computed(() => {
+  const iso = posClosed.value?.opensAt
+  if (!iso) return 'No opening hours are coming up. Ask the owner to check the cafe\'s operating hours.'
+  const tz = 'Asia/Manila' // cafe time, as on the dashboard
+  const opens = new Date(iso)
+  const dayKey = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: tz })
+  const now = currentTime.value
+  const when = dayKey(opens) === dayKey(now)
+    ? 'today'
+    : dayKey(opens) === dayKey(new Date(now.getTime() + 86_400_000))
+      ? 'tomorrow'
+      : `on ${opens.toLocaleDateString('en-US', { timeZone: tz, weekday: 'long' })}`
+  return `Opens ${when} at ${opens.toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' })}.`
+})
+
 const pinInput = ref('')
 const isChangingPin = ref(false)
 const newPinInput = ref('')
@@ -41,7 +77,11 @@ async function loadDeviceData() {
     const devRes = await devicePosService.getCurrentDevice()
     if (devRes.success) {
       device.value = devRes.device
-      
+      applyHours(devRes.hours)
+
+      // Outside opening hours: show the closed screen, nothing else to load.
+      if (posClosed.value) return
+
       // If a staff is already active, we are unlocked!
       if (device.value.active_staff) {
         selectedStaff.value = device.value.active_staff
@@ -72,6 +112,8 @@ async function loadDeviceData() {
       posDeviceCookie.value = null
       router.push('/pos/setup')
     }
+    // Closed mid-load (423): the closed screen explains it.
+    if (posClosed.value) return
     errorMessage.value = e?.data?.message || 'Failed to load POS data'
     loadError.value = e?.data?.message || (navigator.onLine ? 'The register data could not be loaded.' : 'No internet connection.')
   } finally {
@@ -326,6 +368,11 @@ onMounted(() => {
   loadDeviceData()
   timer = setInterval(() => {
     currentTime.value = new Date()
+    // Opening or closing time reached: ask the server (it signs the cashier out at closing).
+    if (recheckAt.value && Date.now() >= recheckAt.value && !loading.value) {
+      recheckAt.value = Date.now() + 30_000
+      loadDeviceData()
+    }
   }, 1000)
 })
 
@@ -1075,6 +1122,22 @@ const isSpoilageOpen = ref(false)
 
 // Floor plan & table reservations modal
 const isFloorPlanOpen = ref(false)
+
+// Closed (opening hours): the server already signed the cashier out, so drop the session here too.
+watch(posClosed, (closed) => {
+  if (!closed) return
+  if (device.value) device.value.active_staff = null
+  selectedStaff.value = null
+  isChangingPin.value = false
+  clearPin()
+  cart.value = []
+  optionsItem.value = null
+  isPaymentModalOpen.value = false
+  isReceiptModalOpen.value = false
+  isTransactionsModalOpen.value = false
+  isSpoilageOpen.value = false
+  isFloorPlanOpen.value = false
+})
 const selectedTableForOrder = ref<any>(null)
 const isUpdatingTableStatus = ref(false)
 
@@ -1086,7 +1149,9 @@ function onTableSelectedFromFloorPlan(table: any) {
   selectedTableForOrder.value = { ...table, status: 'occupied' }
   selectedOrderType.value = 'dine_in'
   isFloorPlanOpen.value = false
-  showNotice(`Assigned ${table.table_name} (Occupied) to current order.`)
+  showNotice(table.guest_name
+    ? `Assigned ${table.table_name} for ${table.guest_name}'s booking to the current order.`
+    : `Assigned ${table.table_name} (Occupied) to current order.`)
 }
 
 async function freeAssignedTable() {
@@ -1304,8 +1369,20 @@ function formatCurrency(amount: number) {
         </div>
       </header>
 
+      <!-- ── CLOSED (outside opening hours) ───────────────────────────────── -->
+      <main v-if="posClosed" class="flex-1 flex flex-col items-center justify-center p-4 bg-gray-50">
+        <div role="status" class="w-full max-w-sm text-center">
+          <div class="mx-auto mb-4 w-14 h-14 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center">
+            <Icon name="heroicons:clock" class="w-7 h-7 text-[#7B5A50]" />
+          </div>
+          <h2 class="text-2xl font-bold text-gray-800">The cafe is closed</h2>
+          <p class="mt-2 text-base text-gray-600">{{ closedOpensText }}</p>
+          <p class="mt-1 text-sm text-gray-500">The register can only be used during operating hours. This screen unlocks on its own when the cafe opens.</p>
+        </div>
+      </main>
+
       <!-- ── LOCK SCREEN ──────────────────────────────────────────────────── -->
-      <main v-if="!device.active_staff" class="flex-1 flex flex-col items-center justify-center p-4 bg-gray-50">
+      <main v-else-if="!device.active_staff" class="flex-1 flex flex-col items-center justify-center p-4 bg-gray-50">
         
         <!-- STEP 1: Select Staff -->
         <div v-if="!selectedStaff" class="w-full max-w-3xl">
@@ -1663,6 +1740,7 @@ function formatCurrency(amount: number) {
             <div class="flex items-center gap-1.5 min-w-0 mr-2">
               <Icon name="heroicons:map-pin" class="w-4 h-4 text-[#7D5A50] shrink-0" />
               <span class="truncate font-bold text-[#2D201B]">{{ selectedTableForOrder.table_name }}</span>
+              <span v-if="selectedTableForOrder.guest_name" class="truncate text-[#7D5A50]">{{ selectedTableForOrder.guest_name }}</span>
               <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E8DEC8] text-[#5B463C]">Occupied</span>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">

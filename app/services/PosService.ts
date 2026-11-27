@@ -8,6 +8,13 @@ export interface PosDevice {
     registered_at: string
 }
 
+/** The register only works during the cafe's opening hours. Times are ISO strings. */
+export interface PosHoursStatus {
+    is_open: boolean
+    closes_at: string | null // null while open 24/7
+    opens_at: string | null  // null while open, or when no opening is coming up
+}
+
 export interface SetupBranch {
     uuid: string
     branch_name: string
@@ -138,7 +145,7 @@ export class DevicePosService extends BaseService {
     // ── POS Device API (Uses POS device_token) ──────────────────────────────────
 
     getCurrentDevice() {
-        return this.get<{ success: boolean; device: PosDevice }>('/pos/device')
+        return this.get<{ success: boolean; device: PosDevice; hours?: PosHoursStatus }>('/pos/device')
     }
 
     unregisterDevice() {

@@ -88,11 +88,15 @@ export function useOperatingHours() {
   )
   const isLoaded = useState('brewspot_operating_hours_loaded', () => false)
   const ownerService = useOwnerProfileService()
+  const reservationService = useReservationService('manager')
   const authStore = useAuthStore()
 
-  async function loadOperatingHours(force = false) {
+  // Owners read the cafe's hours directly; managers read them through their branch.
+  async function loadOperatingHours(force = false, branchUuid?: string) {
     if (isLoaded.value && !force) return
-    const res = await ownerService.getOperatingHours()
+    const res = branchUuid
+      ? await reservationService.openingHours(branchUuid)
+      : await ownerService.getOperatingHours()
     if (res.success && res.data) {
       operatingHoursState.value = fromApi(res.data)
       isLoaded.value = true
@@ -119,7 +123,7 @@ export function useOperatingHours() {
         setInterval(() => { clock.value = new Date() }, 60_000)
       }
 
-      // Only owners can read the cafe's hours for now.
+      // Owners load here; managers call loadOperatingHours(false, branchUuid) once their branch is known.
       if (authStore.role === 'Cafe Owner') {
         loadOperatingHours().catch(e => console.warn('Could not load operating hours:', e))
       }

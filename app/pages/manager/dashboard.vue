@@ -33,6 +33,7 @@ const initialRange = ranges.find(r => r === route.query.range) ?? 'daily'
 const range = ref<DashboardRange>(initialRange)
 const branches = ref<ManagedBranchInfo[]>([])
 const branchUuid = ref<string>('')
+const { isOpenNow, loadOperatingHours } = useOperatingHours()
 const stats = ref<ManagerDashboardStats | null>(null)
 const loading = ref(true)
 const refreshing = ref(false)
@@ -110,6 +111,9 @@ async function init() {
     // A manager runs exactly one branch.
     branchUuid.value = branches.value[0]!.uuid
 
+    // "Open now" in the header needs the cafe's hours (read through the branch).
+    loadOperatingHours(true, branchUuid.value).catch(e => console.warn('Could not load operating hours:', e))
+
     await loadStats()
   } catch (err: any) {
     console.warn('Failed to load manager branches:', err)
@@ -159,7 +163,6 @@ const headerTitle = computed(() => {
   return (delimiter && raw.split(delimiter)[0]?.trim()) || raw
 })
 
-const { isOpenNow } = useOperatingHours()
 </script>
 
 <template>
