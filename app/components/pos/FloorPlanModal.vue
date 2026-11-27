@@ -65,7 +65,7 @@ defineProps<{
 
 const emit = defineEmits<{
   close: []
-  selectTable: [table: TableData]
+  selectTable: [table: TableData & { guest_name?: string | null }]
 }>()
 
 const devicePosService = useDevicePosService()
@@ -490,29 +490,49 @@ const tableActions = computed<TableAction[]>(() => {
   if (!t) return []
   const state = tableState(t)
   if (state === 'available') {
+    // Free now, but a booking is coming later today: the guest may arrive early.
+    const booked = upcomingBooking(t)
+    const walkIn = { key: 'walk-in', label: 'Assign to walk-in order', hint: 'Seat a guest without a booking and start their order.', icon: 'heroicons:user-plus', primary: !booked, run: () => assignToOrder(t, null) }
+    if (!booked) return [walkIn]
     return [
-      { key: 'walk-in', label: 'Assign to walk-in order', hint: 'Seat a guest without a booking and start their order.', icon: 'heroicons:user-plus', primary: true, run: () => assignToOrder(t) },
+      { key: 'seat', label: `Seat ${booked.customer_name} & assign to order`, hint: `${booked.customer_name}'s party (${splitTime(new Date(booked.reservation_date)).time} ${splitTime(new Date(booked.reservation_date)).meridiem}) has arrived. Seat them here and start their order.`, icon: 'heroicons:arrow-right-end-on-rectangle', primary: true, run: () => assignToOrder(t, booked) },
+      walkIn,
     ]
   }
   if (state === 'reserved') {
+    const held = activeBooking(t)
     return [
-      { key: 'seat', label: 'Seat & assign to order', hint: 'The booked guest has arrived. Seat them and start their order.', icon: 'heroicons:arrow-right-end-on-rectangle', primary: true, run: () => assignToOrder(t) },
+      { key: 'seat', label: held ? `Seat ${held.customer_name} & assign to order` : 'Seat & assign to order', hint: 'The booked guest has arrived. Seat them and start their order.', icon: 'heroicons:arrow-right-end-on-rectangle', primary: true, run: () => assignToOrder(t, held ?? undefined) },
+      { key: 'walk-in', label: 'Assign to walk-in order', hint: held ? `Seat a guest without a booking. When they leave, the table goes back to held for ${held.customer_name}.` : 'Seat a guest without a booking and start their order.', icon: 'heroicons:user-plus', primary: false, run: () => assignToOrder(t, null) },
       { key: 'release', label: 'Mark available', hint: 'Release the hold so walk-ins can use this table.', icon: 'heroicons:lock-open', primary: false, run: () => markTableAvailable(t, { releaseHold: true }) },
     ]
   }
   if (state === 'occupied') {
-    const seated = activeBooking(t)
-    const next = upcomingBooking(t, seated?.status === 'seated' ? seated.uuid : undefined)
-    return [
-      next
-        ? { key: 'left', label: 'Customer left: back to held', hint: `Guests have gone. The table stays held for ${next.customer_name} at ${splitTime(new Date(next.reservation_date)).time} ${splitTime(new Date(next.reservation_date)).meridiem}.`, icon: 'heroicons:check-circle', primary: true, run: () => markTableAvailable(t) }
-        : { key: 'left', label: 'Customer left: mark available', hint: 'Guests have paid and gone. Free the table for the next party.', icon: 'heroicons:check-circle', primary: true, run: () => markTableAvailable(t) },
-    ]
+    const active = activeBooking(t)
+    const seated = active?.status === 'seated' ? active : null
+    const next = upcomingBooking(t, seated?.uuid)
+    // A booked guest who has arrived while the table still reads Occupied: seat them and start the order.
+    const arriving = !seated && active && OPEN.includes(active.status) ? active : null
+    const actions: TableAction[] = []
+    if (arriving) {
+      actions.push({ key: 'seat', label: `Seat ${arriving.customer_name} & assign to order`, hint: `${arriving.customer_name}'s party has arrived. Seat them here and start their order.`, icon: 'heroicons:arrow-right-end-on-rectangle', primary: true, run: () => assignToOrder(t, arriving) })
+    }
+    if (!seated) {
+      // No seated booking: the people here are walk-ins.
+      actions.push({ key: 'walk-in', label: 'Assign to walk-in order', hint: 'Walk-in guests are at this table. Start or continue their order.', icon: 'heroicons:user-plus', primary: !arriving, run: () => assignToOrder(t, null) })
+    }
+    actions.push(next
+      ? { key: 'left', label: 'Customer left: back to held', hint: `Guests have gone. The table stays held for ${next.customer_name} at ${splitTime(new Date(next.reservation_date)).time} ${splitTime(new Date(next.reservation_date)).meridiem}.`, icon: 'heroicons:check-circle', primary: !actions.length, run: () => markTableAvailable(t) }
+      : { key: 'left', label: 'Customer left: mark available', hint: 'Guests have paid and gone. Free the table for the next party.', icon: 'heroicons:check-circle', primary: !actions.length, run: () => markTableAvailable(t) })
+    return actions
   }
   return []
 })
 
-async function assignToOrder(table: TableData) {
+// Seats the table and hands it to the register's current order. With a booking, that booking is
+// the one seated; null is a walk-in (no booking touched); left out, the table's active booking is.
+async function assignToOrder(table: TableData, booking?: Booking | null) {
+  if (updatingTable.value) return
   updatingTable.value = true
   try {
     const res = await devicePosService.updateTableStatus(table.uuid, 'occupied')
@@ -522,8 +542,7 @@ async function assignToOrder(table: TableData) {
       table.status = 'occupied'
     }
 
-    // If there is an active reservation on this table, mark it seated
-    const b = activeBooking(table)
+    const b = booking === undefined ? activeBooking(table) : booking
     if (b && (b.status === 'confirmed' || b.status === 'pending')) {
       try {
         await devicePosService.updateReservationStatus(b.uuid, 'seated')
@@ -534,7 +553,7 @@ async function assignToOrder(table: TableData) {
 
     await refreshAll(false)
     showToast(`Assigned ${table.table_name} to order (Occupied)`)
-    emit('selectTable', { ...table, status: 'occupied' })
+    emit('selectTable', { ...table, status: 'occupied', guest_name: b?.customer_name ?? null })
     emit('close')
   } catch (e: any) {
     showToast(e?.data?.message || 'Could not update table to occupied', 'error')
@@ -792,7 +811,7 @@ onUnmounted(() => {
                           :status="b.status"
                           :start="b.reservation_date"
                           :now="now"
-                          :busy="busyBooking === b.uuid"
+                          :busy="busyBooking === b.uuid || updatingTable"
                           :show-hint="selectedBookingUuid === b.uuid"
                           @act="(status) => act(b, status)"
                         />

@@ -19,6 +19,12 @@ export function useDeviceApi() {
                 token.value = null
                 navigateTo('/pos/setup')
             }
+            // Outside opening hours: the register page switches to its closed screen.
+            if (response.status === 423 && response._data?.closed) {
+                nuxtApp.runWithContext(() => {
+                    usePosClosed().value = { opensAt: response._data.opens_at ?? null }
+                })
+            }
             // Plan-locked or expired: a change the user clicked (POST/PATCH/PUT/DELETE) gets the
             // shared popup. Page loads (GET) don't; the page shows its own locked card instead.
             const method = String(options.method ?? (request instanceof Request ? request.method : 'GET')).toUpperCase()
