@@ -109,32 +109,37 @@ onBeforeUnmount(() => { if (noticeTimer) clearTimeout(noticeTimer) })
 </script>
 
 <template>
-  <section class="bg-white border border-[#EDD8CC] rounded-2xl p-6 flex flex-col gap-4" aria-labelledby="pos-registers-heading">
-    <div class="flex flex-wrap items-baseline justify-between gap-2">
-      <div class="flex items-baseline gap-2.5">
-        <h2 id="pos-registers-heading" class="text-[22px] font-bold text-[#3D2B24]">POS Registers</h2>
+  <section class="bg-white border border-[#EDD8CC] rounded-2xl p-6 shadow-sm flex flex-col gap-4" aria-labelledby="pos-registers-heading">
+    <!-- Header: same heading treatment as Branch Information / BIR Document -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h2 id="pos-registers-heading" class="text-lg sm:text-xl font-bold text-[#3D2B24] flex items-center gap-2">
+          <Icon name="heroicons:computer-desktop" class="size-6 text-[#A96746]" />
+          POS Registers
+        </h2>
         <span v-if="!loading && devices.length" class="text-sm font-medium text-[#9E7060] tabular-nums">
-          {{ devices.length }} {{ devices.length === 1 ? 'register' : 'registers' }}<template v-if="inUseCount"> · {{ inUseCount }} in use</template>
+          {{ devices.length }} {{ devices.length === 1 ? 'register' : 'registers' }}<template v-if="inUseCount"> · <span class="text-emerald-700">{{ inUseCount }} in use</span></template>
         </span>
       </div>
       <div v-if="!loading && !planLock" class="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          class="inline-flex items-center gap-1.5 rounded-xl border border-[#EDD8CC] bg-[#FFF8EA] hover:bg-[#F3E5D4] px-3.5 py-1.5 text-xs font-bold text-[#7D5A50] transition-all shadow-xs active:scale-[0.97] cursor-pointer"
-          @click="isQrModalOpen = true"
+          class="inline-flex items-center gap-1.5 border border-[#EDD8CC] bg-white rounded-[10px] px-3.5 py-2 text-[13px] font-semibold text-[#7D5A50] hover:bg-[#FFF8EA] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
           :title="scope === 'owner' ? 'Generate & Print POS QR Code' : 'View & Print POS QR Code'"
+          @click="isQrModalOpen = true"
         >
-          <Icon name="heroicons:qr-code" class="w-4 h-4 text-[#7D5A50]" />
-          <span>{{ scope === 'owner' ? 'Generate POS QR' : 'View POS QR' }}</span>
+          <Icon name="heroicons:qr-code" class="size-4" />
+          {{ scope === 'owner' ? 'Generate POS QR' : 'View POS QR' }}
         </button>
         <CommonA2HSButton variant="card" label="Install POS App" data-walkthrough="pos-install-btn" />
         <button
           type="button"
-          class="inline-flex items-center gap-1.5 rounded-lg text-[13px] font-semibold text-[#7D5A50] hover:text-[#3D2B24] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+          class="size-[38px] inline-flex items-center justify-center border border-[#EDD8CC] bg-white rounded-[10px] text-[#7D5A50] hover:bg-[#FFF8EA] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
+          aria-label="Refresh registers"
+          title="Refresh"
           @click="load"
         >
-          <Icon name="heroicons:arrow-path-20-solid" class="w-4 h-4" aria-hidden="true" />
-          Refresh
+          <Icon name="heroicons:arrow-path-20-solid" class="size-4" :class="loading ? 'animate-spin' : ''" aria-hidden="true" />
         </button>
       </div>
     </div>
@@ -154,9 +159,15 @@ onBeforeUnmount(() => { if (noticeTimer) clearTimeout(noticeTimer) })
 
     <!-- Loading -->
     <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3" aria-hidden="true">
-      <div v-for="i in 2" :key="i" class="border border-[#EDD8CC] rounded-xl p-4 flex items-center gap-3">
-        <span class="skeleton w-12 h-12 rounded-[10px] shrink-0" />
-        <span class="flex-1 space-y-2"><span class="skeleton block h-3.5 w-1/2 rounded" /><span class="skeleton block h-3 w-2/3 rounded" /></span>
+      <div v-for="i in 2" :key="i" class="border border-[#EDD8CC] rounded-xl p-4 flex flex-col gap-3.5">
+        <div class="flex items-center gap-3">
+          <span class="skeleton w-12 h-12 rounded-[10px] shrink-0" />
+          <span class="flex-1 space-y-2"><span class="skeleton block h-3.5 w-1/2 rounded" /><span class="skeleton block h-4 w-14 rounded-full" /></span>
+        </div>
+        <div class="grid grid-cols-2 gap-3 border-t border-[#EDD8CC] pt-3">
+          <span class="space-y-1.5"><span class="skeleton block h-2.5 w-14 rounded" /><span class="skeleton block h-3.5 w-16 rounded" /></span>
+          <span class="space-y-1.5"><span class="skeleton block h-2.5 w-12 rounded" /><span class="skeleton block h-3.5 w-20 rounded" /></span>
+        </div>
       </div>
     </div>
 
@@ -181,38 +192,65 @@ onBeforeUnmount(() => { if (noticeTimer) clearTimeout(noticeTimer) })
       <li
         v-for="device in devices"
         :key="device.uuid"
-        class="border border-[#EDD8CC] rounded-xl p-4 flex items-start gap-3"
+        class="border rounded-xl p-4 flex flex-col gap-3.5 transition-colors"
+        :class="device.active_staff ? 'border-emerald-200 bg-emerald-50/30' : 'border-[#EDD8CC] bg-white'"
       >
-        <div class="relative bg-[#FFF0D1] rounded-[10px] w-12 h-12 flex items-center justify-center shrink-0">
-          <Icon name="heroicons:computer-desktop" class="w-6 h-6 text-[#7D5A50]" />
-          <span
-            class="absolute -top-1 -right-1 w-3 h-3 rounded-full ring-2 ring-white"
-            :class="device.active_staff ? 'bg-emerald-500' : 'bg-[#D9C3A5]'"
-            aria-hidden="true"
-          />
+        <!-- Top: tile, name + status, remove -->
+        <div class="flex items-center gap-3">
+          <div class="bg-[#FFF0D1] rounded-[10px] w-12 h-12 flex items-center justify-center shrink-0">
+            <Icon name="heroicons:computer-desktop" class="size-6 text-[#7D5A50]" />
+          </div>
+
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-[#3D2B24] truncate" :title="device.name">{{ device.name }}</p>
+            <span
+              class="mt-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+              :class="device.active_staff ? 'bg-emerald-100 text-emerald-800' : 'bg-[#F4ECE1] text-[#7D5A50]'"
+            >
+              <span class="size-1.5 rounded-full" :class="device.active_staff ? 'bg-emerald-500' : 'bg-[#B4846C]'" aria-hidden="true" />
+              {{ device.active_staff ? 'In use' : 'Locked' }}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            class="size-9 shrink-0 inline-flex items-center justify-center rounded-[10px] border border-[#EDD8CC] bg-white text-[#9E7060] hover:text-[#9E4F47] hover:border-[#E5C5C0] hover:bg-[#F3DFDC]/50 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9E4F47]"
+            :aria-label="`Remove register ${device.name}`"
+            title="Remove register"
+            @click="askRemove(device)"
+          >
+            <Icon name="heroicons:trash" class="size-4" />
+          </button>
         </div>
 
-        <div class="flex-1 min-w-0 flex flex-col gap-1">
-          <p class="text-[15px] font-semibold text-[#3D2B24] truncate">{{ device.name }}</p>
-          <p v-if="device.active_staff" class="text-sm text-emerald-700 break-words">
-            {{ device.active_staff.name }} signed in<template v-if="device.active_since"> since {{ formatTime(device.active_since) }}</template>
-          </p>
-          <p v-else class="text-sm text-[#9E7060]">Locked, no one signed in</p>
-          <p class="text-xs text-[#9E7060]">
-            {{ device.last_used_at ? `Last used ${timeAgo(device.last_used_at)}` : 'Not used yet' }}
-            <template v-if="device.created_at"> · Added {{ formatDate(device.created_at) }}<template v-if="device.registered_by"> by {{ device.registered_by }}</template></template>
-          </p>
-        </div>
-
-        <button
-          type="button"
-          class="-mr-1.5 -mt-1.5 size-9 shrink-0 rounded-lg flex items-center justify-center text-[#9E7060] hover:text-[#9E4F47] hover:bg-[#F3DFDC]/70 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9E4F47]"
-          :aria-label="`Remove register ${device.name}`"
-          title="Remove register"
-          @click="askRemove(device)"
+        <!-- Who is on it now -->
+        <div
+          v-if="device.active_staff"
+          class="flex items-center gap-2.5 rounded-[10px] border border-emerald-200 bg-white px-3 py-2"
         >
-          <Icon name="heroicons:trash" class="size-[18px]" />
-        </button>
+          <span class="size-7 shrink-0 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold flex items-center justify-center">
+            {{ device.active_staff.name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase() }}
+          </span>
+          <p class="min-w-0 text-[13px] leading-snug text-[#3D2B24]">
+            <span class="font-semibold">{{ device.active_staff.name }}</span>
+            <span class="text-[#9E7060]"> signed in<template v-if="device.active_since"> since {{ formatTime(device.active_since) }}</template></span>
+          </p>
+        </div>
+
+        <!-- Details, same label style as the cards above -->
+        <dl class="grid grid-cols-2 gap-3 border-t border-[#EDD8CC] pt-3">
+          <div class="min-w-0">
+            <dt class="text-[11px] font-bold text-[#9E7060] uppercase tracking-wider">Last used</dt>
+            <dd class="mt-0.5 text-[13px] font-medium text-[#3D2B24]">{{ device.last_used_at ? timeAgo(device.last_used_at) : 'Not used yet' }}</dd>
+          </div>
+          <div class="min-w-0">
+            <dt class="text-[11px] font-bold text-[#9E7060] uppercase tracking-wider">Added</dt>
+            <dd class="mt-0.5 text-[13px] font-medium text-[#3D2B24] truncate" :title="device.registered_by ? `by ${device.registered_by}` : undefined">
+              {{ formatDate(device.created_at) || '—' }}
+            </dd>
+            <dd v-if="device.registered_by" class="text-[11.5px] text-[#9E7060] truncate">by {{ device.registered_by }}</dd>
+          </div>
+        </dl>
       </li>
     </ul>
 

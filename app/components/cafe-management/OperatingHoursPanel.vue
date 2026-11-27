@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 import { useOperatingHours } from '~/composables/useOperatingHours'
 
-// Cafe-wide hours at a glance: shows today's schedule and button to edit.
+// Cafe-wide hours at a glance: today's hours and live status, the week as a strip, and an edit button.
+// Styled like the page's stat cards (uppercase label, big value). The edit modal is separate.
 const emit = defineEmits<{
   (e: 'edit'): void
 }>()
@@ -12,86 +13,92 @@ const {
   isOpenNow,
   isLoaded,
   nextChangeText,
-  formattedSummary,
   formatTime12h
 } = useOperatingHours()
 
-// Today's schedule entry
-const todaySchedule = computed(() => {
-  return weekView.value?.find(d => d.isToday)
+const todaySchedule = computed(() => weekView.value?.find(d => d.isToday))
+
+const todayHours = computed(() => {
+  const t = todaySchedule.value
+  if (!t || !t.isOpen) return 'Closed today'
+  if (t.is24Hours) return 'Open 24 hours'
+  return `${formatTime12h(t.openTime)} – ${formatTime12h(t.closeTime)}`
 })
+
+function dayTitle(d: { day: string; isOpen: boolean; is24Hours?: boolean; openTime: string; closeTime: string }) {
+  if (!d.isOpen) return `${d.day}: closed`
+  if (d.is24Hours) return `${d.day}: open 24 hours`
+  return `${d.day}: ${formatTime12h(d.openTime)} – ${formatTime12h(d.closeTime)}`
+}
 </script>
 
 <template>
   <div
     role="region"
-    aria-label="Today's operating hours"
-    class="w-full sm:w-auto inline-flex items-center justify-between gap-4 sm:gap-6 bg-white rounded-2xl border border-[#EEDFC4] shadow-[0_2px_12px_rgba(59,31,14,0.03)] hover:shadow-[0_4px_16px_rgba(59,31,14,0.06)] hover:border-[#D4C3B2] p-3 sm:py-3 sm:px-4.5 transition-all duration-160 ease-out select-none"
+    aria-label="Opening hours"
+    class="w-full sm:w-auto flex items-center gap-3.5 bg-white rounded-2xl border border-[#EDD8CC] shadow-sm px-3.5 py-2 sm:pl-4"
   >
-    <!-- Left: Clock Icon + Day Today & Operating Time -->
-    <div class="flex items-center gap-3 min-w-0">
-      <!-- Tactile Clock Icon -->
-      <div class="w-10 h-10 rounded-xl bg-[#FAF4ED] text-[#7B5A50] border border-[#EEDFC4] flex items-center justify-center shrink-0 shadow-2xs">
-        <Icon name="heroicons:clock" class="w-5 h-5" />
-      </div>
-
-      <!-- Text: Day Today + The Time -->
-      <div class="flex flex-col min-w-0">
-        <!-- Top line: Live Status + Day Today -->
-        <div class="flex items-center gap-2 flex-wrap min-w-0">
-          <span
-            class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold border shadow-2xs shrink-0"
-            :class="isOpenNow 
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-              : 'bg-[#FAF4ED] text-[#7B5A50] border-[#EEDFC4]'"
-          >
-            <span
-              class="w-1.5 h-1.5 rounded-full shrink-0"
-              :class="isOpenNow ? 'bg-emerald-500 animate-pulse' : 'bg-[#7B5A50]'"
-              aria-hidden="true"
-            ></span>
-            <span>{{ isOpenNow ? 'Open now' : 'Closed now' }}</span>
+    <!-- Today: label + live status, then hours + next change. Two lines so it matches the title block's height. -->
+    <div class="min-w-0 flex-1 sm:flex-none">
+      <p class="flex items-center gap-2 whitespace-nowrap">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-[#9E7060]">
+          Today<template v-if="todaySchedule"> · {{ todaySchedule.day }}</template>
+        </span>
+        <span v-if="isLoaded" class="inline-flex items-center gap-1 text-[11px] font-semibold" :class="isOpenNow ? 'text-emerald-700' : 'text-[#7D5A50]'">
+          <span class="relative flex size-1.5 shrink-0" aria-hidden="true">
+            <span v-if="isOpenNow" class="absolute inline-flex size-full rounded-full bg-emerald-500 opacity-60 motion-safe:animate-ping" />
+            <span class="relative inline-flex size-1.5 rounded-full" :class="isOpenNow ? 'bg-emerald-500' : 'bg-[#B4846C]'" />
           </span>
+          {{ isOpenNow ? 'Open now' : 'Closed now' }}
+        </span>
+      </p>
 
-          <span class="text-xs font-extrabold uppercase tracking-wider text-[#482D25] truncate">
-            Today ({{ todaySchedule?.day || 'Today' }})
-          </span>
-
-          <span v-if="nextChangeText" class="text-xs font-semibold text-[#8A6E64] tabular-nums whitespace-nowrap hidden sm:inline">
-            · {{ nextChangeText }}
-          </span>
-        </div>
-
-        <!-- Bottom line: The Time (AM and PM clearly shown) -->
-        <div class="mt-0.5 flex items-center gap-1.5">
-          <template v-if="!isLoaded">
-            <span class="text-xs text-[#8A6E64] font-medium">Loading schedule…</span>
-          </template>
-          <template v-else-if="!todaySchedule?.isOpen">
-            <span class="text-xs sm:text-sm font-bold text-[#A8988B]">Closed today</span>
-          </template>
-          <template v-else-if="todaySchedule?.is24Hours">
-            <span class="text-xs sm:text-sm font-bold text-emerald-700">Open 24 Hours</span>
-          </template>
-          <template v-else>
-            <div class="flex items-baseline gap-1 font-display text-xs sm:text-sm font-extrabold text-[#2D201B] tabular-nums tracking-tight">
-              <span>{{ formatTime12h(todaySchedule?.openTime) }}</span>
-              <span class="text-xs text-[#8A6E64] font-normal mx-0.5">–</span>
-              <span>{{ formatTime12h(todaySchedule?.closeTime) }}</span>
-            </div>
-          </template>
-        </div>
-      </div>
+      <p v-if="!isLoaded" class="mt-1 h-5 w-32 rounded-md bg-[#F4ECE1] motion-safe:animate-pulse" aria-label="Loading opening hours" />
+      <p v-else class="mt-0.5 flex items-baseline gap-1.5 whitespace-nowrap">
+        <span
+          class="font-display text-[15px] font-bold leading-tight tabular-nums"
+          :class="todaySchedule?.isOpen ? 'text-[#3D2B24]' : 'text-[#A8988B]'"
+        >{{ todayHours }}</span>
+        <span v-if="nextChangeText" class="text-[11px] font-medium text-[#9E7060] tabular-nums">· {{ nextChangeText }}</span>
+      </p>
     </div>
 
-    <!-- Right: Edit Hours Button (Click to show edit modal) -->
+    <!-- The week at a glance -->
+    <div class="hidden md:block self-stretch w-px bg-[#EDD8CC]" aria-hidden="true" />
+    <ul v-if="isLoaded" class="hidden md:flex items-center gap-1" aria-label="This week">
+      <li
+        v-for="d in weekView"
+        :key="d.day"
+        :title="dayTitle(d)"
+        :aria-label="dayTitle(d)"
+        class="flex flex-col items-center gap-0.5"
+      >
+        <span
+          class="flex size-6 items-center justify-center rounded-md text-[10px] font-bold"
+          :class="d.isToday
+            ? 'bg-[#3B1F0E] text-[#FFF8EA] shadow-sm'
+            : d.isOpen
+              ? 'bg-[#FAF4ED] text-[#7D5A50] border border-[#EEDFC4]'
+              : 'border border-dashed border-[#DED4CA] text-[#C2A592]'"
+        >
+          {{ d.day.charAt(0) }}
+        </span>
+        <span
+          class="size-1 rounded-full"
+          :class="!d.isOpen ? 'bg-transparent' : d.is24Hours ? 'bg-emerald-500' : 'bg-[#B4846C]'"
+          aria-hidden="true"
+        />
+      </li>
+    </ul>
+
+    <!-- Edit (opens the hours modal) -->
     <button
       type="button"
+      class="shrink-0 inline-flex items-center gap-1.5 border border-[#EDD8CC] bg-white rounded-[10px] px-3 py-1.5 text-[13px] font-semibold text-[#7D5A50] hover:bg-[#FFF8EA] hover:border-[#D8C7B5] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
       @click="emit('edit')"
-      class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl bg-[#3B1F0E] hover:bg-[#2A150A] text-[#FFF8EA] text-xs font-bold transition-all duration-160 active:scale-95 cursor-pointer shadow-2xs shrink-0 group/btn"
     >
-      <span>Edit hours</span>
-      <Icon name="heroicons:pencil-square" class="w-3.5 h-3.5 text-[#E7D6CB] group-hover/btn:rotate-6 transition-transform duration-160" />
+      <Icon name="heroicons:clock" class="size-4" />
+      Edit hours
     </button>
   </div>
 </template>

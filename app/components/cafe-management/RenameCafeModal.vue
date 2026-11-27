@@ -44,6 +44,13 @@ watch(() => props.show, (open) => {
   generalError.value = ''
 })
 
+// Escape closes, except while sending
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && props.show && !submitting.value) emit('close')
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+
 const trimmedName = computed(() => newName.value.trim().replace(/\s+/g, ' '))
 const branchCount = computed(() => props.branches.length)
 const readyCount = computed(() => props.branches.filter(b => files.value[b.uuid] && dates.value[b.uuid]).length)
@@ -134,19 +141,19 @@ async function submit() {
         <!-- Header -->
         <div class="flex items-center justify-between gap-4 px-6 md:px-8 pt-5 pb-4 border-b border-[#EEDFC4] bg-[#FDFBF7] shrink-0">
           <div class="flex items-center gap-3.5 min-w-0">
-            <div class="w-10 h-10 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0">
+            <div class="w-10 h-10 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0 shadow-2xs">
               <Icon name="heroicons:pencil-square" class="w-5 h-5" />
             </div>
             <div class="min-w-0">
-              <h2 id="rename-cafe-title" class="text-xl font-display font-extrabold text-[#3B1F0E]">Rename Cafe</h2>
-              <p class="text-xs text-[#8A6E64] mt-0.5">Step {{ step }} of 2 · {{ step === 1 ? 'New name' : 'Updated CORs' }}</p>
+              <h2 id="rename-cafe-title" class="text-xl font-display font-extrabold text-[#3B1F0E] truncate">Rename Cafe</h2>
+              <p class="text-xs text-[#8A6E64] mt-0.5">Step {{ step }} of 2 · {{ step === 1 ? 'Choose the new name' : 'Upload the updated CORs' }}</p>
             </div>
           </div>
           <button
             type="button"
-            aria-label="Close"
+            aria-label="Close modal"
             :disabled="submitting"
-            class="w-9 h-9 rounded-xl bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] active:scale-95 transition-all flex items-center justify-center cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 disabled:opacity-50"
+            class="w-9 h-9 rounded-xl bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 disabled:opacity-50"
             @click="emit('close')"
           >
             <Icon name="heroicons:x-mark" class="w-4 h-4" />
@@ -154,7 +161,7 @@ async function submit() {
         </div>
 
         <!-- Body -->
-        <div class="flex-1 min-h-0 overflow-y-auto px-6 md:px-8 py-5 space-y-4">
+        <div class="flex-1 min-h-0 overflow-y-auto px-6 md:px-8 py-4 space-y-4">
           <!-- Step 1: name -->
           <template v-if="step === 1">
             <div class="rounded-2xl border border-[#F3D9A4] bg-[#FDF8EC] px-4 py-3 text-xs text-[#6B4A12] flex gap-2.5">
@@ -173,39 +180,62 @@ async function submit() {
               <p v-if="!previous.can_resubmit" class="mt-0.5 text-[#A2535B]">That name can't be requested again. You can ask for a different one.</p>
             </div>
 
-            <div class="space-y-1">
-              <span class="block text-xs font-bold text-[#3B1F0E]">Current name</span>
-              <p class="h-11 px-3.5 rounded-xl border border-[#EADCC7] bg-[#FAF6F0] text-sm font-semibold text-[#8A6E64] flex items-center">{{ currentName }}</p>
-            </div>
+            <!-- ── Cafe name ───────────────────────────────────────── -->
+            <section class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5" aria-labelledby="rename-name-title">
+              <div>
+                <h3 id="rename-name-title" class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+                  <span>Cafe Name</span>
+                </h3>
+                <p class="text-[11px] text-[#8A6E64] mt-1">Type it exactly as it appears on your new BIR Certificate of Registration.</p>
+              </div>
 
-            <label class="block">
-              <span class="block text-xs font-bold text-[#3B1F0E] mb-1">New name <span class="text-red-500">*</span></span>
-              <input
-                v-model="newName"
-                type="text"
-                maxlength="150"
-                autocomplete="organization"
-                placeholder="As it appears on your new BIR COR"
-                class="w-full h-11 px-3.5 rounded-xl border bg-white text-sm font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 outline-none transition-all shadow-2xs"
-                :class="errors.new_name ? 'border-red-400 bg-red-50/30' : 'border-[#D8C7B5]'"
-                @input="delete errors.new_name"
-                @keydown.enter.prevent="next"
-              />
-              <span v-if="errors.new_name" class="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div class="min-w-0">
+                  <span class="block text-xs font-bold text-[#3B1F0E] mb-1">Current name</span>
+                  <p class="w-full px-3.5 py-3 rounded-xl border border-[#EADCC7] bg-[#F4EFEA] text-sm font-semibold text-[#8A6E64] truncate" :title="currentName">{{ currentName }}</p>
+                </div>
+
+                <label class="block min-w-0">
+                  <span class="block text-xs font-bold text-[#3B1F0E] mb-1">New name <span class="text-red-500">*</span></span>
+                  <input
+                    v-model="newName"
+                    type="text"
+                    maxlength="150"
+                    autocomplete="organization"
+                    placeholder="New cafe name"
+                    class="w-full bg-white border rounded-xl px-3.5 py-3 text-sm font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal shadow-2xs focus:outline-none focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 transition-all"
+                    :class="errors.new_name ? 'border-red-400 bg-red-50/30' : 'border-[#D8C7B5]'"
+                    @input="delete errors.new_name"
+                    @keydown.enter.prevent="next"
+                  />
+                </label>
+              </div>
+
+              <p v-if="errors.new_name" class="-mt-1.5 text-xs text-red-600 font-semibold flex items-center gap-1">
                 <Icon name="heroicons:exclamation-circle" class="w-3.5 h-3.5 shrink-0" />
                 <span>{{ errors.new_name }}</span>
-              </span>
-            </label>
+              </p>
+              <p v-else class="-mt-1.5 text-[11px] text-[#8A6E64] text-right tabular-nums">{{ trimmedName.length }} / 150</p>
+            </section>
           </template>
 
           <!-- Step 2: one COR per branch -->
           <template v-else>
-            <div class="flex items-baseline justify-between gap-3">
-              <p class="text-xs text-[#8A6E64]">
-                Upload each branch's new COR showing <strong class="text-[#3B1F0E]">{{ trimmedName }}</strong>.
-              </p>
+            <!-- ── Updated CORs ────────────────────────────────────── -->
+            <section class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5" aria-labelledby="rename-cors-title">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <h3 id="rename-cors-title" class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+                  <span>Updated CORs</span>
+                </h3>
+                <p class="text-[11px] text-[#8A6E64] mt-1">
+                  Each branch's new COR showing <strong class="font-semibold text-[#3B1F0E]">{{ trimmedName }}</strong>.
+                </p>
+              </div>
               <span class="shrink-0 text-xs font-bold tabular-nums" :class="readyCount === branchCount ? 'text-emerald-700' : 'text-[#8A6E64]'">
-                {{ readyCount }} / {{ branchCount }} ready
+                {{ readyCount }} of {{ branchCount }} ready
               </span>
             </div>
 
@@ -213,8 +243,10 @@ async function submit() {
               <li
                 v-for="b in branches"
                 :key="b.uuid"
-                class="rounded-2xl border bg-[#FCFBF8] p-4 space-y-3"
-                :class="errors[`documents.${b.uuid}.file`] || errors[`documents.${b.uuid}.registered_at`] ? 'border-red-300' : 'border-[#EADCC7]'"
+                class="rounded-xl border bg-white p-3.5 space-y-3 shadow-2xs transition-colors"
+                :class="errors[`documents.${b.uuid}.file`] || errors[`documents.${b.uuid}.registered_at`]
+                  ? 'border-red-300'
+                  : files[b.uuid] && dates[b.uuid] ? 'border-[#3B1F0E] ring-1 ring-[#3B1F0E]' : 'border-[#D8C7B5]'"
               >
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
@@ -280,6 +312,7 @@ async function submit() {
                 </div>
               </li>
             </ul>
+            </section>
 
             <p v-if="generalError" role="alert" class="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-800">
               {{ generalError }}
@@ -288,7 +321,7 @@ async function submit() {
         </div>
 
         <!-- Footer -->
-        <div class="flex items-center justify-between px-6 md:px-8 py-3.5 border-t border-[#EEDFC4] bg-[#FAF8F5] shrink-0">
+        <div class="flex items-center justify-between gap-3 px-6 md:px-8 py-3.5 border-t border-[#EEDFC4] bg-[#FAF8F5] rounded-b-3xl shrink-0">
           <button
             type="button"
             :disabled="submitting"

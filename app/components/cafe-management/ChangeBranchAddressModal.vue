@@ -44,6 +44,13 @@ watch(() => props.show, (open) => {
   generalError.value = ''
 })
 
+// Escape closes, except while sending
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && props.show && !submitting.value) emit('close')
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+
 const normalize = (v: string | null | undefined) => (v ?? '').trim().replace(/\s+/g, ' ')
 const trimmedAddress = computed(() => normalize(newAddress.value))
 
@@ -118,19 +125,19 @@ async function submit() {
         <!-- Header -->
         <div class="flex items-center justify-between gap-4 px-6 md:px-8 pt-5 pb-4 border-b border-[#EEDFC4] bg-[#FDFBF7] shrink-0">
           <div class="flex items-center gap-3.5 min-w-0">
-            <div class="w-10 h-10 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0">
+            <div class="w-10 h-10 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0 shadow-2xs">
               <Icon name="heroicons:map-pin" class="w-5 h-5" />
             </div>
             <div class="min-w-0">
-              <h2 id="change-address-title" class="text-xl font-display font-extrabold text-[#3B1F0E]">Change Branch Address</h2>
+              <h2 id="change-address-title" class="text-xl font-display font-extrabold text-[#3B1F0E] truncate">Change Branch Address</h2>
               <p class="text-xs text-[#8A6E64] mt-0.5 truncate">{{ branchName }}</p>
             </div>
           </div>
           <button
             type="button"
-            aria-label="Close"
+            aria-label="Close modal"
             :disabled="submitting"
-            class="w-9 h-9 rounded-xl bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] active:scale-95 transition-all flex items-center justify-center cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 disabled:opacity-50"
+            class="w-9 h-9 rounded-xl bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 disabled:opacity-50"
             @click="emit('close')"
           >
             <Icon name="heroicons:x-mark" class="w-4 h-4" />
@@ -138,7 +145,7 @@ async function submit() {
         </div>
 
         <!-- Body -->
-        <div class="flex-1 min-h-0 overflow-y-auto px-6 md:px-8 py-5 space-y-4">
+        <div class="flex-1 min-h-0 overflow-y-auto px-6 md:px-8 py-4 space-y-4">
           <div class="rounded-2xl border border-[#F3D9A4] bg-[#FDF8EC] px-4 py-3 text-xs text-[#6B4A12] flex gap-2.5">
             <Icon name="heroicons:information-circle" class="w-4 h-4 shrink-0 mt-0.5 text-[#B07A1E]" />
             <p>
@@ -154,43 +161,64 @@ async function submit() {
             <p v-if="!previous.can_resubmit" class="mt-0.5 text-[#A2535B]">That address can't be requested again. You can ask for a different one.</p>
           </div>
 
-          <div class="space-y-1">
-            <span class="block text-xs font-bold text-[#3B1F0E]">Current address</span>
-            <p class="min-h-11 px-3.5 py-2.5 rounded-xl border border-[#EADCC7] bg-[#FAF6F0] text-sm font-semibold text-[#8A6E64] break-words">{{ currentAddress || '—' }}</p>
-          </div>
+          <!-- ── Address ─────────────────────────────────────────── -->
+          <section class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5" aria-labelledby="change-address-section-title">
+            <div>
+              <h3 id="change-address-section-title" class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+                <span>Address</span>
+              </h3>
+              <p class="text-[11px] text-[#8A6E64] mt-1">Type it exactly as it appears on the branch's new BIR Certificate of Registration.</p>
+            </div>
 
-          <label class="block">
-            <span class="block text-xs font-bold text-[#3B1F0E] mb-1">New address <span class="text-red-500">*</span></span>
-            <textarea
-              v-model="newAddress"
-              rows="2"
-              maxlength="500"
-              autocomplete="street-address"
-              placeholder="As it appears on your new BIR COR"
-              class="w-full px-3.5 py-2.5 rounded-xl border bg-white text-sm font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 outline-none transition-all shadow-2xs resize-none"
-              :class="errors.new_address ? 'border-red-400 bg-red-50/30' : 'border-[#D8C7B5]'"
-              @input="delete errors.new_address"
-            />
-            <span v-if="errors.new_address" class="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
-              <Icon name="heroicons:exclamation-circle" class="w-3.5 h-3.5 shrink-0" />
-              <span>{{ errors.new_address }}</span>
-            </span>
-          </label>
+            <div>
+              <span class="block text-xs font-bold text-[#3B1F0E] mb-1">Current address</span>
+              <p class="w-full px-3.5 py-3 rounded-xl border border-[#EADCC7] bg-[#F4EFEA] text-sm font-semibold text-[#8A6E64] break-words">{{ currentAddress || '—' }}</p>
+            </div>
 
-          <!-- Updated COR -->
-          <div
-            class="rounded-2xl border bg-[#FCFBF8] p-4 space-y-3"
+            <label class="block">
+              <span class="block text-xs font-bold text-[#3B1F0E] mb-1">New address <span class="text-red-500">*</span></span>
+              <textarea
+                v-model="newAddress"
+                rows="2"
+                maxlength="500"
+                autocomplete="street-address"
+                placeholder="Street, barangay, city"
+                class="w-full bg-white border rounded-xl px-3.5 py-3 text-sm font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal shadow-2xs focus:outline-none focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 transition-all resize-none"
+                :class="errors.new_address ? 'border-red-400 bg-red-50/30' : 'border-[#D8C7B5]'"
+                @input="delete errors.new_address"
+              />
+              <span v-if="errors.new_address" class="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+                <Icon name="heroicons:exclamation-circle" class="w-3.5 h-3.5 shrink-0" />
+                <span>{{ errors.new_address }}</span>
+              </span>
+              <span v-else class="block text-[11px] text-[#8A6E64] mt-1 text-right tabular-nums">{{ trimmedAddress.length }} / 500</span>
+            </label>
+          </section>
+
+          <!-- ── Updated COR ─────────────────────────────────────── -->
+          <section
+            class="rounded-2xl border bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5"
             :class="errors.file || errors.registered_at ? 'border-red-300' : 'border-[#EADCC7]'"
+            aria-labelledby="change-address-cor-title"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <p class="text-sm font-bold text-[#3B1F0E]">Updated COR</p>
-                <p class="text-[11px] text-[#8A6E64]">
-                  Must show the new address and the same TIN
-                  <template v-if="currentRegisteredAt"> · current COR {{ formatDate(currentRegisteredAt) }}</template>
+                <h3 id="change-address-cor-title" class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+                  <span>Updated COR</span>
+                </h3>
+                <p class="text-[11px] text-[#8A6E64] mt-1">
+                  Must show the new address and the same TIN<template v-if="currentRegisteredAt"> · current COR {{ formatDate(currentRegisteredAt) }}</template>
                 </p>
               </div>
-              <Icon v-if="file && registeredAt" name="heroicons:check-circle" class="w-5 h-5 shrink-0 text-emerald-600" aria-label="Ready" />
+              <span
+                class="shrink-0 inline-flex items-center gap-1 text-xs font-bold"
+                :class="file && registeredAt ? 'text-emerald-700' : 'text-[#8A6E64]'"
+              >
+                <Icon v-if="file && registeredAt" name="heroicons:check-circle" class="w-4 h-4" />
+                {{ file && registeredAt ? 'Ready' : 'Required' }}
+              </span>
             </div>
 
             <input ref="fileInput" type="file" :accept="ACCEPT" class="hidden" @change="onFile" />
@@ -231,7 +259,7 @@ async function submit() {
                 <p v-if="errors.registered_at" class="text-xs text-red-600 mt-1 font-semibold">{{ errors.registered_at }}</p>
               </div>
             </div>
-          </div>
+          </section>
 
           <p v-if="generalError" role="alert" class="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-800">
             {{ generalError }}
@@ -239,7 +267,7 @@ async function submit() {
         </div>
 
         <!-- Footer -->
-        <div class="flex items-center justify-between px-6 md:px-8 py-3.5 border-t border-[#EEDFC4] bg-[#FAF8F5] shrink-0">
+        <div class="flex items-center justify-between gap-3 px-6 md:px-8 py-3.5 border-t border-[#EEDFC4] bg-[#FAF8F5] rounded-b-3xl shrink-0">
           <button
             type="button"
             :disabled="submitting"
