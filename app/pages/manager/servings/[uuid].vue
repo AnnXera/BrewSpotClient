@@ -307,23 +307,14 @@ onBeforeUnmount(() => {
             <MenuBreadcrumbs :items="breadcrumbs" class="mb-1.5" />
 
             <!-- Title & Status Tag -->
-            <div class="flex flex-wrap items-baseline gap-3">
+            <div class="flex flex-wrap items-end gap-x-3 gap-y-2">
               <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">
                 {{ categoryName || 'Category Items' }}
               </h1>
-              <span
-                v-if="lowStockThresholdPercent"
-                class="inline-flex items-center gap-1 rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-amber-800"
-              >
-                <Icon name="heroicons:bell-alert" class="w-3.5 h-3.5 text-amber-600" />
-                Low Stock Alert: ≤{{ lowStockThresholdPercent }}%
-              </span>
-              <span
-                v-if="dirtyCount"
-                class="inline-block rounded-md border border-amber-300 bg-amber-50 px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-amber-800 animate-pulse"
-              >
-                {{ dirtyCount }} unsaved change{{ dirtyCount === 1 ? '' : 's' }}
-              </span>
+              <div class="mb-0.5 flex flex-wrap items-center gap-2">
+                <ServingsHeaderBadge v-if="lowStockThresholdPercent" variant="alert" :percent="lowStockThresholdPercent" />
+                <ServingsHeaderBadge v-if="dirtyCount" variant="unsaved" :count="dirtyCount" />
+              </div>
             </div>
 
             <!-- Subtitle -->
@@ -407,8 +398,8 @@ onBeforeUnmount(() => {
                     min="0"
                     step="1"
                     inputmode="numeric"
-                    placeholder="30"
-                    class="bulk-input h-full w-16 rounded-l-xl bg-transparent pl-3 text-right font-mono text-[14px] font-semibold tabular-nums text-[#3B1F0E] placeholder:font-normal placeholder:text-[#C9B39A] focus:outline-none"
+                    placeholder="Amount"
+                    class="bulk-input h-full w-20 rounded-l-xl bg-transparent pl-3 text-right font-display text-[14px] font-semibold tabular-nums text-[#3B1F0E] placeholder:font-normal placeholder:text-[#C9B39A] focus:outline-none"
                   >
                   <span class="pl-1.5 pr-3 text-[12px] font-medium text-[#9E7060]">servings</span>
                 </div>

@@ -1,6 +1,7 @@
 <!--app/components/approval/CafeUpdateDetailsModal.vue-->
-<!-- A cafe name change request: old and new name, then each branch's current COR beside the
-     updated one, so the admin can check every new COR shows the new name. -->
+<!-- A cafe update request. Name change: old and new name, then each branch's current COR beside
+     the updated one, so the admin can check every new COR shows the new name. Address change:
+     the branch's old and new address, then its current COR beside the updated one. -->
 <script setup lang="ts">
 import type { CafeUpdateRequest } from '~/services/CafeUpdateService'
 
@@ -21,6 +22,7 @@ const { openDocument } = useDocumentViewer()
 
 const isPending = computed(() => props.request?.status === 'pending_approval' || props.request?.status === 'resubmitted')
 const approved = computed(() => props.request?.status === 'approved')
+const isAddress = computed(() => props.request?.type === 'address_change')
 
 function formatDate(value?: string | null, withTime = false) {
   if (!value) return '—'
@@ -37,6 +39,17 @@ function docIcon(type: string) {
 const detailRows = computed(() => {
   const r = props.request
   if (!r) return []
+  if (r.type === 'address_change') {
+    return [
+      { label: 'Branch', value: r.branch ? `${r.branch.branch_name} (${r.branch.branch_type})` : 'Deleted branch', wide: false },
+      { label: 'Cafe', value: r.cafe_name || '—', wide: false },
+      { label: approved.value ? 'Previous Address' : 'Current Address', value: r.old_address || '—', wide: true },
+      { label: 'Requested Address', value: r.new_address || '—', wide: true },
+      { label: 'Owner', value: r.owner?.name || '—', wide: false },
+      { label: 'Owner Email', value: r.owner?.email || '—', wide: false },
+      { label: 'Date Submitted', value: formatDate(r.submitted_at, true), wide: false },
+    ]
+  }
   return [
     { label: 'Current Name', value: r.old_name },
     { label: 'Requested Name', value: r.new_name },
@@ -59,7 +72,7 @@ const detailRows = computed(() => {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Cafe Name Change"
+        :aria-label="isAddress ? 'Branch Address Change' : 'Cafe Name Change'"
         class="relative bg-white rounded-3xl w-full max-w-[720px] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] flex flex-col shadow-[0_24px_50px_-12px_rgba(59,31,14,0.22)] border border-[#EEDFC4] overflow-hidden animate-in fade-in zoom-in-95 duration-150"
       >
         <div v-if="loading || !request" class="p-10 flex flex-col items-center justify-center gap-3 text-[#3B1F0E]/50">
@@ -72,7 +85,7 @@ const detailRows = computed(() => {
           <div class="px-6 pt-6 shrink-0">
             <div class="flex items-center justify-between mb-[24px]">
               <p class="font-display text-[14px] leading-[16.5px] tracking-[0.77%] font-semibold text-[#9E7060] uppercase">
-                Cafe Name Change Details
+                {{ isAddress ? 'Branch Address Change Details' : 'Cafe Name Change Details' }}
               </p>
 
               <button type="button" class="cursor-pointer" aria-label="Close" @click="emit('close')">
@@ -82,17 +95,20 @@ const detailRows = computed(() => {
 
             <div class="flex items-center gap-3 pb-[24px] border-b border-[#B4846C]">
               <div class="w-[56px] h-[56px] rounded-[12px] bg-[#F0E3CE] text-[#7D5A50] flex items-center justify-center shrink-0">
-                <Icon name="heroicons:pencil-square" class="w-7 h-7" />
+                <Icon :name="isAddress ? 'heroicons:map-pin' : 'heroicons:pencil-square'" class="w-7 h-7" />
               </div>
 
               <div class="flex-1 min-w-0">
                 <div class="flex items-center justify-between gap-3">
-                  <p class="font-display text-[24px] font-bold text-[#3D2B24] truncate">{{ request.new_name }}</p>
+                  <p class="font-display text-[24px] font-bold text-[#3D2B24] truncate">
+                    {{ isAddress ? (request.branch?.branch_name || 'Deleted branch') : request.new_name }}
+                  </p>
                   <StatusBadge :status="request.status" />
                 </div>
 
                 <p class="font-display text-[12px] text-[#9E7060] truncate">
-                  From {{ request.old_name }} · ID: {{ request.uuid.slice(0, 8) }}
+                  <template v-if="isAddress">Address change · {{ request.cafe_name }} · ID: {{ request.uuid.slice(0, 8) }}</template>
+                  <template v-else>From {{ request.old_name }} · ID: {{ request.uuid.slice(0, 8) }}</template>
                 </p>
               </div>
             </div>
@@ -107,7 +123,7 @@ const detailRows = computed(() => {
                 Request Details
               </h3>
               <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-                <div v-for="row in detailRows" :key="row.label" class="min-w-0">
+                <div v-for="row in detailRows" :key="row.label" class="min-w-0" :class="{ 'sm:col-span-2': (row as { wide?: boolean }).wide }">
                   <dt class="text-xs font-bold text-[#8A6E64]">{{ row.label }}</dt>
                   <dd class="mt-0.5 text-sm font-semibold text-[#2D201B] break-words">{{ row.value }}</dd>
                 </div>
@@ -118,9 +134,12 @@ const detailRows = computed(() => {
             <section class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs">
               <h3 class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5 mb-1">
                 <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
-                Updated CORs
+                {{ isAddress ? 'Updated COR' : 'Updated CORs' }}
               </h3>
-              <p v-if="isPending" class="text-xs text-[#8A6E64] mb-3">
+              <p v-if="isPending && isAddress" class="text-xs text-[#8A6E64] mb-3">
+                Check that the new COR shows <span class="font-semibold text-[#3D2B24]">{{ request.new_address }}</span> and the same TIN as the current one.
+              </p>
+              <p v-else-if="isPending" class="text-xs text-[#8A6E64] mb-3">
                 Check that each new COR shows <span class="font-semibold text-[#3D2B24]">{{ request.new_name }}</span> and the same TIN as the current one.
               </p>
               <div v-else class="mb-3" />
@@ -208,7 +227,7 @@ const detailRows = computed(() => {
                 <template v-if="request.status === 'rejected'">
                   <div>
                     <dt class="text-xs font-bold text-[#8A6E64]">Resubmission</dt>
-                    <dd class="mt-0.5 text-sm font-semibold text-[#2D201B]">{{ request.can_resubmit ? 'Allowed' : 'This name is final' }}</dd>
+                    <dd class="mt-0.5 text-sm font-semibold text-[#2D201B]">{{ request.can_resubmit ? 'Allowed' : isAddress ? 'This address is final' : 'This name is final' }}</dd>
                   </div>
                   <div class="sm:col-span-2">
                     <dt class="text-xs font-bold text-[#8A6E64]">Reason</dt>
@@ -233,7 +252,7 @@ const detailRows = computed(() => {
             class="flex-1 rounded-xl border border-[#7D5A50] bg-[#7D5A50] text-[#FFF0D1] font-display font-semibold text-[14px] py-3 hover:bg-[#65463D] hover:border-[#65463D] transition-colors disabled:opacity-50"
             :disabled="decisionLoading"
             @click="emit('approve')"
-          >{{ decisionLoading ? 'Saving…' : 'Approve & Rename' }}</button>
+          >{{ decisionLoading ? 'Saving…' : isAddress ? 'Approve & Update Address' : 'Approve & Rename' }}</button>
         </div>
       </div>
     </div>

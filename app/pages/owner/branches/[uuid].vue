@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { BranchDetail, BranchReview } from '~/services/OwnerProfileService'
+import type { AddressChangeOverview, CafeUpdateRequest } from '~/services/CafeUpdateService'
 import { isOperationalBranchStatus } from '~/utils/branchStatus'
 
 definePageMeta({
@@ -106,6 +107,7 @@ async function fetchBranch() {
     if (res.success && res.branch) {
       branch.value = res.branch
       review.value = res.review ?? null
+      fetchAddressChange()
     } else if (isRefresh) {
       refreshError.value = res.message || 'The branch details could not be refreshed.'
     } else {
@@ -125,6 +127,7 @@ watch(() => route.params.uuid, (next, prev) => {
   if (next && next !== prev) {
     branch.value = null
     review.value = null
+    addressChange.value = null
     fetchBranch()
   }
 })
@@ -191,6 +194,61 @@ function onContactSaved(updated: Partial<BranchDetail> | undefined) {
     }
   }
   showToast('Branch details updated. Managers have been notified.')
+}
+
+// ── Address change ──
+// The address is on the branch's BIR COR, so moving goes to an admin with the updated COR.
+// The current address stays until it is approved.
+const cafeUpdateService = useCafeUpdateService()
+const addressChange = ref<AddressChangeOverview | null>(null)
+const showAddressChange = ref(false)
+const confirmCancelAddress = ref(false)
+const cancellingAddress = ref(false)
+const addressError = ref('')
+
+const addressRequest = computed(() => addressChange.value?.request ?? null)
+const addressPending = computed(() => addressRequest.value?.status === 'pending_approval' || addressRequest.value?.status === 'resubmitted')
+const addressRejected = computed(() => addressRequest.value?.status === 'rejected')
+// Blocked for another reason than its own pending request (e.g. a cafe rename under review)
+const addressBlockedReason = computed(() => (addressPending.value ? null : addressChange.value?.blocked ?? null))
+
+async function fetchAddressChange() {
+  const uuid = branch.value?.uuid
+  if (!uuid || !isOperationalBranchStatus(branchStatus.value)) {
+    addressChange.value = null
+    return
+  }
+  try {
+    const res = await cafeUpdateService.addressOverview(uuid)
+    if (branch.value?.uuid === uuid) addressChange.value = res
+  } catch {
+    // Not critical: the page works without it, and the server still blocks conflicting requests
+  }
+}
+
+function onAddressSubmitted(request: CafeUpdateRequest) {
+  showAddressChange.value = false
+  if (addressChange.value) addressChange.value = { ...addressChange.value, request, blocked: null }
+  showToast('Address change sent. An admin will review it.')
+  fetchAddressChange()
+}
+
+async function cancelAddressChange() {
+  const request = addressRequest.value
+  if (!branch.value || !request) return
+  cancellingAddress.value = true
+  addressError.value = ''
+  try {
+    await cafeUpdateService.withdrawAddressChange(branch.value.uuid, request.uuid)
+    confirmCancelAddress.value = false
+    showToast('Address change cancelled.')
+    await fetchAddressChange()
+  } catch (e: any) {
+    addressError.value = e?.data?.message || 'Could not cancel the address change.'
+    confirmCancelAddress.value = false
+  } finally {
+    cancellingAddress.value = false
+  }
 }
 
 onMounted(fetchBranch)
@@ -339,6 +397,51 @@ onMounted(fetchBranch)
           <Transition name="fade-tab" mode="out-in">
             <!-- Branch Details Tab -->
             <div v-if="activeTab === 'details'" key="details" class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+              <!-- Address change: waiting for review, or not approved (same banner as the cafe rename) -->
+              <section
+                v-if="(addressPending || addressRejected) && addressRequest"
+                :role="addressRejected ? 'alert' : 'status'"
+                aria-label="Branch address change"
+                class="lg:col-span-2 flex flex-col sm:flex-row sm:items-center gap-4 bg-white border border-[#EEDFC4] rounded-2xl shadow-sm px-5 py-4"
+              >
+                <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                  <span class="w-10 h-10 shrink-0 rounded-xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center">
+                    <Icon :name="addressRejected ? 'heroicons:exclamation-circle' : 'heroicons:clock'" class="w-5 h-5" />
+                  </span>
+                  <div class="min-w-0">
+                    <p class="text-sm text-[#3D2B24] break-words">
+                      <template v-if="addressRejected">Moving to <strong class="font-bold">{{ addressRequest.new_address }}</strong> was not approved</template>
+                      <template v-else>Moving to <strong class="font-bold">{{ addressRequest.new_address }}</strong> is waiting for review</template>
+                    </p>
+                    <p class="mt-0.5 text-[13px] text-[#9E7060]">
+                      <template v-if="addressRejected">{{ addressRequest.reason || 'No reason was given.' }}</template>
+                      <template v-else>The branch keeps its current address until an admin approves it.</template>
+                    </p>
+                    <p v-if="addressError" role="alert" class="mt-1 text-xs font-semibold text-red-700">{{ addressError }}</p>
+                  </div>
+                </div>
+
+                <button
+                  v-if="addressRejected"
+                  type="button"
+                  :disabled="!!addressBlockedReason"
+                  :title="addressBlockedReason || undefined"
+                  class="shrink-0 self-start sm:self-auto h-9 px-4 rounded-xl bg-[#7D5A50] text-sm font-semibold text-[#FFF8EA] hover:bg-[#684940] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                  @click="showAddressChange = true"
+                >
+                  {{ addressRequest.can_resubmit ? 'Edit and resubmit' : 'Request a different address' }}
+                </button>
+                <button
+                  v-else
+                  type="button"
+                  :disabled="cancellingAddress"
+                  class="shrink-0 self-start sm:self-auto h-9 px-4 rounded-xl border border-[#EEDFC4] bg-white text-sm font-semibold text-[#7D5A50] hover:bg-[#FAF4ED] active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                  @click="confirmCancelAddress = true"
+                >
+                  Cancel request
+                </button>
+              </section>
+
               <!-- Low stock alert limit: cafe-wide, so it sits above both branch cards -->
               <div class="cafe-card cafe-card-1 lg:col-span-2 rounded-2xl bg-white border border-[#EDD8CC] shadow-sm px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-3 min-w-0">
@@ -402,8 +505,23 @@ onMounted(fetchBranch)
                       <p class="text-base font-semibold text-[#3D2B24] break-words">{{ branch.branch_name }}</p>
                     </div>
                     <div class="flex flex-col gap-1">
-                      <p class="text-xs font-bold text-[#9E7060] uppercase tracking-wider">{{ isMain ? 'Main Address' : 'Address' }}</p>
+                      <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs font-bold text-[#9E7060] uppercase tracking-wider">{{ isMain ? 'Main Address' : 'Address' }}</p>
+                        <!-- Moving needs an admin and the updated COR, so it's a request, not an edit -->
+                        <button
+                          v-if="addressChange && !addressPending && !addressRejected"
+                          type="button"
+                          :disabled="!!addressBlockedReason"
+                          :title="addressBlockedReason || 'Request an address change'"
+                          class="inline-flex items-center gap-1 text-xs font-semibold text-[#7D5A50] hover:text-[#3B1F0E] underline-offset-2 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline transition-colors"
+                          @click="showAddressChange = true"
+                        >
+                          <Icon name="heroicons:map-pin" class="size-3.5" />
+                          Change
+                        </button>
+                      </div>
                       <p class="text-sm sm:text-base font-medium text-[#3D2B24] break-words">{{ branch.address || '—' }}</p>
+                      <p v-if="addressBlockedReason && !addressRejected" class="text-xs text-[#9E7060]">{{ addressBlockedReason }}</p>
                     </div>
                   </div>
                 </div>
@@ -470,7 +588,7 @@ onMounted(fetchBranch)
 
               <!-- POS Registers (full width, under both cards) -->
               <div v-if="isOperational" class="cafe-card cafe-card-3 lg:col-span-2">
-                <PosDevicesCard :branch-uuid="branch.uuid" scope="owner" />
+                <PosDevicesCard :branch-uuid="branch.uuid" :branch-name="branch.branch_name" scope="owner" />
               </div>
             </div>
 
@@ -515,6 +633,29 @@ onMounted(fetchBranch)
       :loading="removing"
       @confirm="removeBranch"
       @cancel="confirmRemove = false"
+    />
+
+    <CafeManagementChangeBranchAddressModal
+      v-if="branch"
+      :show="showAddressChange"
+      :branch-uuid="branch.uuid"
+      :branch-name="branch.branch_name"
+      :current-address="branch.address"
+      :current-registered-at="addressChange?.current_registered_at"
+      :previous="addressRequest"
+      @close="showAddressChange = false"
+      @submitted="onAddressSubmitted"
+    />
+
+    <ConfirmDialog
+      :open="confirmCancelAddress"
+      title="Cancel address change?"
+      :message="`Cancel the request to move this branch to ${addressRequest?.new_address ?? 'the new address'}? You can send a new one any time.`"
+      confirm-label="Cancel request"
+      danger
+      :loading="cancellingAddress"
+      @confirm="cancelAddressChange"
+      @cancel="confirmCancelAddress = false"
     />
 
     <CafeManagementEditBranchContactModal

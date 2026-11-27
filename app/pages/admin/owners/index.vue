@@ -1,6 +1,7 @@
 <!-- pages/admin/ownermanagement.vue -->
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import Pagination from '~/components/common/Pagination.vue'
 import type { OwnerListItem, OwnerStats } from '~/services/OwnerManagementService'
 import { mockOwners, mockOwnerStats } from '~/mocks/mockOwners'
 
@@ -48,16 +49,6 @@ const statusOptions = [
 ]
 
 const hasActiveFilters = computed(() => Boolean(search.value || status.value || date.value))
-
-const paginationFrom = computed(() => {
-  if (total.value === 0) return 0
-  return (currentPage.value - 1) * perPage + 1
-})
-
-const paginationTo = computed(() => {
-  if (total.value === 0) return 0
-  return Math.min(currentPage.value * perPage, total.value)
-})
 
 async function fetchStats() {
   if (USE_MOCK_DATA) {
@@ -407,38 +398,10 @@ onMounted(() => {
           </table>
         </div>
 
-        <!-- Integrated Pagination Footer -->
-        <div v-if="owners.length > 0" class="border-t border-[#F3E7D2] px-6 py-3.5 bg-[#FAF4ED]/50 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div class="font-sans text-xs text-[#9E7060]">
-            Showing <strong class="text-[#3D2B24] font-semibold">{{ paginationFrom }}</strong> to <strong class="text-[#3D2B24] font-semibold">{{ paginationTo }}</strong> of <strong class="text-[#3D2B24] font-semibold">{{ total }}</strong> registered owners
-          </div>
-          
-          <div class="flex items-center gap-1.5">
-            <button
-              type="button"
-              class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#EDD8CC] bg-white text-[#7D5A50] hover:bg-[#FDF3E7] hover:text-[#3D2B24] disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs"
-              :disabled="currentPage <= 1"
-              aria-label="Previous page"
-              @click="goToPage(currentPage - 1)"
-            >
-              <Icon name="heroicons:chevron-left" class="w-4 h-4" />
-            </button>
-
-            <span class="font-sans text-xs font-bold text-[#5C3A28] px-2.5">
-              Page {{ currentPage }} of {{ Math.max(1, lastPage) }}
-            </span>
-
-            <button
-              type="button"
-              class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#EDD8CC] bg-white text-[#7D5A50] hover:bg-[#FDF3E7] hover:text-[#3D2B24] disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs"
-              :disabled="currentPage >= Math.max(1, lastPage)"
-              aria-label="Next page"
-              @click="goToPage(currentPage + 1)"
-            >
-              <Icon name="heroicons:chevron-right" class="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <!-- Pagination: the shared component -->
+        <nav v-if="owners.length > 0" aria-label="Table pages" class="border-t border-[#F3E7D2]">
+          <Pagination :page="currentPage" :last-page="lastPage" @change="goToPage" />
+        </nav>
       </div>
     </main>
 

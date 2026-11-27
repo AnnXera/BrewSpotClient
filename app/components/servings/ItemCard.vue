@@ -1,5 +1,5 @@
 <!-- app/components/servings/ItemCard.vue -->
-<!-- One item on a category's servings page. Shows the unsaved limit/eye (`limit`, `enabled`); the parent owns the draft. -->
+<!-- One item on a category's servings page. Shows the unsaved limit/switch (`limit`, `enabled`); the parent owns the draft. -->
 <script setup lang="ts">
 import type { CategoryServingItem, ServingItemStatus } from '~/services/ServingService'
 
@@ -24,12 +24,16 @@ const stock = computed(() =>
     : props.limit,
 )
 
+const sold = computed(() => props.item.servings_sold ?? 0)
+const hasLimit = computed(() => props.limit > 0)
+const isOn = computed(() => props.enabled && props.item.editable)
+
 // Items visible at the branch start out available; the manager decides to switch one off.
 // A limit of 0 means no limit has been set yet, so it is not "sold out".
 const status = computed<ServingItemStatus>(() => {
   if (!props.item.editable) return 'branch_unavailable'
   if (!props.enabled) return 'unavailable'
-  return props.limit > 0 && stock.value === 0 ? 'sold_out' : 'available'
+  return hasLimit.value && stock.value === 0 ? 'sold_out' : 'available'
 })
 
 const thresholdPercent = computed(() => props.item.low_stock_threshold_percent ?? null)
@@ -42,181 +46,265 @@ const isLowStock = computed(() => {
   return stock.value <= lowRemaining
 })
 
-const remainingPercent = computed(() => {
-  if (props.limit <= 0) return 0
-  return Math.round((stock.value / props.limit) * 100)
+const remainingRatio = computed(() => (hasLimit.value ? Math.min(1, stock.value / props.limit) : 0))
+
+// One tone drives the status label, the ring and the number so the card reads as a single state.
+type Tone = 'ok' | 'low' | 'out' | 'off' | 'none'
+const tone = computed<Tone>(() => {
+  if (status.value === 'branch_unavailable' || status.value === 'unavailable') return 'off'
+  if (status.value === 'sold_out') return 'out'
+  if (isLowStock.value) return 'low'
+  return hasLimit.value ? 'ok' : 'none'
 })
 
-const badge = computed(() => {
-  if (isLowStock.value) {
-    return {
-      label: `Low Stock (${remainingPercent.value}%)`,
-      cls: 'bg-amber-50 text-amber-800 border border-amber-300/80',
-    }
-  }
-  return {
-    available: { label: 'Available', cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80' },
-    sold_out: { label: 'Sold Out', cls: 'bg-rose-50 text-rose-700 border border-rose-200/80' },
-    unavailable: { label: 'Unavailable', cls: 'bg-amber-50 text-amber-700 border border-amber-200/80' },
-    branch_unavailable: { label: 'Not at branch', cls: 'bg-stone-100 text-stone-600 border border-stone-200' },
-  }[status.value]
+const statusLabel = computed(() => {
+  if (status.value === 'branch_unavailable') return 'Not at this branch'
+  if (status.value === 'unavailable') return 'Off today'
+  if (status.value === 'sold_out') return 'Sold out'
+  if (isLowStock.value) return 'Low stock'
+  return hasLimit.value ? 'Available' : 'No limit set'
 })
 
-const editing = ref(false)
-const text = ref<string | number>('')
-const input = ref<HTMLInputElement | null>(null)
+const TONES: Record<Tone, { ring: string; text: string; dot: string; label: string }> = {
+  ok: { ring: 'text-emerald-500', text: 'text-[#3B1F0E]', dot: 'bg-emerald-500', label: 'text-emerald-700' },
+  low: { ring: 'text-amber-500', text: 'text-amber-700', dot: 'bg-amber-500', label: 'text-amber-700' },
+  out: { ring: 'text-rose-500', text: 'text-rose-700', dot: 'bg-rose-500', label: 'text-rose-700' },
+  off: { ring: 'text-stone-300', text: 'text-stone-400', dot: 'bg-stone-400', label: 'text-stone-500' },
+  none: { ring: 'text-[#B4846C]', text: 'text-[#3B1F0E]', dot: 'bg-[#B4846C]', label: 'text-[#7D5A50]' },
+}
+const t = computed(() => TONES[tone.value])
 
-async function startEdit() {
+// Ring geometry (viewBox 96x96)
+const R = 40
+const CIRC = 2 * Math.PI * R
+const dashOffset = computed(() => CIRC * (1 - remainingRatio.value))
+
+// ---- Daily limit stepper ----
+const text = ref<string>(String(props.limit))
+const focused = ref(false)
+
+watch(() => props.limit, (v) => {
+  if (!focused.value) text.value = String(v)
+})
+
+function setLimit(n: number) {
   if (!props.item.editable) return
-  text.value = String(props.limit)
-  editing.value = true
-  await nextTick()
-  input.value?.select()
+  const clamped = Math.min(MAX_LIMIT, Math.max(0, Math.floor(n)))
+  text.value = String(clamped)
+  if (clamped !== props.limit) emit('update:limit', clamped)
 }
 
 function commit() {
-  if (!editing.value) return
-  editing.value = false
-  const raw = String(text.value).trim()
-  const n = Math.floor(Number(raw))
-  if (raw !== '' && Number.isFinite(n)) {
-    emit('update:limit', Math.min(MAX_LIMIT, Math.max(0, n)))
+  focused.value = false
+  const raw = text.value.trim()
+  const n = Number(raw)
+  if (raw === '' || !Number.isFinite(n)) {
+    text.value = String(props.limit)
+    return
   }
+  setLimit(n)
 }
 
-function onEye() {
+function onToggle() {
   if (props.item.editable) emit('toggle')
 }
 </script>
 
 <template>
-  <div class="relative group">
+  <div
+    class="item-card flex flex-col gap-4 rounded-2xl border bg-white p-4 shadow-2xs sm:p-5"
+    :class="error ? 'border-rose-400 ring-1 ring-rose-300' : 'border-[#E3CFB4] hover:border-[#C9A88A]'"
+  >
+    <!-- Header: picture, name, status, selling-today toggle -->
+    <div class="flex items-center gap-3">
+      <img
+        v-if="item.picture"
+        :src="item.picture"
+        :alt="item.menu_name"
+        class="size-10 shrink-0 rounded-xl border border-[#E3CFB4]/60 object-cover"
+        :class="tone === 'off' ? 'grayscale opacity-60' : ''"
+      >
+      <div
+        v-else
+        class="flex size-10 shrink-0 items-center justify-center rounded-xl border border-[#E3CFB4]/60 bg-[#FDF3E7]"
+      >
+        <Icon name="heroicons:cake" class="h-5 w-5 text-[#9E7060]" />
+      </div>
+
+      <div class="min-w-0 flex-1">
+        <p class="truncate font-display text-[16px] font-bold leading-tight text-[#3B1F0E]" :title="item.menu_name">
+          {{ item.menu_name }}
+        </p>
+        <p class="mt-0.5 flex items-center gap-1.5 text-[12px] font-semibold" :class="t.label">
+          <span class="size-1.5 shrink-0 rounded-full" :class="t.dot" aria-hidden="true" />
+          {{ statusLabel }}
+        </p>
+      </div>
+
+      <!-- 44px hit area around a compact switch -->
+      <button
+        type="button"
+        role="switch"
+        :aria-checked="isOn"
+        :aria-label="`Selling ${item.menu_name} today`"
+        :title="isOn ? 'Selling today. Tap to switch off.' : 'Not selling today. Tap to switch on.'"
+        :disabled="!item.editable"
+        class="-mr-1.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50] disabled:cursor-not-allowed disabled:opacity-40"
+        @click="onToggle"
+      >
+        <span class="switch relative inline-flex h-6 w-10 items-center rounded-full p-0.5" :class="isOn ? 'bg-[#7D5A50]' : 'bg-stone-300'">
+          <span class="knob size-5 rounded-full bg-white shadow-sm" :class="isOn ? 'translate-x-4' : 'translate-x-0'" />
+        </span>
+      </button>
+    </div>
+
+    <!-- Body: ring gauge of what is left + today's figures -->
+    <div v-if="item.editable" class="flex items-center gap-4">
+      <div class="relative size-24 shrink-0">
+        <svg viewBox="0 0 96 96" class="size-full -rotate-90" aria-hidden="true">
+          <circle cx="48" cy="48" :r="R" fill="none" stroke-width="8" class="stroke-[#F1E6D8]" />
+          <circle
+            v-if="hasLimit"
+            cx="48"
+            cy="48"
+            :r="R"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="8"
+            stroke-linecap="round"
+            class="ring-arc"
+            :class="t.ring"
+            :stroke-dasharray="CIRC"
+            :stroke-dashoffset="dashOffset"
+          />
+        </svg>
+        <div class="absolute inset-0 flex flex-col items-center justify-center leading-none">
+          <template v-if="hasLimit">
+            <span class="font-display text-[26px] font-bold tabular-nums" :class="t.text">{{ stock }}</span>
+            <span class="mt-1 text-[11px] font-medium text-[#8B6656]">left</span>
+          </template>
+          <template v-else>
+            <span class="font-display text-[15px] font-bold text-[#7D5A50]">No</span>
+            <span class="mt-0.5 text-[11px] font-medium text-[#8B6656]">limit</span>
+          </template>
+        </div>
+        <span class="sr-only">
+          {{ hasLimit ? `${stock} of ${limit} servings left` : 'No daily limit set' }}
+        </span>
+      </div>
+
+      <dl class="min-w-0 flex-1 divide-y divide-[#F1E6D8] text-[13px]">
+        <div class="flex items-center justify-between gap-2 py-1.5">
+          <dt class="text-[#8B6656]">Sold today</dt>
+          <dd class="font-display text-[15px] font-bold tabular-nums text-[#3B1F0E]">{{ sold }}</dd>
+        </div>
+        <div class="flex items-center justify-between gap-2 py-1.5">
+          <dt class="text-[#8B6656]">Daily limit</dt>
+          <dd class="font-display text-[15px] font-bold tabular-nums text-[#3B1F0E]">
+            {{ hasLimit ? limit : 'None' }}
+          </dd>
+        </div>
+        <div v-if="thresholdPercent && hasLimit" class="flex items-center justify-between gap-2 py-1.5">
+          <dt class="text-[#8B6656]">Alert at</dt>
+          <dd class="font-display text-[13px] font-semibold tabular-nums text-[#7D5A50]">&le;{{ thresholdPercent }}%</dd>
+        </div>
+      </dl>
+    </div>
+
+    <p v-else class="flex items-start gap-2 rounded-xl bg-stone-50 px-3 py-2.5 text-[12px] leading-snug text-stone-500">
+      <Icon name="heroicons:information-circle" class="mt-px h-4 w-4 shrink-0" />
+      Switched off for this branch in Menu Management, so it can't be served here.
+    </p>
+
+    <!-- Footer: full-width daily limit stepper with 44px targets -->
     <div
-      class="item-card bg-white border rounded-2xl p-4 sm:p-5 flex flex-col gap-3.5 shadow-2xs transition-card"
-      :class="error ? 'border-rose-400 ring-1 ring-rose-300' : 'border-[#E3CFB4] hover:border-[#B4846C]'"
+      class="mt-auto flex h-11 items-stretch overflow-hidden rounded-xl border bg-[#FDFAF6]"
+      :class="item.editable ? 'border-[#E3CFB4] focus-within:border-[#7D5A50] focus-within:ring-2 focus-within:ring-[#7D5A50]/20' : 'border-stone-200 opacity-50'"
     >
-      <!-- Item Header: Name, Image, Eye Toggle -->
-      <div class="flex items-center justify-between gap-3">
-        <div class="flex items-center gap-3 min-w-0">
-          <img
-            v-if="item.picture"
-            :src="item.picture"
-            :alt="item.menu_name"
-            class="size-10 rounded-xl object-cover shrink-0 border border-[#E3CFB4]/60"
-          >
-          <div
-            v-else
-            class="size-10 rounded-xl bg-[#FDF3E7] border border-[#E3CFB4]/60 flex items-center justify-center shrink-0"
-          >
-            <Icon name="heroicons:cake" class="w-5 h-5 text-[#9E7060]" />
-          </div>
-          <div class="min-w-0">
-            <p class="font-display font-bold text-[17px] text-[#3B1F0E] truncate leading-tight">
-              {{ item.menu_name }}
-            </p>
-            <p v-if="!item.editable" class="text-[11px] font-medium text-stone-500">
-              Not assigned to this branch
-            </p>
-          </div>
-        </div>
+      <button
+        type="button"
+        class="step-btn flex w-11 shrink-0 cursor-pointer items-center justify-center text-[#7D5A50] hover:bg-[#F5E6D8] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+        :disabled="!item.editable || limit <= 0"
+        :aria-label="`Decrease daily limit for ${item.menu_name}`"
+        @click="setLimit(limit - 1)"
+      >
+        <Icon name="heroicons:minus" class="h-5 w-5" />
+      </button>
 
-        <!-- Eye toggle button -->
-        <button
-          type="button"
-          class="eye-btn shrink-0 p-2 rounded-xl border border-transparent transition-all duration-160 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
-          :class="[
-            item.editable ? 'hover:bg-[#FDF3E7] hover:border-[#E3CFB4] active:scale-[0.92] cursor-pointer' : 'cursor-not-allowed opacity-40',
-            enabled ? 'text-[#7D5A50]' : 'text-stone-400'
-          ]"
+      <label class="flex min-w-0 flex-1 cursor-text items-center justify-center gap-1.5 border-x border-[#EBE0D2]">
+        <input
+          v-model="text"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]*"
           :disabled="!item.editable"
-          :aria-label="enabled ? 'Mark unavailable for today' : 'Mark available for today'"
-          :aria-pressed="enabled"
-          @click="onEye"
+          :aria-label="`Daily limit for ${item.menu_name}`"
+          class="w-[7ch] min-w-0 bg-transparent text-right font-display text-[16px] font-bold tabular-nums text-[#3B1F0E] outline-none disabled:cursor-not-allowed"
+          @focus="focused = true; ($event.target as HTMLInputElement).select()"
+          @blur="commit"
+          @keydown.enter.prevent="($event.target as HTMLInputElement).blur()"
+          @keydown.esc.prevent="text = String(limit); ($event.target as HTMLInputElement).blur()"
+          @keydown.up.prevent="setLimit(limit + 1)"
+          @keydown.down.prevent="setLimit(limit - 1)"
         >
-          <Icon :name="enabled ? 'heroicons:eye' : 'heroicons:eye-slash'" class="w-5 h-5" />
-        </button>
-      </div>
+        <span class="w-[7ch] text-left text-[12px] font-medium text-[#8B6656]">
+          {{ limit === 1 ? 'serving' : 'servings' }}
+        </span>
+      </label>
 
-      <!-- Properties Box -->
-      <div class="bg-[#FAF4ED] border border-[#EBE0D2] rounded-xl p-3 flex flex-col gap-2.5">
-        <!-- Status Row -->
-        <div class="flex items-center justify-between">
-          <span class="font-display font-medium text-[13px] text-[#7D5A50]">Status</span>
-          <span class="font-display font-semibold text-[11px] rounded-full px-2.5 py-0.5" :class="badge.cls">
-            {{ badge.label }}
-          </span>
-        </div>
+      <button
+        type="button"
+        class="step-btn flex w-11 shrink-0 cursor-pointer items-center justify-center text-[#7D5A50] hover:bg-[#F5E6D8] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+        :disabled="!item.editable || limit >= MAX_LIMIT"
+        :aria-label="`Increase daily limit for ${item.menu_name}`"
+        @click="setLimit(limit + 1)"
+      >
+        <Icon name="heroicons:plus" class="h-5 w-5" />
+      </button>
+    </div>
 
-        <!-- Daily Limit Row -->
-        <div class="flex items-center justify-between">
-          <span class="font-display font-medium text-[13px] text-[#7D5A50]">Daily Limit</span>
-          <input
-            v-if="editing"
-            ref="input"
-            v-model="text"
-            type="number"
-            min="0"
-            :max="MAX_LIMIT"
-            step="1"
-            inputmode="numeric"
-            aria-label="Daily limit"
-            class="w-[84px] bg-white rounded-lg border border-[#7D5A50] px-2.5 py-1 text-center font-display font-semibold text-[14px] text-[#3B1F0E] outline-none ring-2 ring-[#7D5A50]/20 shadow-2xs"
-            @blur="commit"
-            @keydown.enter.prevent="commit"
-            @keydown.esc.prevent="editing = false"
-          >
-          <button
-            v-else
-            type="button"
-            class="edit-limit-btn bg-white rounded-lg border border-[#E3CFB4] hover:border-[#7D5A50] hover:bg-[#FFFDF9] px-2.5 py-1 flex items-center gap-2 font-display font-semibold text-[14px] text-[#7D5A50] shadow-2xs transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
-            :class="item.editable ? 'active:scale-[0.96] cursor-pointer' : 'cursor-not-allowed opacity-50'"
-            :disabled="!item.editable"
-            aria-label="Edit daily limit"
-            @click="startEdit"
-          >
-            <span class="tabular-nums">{{ limit }}</span>
-            <Icon name="heroicons:pencil-square" class="w-3.5 h-3.5 text-[#B4846C]" />
-          </button>
-        </div>
-
-        <!-- Available Stock Row -->
-        <div class="flex items-center justify-between pt-1 border-t border-[#EBE0D2]/60">
-          <span class="font-display font-medium text-[13px] text-[#7D5A50]">Available Stock</span>
-          <span class="font-display font-bold text-[16px] tabular-nums text-[#3B1F0E] text-right min-w-[60px]">
-            {{ stock }}
-          </span>
-        </div>
-      </div>
-
-      <!-- Row Error -->
-      <div v-if="error" role="alert" class="flex items-center gap-1.5 text-[12px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5">
-        <Icon name="heroicons:exclamation-circle" class="w-4 h-4 shrink-0 text-rose-600" />
-        <span class="truncate">{{ error }}</span>
-      </div>
+    <!-- Row Error -->
+    <div v-if="error" role="alert" class="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[12px] text-rose-700">
+      <Icon name="heroicons:exclamation-circle" class="h-4 w-4 shrink-0 text-rose-600" />
+      <span class="truncate">{{ error }}</span>
     </div>
   </div>
 </template>
 
 <style scoped>
 .item-card {
-  transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1),
-              box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1),
-              border-color 180ms ease-out;
+  transition: box-shadow 200ms ease-out, border-color 200ms ease-out;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .item-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px -2px rgba(61, 43, 36, 0.08);
+    box-shadow: 0 6px 16px -6px rgba(61, 43, 36, 0.12);
   }
+}
+
+.ring-arc {
+  transition: stroke-dashoffset 300ms cubic-bezier(0.23, 1, 0.32, 1), color 200ms ease-out;
+}
+
+.switch {
+  transition: background-color 200ms ease-out;
+}
+
+.knob {
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.step-btn {
+  transition: background-color 150ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .item-card,
-  .eye-btn,
-  .edit-limit-btn {
+  .ring-arc,
+  .switch,
+  .knob,
+  .step-btn {
     transition: none !important;
-    transform: none !important;
   }
 }
 </style>

@@ -253,20 +253,15 @@ onBeforeUnmount(() => {
         <header class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 pb-2">
           <div class="min-w-0">
             <!-- Title + Badge -->
-            <div class="flex flex-wrap items-baseline gap-3">
+            <div class="flex flex-wrap items-end gap-x-3 gap-y-2">
               <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">
                 Servings Management
               </h1>
-              <span class="inline-block rounded-md border border-[#E3CFB4] bg-white px-2.5 py-0.5 font-mono text-[11px] font-medium tracking-wide uppercase text-[#7D5A50]">
-                Live Operations
-              </span>
-              <span
-                v-if="lowStockThresholdPercent"
-                class="inline-flex items-center gap-1 rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-amber-800"
-              >
-                <Icon name="heroicons:bell-alert" class="w-3.5 h-3.5 text-amber-600" />
-                Low Stock Alert: ≤{{ lowStockThresholdPercent }}%
-              </span>
+              <!-- Bottom-aligned with a small lift so the pills settle low beside the title -->
+              <div class="mb-0.5 flex flex-wrap items-center gap-2">
+                <ServingsHeaderBadge variant="live" />
+                <ServingsHeaderBadge v-if="lowStockThresholdPercent" variant="alert" :percent="lowStockThresholdPercent" />
+              </div>
             </div>
 
             <!-- Subtitle line -->

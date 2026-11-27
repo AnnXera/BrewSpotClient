@@ -7,7 +7,7 @@ export type NotificationKind =
     // Owner: account and branch decisions
     | 'account_approved' | 'account_rejected' | 'account_suspended' | 'account_reactivated'
     | 'branch_approved' | 'branch_rejected'
-    | 'cafe_name_approved' | 'cafe_name_rejected'
+    | 'cafe_name_approved' | 'cafe_name_rejected' | 'branch_address_approved' | 'branch_address_rejected'
     // Owner: subscription and billing
     | 'payment_received' | 'payment_failed' | 'plan_change_scheduled' | 'subscription_cancelled'
     | 'subscription_expiring' | 'renewal_open' | 'subscription_expired'

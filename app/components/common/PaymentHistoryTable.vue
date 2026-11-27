@@ -159,38 +159,10 @@
             </div>
           </li>
         </ul>
-        <!-- Integrated Pagination Footer -->
-        <div v-if="filteredHistory.length > 0 && !loading" class="border-t border-[#F3E7D2] px-6 py-3.5 bg-[#FAF4ED]/50 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div class="font-sans text-xs text-[#9E7060]">
-            Showing <strong class="text-[#3D2B24] font-semibold">{{ ((currentPage - 1) * perPage) + 1 }}</strong> to <strong class="text-[#3D2B24] font-semibold">{{ Math.min(currentPage * perPage, filteredHistory.length) }}</strong> of <strong class="text-[#3D2B24] font-semibold">{{ filteredHistory.length }}</strong> transactions
-          </div>
-
-          <div class="flex items-center gap-1.5">
-            <button
-              type="button"
-              class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#EDD8CC] bg-white text-[#7D5A50] hover:bg-[#FDF3E7] hover:text-[#3D2B24] disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs cursor-pointer"
-              :disabled="currentPage <= 1"
-              aria-label="Previous page"
-              @click="currentPage > 1 && (currentPage--)"
-            >
-              <Icon name="heroicons:chevron-left" class="w-4 h-4" />
-            </button>
-
-            <span class="font-sans text-xs font-bold text-[#5C3A28] px-2.5">
-              Page {{ currentPage }} of {{ Math.max(1, lastPage) }}
-            </span>
-
-            <button
-              type="button"
-              class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#EDD8CC] bg-white text-[#7D5A50] hover:bg-[#FDF3E7] hover:text-[#3D2B24] disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs cursor-pointer"
-              :disabled="currentPage >= Math.max(1, lastPage)"
-              aria-label="Next page"
-              @click="currentPage < lastPage && (currentPage++)"
-            >
-              <Icon name="heroicons:chevron-right" class="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <!-- Pagination: the shared component -->
+        <nav v-if="filteredHistory.length > 0 && !loading" aria-label="Transaction pages" class="border-t border-[#F3E7D2]">
+          <Pagination :page="currentPage" :last-page="lastPage" @change="(p) => (currentPage = p)" />
+        </nav>
       </template>
     </div>
 
@@ -217,6 +189,7 @@
 <script setup lang="ts">
 import DropdownList from '~/components/common/DropdownList.vue'
 import SearchInput from '~/components/common/SearchInput.vue'
+import Pagination from '~/components/common/Pagination.vue'
 import EmilCalendar from '~/components/common/EmilCalendar.vue'
 
 export interface PaymentTransaction {
@@ -238,6 +211,8 @@ const props = withDefaults(
     perPage?: number
     showControls?: boolean
     showOwnerName?: boolean
+    // Named in the Excel export title when the table is scoped to one owner.
+    ownerName?: string
   }>(),
   {
     loading: false,
@@ -383,6 +358,6 @@ function handleExportExcel() {
   const label = selectedStatus.value
     ? formatStatusLabel(selectedStatus.value)
     : 'All Payment Statuses'
-  exportToExcel(filteredHistory.value, label)
+  exportToExcel(filteredHistory.value, label, props.ownerName)
 }
 </script>

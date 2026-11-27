@@ -357,19 +357,21 @@ function viewDetails(uuid: string) {
     </Teleport>
     <main class="flex-1 p-6 sm:p-8 lg:p-10 space-y-8">
       <!-- Header: cafe title + cafe-wide opening hours (click to edit) -->
-      <header class="flex flex-col md:flex-row md:items-start justify-between gap-4">
+      <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <!-- Same format as the Servings header: big tight title, icon-led subtitle line -->
         <div class="min-w-0">
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <!-- Bottom-aligned with a small lift so the Rename pill rests beside the title's baseline (as on Servings) -->
+          <div class="flex flex-wrap items-end gap-x-3 gap-y-2">
             <h1 class="font-display text-[30px] sm:text-[34px] md:text-[38px] font-bold leading-tight tracking-[-0.02em] text-[#3B1F0E]">{{ cafeName || 'Cafe Management' }}</h1>
             <!-- Rename: hidden while a request is waiting (the banner below handles it) -->
             <button
               v-if="cafeName && !renamePending"
               type="button"
-              class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[#EEDFC4] bg-white text-xs font-bold text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] hover:border-[#D8C7B5] active:scale-95 transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+              class="mb-0.5 inline-flex items-center gap-1.5 h-7 pl-2.5 pr-3 rounded-full border border-[#DED4CA] bg-white text-xs font-semibold text-[#5B463C] shadow-2xs hover:border-[#7D5A50] hover:bg-[#F8EFE7] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+              title="Rename your cafe (an admin reviews it)"
               @click="openRename"
             >
-              <Icon name="heroicons:pencil-square" class="w-3.5 h-3.5" />
+              <Icon name="heroicons:pencil-square" class="size-3.5 text-[#7D5A50]" />
               Rename
             </button>
           </div>

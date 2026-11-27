@@ -1,6 +1,7 @@
 <!--app/pages/admin/approvals.vue-->
 <script setup lang="ts">
 import SearchInput from '~/components/common/SearchInput.vue'
+import Pagination from '~/components/common/Pagination.vue'
 import type { ApprovalListItem, ApprovalStats, Paginated } from '~/services/OwnerManagementService'
 import type { CafeUpdateRequest } from '~/services/CafeUpdateService'
 
@@ -20,7 +21,7 @@ const ownerService = useOwnerManagementService()
 const cafeUpdateService = useCafeUpdateService()
 const route = useRoute()
 
-// 'cafe_update': owner requests to change registered cafe details (today, the cafe name)
+// 'cafe_update': owner requests to change registered cafe details (the cafe name, or a branch address)
 type RegistrationTab = 'owner' | 'branch' | 'cafe_update'
 // 'pending' and 'resubmitted' split what awaits review (the API's 'pending_approval')
 type StatusTab = 'general' | 'pending' | 'resubmitted' | 'approved' | 'rejected'
@@ -548,7 +549,7 @@ watch(() => route.query.uuid, async (uuid) => {
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Contacts</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Status</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Submitted At</th>
-                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Actions</th>
+                <th class="w-12 px-4 py-3.5"><span class="sr-only">Open</span></th>
               </tr>
             </thead>
 
@@ -560,7 +561,7 @@ watch(() => route.query.uuid, async (uuid) => {
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">CORs</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Status</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Submitted At</th>
-                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Actions</th>
+                <th class="w-12 px-4 py-3.5"><span class="sr-only">Open</span></th>
               </tr>
             </thead>
 
@@ -572,7 +573,7 @@ watch(() => route.query.uuid, async (uuid) => {
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Address</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Status</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Submitted At</th>
-                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Actions</th>
+                <th class="w-12 px-4 py-3.5"><span class="sr-only">Open</span></th>
               </tr>
             </thead>
 
@@ -603,13 +604,26 @@ watch(() => route.query.uuid, async (uuid) => {
                 <tr
                   v-for="req in cafeUpdates"
                   :key="req.uuid"
-                  class="border-b border-[#F3E7D2] last:border-b-0 hover:bg-[#FAF4ED]/60 transition-colors duration-150 ease-out cursor-pointer group font-sans"
+                  class="border-b border-[#F3E7D2] last:border-b-0 hover:bg-[#FAF4ED]/60 transition-colors duration-150 ease-out cursor-pointer group font-sans outline-none focus-visible:bg-[#FAF4ED] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#B4846C]/40"
+                  tabindex="0"
+                  :aria-label="`Open ${req.type === 'address_change' ? 'address change' : 'name change'} request from ${req.owner?.name || 'owner'}`"
                   @click="openCafeUpdate(req.uuid, req)"
+                  @keydown.enter.prevent="openCafeUpdate(req.uuid, req)"
+                  @keydown.space.prevent="openCafeUpdate(req.uuid, req)"
                 >
                   <td class="px-6 py-4 max-w-[320px]">
-                    <p class="font-sans text-[11px] font-semibold uppercase tracking-wide text-[#9E7060]">Name change</p>
-                    <p class="font-sans text-sm text-[#8B6656] truncate">{{ req.old_name }}</p>
-                    <p class="font-display text-[15px] font-bold text-[#3D2B24] truncate">→ {{ req.new_name }}</p>
+                    <template v-if="req.type === 'address_change'">
+                      <p class="font-sans text-[11px] font-semibold uppercase tracking-wide text-[#9E7060] truncate">
+                        Address change · {{ req.branch?.branch_name || 'Deleted branch' }}
+                      </p>
+                      <p class="font-sans text-sm text-[#8B6656] truncate" :title="req.old_address || undefined">{{ req.old_address }}</p>
+                      <p class="font-display text-[15px] font-bold text-[#3D2B24] truncate" :title="req.new_address || undefined">→ {{ req.new_address }}</p>
+                    </template>
+                    <template v-else>
+                      <p class="font-sans text-[11px] font-semibold uppercase tracking-wide text-[#9E7060]">Name change</p>
+                      <p class="font-sans text-sm text-[#8B6656] truncate">{{ req.old_name }}</p>
+                      <p class="font-display text-[15px] font-bold text-[#3D2B24] truncate">→ {{ req.new_name }}</p>
+                    </template>
                   </td>
                   <td class="px-6 py-4">
                     <p class="font-sans text-sm font-semibold text-[#3D2B24]">{{ req.owner?.name || '—' }}</p>
@@ -622,15 +636,8 @@ watch(() => route.query.uuid, async (uuid) => {
                   <td class="px-6 py-4 font-sans text-sm text-[#5E4A42] whitespace-nowrap">
                     {{ req.submitted_at ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(req.submitted_at)) : '—' }}
                   </td>
-                  <td class="px-6 py-4">
-                    <button
-                      type="button"
-                      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-semibold text-xs hover:bg-[#FAF4ED] hover:border-[#D9C4B8] hover:text-[#3D2B24] active:scale-95 transition-[transform,background-color,border-color] duration-140 ease-out shadow-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-                      @click.stop="openCafeUpdate(req.uuid, req)"
-                    >
-                      <span>View</span>
-                      <Icon name="heroicons:arrow-right" class="w-3.5 h-3.5 text-[#B4846C]" />
-                    </button>
+                  <td class="w-12 px-4 py-4 text-right">
+                    <Icon name="heroicons:chevron-right" class="w-5 h-5 text-[#C2A592] transition-[color,transform] duration-150 group-hover:translate-x-0.5 group-hover:text-[#7D5A50]" aria-hidden="true" />
                   </td>
                 </tr>
               </template>
@@ -658,38 +665,10 @@ watch(() => route.query.uuid, async (uuid) => {
           </table>
         </div>
 
-        <!-- Integrated Pagination Footer -->
-        <div v-if="rowCount > 0" class="border-t border-[#F3E7D2] px-6 py-3.5 bg-[#FAF4ED]/50 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div class="font-sans text-xs text-[#9E7060]">
-            Showing <strong class="text-[#3D2B24] font-semibold">{{ ((currentPage - 1) * perPage) + 1 }}</strong> to <strong class="text-[#3D2B24] font-semibold">{{ Math.min(currentPage * perPage, total) }}</strong> of <strong class="text-[#3D2B24] font-semibold">{{ total }}</strong> applications
-          </div>
-
-          <div class="flex items-center gap-1.5">
-            <button
-              type="button"
-              class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#EDD8CC] bg-white text-[#7D5A50] hover:bg-[#FDF3E7] hover:text-[#3D2B24] disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs cursor-pointer"
-              :disabled="currentPage <= 1"
-              aria-label="Previous page"
-              @click="goToPage(currentPage - 1)"
-            >
-              <Icon name="heroicons:chevron-left" class="w-4 h-4" />
-            </button>
-
-            <span class="font-sans text-xs font-bold text-[#5C3A28] px-2.5">
-              Page {{ currentPage }} of {{ Math.max(1, lastPage) }}
-            </span>
-
-            <button
-              type="button"
-              class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#EDD8CC] bg-white text-[#7D5A50] hover:bg-[#FDF3E7] hover:text-[#3D2B24] disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-[transform,background-color] duration-140 ease-out shadow-xs cursor-pointer"
-              :disabled="currentPage >= Math.max(1, lastPage)"
-              aria-label="Next page"
-              @click="goToPage(currentPage + 1)"
-            >
-              <Icon name="heroicons:chevron-right" class="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <!-- Pagination: the shared component -->
+        <nav v-if="rowCount > 0" aria-label="Table pages" class="border-t border-[#F3E7D2]">
+          <Pagination :page="currentPage" :last-page="lastPage" @change="goToPage" />
+        </nav>
       </div>
     </main>
 
@@ -775,10 +754,15 @@ watch(() => route.query.uuid, async (uuid) => {
             />
             <span class="font-sans text-sm text-[#3B1F0E]">
               {{ decisionKind === 'cafe_update'
-                ? 'Let the owner request this name again'
+                ? `Let the owner request this ${cafeUpdate?.type === 'address_change' ? 'address' : 'name'} again`
                 : decisionKind === 'branch' ? 'Let the owner edit and resubmit this branch' : 'Let the applicant edit and resubmit' }}
               <span class="block text-xs text-[#3B1F0E]/60 mt-0.5">
-                <template v-if="decisionKind === 'cafe_update'">
+                <template v-if="decisionKind === 'cafe_update' && cafeUpdate?.type === 'address_change'">
+                  {{ allowResubmit
+                    ? 'They can fix the COR and send the same address back for review.'
+                    : 'This address is final. They can still request a different one.' }}
+                </template>
+                <template v-else-if="decisionKind === 'cafe_update'">
                   {{ allowResubmit
                     ? 'They can fix the CORs and send the same name back for review.'
                     : 'This name is final. They can still request a different name.' }}

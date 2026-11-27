@@ -201,6 +201,22 @@ const ACTIONS: Record<string, { label: string; icon: string; tone: string }> = {
   'menu.category_updated': { label: 'Category edited', icon: 'heroicons:pencil-square', tone: EDIT },
   'menu.category_deleted': { label: 'Category deleted', icon: 'heroicons:trash', tone: REMOVE },
   'branch.details_updated': { label: 'Branch details edited', icon: 'heroicons:building-storefront', tone: EDIT },
+  // Requests an admin reviews (CafeUpdateService): moving a branch, renaming the cafe
+  'branch_address_change_requested': { label: 'Address change requested', icon: 'heroicons:map-pin', tone: EDIT },
+  'branch_address_change_withdrawn': { label: 'Address change cancelled', icon: 'heroicons:map-pin', tone: OFF },
+  'branch_address_change_approved': { label: 'Address change approved', icon: 'heroicons:check-circle', tone: ON },
+  'branch_address_change_rejected': { label: 'Address change declined', icon: 'heroicons:x-circle', tone: REMOVE },
+  'cafe_name_change_requested': { label: 'Rename requested', icon: 'heroicons:pencil-square', tone: EDIT },
+  'cafe_name_change_withdrawn': { label: 'Rename cancelled', icon: 'heroicons:pencil-square', tone: OFF },
+  'cafe_name_change_approved': { label: 'Rename approved', icon: 'heroicons:check-circle', tone: ON },
+  'cafe_name_change_rejected': { label: 'Rename declined', icon: 'heroicons:x-circle', tone: REMOVE },
+}
+
+// Last resort for an action this list doesn't know yet: "branch_address_change_requested" or
+// "menu.item_moved" reads as "Branch address change requested" / "Item moved", never the raw code.
+function humanizeAction(action: string) {
+  const words = action.replace(/^[a-z]+\./, '').replace(/[._]+/g, ' ').trim()
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : 'Activity'
 }
 // Availability rows: on or off at a branch.
 function actionInfo(l: ActivityLogRow) {
@@ -209,7 +225,7 @@ function actionInfo(l: ActivityLogRow) {
     const what = l.action === 'menu.item_availability' ? 'Item' : 'Category'
     return { label: `${what} ${on ? 'available' : 'unavailable'}`, icon: on ? 'heroicons:eye' : 'heroicons:eye-slash', tone: on ? ON : OFF }
   }
-  return ACTIONS[l.action] ?? { label: l.action, icon: 'heroicons:clipboard-document-list', tone: OFF }
+  return ACTIONS[l.action] ?? { label: humanizeAction(l.action), icon: 'heroicons:clipboard-document-list', tone: OFF }
 }
 
 function roleLabel(r: string | null) {
