@@ -1659,22 +1659,23 @@ onBeforeUnmount(() => {
           </form>
         </div>
 
-        <!-- STEP 2: OTP Verification -->
-        <div v-else-if="currentStep === 2" key="step2" class="space-y-6">
+        <!-- STEP 2: OTP Verification (same size and format as verify-login-code.vue) -->
+        <div v-else-if="currentStep === 2" key="step2" class="mx-auto w-full max-w-sm">
+          <!-- Change Email -->
           <button
             type="button"
-            class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8B6656] hover:text-[#3B1F0E] transition-colors py-1 px-2.5 -ml-2.5 rounded-lg hover:bg-[#7B5A50]/8 active:scale-[0.97]"
+            class="flex items-center gap-1 text-sm font-semibold text-[#7B5A50] hover:opacity-80 transition-opacity mb-8"
             @click="currentStep = 1"
           >
             <Icon name="heroicons:chevron-left" class="w-4 h-4" />
             Change Email
           </button>
 
-          <div>
-            <span class="text-xs uppercase tracking-wider font-bold text-[#7B5A50] block mb-1">Verification</span>
-            <h1 class="font-display text-2xl sm:text-3xl font-extrabold text-[#2D201B] tracking-tight">Check your inbox</h1>
-            <p class="text-xs sm:text-sm text-[#7D5A50]/80 mt-1.5 leading-relaxed">
-              We sent a 6-digit code to <span class="font-bold text-[#2D201B]">{{ email }}</span>.
+          <!-- Header -->
+          <div class="mb-8">
+            <h1 class="text-3xl font-bold text-[#2d201b]">Check your inbox</h1>
+            <p class="text-gray-600 text-sm mt-1.5 leading-relaxed">
+              We sent a 6-digit code to <span class="font-semibold text-[#2d201b]">{{ email }}</span>.
               Enter it below to continue.
             </p>
           </div>
@@ -1683,7 +1684,7 @@ onBeforeUnmount(() => {
           <div
             v-if="error"
             role="alert"
-            class="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm flex items-center gap-3 shadow-xs"
+            class="p-3.5 rounded-lg bg-red-100 border border-red-300 text-red-700 text-sm flex items-center gap-3 mb-6"
           >
             <Icon name="heroicons:exclamation-circle" class="w-5 h-5 text-red-500 shrink-0" />
             <span class="font-medium">{{ error }}</span>
@@ -1693,15 +1694,15 @@ onBeforeUnmount(() => {
           <p
             v-if="notice && !error"
             role="status"
-            class="flex items-center gap-2 text-xs sm:text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 p-3 rounded-xl"
+            class="mb-6 flex items-center gap-2 text-sm font-medium text-[#1F8A4C]"
           >
-            <Icon name="heroicons:check-circle" class="w-4 h-4 shrink-0" />
+            <Icon name="heroicons:check-circle" class="w-5 h-5 shrink-0" />
             {{ notice }}
           </p>
 
           <form @submit.prevent="handleVerifyOTP" class="space-y-6">
             <!-- Digit Inputs -->
-            <div class="flex justify-between gap-2 sm:gap-3" role="group" aria-label="6-digit verification code">
+            <div class="flex justify-between gap-2" role="group" aria-label="6-digit verification code">
               <input
                 v-for="(digit, index) in digits"
                 :key="index"
@@ -1714,8 +1715,8 @@ onBeforeUnmount(() => {
                 :autocomplete="index === 0 ? 'one-time-code' : 'off'"
                 :aria-label="`Digit ${index + 1} of 6`"
                 :disabled="loading"
-                :class="digit ? 'border-[#7B5A50] ring-2 ring-[#7B5A50]/15 bg-[#FFFDF9]' : 'border-[#D9C7B6] hover:border-[#B49A85]'"
-                class="min-w-0 w-full h-14 text-center text-xl sm:text-2xl font-bold tabular-nums rounded-xl border bg-white text-[#2D201B] outline-none focus:border-[#7B5A50] focus:ring-4 focus:ring-[#7B5A50]/15 transition-all duration-150 active:scale-[0.98]"
+                :class="digit ? 'border-[#7B5A50]' : 'border-gray-300'"
+                class="min-w-0 w-full h-14 text-center text-xl font-semibold tabular-nums rounded-md border bg-white text-[#2d201b] outline-none focus:border-[#7B5A50] focus:ring-2 focus:ring-[#7B5A50]/20 transition"
                 @input="onDigitInput(index, $event)"
                 @keydown="onDigitKeydown(index, $event)"
                 @paste="onDigitPaste(index, $event)"
@@ -1727,20 +1728,19 @@ onBeforeUnmount(() => {
             <button
               type="submit"
               :disabled="loading || otpCode.length < 6"
-              class="w-full h-12 rounded-xl bg-[#3B1F0E] text-[#FFF8EA] font-display font-semibold tracking-wide hover:bg-[#2A150A] active:scale-[0.98] transition-all duration-160 ease-out flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(59,31,14,0.18)] hover:shadow-[0_6px_20px_rgba(59,31,14,0.24)] cursor-pointer disabled:opacity-50 group"
+              class="w-full h-11 rounded-md bg-[#7B5A50] text-white font-medium hover:bg-[#65463d] transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <span v-if="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              <span>{{ loading ? 'Verifying...' : 'Verify and Continue' }}</span>
-              <Icon v-if="!loading" name="heroicons:arrow-right" class="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-160" />
+              {{ loading ? 'Verifying...' : 'Verify and Continue' }}
             </button>
 
             <!-- Resend -->
-            <p class="text-xs sm:text-sm text-[#8B6656] text-center">
+            <p class="text-sm text-gray-600 text-center">
               Didn't receive it?
               <button
                 type="button"
                 :disabled="cooldown > 0 || resending"
-                class="font-bold tabular-nums text-[#3B1F0E] hover:underline disabled:opacity-50 disabled:no-underline ml-1 cursor-pointer"
+                class="font-semibold tabular-nums text-[#7B5A50] hover:underline disabled:opacity-50 disabled:no-underline"
                 @click="handleResendOTP"
               >
                 {{ cooldown > 0 ? `Resend code in ${cooldownLabel}` : resending ? 'Sending...' : 'Resend code' }}

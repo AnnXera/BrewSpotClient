@@ -161,21 +161,16 @@ useAutoRefresh(loadDashboardData)
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <div class="flex flex-wrap items-center gap-2.5 sm:gap-3">
-              <h1 class="font-display text-2xl font-black text-[#3D2B24] tracking-tight min-[360px]:text-3xl sm:text-[32px] sm:leading-tight">
+              <h1 class="font-display text-2xl font-bold text-[#3B1F0E] tracking-tight min-[360px]:text-3xl sm:text-[32px] sm:leading-tight">
                 Admin Dashboard
               </h1>
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#FAF4ED] text-[#7D5A50] border border-[#EEDFC4] shadow-2xs">
-                <span class="w-2 h-2 rounded-full bg-[#B4846C] animate-pulse" />
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-white text-[#7D5A50] border border-[#EEDFC4]">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse motion-reduce:animate-none" />
                 <span>Platform Operational</span>
               </span>
             </div>
-            <p class="font-sans text-xs sm:text-sm text-[#9E7060] mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p class="font-sans text-xs sm:text-sm text-[#8B6656] mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span>Overview of cafe operations, subscriptions, and platform metrics.</span>
-              <span class="hidden sm:inline text-[#D9C3A5]">&bull;</span>
-              <span class="inline-flex items-center gap-1 font-medium text-[#7D5A50]">
-                <Icon name="heroicons:users" class="w-3.5 h-3.5 text-[#B4846C]" />
-                <span>{{ activeSubscribersCount }} active {{ activeSubscribersCount === 1 ? 'subscriber' : 'subscribers' }}</span>
-              </span>
               <template v-if="updatedAt">
                 <span class="hidden sm:inline text-[#D9C3A5]">&bull;</span>
                 <span class="text-[11px] sm:text-xs text-[#9E7060]/80">Updated {{ updatedAt }}</span>
@@ -188,12 +183,12 @@ useAutoRefresh(loadDashboardData)
             <!-- Export Report -->
             <button
               type="button"
-              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-semibold text-sm hover:bg-[#FDF3E7] hover:border-[#D9C4B8] hover:text-[#3D2B24] active:scale-95 transition-[transform,background-color,border-color] duration-160 ease-out shadow-xs disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
+              class="inline-flex h-10 items-center gap-2 px-4 rounded-xl bg-white border border-[#EEDFC4] text-[#7D5A50] font-sans font-semibold text-sm shadow-xs hover:bg-[#FDF8F3] hover:border-[#D9C4B8] hover:text-[#3B1F0E] active:scale-[0.97] transition-[transform,background-color,border-color,color] duration-160 ease-out disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B4846C]/40"
               :disabled="loading || !transactionsList.length"
               title="Export platform transactions to Excel"
               @click="handleExportDashboardReport"
             >
-              <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 text-[#7D5A50]" />
+              <Icon name="heroicons:arrow-down-tray" class="w-4 h-4" />
               <span class="hidden sm:inline">Export Report</span>
               <span class="sm:hidden">Export</span>
             </button>
@@ -201,14 +196,14 @@ useAutoRefresh(loadDashboardData)
             <!-- Refresh Button -->
             <button
               type="button"
-              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-semibold text-sm hover:bg-[#FDF3E7] hover:border-[#D9C4B8] hover:text-[#3D2B24] active:scale-95 transition-[transform,background-color,border-color] duration-160 ease-out shadow-xs disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
+              class="inline-flex h-10 items-center gap-2 px-4 rounded-xl bg-white border border-[#EEDFC4] text-[#7D5A50] font-sans font-semibold text-sm shadow-xs hover:bg-[#FDF8F3] hover:border-[#D9C4B8] hover:text-[#3B1F0E] active:scale-[0.97] transition-[transform,background-color,border-color,color] duration-160 ease-out disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B4846C]/40"
               :disabled="loading || refreshing"
               title="Refresh platform figures"
               @click="loadDashboardData"
             >
               <Icon
                 name="heroicons:arrow-path"
-                class="w-4 h-4 text-[#7D5A50]"
+                class="w-4 h-4"
                 :class="{ 'animate-spin': loading || refreshing }"
               />
               <span>Refresh</span>
@@ -228,7 +223,7 @@ useAutoRefresh(loadDashboardData)
           </p>
           <button
             type="button"
-            class="rounded-lg bg-[#8E2F25] px-3.5 py-1.5 text-[13px] font-semibold text-white hover:bg-[#74261E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8E2F25] focus-visible:ring-offset-2"
+            class="inline-flex h-8 items-center rounded-xl bg-[#8E2F25] px-3 text-[13px] font-semibold text-white hover:bg-[#74261E] active:scale-[0.97] transition-[transform,background-color] duration-160 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8E2F25]/40"
             @click="loadDashboardData"
           >
             Try again

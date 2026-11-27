@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CardAction from '~/components/dashboard/CardAction.vue'
 import { computed } from 'vue'
 import { formatCount } from '~/utils/dashboardFormat'
 
@@ -97,13 +98,7 @@ const pct = (b: Breakdown, s: Segment) => (total(b) ? Math.round((s.value / tota
                 {{ b.subtitle }}<template v-if="!loading && total(b)"> · <span class="tabular-nums">{{ formatCount(total(b)) }}</span> total</template>
               </p>
             </div>
-            <NuxtLink
-              :to="b.link"
-              class="inline-flex shrink-0 items-center gap-1 rounded font-display text-[13px] font-semibold text-[#7D5A50] underline decoration-[#7D5A50]/30 underline-offset-4 hover:decoration-[#7D5A50] active:scale-[0.97] transition-transform duration-160 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]"
-            >
-              {{ b.linkLabel }}
-              <Icon name="heroicons:arrow-up-right-20-solid" class="h-3.5 w-3.5" />
-            </NuxtLink>
+            <CardAction :to="b.link">{{ b.linkLabel }}</CardAction>
           </header>
 
           <!-- Split bar -->

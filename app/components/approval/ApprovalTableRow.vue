@@ -56,15 +56,9 @@ function formatDate(value: string | null) {
     </td>
 
     <td class="px-6 py-4">
-      <div class="flex flex-col gap-0.5 text-xs">
-        <div class="flex items-center gap-1.5 font-semibold text-[#3D2B24]">
-          <Icon name="heroicons:phone" class="w-3.5 h-3.5 text-[#B4846C] shrink-0" />
-          <span>{{ approval.user?.phone_number ?? '—' }}</span>
-        </div>
-        <div class="flex items-center gap-1.5 text-[#7D5A50]">
-          <Icon name="heroicons:envelope" class="w-3.5 h-3.5 text-[#B4846C]/70 shrink-0" />
-          <span class="truncate max-w-[200px]">{{ approval.user?.email ?? '—' }}</span>
-        </div>
+      <div class="flex items-center gap-1.5 text-xs font-medium text-[#3D2B24]">
+        <Icon name="heroicons:envelope" class="w-3.5 h-3.5 text-[#B4846C] shrink-0" />
+        <span class="truncate max-w-[220px]" :title="approval.user?.email ?? undefined">{{ approval.user?.email ?? '—' }}</span>
       </div>
     </td>
 

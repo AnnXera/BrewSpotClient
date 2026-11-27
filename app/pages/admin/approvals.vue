@@ -399,10 +399,10 @@ watch(() => route.query.uuid, async (uuid) => {
       </div>
 
       <!-- Registration Category Tabs -->
-      <div class="scroll-reveal overflow-x-auto scrollbar-none flex items-center gap-1 sm:gap-2 mb-6 border-b border-[#EEDFC4]">
+      <div class="scroll-reveal flex flex-wrap items-center gap-x-1 sm:gap-x-2 mb-6 border-b border-[#EEDFC4]">
         <button
           type="button"
-          class="flex items-center gap-2 px-4 py-2.5 font-display text-sm sm:text-base transition-colors relative z-10 active:scale-[0.98] duration-140 cursor-pointer shrink-0"
+          class="flex items-center gap-2 px-3 sm:px-4 py-2.5 font-display text-sm sm:text-base transition-colors relative z-10 active:scale-[0.98] duration-140 cursor-pointer shrink-0"
           :class="registrationTab === 'owner' ? 'text-[#3D2B24] font-bold' : 'text-[#9E7060] font-medium hover:text-[#3D2B24]'"
           @click="switchRegistrationTab('owner')"
         >
@@ -418,7 +418,7 @@ watch(() => route.query.uuid, async (uuid) => {
 
         <button
           type="button"
-          class="flex items-center gap-2 px-4 py-2.5 font-display text-sm sm:text-base transition-colors relative z-10 active:scale-[0.98] duration-140 cursor-pointer shrink-0"
+          class="flex items-center gap-2 px-3 sm:px-4 py-2.5 font-display text-sm sm:text-base transition-colors relative z-10 active:scale-[0.98] duration-140 cursor-pointer shrink-0"
           :class="registrationTab === 'branch' ? 'text-[#3D2B24] font-bold' : 'text-[#9E7060] font-medium hover:text-[#3D2B24]'"
           @click="switchRegistrationTab('branch')"
         >
@@ -434,7 +434,7 @@ watch(() => route.query.uuid, async (uuid) => {
 
         <button
           type="button"
-          class="flex items-center gap-2 px-4 py-2.5 font-display text-sm sm:text-base transition-colors relative z-10 active:scale-[0.98] duration-140 cursor-pointer shrink-0"
+          class="flex items-center gap-2 px-3 sm:px-4 py-2.5 font-display text-sm sm:text-base transition-colors relative z-10 active:scale-[0.98] duration-140 cursor-pointer shrink-0"
           :class="registrationTab === 'cafe_update' ? 'text-[#3D2B24] font-bold' : 'text-[#9E7060] font-medium hover:text-[#3D2B24]'"
           @click="switchRegistrationTab('cafe_update')"
         >
@@ -546,7 +546,7 @@ watch(() => route.query.uuid, async (uuid) => {
               <tr class="bg-[#FAF4ED] border-b border-[#EEDFC4]">
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Owner</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Cafe</th>
-                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Contacts</th>
+                <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Email</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Status</th>
                 <th class="font-sans text-[11px] font-bold tracking-wider text-[#7D5A50] uppercase px-6 py-3.5">Submitted At</th>
                 <th class="w-12 px-4 py-3.5"><span class="sr-only">Open</span></th>

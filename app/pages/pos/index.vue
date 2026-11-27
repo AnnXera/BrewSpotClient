@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import logoIcon from '~/assets/images/logo-icon.svg'
 import FloorPlanModal from '~/components/pos/FloorPlanModal.vue'
+import MenuItemCard from '~/components/pos/MenuItemCard.vue'
 import { formatOrderType } from '~/utils/dashboardFormat'
 import type { PosOrderType } from '~/services/PosService'
 import { variantLabel, TEMPERATURE_LABELS, type Temperature } from '~/utils/variant'
@@ -388,6 +389,100 @@ const filteredItems = computed(() => {
   
   return items
 })
+
+// "All Items" with no search: one swipeable row per category. A chosen category or a search shows the full grid.
+const isGroupedView = computed(() => selectedCategory.value === 'all' && searchQuery.value.trim() === '')
+
+const itemsByCategory = computed(() => {
+  const known = new Set(categories.value.filter(c => c.uuid !== 'all').map(c => c.uuid))
+  const groups = categories.value
+    .filter(c => c.uuid !== 'all')
+    .map(c => ({ uuid: c.uuid as string, name: c.name as string, items: menuItems.value.filter(i => i.category_uuid === c.uuid) }))
+    .filter(g => g.items.length > 0)
+  const other = menuItems.value.filter(i => !known.has(i.category_uuid))
+  if (other.length) groups.push({ uuid: '__other', name: 'Other', items: other })
+  return groups
+})
+
+// Drag a row sideways with the mouse (touch and trackpads scroll natively).
+// A drag that moves more than a few pixels does not count as a tap on a card.
+const rowDrag = { el: null as HTMLElement | null, startX: 0, startLeft: 0, moved: false }
+
+function onRowPointerDown(e: PointerEvent) {
+  if (e.pointerType !== 'mouse' || e.button !== 0) return
+  const el = e.currentTarget as HTMLElement
+  rowDrag.el = el
+  rowDrag.startX = e.clientX
+  rowDrag.startLeft = el.scrollLeft
+  rowDrag.moved = false
+}
+
+function onRowPointerMove(e: PointerEvent) {
+  const el = rowDrag.el
+  if (!el) return
+  const dx = e.clientX - rowDrag.startX
+  if (!rowDrag.moved && Math.abs(dx) > 5) {
+    rowDrag.moved = true
+    el.setPointerCapture(e.pointerId)
+    el.classList.add('is-dragging')
+  }
+  if (rowDrag.moved) el.scrollLeft = rowDrag.startLeft - dx
+}
+
+function onRowPointerUp(e: PointerEvent) {
+  const el = rowDrag.el
+  if (!el) return
+  if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+  el.classList.remove('is-dragging')
+  rowDrag.el = null
+}
+
+function onRowClickCapture(e: MouseEvent) {
+  if (rowDrag.moved) {
+    e.stopPropagation()
+    e.preventDefault()
+    rowDrag.moved = false
+  }
+}
+
+// Arrow buttons: move a row by most of its visible width.
+const rowEls = new Map<string, HTMLElement>()
+const rowEdges = ref<Record<string, { start: boolean; end: boolean }>>({})
+
+// Function refs run on every render, so only act when the element actually changes,
+// and only write state when the edge values differ (otherwise this would re-render forever).
+function setRowEl(uuid: string, el: any) {
+  if (el) {
+    if (rowEls.get(uuid) === el) return
+    rowEls.set(uuid, el as HTMLElement)
+    nextTick(() => updateRowEdges(uuid))
+  } else {
+    rowEls.delete(uuid)
+  }
+}
+
+function updateRowEdges(uuid: string) {
+  const el = rowEls.get(uuid)
+  if (!el) return
+  const start = el.scrollLeft <= 8
+  const end = el.scrollLeft + el.clientWidth >= el.scrollWidth - 8
+  const prev = rowEdges.value[uuid]
+  if (prev && prev.start === start && prev.end === end) return
+  rowEdges.value[uuid] = { start, end }
+}
+
+function scrollRow(uuid: string, dir: 1 | -1) {
+  const el = rowEls.get(uuid)
+  if (!el) return
+  el.scrollBy({ left: dir * Math.max(200, el.clientWidth * 0.8), behavior: 'smooth' })
+}
+
+function refreshAllRowEdges() {
+  rowEls.forEach((_el, uuid) => updateRowEdges(uuid))
+}
+
+onMounted(() => window.addEventListener('resize', refreshAllRowEdges, { passive: true }))
+onUnmounted(() => window.removeEventListener('resize', refreshAllRowEdges))
 
 // ── CASHIER PROFILE & SHIFT DETAILS ─────────────────────────────────────────
 const currentCashier = computed(() => {
@@ -999,9 +1094,24 @@ async function freeAssignedTable() {
   const table = selectedTableForOrder.value
   isUpdatingTableStatus.value = true
   try {
-    const res = await devicePosService.updateTableStatus(table.uuid, 'available')
+    // If a booking is still coming later today on this table, it goes back to Held instead of Free.
+    let next: any = null
+    try {
+      const r = await devicePosService.getReservations()
+      const now = Date.now()
+      next = (r?.reservations?.data || [])
+        .filter((b: any) => b.table?.uuid === table.uuid
+          && ['pending', 'confirmed'].includes(b.status)
+          && new Date(b.reservation_end).getTime() > now)
+        .sort((a: any, b: any) => String(a.reservation_date).localeCompare(String(b.reservation_date)))[0] || null
+    } catch {
+      // Bookings could not be checked; fall back to freeing the table.
+    }
+    const res = await devicePosService.updateTableStatus(table.uuid, next ? 'reserved' : 'available')
     if (res.success) {
-      showNotice(`${table.table_name} is now Available (Customer Left).`)
+      showNotice(next
+        ? `${table.table_name} is back to Held for ${next.customer_name}'s booking (Customer Left).`
+        : `${table.table_name} is now Available (Customer Left).`)
       selectedTableForOrder.value = null
     }
   } catch (e: any) {
@@ -1410,77 +1520,93 @@ function formatCurrency(amount: number) {
           </div>
 
           <!-- Items Grid (3 Columns with Circular Food Photos matching reference) -->
-          <div class="flex-1 overflow-y-auto pr-1 pb-20">
+          <div class="soft-scroll flex-1 overflow-y-auto pr-1.5 pb-20">
             <div v-if="filteredItems.length === 0" class="h-64 flex flex-col items-center justify-center text-center p-8 text-gray-500">
               <Icon name="heroicons:magnifying-glass" class="w-10 h-10 mb-2 text-gray-300" />
               <p class="text-sm font-semibold text-gray-700">No menu items found</p>
               <p class="text-xs text-gray-400 mt-1">{{ searchQuery.trim() ? `No results for "${searchQuery.trim()}"` : 'This category has no items yet.' }}</p>
             </div>
 
-            <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-              <button 
-                v-for="item in filteredItems" 
-                :key="item.uuid"
-                @click="addToCart(item)"
-                :disabled="item.sold_out"
-                class="bg-white rounded-2xl border border-[#EFECE6] p-3 flex flex-col justify-between shadow-[0_3px_14px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_22px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all group text-left cursor-pointer relative select-none active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+            <!-- All Items: one swipeable row per category -->
+            <div v-else-if="isGroupedView" class="space-y-6">
+              <section
+                v-for="group in itemsByCategory"
+                :key="group.uuid"
+                :aria-labelledby="`cat-row-${group.uuid}`"
               >
-                <!-- Circular Image Container (Centered Floating Circle) -->
-                <div class="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-full overflow-hidden shadow-xs bg-gradient-to-tr from-[#FAF8F5] to-[#EFEAE2] flex items-center justify-center mb-2 relative">
-                  <img 
-                    v-if="item.picture" 
-                    :src="item.picture" 
-                    :alt="item.menu_name" 
-                    class="w-full h-full object-cover group-hover:scale-108 transition-transform duration-300" 
-                  />
-                  <div v-else class="w-full h-full flex items-center justify-center bg-[#FDF8F3] text-[#7B5A50]">
-                    <Icon name="heroicons:cake" class="w-7 h-7 sm:w-8 sm:h-8 opacity-60 group-hover:scale-110 transition-transform duration-300" />
-                  </div>
-                  <div v-if="item.sold_out" class="absolute inset-0 bg-black/60 backdrop-blur-[1px] flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider">
-                    Sold Out
-                  </div>
-                </div>
-
-                <!-- Info matching reference layout -->
-                <!-- Text wraps instead of clipping: names and categories are always shown in full. -->
-                <div
-                  class="flex-1 min-w-0 flex flex-col transition-opacity duration-200"
-                  :class="item.description?.trim() ? 'group-hover:opacity-0 group-focus-visible:opacity-0' : ''"
-                >
-                  <h3 class="font-bold text-xs sm:text-sm text-[#2D201B] leading-snug [overflow-wrap:anywhere]">
-                    {{ item.menu_name }}
+                <div class="mb-2.5 flex items-center justify-between gap-3 px-1">
+                  <h3 :id="`cat-row-${group.uuid}`" class="flex items-baseline gap-2 text-sm font-bold text-[#2D201B]">
+                    {{ group.name }}
+                    <span class="text-xs font-medium text-[#8A6E64] tabular-nums">{{ group.items.length }}</span>
                   </h3>
-
-                  <div class="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 mt-auto pt-2">
-                    <span class="min-w-0 text-[11px] text-[#8A6E64] capitalize [overflow-wrap:anywhere]">
-                      {{ getCategoryName(item.category_uuid) }}
-                    </span>
-                    <span class="ml-auto font-bold text-xs sm:text-sm text-[#2D201B] tabular-nums whitespace-nowrap">
-                      {{ formatCurrency(item.base_price) }}
-                    </span>
+                  <div class="flex items-center gap-1">
+                    <button
+                      type="button"
+                      class="row-arrow grid size-9 place-items-center rounded-full border border-[#EFECE6] bg-white text-[#7B5A50] disabled:opacity-30"
+                      :disabled="rowEdges[group.uuid]?.start ?? true"
+                      :aria-label="`Scroll ${group.name} left`"
+                      @click="scrollRow(group.uuid, -1)"
+                    >
+                      <Icon name="heroicons:chevron-left-20-solid" class="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      class="row-arrow grid size-9 place-items-center rounded-full border border-[#EFECE6] bg-white text-[#7B5A50] disabled:opacity-30"
+                      :disabled="rowEdges[group.uuid]?.end ?? true"
+                      :aria-label="`Scroll ${group.name} right`"
+                      @click="scrollRow(group.uuid, 1)"
+                    >
+                      <Icon name="heroicons:chevron-right-20-solid" class="size-4" />
+                    </button>
+                    <button
+                      v-if="group.uuid !== '__other'"
+                      type="button"
+                      class="ml-1 rounded-full px-3 py-1.5 text-xs font-semibold text-[#7B5A50] transition-colors hover:bg-[#FDF8F3]"
+                      @click="selectedCategory = group.uuid"
+                    >
+                      See all
+                    </button>
                   </div>
-
-                  <p v-if="!item.sold_out" class="text-[10px] text-gray-400 mt-0.5">
-                    {{ item.available_stock }} left
-                  </p>
                 </div>
 
-                <!-- Description on hover: covers the card text; scrolls inside the card if it is very long. -->
                 <div
-                  v-if="item.description?.trim()"
-                  class="desc-overlay absolute inset-0 z-10 rounded-2xl bg-white p-3 flex flex-col overflow-y-auto opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto group-focus-visible:opacity-100 group-focus-visible:translate-y-0"
+                  class="row-fade relative"
+                  :class="{ 'fade-start': rowEdges[group.uuid] && !rowEdges[group.uuid].start, 'fade-end': rowEdges[group.uuid] && !rowEdges[group.uuid].end }"
                 >
-                  <p class="font-bold text-xs sm:text-sm text-[#2D201B] leading-snug [overflow-wrap:anywhere]">
-                    {{ item.menu_name }}
-                  </p>
-                  <p class="mt-1.5 text-[11px] sm:text-xs leading-relaxed text-[#A4847A] whitespace-pre-line [overflow-wrap:anywhere]">
-                    {{ item.description.trim() }}
-                  </p>
-                  <p class="mt-auto pt-2 font-bold text-xs sm:text-sm text-[#2D201B] tabular-nums">
-                    {{ formatCurrency(item.base_price) }}
-                  </p>
+                <div
+                  :ref="(el) => setRowEl(group.uuid, el)"
+                  class="cat-row hide-scrollbar -mx-1 flex gap-3 overflow-x-auto px-1 pb-2 pt-1"
+                  @scroll.passive="updateRowEdges(group.uuid)"
+                  @pointerdown="onRowPointerDown"
+                  @pointermove="onRowPointerMove"
+                  @pointerup="onRowPointerUp"
+                  @pointercancel="onRowPointerUp"
+                  @click.capture="onRowClickCapture"
+                >
+                  <MenuItemCard
+                    v-for="item in group.items"
+                    :key="item.uuid"
+                    :item="item"
+                    :category-name="group.name"
+                    :price="formatCurrency(item.base_price)"
+                    class="w-[148px] shrink-0 snap-start sm:w-[164px]"
+                    @add="addToCart"
+                  />
                 </div>
-              </button>
+                </div>
+              </section>
+            </div>
+
+            <!-- A chosen category or a search: the full grid, scroll down for more -->
+            <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+              <MenuItemCard
+                v-for="item in filteredItems"
+                :key="item.uuid"
+                :item="item"
+                :category-name="getCategoryName(item.category_uuid)"
+                :price="formatCurrency(item.base_price)"
+                @add="addToCart"
+              />
             </div>
           </div>
         </section>
@@ -2434,6 +2560,61 @@ select:focus-visible,
   outline: 2px solid #7B5A50;
   outline-offset: 2px;
 }
+/* Catalog scrollbar: thin, warm, quiet until you hover or scroll */
+.soft-scroll { scrollbar-gutter: stable; }
+/* Firefox (no ::-webkit-scrollbar): standard thin scrollbar */
+@supports not selector(::-webkit-scrollbar) {
+  .soft-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  .soft-scroll:hover,
+  .soft-scroll:focus-within { scrollbar-color: #D9C3A5 transparent; }
+}
+.soft-scroll::-webkit-scrollbar { width: 6px; }
+.soft-scroll::-webkit-scrollbar-track { background: transparent; }
+.soft-scroll::-webkit-scrollbar-button { display: none; height: 0; }
+.soft-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+.soft-scroll:hover::-webkit-scrollbar-thumb { background: #D9C3A5; }
+.soft-scroll::-webkit-scrollbar-thumb:hover { background: #B4846C; }
+
+/* Category rows: fade the edge where more items are hidden */
+.row-fade::before,
+.row-fade::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 8px;
+  width: 40px;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.row-fade::before { left: -4px; background: linear-gradient(to right, #F5F6F8, rgba(245, 246, 248, 0)); }
+.row-fade::after { right: -4px; background: linear-gradient(to left, #F5F6F8, rgba(245, 246, 248, 0)); }
+.row-fade.fade-start::before,
+.row-fade.fade-end::after { opacity: 1; }
+
+.cat-row {
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 4px; /* matches px-1, so the first card rests at scrollLeft 0 */
+  overscroll-behavior-x: contain;
+  cursor: grab;
+}
+.cat-row.is-dragging {
+  cursor: grabbing;
+  scroll-snap-type: none;
+  user-select: none;
+}
+.cat-row.is-dragging > * { pointer-events: none; }
+.row-arrow { transition: background-color 160ms ease, transform 140ms cubic-bezier(0.23, 1, 0.32, 1), opacity 160ms ease; }
+.row-arrow:not(:disabled):hover { background: #FDF8F3; }
+.row-arrow:not(:disabled):active { transform: scale(0.94); }
+
 .hide-scrollbar {
   scrollbar-width: none;
 }
