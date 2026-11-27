@@ -26,7 +26,15 @@ function formatDate(value: string | null) {
 </script>
 
 <template>
-  <tr class="border-b border-[#F3E7D2] last:border-b-0 hover:bg-[#FAF4ED]/60 transition-colors duration-150 ease-out cursor-default group font-sans">
+  <!-- The whole row opens the application -->
+  <tr
+    class="border-b border-[#F3E7D2] last:border-b-0 hover:bg-[#FAF4ED]/60 transition-colors duration-150 ease-out cursor-pointer group font-sans outline-none focus-visible:bg-[#FAF4ED] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#B4846C]/40"
+    tabindex="0"
+    :aria-label="`Open branch application for ${approval.cafe?.cafe_name ?? 'this cafe'}`"
+    @click="emit('view', approval)"
+    @keydown.enter.prevent="emit('view', approval)"
+    @keydown.space.prevent="emit('view', approval)"
+  >
     <td class="px-6 py-4">
       <div class="flex items-center gap-3">
         <img
@@ -63,15 +71,8 @@ function formatDate(value: string | null) {
       </div>
     </td>
 
-    <td class="px-6 py-4">
-      <button
-        type="button"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#EDD8CC] text-[#7D5A50] font-sans font-semibold text-xs hover:bg-[#FAF4ED] hover:border-[#D9C4B8] hover:text-[#3D2B24] active:scale-95 transition-[transform,background-color,border-color] duration-140 ease-out shadow-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#B4846C]/40"
-        @click="emit('view', approval)"
-      >
-        <span>View Details</span>
-        <Icon name="heroicons:arrow-right" class="w-3.5 h-3.5 text-[#B4846C]" />
-      </button>
+    <td class="w-12 px-4 py-4 text-right">
+      <Icon name="heroicons:chevron-right" class="w-5 h-5 text-[#C2A592] transition-[color,transform] duration-150 group-hover:translate-x-0.5 group-hover:text-[#7D5A50]" aria-hidden="true" />
     </td>
   </tr>
 </template>
