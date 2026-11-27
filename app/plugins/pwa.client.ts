@@ -27,15 +27,17 @@ export default defineNuxtPlugin(() => {
       markAsInstalled()
     })
 
-    // 4. Also listen for display-mode transitioning to standalone (when Chrome reparents the tab into the PWA window)
-    const standaloneMedia = window.matchMedia('(display-mode: standalone)')
+    // 4. Also catch a browser tab being reparented into the PWA window on install.
+    // Watch "leaving browser mode" rather than "entering standalone": an installed window also
+    // re-enters standalone when it leaves fullscreen (F11), and that is not an install.
+    const browserMedia = window.matchMedia('(display-mode: browser)')
     const handleDisplayModeChange = (e: MediaQueryListEvent) => {
-      if (e.matches) {
+      if (!e.matches && isStandalonePwaWindow()) {
         markAsInstalled()
       }
     }
-    if (typeof standaloneMedia.addEventListener === 'function') {
-      standaloneMedia.addEventListener('change', handleDisplayModeChange)
+    if (typeof browserMedia.addEventListener === 'function') {
+      browserMedia.addEventListener('change', handleDisplayModeChange)
     }
 
     // 5. If already launched in standalone A2HS mode on a dashboard route, immediately leave the dashboard

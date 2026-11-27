@@ -111,113 +111,156 @@ async function save() {
 }
 
 const inputClass = (field: string) => [
-  'w-full h-11 rounded-xl border bg-white px-3.5 text-sm font-semibold text-[#2D201B] outline-none transition-all shadow-2xs placeholder:text-[#A8988B] placeholder:font-normal focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15',
+  'w-full bg-white border rounded-xl px-3.5 py-3 text-sm font-semibold text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal shadow-2xs focus:outline-none focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15 transition-all',
   errors.value[field] ? 'border-red-400 bg-red-50/30' : 'border-[#D8C7B5]',
 ]
+
+function close() {
+  if (!saving.value) emit('close')
+}
+
+// Escape closes, except while saving
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && props.show) close()
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="show" class="fixed inset-0 z-[3000] flex items-center justify-center p-3 sm:p-6">
-      <div class="fixed inset-0 bg-black/45 backdrop-blur-sm" aria-hidden="true" @click="emit('close')" />
+    <div v-if="show" class="fixed inset-0 z-[3000] flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+      <div class="fixed inset-0 bg-black/45 backdrop-blur-sm transition-opacity duration-200" aria-hidden="true" @click="close" />
 
       <form
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-branch-title"
-        class="relative bg-white rounded-3xl w-full max-w-[520px] max-h-[calc(100dvh-1.5rem)] flex flex-col shadow-[0_24px_50px_-12px_rgba(59,31,14,0.22)] border border-[#EEDFC4]"
+        class="relative bg-white rounded-3xl w-full max-w-[600px] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] flex flex-col shadow-[0_24px_50px_-12px_rgba(59,31,14,0.22)] border border-[#EEDFC4] overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150"
         @submit.prevent="save"
       >
         <!-- Header -->
-        <div class="flex items-start justify-between gap-4 px-6 pt-6 pb-5 border-b border-[#EEDFC4] bg-[#FDFBF7] rounded-t-3xl">
-          <div class="flex items-center gap-4 min-w-0">
-            <div class="w-11 h-11 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0">
+        <div class="flex items-center justify-between gap-4 px-6 md:px-8 pt-5 pb-4 border-b border-[#EEDFC4] bg-[#FDFBF7] shrink-0">
+          <div class="flex items-center gap-3.5 min-w-0">
+            <div class="w-10 h-10 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0 shadow-2xs">
               <Icon name="heroicons:pencil-square" class="w-5 h-5" />
             </div>
             <div class="min-w-0">
-              <h2 id="edit-branch-title" class="text-xl font-display font-extrabold text-[#3B1F0E]">Edit Contact Details</h2>
-              <p class="mt-0.5 text-[13px] text-[#8A6E64] truncate">{{ branch.branch_name }}</p>
+              <h2 id="edit-branch-title" class="text-xl font-display font-extrabold text-[#3B1F0E] truncate">Edit Contact Details</h2>
+              <p class="text-xs text-[#8A6E64] mt-0.5 truncate">{{ branch.branch_name }}</p>
             </div>
           </div>
           <button
             type="button"
-            aria-label="Close"
-            class="w-9 h-9 rounded-xl bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FAF4ED] flex items-center justify-center shrink-0"
-            @click="emit('close')"
+            aria-label="Close modal"
+            :disabled="saving"
+            class="w-9 h-9 rounded-xl bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 disabled:opacity-50"
+            @click="close"
           >
             <Icon name="heroicons:x-mark" class="w-4 h-4" />
           </button>
         </div>
 
         <!-- Body -->
-        <div class="px-6 py-5 flex flex-col gap-4 overflow-y-auto">
-          <!-- Picture -->
-          <div class="flex items-center gap-4">
-            <img
-              v-if="preview || branch.cafe_picture_url"
-              :src="preview || branch.cafe_picture_url || ''"
-              alt=""
-              class="w-20 h-20 rounded-2xl object-cover border border-[#EDD8CC] shrink-0"
-            />
-            <div v-else class="w-20 h-20 rounded-2xl bg-[#F4ECE1] border border-[#EDD8CC] flex items-center justify-center shrink-0">
-              <Icon name="heroicons:building-storefront" class="w-8 h-8 text-[#9E7060]" />
+        <div class="flex-1 min-h-0 overflow-y-auto px-6 md:px-8 py-4 space-y-4">
+          <!-- ── Picture ─────────────────────────────────────────── -->
+          <section class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5" aria-labelledby="edit-branch-picture-title">
+            <h3 id="edit-branch-picture-title" class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+              <span>Picture</span>
+            </h3>
+
+            <div class="flex items-center gap-4">
+              <img
+                v-if="preview || branch.cafe_picture_url"
+                :src="preview || branch.cafe_picture_url || ''"
+                alt=""
+                class="w-20 h-20 rounded-2xl object-cover border border-[#D8C7B5] shadow-2xs shrink-0"
+              />
+              <div v-else class="w-20 h-20 rounded-2xl bg-[#FBF2E1] border border-[#D8C7B5] flex items-center justify-center shrink-0 shadow-2xs">
+                <Icon name="heroicons:building-storefront" class="w-8 h-8 text-[#B4846C]" />
+              </div>
+              <div class="min-w-0">
+                <label class="inline-flex items-center gap-2 h-11 px-3.5 rounded-xl border border-[#D8C7B5] bg-white text-sm font-bold text-[#5C4037] shadow-2xs hover:bg-[#FAF4ED] cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-[#7D5A50]/40">
+                  <Icon name="heroicons:photo" class="w-4 h-4 text-[#7D5A50]" />
+                  <span>{{ picture ? 'Choose another' : 'Change picture' }}</span>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" @change="onPicture" />
+                </label>
+                <p v-if="picture" class="mt-1.5 text-[11px] font-semibold text-emerald-700 truncate">New picture selected · {{ picture.name }}</p>
+                <p v-else class="mt-1.5 text-[11px] text-[#8A6E64]">JPG, PNG or WEBP, up to 2MB.</p>
+                <p v-if="errors.cafe_picture" class="text-red-600 text-xs font-semibold mt-1">{{ errors.cafe_picture }}</p>
+              </div>
             </div>
-            <div class="min-w-0">
-              <label class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-[#DED4CA] bg-white text-xs font-semibold text-[#5B463C] hover:border-[#7D5A50] hover:bg-[#F8EFE7] cursor-pointer transition-colors">
-                <Icon name="heroicons:photo" class="size-3.5 text-[#7D5A50]" />
-                <span>{{ picture ? 'Choose another' : 'Change picture' }}</span>
-                <input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" @change="onPicture" />
-              </label>
-              <p class="mt-1.5 text-[11px] text-[#9E7060]">JPG, PNG or WEBP, up to 2MB.</p>
-              <p v-if="errors.cafe_picture" class="text-xs text-red-600 mt-1 font-semibold">{{ errors.cafe_picture }}</p>
+          </section>
+
+          <!-- ── Contact ─────────────────────────────────────────── -->
+          <section class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs space-y-3.5" aria-labelledby="edit-branch-contact-title">
+            <div>
+              <h3 id="edit-branch-contact-title" class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+                <span>Contact</span>
+              </h3>
+              <p class="text-[11px] text-[#8A6E64] mt-1">How customers and BrewSpot reach this branch.</p>
             </div>
-          </div>
 
-          <div>
-            <label for="edit-branch-email" class="block text-xs font-bold text-[#3B1F0E] mb-1">Email Address</label>
-            <input id="edit-branch-email" v-model="email" type="email" autocomplete="off" :class="inputClass('cafe_email')" @input="delete errors.cafe_email" />
-            <p v-if="errors.cafe_email" class="text-xs text-red-600 mt-1 font-semibold">{{ errors.cafe_email }}</p>
-          </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div class="min-w-0">
+                <label for="edit-branch-email" class="block text-xs font-bold text-[#3B1F0E] mb-1">Email address</label>
+                <input
+                  id="edit-branch-email"
+                  v-model="email"
+                  type="email"
+                  autocomplete="off"
+                  placeholder="branch@example.com"
+                  :class="inputClass('cafe_email')"
+                  @input="delete errors.cafe_email"
+                />
+                <p v-if="errors.cafe_email" class="text-red-600 text-xs font-semibold mt-1">{{ errors.cafe_email }}</p>
+              </div>
 
-          <div>
-            <label for="edit-branch-phone" class="block text-xs font-bold text-[#3B1F0E] mb-1">Phone Number</label>
-            <input
-              id="edit-branch-phone"
-              v-model="phone"
-              type="tel"
-              inputmode="tel"
-              maxlength="16"
-              placeholder="09123456789 or 0822991234"
-              :class="inputClass('cafe_phonenumber')"
-              @input="delete errors.cafe_phonenumber"
-            />
-            <p v-if="errors.cafe_phonenumber" class="text-xs text-red-600 mt-1 font-semibold">{{ errors.cafe_phonenumber }}</p>
-          </div>
+              <div class="min-w-0">
+                <label for="edit-branch-phone" class="block text-xs font-bold text-[#3B1F0E] mb-1">Phone number</label>
+                <input
+                  id="edit-branch-phone"
+                  v-model="phone"
+                  type="tel"
+                  inputmode="tel"
+                  maxlength="16"
+                  placeholder="09123456789"
+                  :class="inputClass('cafe_phonenumber')"
+                  @input="delete errors.cafe_phonenumber"
+                />
+                <p v-if="errors.cafe_phonenumber" class="text-red-600 text-xs font-semibold mt-1">{{ errors.cafe_phonenumber }}</p>
+                <p v-else class="text-[11px] text-[#8A6E64] mt-1">Mobile, or an 082 landline.</p>
+              </div>
+            </div>
+          </section>
 
-          <p class="rounded-xl bg-[#FAF4ED] border border-[#EDD8CC] px-3.5 py-2.5 text-xs text-[#6B4A3A] flex items-start gap-2">
-            <Icon name="heroicons:information-circle" class="w-4 h-4 shrink-0 mt-px text-[#A96746]" />
+          <p class="rounded-2xl border border-[#F3D9A4] bg-[#FDF8EC] px-4 py-3 text-xs text-[#6B4A12] flex items-start gap-2.5">
+            <Icon name="heroicons:information-circle" class="w-4 h-4 shrink-0 mt-0.5 text-[#B07A1E]" />
             <span>Changes apply right away. They are recorded in the activity log, and this branch's managers are notified.</span>
           </p>
 
-          <p v-if="formError" role="alert" class="text-sm text-red-700 font-semibold">{{ formError }}</p>
+          <p v-if="formError" role="alert" class="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-800">{{ formError }}</p>
         </div>
 
-        <!-- Footer -->
-        <div class="flex items-center justify-end gap-2 px-6 py-4 border-t border-[#EEDFC4]">
+        <!-- Footer: Cancel on the left, the main action on the right -->
+        <div class="flex items-center justify-between gap-3 px-6 md:px-8 py-3.5 border-t border-[#EEDFC4] bg-[#FAF8F5] rounded-b-3xl shrink-0">
           <button
             type="button"
-            class="px-4 py-2.5 rounded-xl border border-[#DED4CA] bg-white text-sm font-semibold text-[#5B463C] hover:bg-[#F8EFE7]"
-            @click="emit('close')"
+            :disabled="saving"
+            class="px-5 py-2 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+            @click="close"
           >
             Cancel
           </button>
           <button
             type="submit"
-            class="px-4 py-2.5 rounded-xl bg-[#7D5A50] text-sm font-bold text-[#FFF8EA] hover:bg-[#6A4A41] disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
             :disabled="!dirty || saving"
+            class="px-6 py-2 rounded-xl bg-[#3B1F0E] hover:bg-[#2A150A] text-[#FFF8EA] text-xs sm:text-sm font-bold active:scale-95 transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
           >
-            <Icon v-if="saving" name="heroicons:arrow-path" class="size-4 animate-spin" />
-            <span>{{ saving ? 'Saving...' : 'Save changes' }}</span>
+            <Icon v-if="saving" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
+            <span>{{ saving ? 'Saving...' : 'Save Changes' }}</span>
           </button>
         </div>
       </form>

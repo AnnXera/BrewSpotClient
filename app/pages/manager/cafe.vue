@@ -318,7 +318,7 @@ onMounted(init)
 
               <!-- POS Registers (full width, under both cards) -->
               <div class="cafe-card cafe-card-3 lg:col-span-2">
-                <PosDevicesCard :branch-uuid="branch.uuid" scope="manager" />
+                <PosDevicesCard :branch-uuid="branch.uuid" :branch-name="branch.branch_name" scope="manager" />
               </div>
             </div>
 

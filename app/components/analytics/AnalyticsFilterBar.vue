@@ -65,10 +65,8 @@ function setBranch(branch: string | null) {
        right. Custom opens its two dates inside the same card. -->
   <div class="rounded-2xl border border-[#EEDFC4] bg-white p-2 shadow-sm">
     <div class="flex flex-col gap-2 lg:flex-row lg:items-center">
+      <!-- No decorative calendar tile here: it looked like a date picker you could click -->
       <div class="flex min-w-0 items-center gap-2">
-        <span class="hidden size-11 shrink-0 items-center justify-center rounded-xl bg-[#FAF4ED] text-[#7D5A50] sm:flex" aria-hidden="true">
-          <Icon name="heroicons:calendar-days" class="size-5" />
-        </span>
         <div class="filter-presets min-w-0 overflow-x-auto">
           <div role="radiogroup" aria-label="Date range" class="inline-flex gap-1 rounded-xl bg-[#FAF4ED] p-1">
             <button

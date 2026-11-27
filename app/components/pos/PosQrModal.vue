@@ -1,6 +1,6 @@
 <!-- app/components/pos/PosQrModal.vue -->
-<!-- POS QR Code Modal: Generation for Owner, View-Only for Manager, Print-Ready PDF for Both -->
-<!-- Emil Kowalski Craft: Compact Pop-up Modal, Fixed Proportions, Absolutely Zero Scrolling, No Overlap -->
+<!-- POS QR Code Modal: Owner edits the print title, Manager views. Both can copy the link, save a PNG or a print-ready PDF.
+     Laid out like the owner add/edit modals (EditBranchContactModal): header, scrolling body, footer actions. -->
 <script setup lang="ts">
 import { jsPDF } from 'jspdf'
 
@@ -55,46 +55,40 @@ watch(() => props.show, (isOpen) => {
     loadSavedConfig()
     copiedLink.value = false
   }
-})
+}, { immediate: true })
 
-// Teleport & keyboard listeners
-const isMounted = ref(false)
+// Escape closes, except while the PDF is being made
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && props.show) {
-    emit('close')
-  }
+  if (e.key === 'Escape' && props.show && !isGeneratingPdf.value) emit('close')
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+
+function close() {
+  if (!isGeneratingPdf.value) emit('close')
 }
 
-onMounted(() => {
-  isMounted.value = true
-  if (typeof window !== 'undefined') {
-    window.addEventListener('keydown', onKeydown)
-  }
-})
+function selectAll(e: FocusEvent) {
+  (e.target as HTMLInputElement).select()
+}
 
-onUnmounted(() => {
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('keydown', onKeydown)
-  }
-})
+function savePng() {
+  persistTitle()
+  downloadQrImage()
+}
 
-// Owner: Save / Regenerate QR configuration
-const isSaved = ref(false)
-function saveAndRegenerate() {
-  if (props.scope !== 'owner') return
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem(storageKey.value, JSON.stringify({
-        url: DEFAULT_URL,
-        title: qrTitle.value.trim() || DEFAULT_TITLE,
-        subtitle: qrSubtitle.value.trim() || DEFAULT_SUBTITLE,
-        updatedAt: new Date().toISOString()
-      }))
-      isSaved.value = true
-      setTimeout(() => { isSaved.value = false }, 2500)
-    } catch {
-      // storage unavailable
-    }
+// Owner: the print title is remembered per branch (on blur and whenever a file is made), no separate Save step.
+function persistTitle() {
+  if (props.scope !== 'owner' || typeof window === 'undefined') return
+  try {
+    localStorage.setItem(storageKey.value, JSON.stringify({
+      url: DEFAULT_URL,
+      title: qrTitle.value.trim() || DEFAULT_TITLE,
+      subtitle: qrSubtitle.value.trim() || DEFAULT_SUBTITLE,
+      updatedAt: new Date().toISOString()
+    }))
+  } catch {
+    // storage unavailable
   }
 }
 
@@ -130,6 +124,7 @@ async function toDataUrl(url: string): Promise<string> {
 async function downloadPrintReadyPdf() {
   if (isGeneratingPdf.value) return
   isGeneratingPdf.value = true
+  persistTitle()
   try {
     const qrDataUrl = await toDataUrl(qrCodeImageUrl.value)
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -261,221 +256,147 @@ async function downloadQrImage() {
 </script>
 
 <template>
-  <Teleport to="body" v-if="isMounted">
-    <Transition
-      enter-active-class="transition duration-200 ease-out"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition duration-150 ease-in"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
+  <Teleport to="body">
+    <div v-if="show" class="fixed inset-0 z-[3000] flex items-center justify-center p-3 sm:p-6 print:hidden">
+      <div class="fixed inset-0 bg-black/45 backdrop-blur-sm" aria-hidden="true" @click="close" />
+
       <div
-        v-if="show"
         role="dialog"
         aria-modal="true"
         aria-labelledby="pos-qr-title"
-        class="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm print:hidden overflow-hidden"
-        @click.self="emit('close')"
+        class="relative bg-white rounded-3xl w-full max-w-[520px] max-h-[calc(100dvh-1.5rem)] flex flex-col shadow-[0_24px_50px_-12px_rgba(59,31,14,0.22)] border border-[#EEDFC4]"
       >
-        <Transition
-          enter-active-class="transition duration-200 ease-out"
-          enter-from-class="opacity-0 scale-95"
-          enter-to-class="opacity-100 scale-100"
-          leave-active-class="transition duration-150 ease-in"
-          leave-from-class="opacity-100 scale-100"
-          leave-to-class="opacity-0 scale-95"
-        >
-          <!-- Crisp pop-up modal: 100% non-scrollable, perfectly centered, no bottom overlap -->
-          <div
-            v-if="show"
-            class="relative w-full max-w-[640px] bg-white rounded-2xl shadow-2xl modal-pop border border-[#EAE3D9] overflow-hidden flex flex-col my-auto"
-          >
-      <!-- Modal Header -->
-      <div class="px-5 py-3 border-b border-[#EFECE6] bg-[#FAF8F5] flex items-center justify-between shrink-0">
-        <div class="flex items-center gap-2 min-w-0">
-          <div class="w-7 h-7 rounded-lg bg-[#7B5A50]/10 flex items-center justify-center text-[#7B5A50] shrink-0">
-            <Icon name="heroicons:qr-code" class="w-4 h-4" />
-          </div>
-          <h3 id="pos-qr-title" class="font-bold text-sm text-[#2D201B] truncate">
-            {{ scope === 'owner' ? 'POS QR Code Generator' : 'POS Terminal QR Code' }}
-          </h3>
-          <span
-            class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0"
-            :class="scope === 'owner' ? 'bg-[#7B5A50]/15 text-[#7B5A50]' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'"
-          >
-            {{ scope === 'owner' ? 'Owner' : 'Manager' }}
-          </span>
-        </div>
-
-        <button
-          type="button"
-          @click="emit('close')"
-          aria-label="Close"
-          class="w-7 h-7 rounded-lg hover:bg-white flex items-center justify-center text-gray-400 hover:text-gray-700 transition-all cursor-pointer active:scale-90"
-        >
-          <Icon name="heroicons:x-mark" class="w-4 h-4" />
-        </button>
-      </div>
-
-      <!-- Body: 2 Columns Side by Side (Always side by side, perfectly fitted, NO scrollbars) -->
-      <div class="p-4 sm:p-5 grid grid-cols-[200px_1fr] sm:grid-cols-[220px_1fr] gap-4 sm:gap-5 items-stretch bg-white">
-        <!-- LEFT: QR Code Frame & Quick Image Actions -->
-        <div class="p-3 bg-[#FAF8F5] border border-[#EAE3D9] rounded-xl flex flex-col items-center justify-between text-center shadow-2xs">
-          <!-- QR Frame -->
-          <div class="relative p-2 bg-white rounded-lg border border-gray-200 shadow-2xs">
-            <img
-              :src="qrCodeImageUrl"
-              alt="BrewSpot POS QR Code"
-              class="w-36 h-36 sm:w-40 sm:h-40 object-contain block mx-auto select-none"
-              loading="eager"
-            />
-            <!-- Visual Corner Viewfinder Accents -->
-            <div class="absolute top-1 left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-[#7B5A50] rounded-tl pointer-events-none"></div>
-            <div class="absolute top-1 right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-[#7B5A50] rounded-tr pointer-events-none"></div>
-            <div class="absolute bottom-1 left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-[#7B5A50] rounded-bl pointer-events-none"></div>
-            <div class="absolute bottom-1 right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-[#7B5A50] rounded-br pointer-events-none"></div>
-          </div>
-
-          <p class="font-bold text-xs text-[#2D201B] truncate max-w-full mt-1.5">{{ qrTitle }}</p>
-
-          <!-- Buttons under QR -->
-          <div class="w-full flex items-center justify-center gap-1.5 pt-2 border-t border-[#EAE3D9]/60">
-            <button
-              type="button"
-              @click="downloadQrImage"
-              title="Save PNG image"
-              class="flex-1 h-7 px-2 bg-white hover:bg-[#F3EBE2] border border-[#D8CEBE] text-[#2D201B] font-bold rounded-lg text-[11px] transition-all flex items-center justify-center gap-1 active:scale-95 shadow-2xs cursor-pointer"
-            >
-              <Icon name="heroicons:arrow-down-tray" class="w-3 h-3 text-[#7B5A50]" />
-              <span>PNG</span>
-            </button>
-            <a
-              :href="posUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Open link in new tab"
-              class="flex-1 h-7 px-2 bg-white hover:bg-[#F3EBE2] border border-[#D8CEBE] text-[#2D201B] font-bold rounded-lg text-[11px] transition-all flex items-center justify-center gap-1 active:scale-95 shadow-2xs cursor-pointer"
-            >
-              <Icon name="heroicons:arrow-top-right-on-square" class="w-3 h-3 text-[#7B5A50]" />
-              <span>Open</span>
-            </a>
-          </div>
-        </div>
-
-        <!-- RIGHT: Settings/Details & Download PDF -->
-        <div class="flex flex-col justify-between space-y-2.5">
-          <!-- OWNER SETTINGS -->
-          <div v-if="scope === 'owner'" class="p-3 bg-[#FAF8F5] border border-[#EAE3D9] rounded-xl space-y-2 shadow-2xs">
-            <div class="flex items-center justify-between">
-              <span class="text-[11px] font-bold text-[#7B5A50] uppercase tracking-wider flex items-center gap-1">
-                <Icon name="heroicons:cog-6-tooth" class="w-3.5 h-3.5" />
-                <span>QR Settings</span>
-              </span>
-              <button
-                type="button"
-                @click="saveAndRegenerate"
-                class="h-6 px-2.5 bg-[#7B5A50] hover:bg-[#65463D] text-white text-[11px] font-bold rounded-md transition-all shadow-2xs active:scale-95 cursor-pointer flex items-center gap-1"
-              >
-                <Icon name="heroicons:check" class="w-3 h-3" />
-                <span>{{ isSaved ? 'Saved!' : 'Save' }}</span>
-              </button>
+        <!-- Header -->
+        <div class="flex items-start justify-between gap-4 px-6 pt-6 pb-5 border-b border-[#EEDFC4] bg-[#FDFBF7] rounded-t-3xl">
+          <div class="flex items-center gap-4 min-w-0">
+            <div class="w-11 h-11 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0">
+              <Icon name="heroicons:qr-code" class="w-5 h-5" />
             </div>
-
-            <!-- Target URL (Fixed / Non-editable) -->
-            <div>
-              <div class="flex items-center justify-between mb-0.5">
-                <label for="pos-url-input" class="block text-[11px] font-bold text-gray-600">
-                  Target URL
-                </label>
-                <span class="text-[9px] font-bold uppercase tracking-wider text-[#7B5A50] bg-[#7B5A50]/10 px-1.5 py-0.5 rounded">
-                  Fixed
-                </span>
-              </div>
-              <div class="relative flex items-center">
-                <input
-                  id="pos-url-input"
-                  :value="DEFAULT_URL"
-                  type="text"
-                  readonly
-                  tabindex="-1"
-                  class="w-full h-7.5 bg-[#F4EFEB] border border-[#D8CEBE] text-[#5C453C] rounded-lg pl-2 pr-7 text-xs font-mono outline-none shadow-2xs cursor-not-allowed select-all"
-                />
-                <Icon name="heroicons:lock-closed" class="w-3.5 h-3.5 text-[#8A6E64] absolute right-2 pointer-events-none" />
-              </div>
-            </div>
-
-            <!-- Title Input -->
-            <div>
-              <label for="pos-title-input" class="block text-[11px] font-bold text-gray-600 mb-0.5">
-                Print Title
-              </label>
-              <input
-                id="pos-title-input"
-                v-model="qrTitle"
-                type="text"
-                placeholder="Terminal name"
-                class="w-full h-7.5 bg-white border border-[#D8CEBE] focus:border-[#7B5A50] text-[#2D201B] rounded-lg px-2 text-xs outline-none shadow-2xs"
-              />
+            <div class="min-w-0">
+              <h2 id="pos-qr-title" class="text-xl font-display font-extrabold text-[#3B1F0E]">POS Register QR Code</h2>
+              <p class="mt-0.5 text-[13px] text-[#8A6E64] truncate">
+                {{ branchName || 'Print it for the counter so staff can open the register' }}
+              </p>
             </div>
           </div>
-
-          <!-- MANAGER DETAILS -->
-          <div v-else class="p-3 bg-[#FAF8F5] border border-[#EAE3D9] rounded-xl space-y-2 shadow-2xs">
-            <div class="flex items-center justify-between">
-              <span class="text-[11px] font-bold text-[#7B5A50] uppercase tracking-wider flex items-center gap-1">
-                <Icon name="heroicons:information-circle" class="w-3.5 h-3.5" />
-                <span>Terminal Access</span>
-              </span>
-              <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                Active
-              </span>
-            </div>
-
-            <p class="text-xs text-gray-600 leading-snug">
-              Configured by Owner. Point tablet or smartphone camera at the QR code to open the register.
-            </p>
-
-            <div class="text-[11px] text-gray-500 space-y-1 pt-1 border-t border-[#EAE3D9]">
-              <p>• Point camera & scan QR code</p>
-              <p>• Opens <strong>brewspotph.online/pos</strong></p>
-              <p>• Cashier unlocks with PIN</p>
-            </div>
-          </div>
-
-          <!-- URL Pill with 1-tap Copy -->
-          <div class="p-1.5 bg-[#FAF8F5] border border-[#EAE3D9] rounded-xl flex items-center justify-between gap-1.5 shadow-2xs">
-            <div class="flex items-center gap-1 min-w-0 pl-1">
-              <Icon name="heroicons:link" class="w-3.5 h-3.5 text-[#7B5A50] shrink-0" />
-              <span class="font-mono text-xs font-semibold text-[#2D201B] truncate select-all">{{ posUrl }}</span>
-            </div>
-            <button
-              type="button"
-              @click="copyPosUrl"
-              class="h-6.5 px-2 rounded-lg text-[11px] font-bold transition-all shrink-0 flex items-center gap-1 active:scale-95 cursor-pointer shadow-2xs"
-              :class="copiedLink ? 'bg-emerald-600 text-white' : 'bg-[#7B5A50] hover:bg-[#65463D] text-white'"
-            >
-              <Icon :name="copiedLink ? 'heroicons:check' : 'heroicons:clipboard-document'" class="w-3 h-3" />
-              <span>{{ copiedLink ? 'Copied' : 'Copy' }}</span>
-            </button>
-          </div>
-
-          <!-- PRIMARY ACTION: Print-Ready PDF Button -->
           <button
             type="button"
-            @click="downloadPrintReadyPdf"
+            aria-label="Close"
             :disabled="isGeneratingPdf"
-            class="w-full h-10 bg-[#7B5A50] hover:bg-[#65463D] disabled:opacity-50 text-white font-bold rounded-xl text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] cursor-pointer"
+            class="w-9 h-9 rounded-xl bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FAF4ED] flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            @click="close"
           >
-            <Icon v-if="isGeneratingPdf" name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
-            <Icon v-else name="heroicons:document-arrow-down" class="w-4 h-4" />
-            <span>{{ isGeneratingPdf ? 'Generating PDF...' : 'Download PDF (Print Ready)' }}</span>
+            <Icon name="heroicons:x-mark" class="w-4 h-4" />
+          </button>
+        </div>
+
+        <!-- Body -->
+        <div class="px-6 py-5 flex flex-col gap-4 overflow-y-auto">
+          <!-- QR preview -->
+          <div class="flex items-center gap-4">
+            <div class="relative shrink-0 rounded-2xl bg-white border border-[#EDD8CC] p-2">
+              <img
+                :src="qrCodeImageUrl"
+                :alt="`QR code that opens ${posUrl}`"
+                class="block size-[120px] select-none object-contain"
+                loading="eager"
+              >
+              <span class="pointer-events-none absolute left-1 top-1 size-3 rounded-tl border-l-2 border-t-2 border-[#7D5A50]" />
+              <span class="pointer-events-none absolute right-1 top-1 size-3 rounded-tr border-r-2 border-t-2 border-[#7D5A50]" />
+              <span class="pointer-events-none absolute bottom-1 left-1 size-3 rounded-bl border-b-2 border-l-2 border-[#7D5A50]" />
+              <span class="pointer-events-none absolute bottom-1 right-1 size-3 rounded-br border-b-2 border-r-2 border-[#7D5A50]" />
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs font-bold text-[#3B1F0E]">Printed as</p>
+              <p class="mt-0.5 font-display text-base font-bold text-[#3B1F0E] truncate" :title="qrTitle">{{ qrTitle || DEFAULT_TITLE }}</p>
+              <p class="mt-1 text-[12px] leading-snug text-[#8A6E64]">
+                Staff scan it on a tablet or phone. An owner or manager links the device once, then cashiers unlock with their PIN.
+              </p>
+            </div>
+          </div>
+
+          <!-- Register link -->
+          <div>
+            <label for="pos-qr-link" class="block text-xs font-bold text-[#3B1F0E] mb-1">Register link</label>
+            <div class="flex gap-2">
+              <div class="relative min-w-0 flex-1">
+                <input
+                  id="pos-qr-link"
+                  :value="posUrl"
+                  type="text"
+                  readonly
+                  class="w-full h-11 rounded-xl border border-[#D8C7B5] bg-[#FAF4ED] pl-3.5 pr-9 text-sm font-semibold text-[#5B463C] outline-none shadow-2xs focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15"
+                  @focus="selectAll"
+                >
+                <Icon name="heroicons:lock-closed" class="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-[#A8988B] pointer-events-none" />
+              </div>
+              <button
+                type="button"
+                class="h-11 px-3.5 rounded-xl border text-sm font-semibold inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
+                :class="copiedLink ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-[#DED4CA] bg-white text-[#5B463C] hover:bg-[#F8EFE7]'"
+                @click="copyPosUrl"
+              >
+                <Icon :name="copiedLink ? 'heroicons:check' : 'heroicons:clipboard-document'" class="size-4" />
+                {{ copiedLink ? 'Copied' : 'Copy' }}
+              </button>
+              <a
+                :href="posUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Open register in a new tab"
+                title="Open register in a new tab"
+                class="h-11 w-11 rounded-xl border border-[#DED4CA] bg-white text-[#5B463C] hover:bg-[#F8EFE7] inline-flex items-center justify-center shrink-0"
+              >
+                <Icon name="heroicons:arrow-top-right-on-square" class="size-4" />
+              </a>
+            </div>
+          </div>
+
+          <!-- Owner: print title -->
+          <div v-if="scope === 'owner'">
+            <label for="pos-qr-title-input" class="block text-xs font-bold text-[#3B1F0E] mb-1">Print title</label>
+            <input
+              id="pos-qr-title-input"
+              v-model="qrTitle"
+              type="text"
+              maxlength="60"
+              :placeholder="DEFAULT_TITLE"
+              class="w-full h-11 rounded-xl border border-[#D8C7B5] bg-white px-3.5 text-sm font-semibold text-[#2D201B] outline-none transition-all shadow-2xs placeholder:text-[#A8988B] placeholder:font-normal focus:border-[#3B1F0E] focus:ring-2 focus:ring-[#3B1F0E]/15"
+              @blur="persistTitle"
+            >
+            <p class="mt-1.5 text-[11px] text-[#9E7060]">Shown above the QR code on the printed sheet, e.g. the branch or counter name.</p>
+          </div>
+
+          <p class="rounded-xl bg-[#FAF4ED] border border-[#EDD8CC] px-3.5 py-2.5 text-xs text-[#6B4A3A] flex items-start gap-2">
+            <Icon name="heroicons:information-circle" class="w-4 h-4 shrink-0 mt-px text-[#A96746]" />
+            <span v-if="scope === 'owner'">The PDF is an A4 sheet with the QR code, link and setup steps, ready for a counter standee.</span>
+            <span v-else>Set up by the cafe owner. Download the PDF to print it for the counter.</span>
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="flex flex-wrap items-center justify-end gap-2 px-6 py-4 border-t border-[#EEDFC4]">
+          <button
+            type="button"
+            :disabled="isGeneratingPdf"
+            class="px-4 py-2.5 rounded-xl border border-[#DED4CA] bg-white text-sm font-semibold text-[#5B463C] hover:bg-[#F8EFE7] inline-flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            @click="savePng"
+          >
+            <Icon name="heroicons:photo" class="size-4" />
+            Save PNG
+          </button>
+          <button
+            type="button"
+            :disabled="isGeneratingPdf"
+            class="px-4 py-2.5 rounded-xl bg-[#7D5A50] text-sm font-bold text-[#FFF8EA] hover:bg-[#6A4A41] disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 cursor-pointer"
+            @click="downloadPrintReadyPdf"
+          >
+            <Icon v-if="isGeneratingPdf" name="heroicons:arrow-path" class="size-4 animate-spin" />
+            <Icon v-else name="heroicons:document-arrow-down" class="size-4" />
+            <span>{{ isGeneratingPdf ? 'Making PDF...' : 'Download PDF' }}</span>
           </button>
         </div>
       </div>
     </div>
-        </Transition>
-      </div>
-    </Transition>
   </Teleport>
 </template>

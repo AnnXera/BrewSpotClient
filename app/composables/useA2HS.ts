@@ -69,14 +69,22 @@ export function useA2HS() {
     )
   }
 
+  /**
+   * After an install. The PWA shares cookies with the browser, so if this browser is already a
+   * registered register (the POS can run in a normal tab too), keep its device token and open /pos.
+   * Only an unregistered browser goes through the owner login + setup.
+   */
+  function afterInstall() {
+    if (usePosDeviceToken().value) {
+      navigateTo('/pos', { replace: true })
+    } else {
+      redirectToOwnerLoginForPosSetup()
+    }
+  }
+
   async function promptInstall() {
     if (isInstalled.value) {
-      const posDeviceCookie = usePosDeviceToken()
-      if (posDeviceCookie.value) {
-        navigateTo('/pos')
-      } else {
-        redirectToOwnerLoginForPosSetup()
-      }
+      afterInstall()
       return
     }
 
@@ -88,7 +96,7 @@ export function useA2HS() {
         if (choice && choice.outcome === 'accepted') {
           isInstalled.value = true
           showInstructionsModal.value = false
-          redirectToOwnerLoginForPosSetup()
+          afterInstall()
         }
         deferredPrompt.value = null
       } catch (err) {
@@ -109,7 +117,7 @@ export function useA2HS() {
     isInstalled.value = true
     deferredPrompt.value = null
     showInstructionsModal.value = false
-    redirectToOwnerLoginForPosSetup()
+    afterInstall()
   }
 
   return {

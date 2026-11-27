@@ -7,8 +7,6 @@ import { FLOOR_TAB_LIMIT, doorAsset, tableAsset } from '~/utils/floorPlanCatalog
 import EmilCalendar from '~/components/common/EmilCalendar.vue'
 import DialogShell from '~/components/common/DialogShell.vue'
 import BranchPicker from '~/components/common/BranchPicker.vue'
-import SearchInput from '~/components/common/SearchInput.vue'
-import DropdownList from '~/components/common/DropdownList.vue'
 
 // Shared with owners, who reach it at /owner/reservations for any of their branches.
 definePageMeta({
@@ -71,6 +69,8 @@ const waitlistError = ref('')
 const selectedWaitlistReservation = ref<ReservationRecord | null>(null)
 const waitlistSearch = ref('')
 const waitlistStatusFilter = ref('all')
+// Y-m-d from the calendar; empty = every date
+const waitlistDate = ref('')
 const waitlistStatusOptions = [
   { value: 'all', label: 'All statuses' },
   { value: 'confirmed', label: 'Confirmed' },
@@ -102,6 +102,8 @@ function closeWaitlist() {
 }
 function onWaitlistKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && showWaitlist.value) {
+    // An open date picker closes itself first
+    if (document.querySelector('.emil-calendar-popover')) return
     if (selectedWaitlistReservation.value) selectedWaitlistReservation.value = null
     else closeWaitlist()
   }
@@ -151,9 +153,28 @@ const reservation = reactive({
 
 const planTables = computed<FloorPlanTable[]>(() => activePlan.value?.tables ?? [])
 const planElements = computed<FloorPlanElement[]>(() => activePlan.value?.elements ?? [])
+// Bookings on the picked calendar day (all of them when no day is picked)
+const waitlistDateReservations = computed(() => {
+  if (!waitlistDate.value) return reservations.value
+  return reservations.value.filter((item) => {
+    const date = reservationDateValue(item.reservation_date)
+    return !!date && localDateKey(date) === waitlistDate.value
+  })
+})
+
+const waitlistDateLabel = computed(() => {
+  if (!waitlistDate.value) return 'All dates'
+  const [y, m, d] = waitlistDate.value.split('-').map(Number)
+  const date = new Date(y ?? 0, (m ?? 1) - 1, d ?? 1)
+  const label = waitlistDayLabel(date)
+  return ['Today', 'Tomorrow', 'Yesterday'].includes(label)
+    ? label
+    : new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(date)
+})
+
 const filteredReservations = computed(() => {
   const search = waitlistSearch.value.trim().toLowerCase()
-  return reservations.value.filter((item) => {
+  return waitlistDateReservations.value.filter((item) => {
     const matchesStatus = waitlistStatusFilter.value === 'all'
       || item.status === waitlistStatusFilter.value
     const searchableText = [
@@ -164,6 +185,55 @@ const filteredReservations = computed(() => {
     return matchesStatus && (!search || searchableText.includes(search))
   })
 })
+
+// Waitlist: how many bookings each status tab holds on the picked date (search is ignored, so the tabs don't jump around).
+const waitlistCounts = computed(() => {
+  const counts: Record<string, number> = { all: waitlistDateReservations.value.length }
+  for (const r of waitlistDateReservations.value) {
+    const key = r.status === 'pending' ? 'confirmed' : r.status
+    counts[key] = (counts[key] ?? 0) + 1
+  }
+  return counts
+})
+
+// Header count: guests still to seat across every date (the date filter doesn't change it).
+const waitlistToSeat = computed(() => reservations.value.filter(r => r.status === 'confirmed' || r.status === 'pending').length)
+
+// Waitlist rows grouped by day, earliest first, each labelled Today / Tomorrow / Yesterday or the date.
+const waitlistGroups = computed(() => {
+  const sorted = [...filteredReservations.value].sort((a, b) =>
+    (reservationDateValue(a.reservation_date)?.getTime() ?? 0) - (reservationDateValue(b.reservation_date)?.getTime() ?? 0))
+  const groups: { key: string; label: string; items: ReservationRecord[] }[] = []
+  for (const item of sorted) {
+    const date = reservationDateValue(item.reservation_date)
+    const key = date ? localDateKey(date) : 'unknown'
+    let group = groups[groups.length - 1]
+    if (!group || group.key !== key) {
+      group = { key, label: waitlistDayLabel(date), items: [] }
+      groups.push(group)
+    }
+    group.items.push(item)
+  }
+  return groups
+})
+
+function waitlistDayLabel(date: Date | null) {
+  if (!date) return 'No date'
+  const today = new Date(now.value)
+  today.setHours(0, 0, 0, 0)
+  const day = new Date(date)
+  day.setHours(0, 0, 0, 0)
+  const diff = Math.round((day.getTime() - today.getTime()) / 86400000)
+  if (diff === 0) return 'Today'
+  if (diff === 1) return 'Tomorrow'
+  if (diff === -1) return 'Yesterday'
+  return new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'short', day: 'numeric' }).format(date)
+}
+
+// A confirmed guest whose time has passed and who hasn't been marked arrived yet.
+function waitlistIsLate(item: ReservationRecord) {
+  return item.status === 'confirmed' && reservationStarted(item)
+}
 
 // ── Date and time window ────────────────────────────────────────────
 
@@ -570,6 +640,8 @@ async function updateReservationStatus(item: ReservationRecord, status: Reservat
     const response = await reservationService.updateStatus(branchUuid.value, item.uuid, status)
     // Swap in the server's copy so the row shows its new status and actions right away.
     reservations.value = reservations.value.map((reservation) => reservation.uuid === item.uuid ? response.reservation : reservation)
+    // The details view holds its own copy; refresh it so it shows the new status and actions too.
+    if (selectedWaitlistReservation.value?.uuid === item.uuid) selectedWaitlistReservation.value = response.reservation
     await loadDayReservations()
     const label = statusLabel(status)
     const tableName = item.table?.table_name ? `Table ${item.table.table_name}` : 'Reservation'
@@ -1215,21 +1287,32 @@ onBeforeUnmount(() => {
           role="dialog"
           aria-modal="true"
           aria-labelledby="waitlist-title"
-          class="relative w-full max-w-2xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] flex flex-col overflow-hidden rounded-3xl border border-[#EEDFC4] bg-white shadow-[0_24px_50px_-12px_rgba(59,31,14,0.22)] animate-in fade-in zoom-in-95 duration-150"
+          class="relative w-full max-w-[720px] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] flex flex-col overflow-hidden rounded-3xl border border-[#EEDFC4] bg-white shadow-[0_24px_50px_-12px_rgba(59,31,14,0.22)] animate-in fade-in zoom-in-95 duration-150"
         >
           <!-- Header -->
-          <div class="flex items-center justify-between gap-4 px-6 pt-5 pb-4 border-b border-[#EEDFC4] bg-[#FDFBF7] shrink-0">
+          <div class="flex items-center justify-between gap-4 px-6 md:px-8 pt-5 pb-4 border-b border-[#EEDFC4] bg-[#FDFBF7] shrink-0">
             <div class="flex items-center gap-3.5 min-w-0">
-              <div class="w-10 h-10 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0 shadow-2xs">
+              <button
+                v-if="selectedWaitlistReservation"
+                type="button"
+                aria-label="Back to waitlist"
+                class="w-10 h-10 rounded-2xl bg-white border border-[#EEDFC4] text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] active:scale-95 transition-all flex items-center justify-center shrink-0 shadow-2xs cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                @click="selectedWaitlistReservation = null"
+              >
+                <Icon name="heroicons:arrow-left" class="w-5 h-5" />
+              </button>
+              <div v-else class="w-10 h-10 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] text-[#7D5A50] flex items-center justify-center shrink-0 shadow-2xs">
                 <Icon name="heroicons:queue-list" class="w-5 h-5" />
               </div>
               <div class="min-w-0">
                 <h2 id="waitlist-title" class="text-xl font-display font-extrabold text-[#3B1F0E] truncate">
                   {{ selectedWaitlistReservation ? selectedWaitlistReservation.customer_name : 'Waitlist' }}
                 </h2>
-                <p class="text-xs text-[#8A6E64] mt-0.5">
+                <p class="text-xs text-[#8A6E64] mt-0.5 truncate">
                   <template v-if="selectedWaitlistReservation">Reservation details</template>
-                  <template v-else>{{ reservations.length }} saved reservation{{ reservations.length === 1 ? '' : 's' }}</template>
+                  <template v-else>
+                    {{ reservations.length }} saved reservation{{ reservations.length === 1 ? '' : 's' }}<template v-if="waitlistToSeat"> · {{ waitlistToSeat }} to seat</template>
+                  </template>
                 </p>
               </div>
             </div>
@@ -1243,147 +1326,321 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
-          <!-- List -->
-          <div v-if="!selectedWaitlistReservation" class="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-            <div v-if="waitlistLoading" class="flex items-center justify-center gap-2 py-10 text-sm text-[#8A6E64]">
-              <Icon name="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
-              Loading saved reservations…
-            </div>
-            <div v-else-if="waitlistError" role="alert" class="flex flex-col items-center text-center py-10">
-              <Icon name="heroicons:exclamation-triangle" class="w-8 h-8 text-red-400 mb-2" />
-              <p class="text-sm font-semibold text-[#3B1F0E]">{{ waitlistError }}</p>
-              <button
-                type="button"
-                class="mt-3 h-9 px-3.5 rounded-xl border border-[#D8C7B5] bg-white text-sm font-bold text-[#3B1F0E] inline-flex items-center gap-1.5 hover:bg-[#FAF4ED] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
-                @click="openWaitlist"
-              >
-                <Icon name="heroicons:arrow-path" class="w-4 h-4" />
-                Try again
-              </button>
-            </div>
-            <div v-else-if="!reservations.length" class="flex flex-col items-center text-center py-10">
-              <div class="size-12 rounded-full bg-[#FDF3E7] border border-[#E3CFB4] flex items-center justify-center text-[#9E7060] mb-2">
-                <Icon name="heroicons:queue-list" class="w-6 h-6" />
-              </div>
-              <p class="font-display font-medium text-[14px] text-[#3B1F0E]">No reservations saved yet</p>
-              <p class="text-[12px] text-[#8B6656] mt-0.5">Bookings made on the floor plan will appear here.</p>
-            </div>
-            <template v-else>
-              <p v-if="waitlistActionError" role="alert" class="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{{ waitlistActionError }}</p>
-              <div class="mb-3 flex flex-col gap-2 sm:flex-row">
-                <SearchInput v-model="waitlistSearch" placeholder="Search name, table, or phone" aria-label="Search reservations" clearable white class="sm:flex-1" />
-                <div class="sm:w-44 shrink-0">
-                  <DropdownList v-model="waitlistStatusFilter" :options="waitlistStatusOptions" size="sm" card aria-label="Filter reservations by status" />
+          <!-- ── List ─────────────────────────────────────────────── -->
+          <template v-if="!selectedWaitlistReservation">
+            <!-- Toolbar: one search + date bar, then light underline status tabs -->
+            <div v-if="!waitlistLoading && !waitlistError && reservations.length" class="px-6 md:px-8 pt-4 shrink-0 border-b border-[#EEDFC4]">
+              <!-- Search and date share one field -->
+              <div class="flex h-11 items-stretch rounded-xl border border-[#D8C7B5] bg-white shadow-2xs transition-colors focus-within:border-[#7D5A50] focus-within:ring-2 focus-within:ring-[#7D5A50]/15">
+                <label class="flex min-w-0 flex-1 items-center gap-2 pl-3.5 pr-2 cursor-text">
+                  <Icon name="heroicons:magnifying-glass" class="size-4 shrink-0 text-[#A08676]" />
+                  <input
+                    v-model="waitlistSearch"
+                    type="search"
+                    placeholder="Search name, table, or phone"
+                    aria-label="Search reservations"
+                    class="min-w-0 flex-1 bg-transparent text-sm font-medium text-[#2D201B] placeholder:text-[#A8988B] placeholder:font-normal outline-none [&::-webkit-search-cancel-button]:hidden"
+                  />
+                  <button
+                    v-if="waitlistSearch"
+                    type="button"
+                    class="size-6 shrink-0 rounded-md text-[#A08676] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] flex items-center justify-center cursor-pointer"
+                    aria-label="Clear search"
+                    @click="waitlistSearch = ''"
+                  >
+                    <Icon name="heroicons:x-mark" class="size-3.5" />
+                  </button>
+                </label>
+
+                <span class="my-2 w-px bg-[#EEDFC4]" aria-hidden="true" />
+
+                <!-- Date chip inside the bar -->
+                <div class="flex shrink-0 items-center gap-1 px-1.5">
+                  <EmilCalendar v-model="waitlistDate" align="right">
+                    <template #trigger="{ open, toggle }">
+                      <button
+                        type="button"
+                        class="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-semibold tabular-nums transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                        :class="waitlistDate
+                          ? 'bg-[#3B1F0E] text-[#FFF8EA]'
+                          : open ? 'bg-[#FAF4ED] text-[#3B1F0E]' : 'text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E]'"
+                        :aria-label="waitlistDate ? `Showing ${waitlistDateLabel}. Change date` : 'Filter by date'"
+                        @click="toggle"
+                      >
+                        <Icon name="heroicons:calendar-days" class="size-4" />
+                        {{ waitlistDateLabel }}
+                        <Icon v-if="!waitlistDate" name="heroicons:chevron-down" class="size-3.5 opacity-70 transition-transform" :class="open ? 'rotate-180' : ''" />
+                      </button>
+                    </template>
+                  </EmilCalendar>
+                  <button
+                    v-if="waitlistDate"
+                    type="button"
+                    class="size-8 shrink-0 rounded-lg text-[#7D5A50] hover:bg-[#FAF4ED] hover:text-[#3B1F0E] flex items-center justify-center cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                    aria-label="Show all dates"
+                    title="Show all dates"
+                    @click="waitlistDate = ''"
+                  >
+                    <Icon name="heroicons:x-mark" class="size-4" />
+                  </button>
                 </div>
               </div>
-              <div v-if="!filteredReservations.length" class="py-6 text-center text-sm text-[#8A6E64]">No reservations match your search or filter.</div>
-              <ul v-else class="grid gap-2">
-                <li
-                  v-for="item in filteredReservations"
-                  :key="item.uuid"
-                  class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#EADCC7] bg-[#FCFBF8] px-4 py-3"
-                >
-                  <button
-                    type="button"
-                    class="min-w-0 flex-1 cursor-pointer text-left rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 group"
-                    :aria-label="`View reservation for ${item.customer_name}`"
-                    @click="selectedWaitlistReservation = item"
-                  >
-                    <span class="flex items-center gap-2">
-                      <span class="text-sm font-bold text-[#2D201B] truncate group-hover:underline">{{ item.customer_name }}</span>
-                      <span class="shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold" :class="statusChipClass(item.status)">{{ statusLabel(item.status) }}</span>
-                    </span>
-                    <span class="mt-0.5 block text-xs text-[#8A6E64] truncate">
-                      Table {{ tableNumber(item) }} · {{ formatReservationDate(item.reservation_date) }} · {{ formatReservationTime(item.reservation_date) }} · {{ item.party_size }} guest{{ item.party_size === 1 ? '' : 's' }}
-                    </span>
-                  </button>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <!-- Bookings are saved confirmed, so the waitlist only seats, marks no-show, or cancels. -->
-                    <template v-if="item.status === 'confirmed'">
-                      <button
-                        type="button"
-                        class="relative z-10 h-8 cursor-pointer rounded-lg bg-[#3B1F0E] px-3 text-xs font-bold text-[#FFF8EA] hover:bg-[#2A150A] transition-colors disabled:cursor-wait disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
-                        :disabled="updatingReservation === item.uuid"
-                        @pointerdown.stop
-                        @click.prevent.stop="updateReservationStatus(item, 'seated')"
-                      >
-                        Arrived
-                      </button>
-                      <button
-                        v-if="reservationStarted(item)"
-                        type="button"
-                        class="relative z-10 h-8 cursor-pointer rounded-lg border border-amber-200 bg-white px-3 text-xs font-bold text-amber-800 hover:bg-amber-50 transition-colors disabled:cursor-wait disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-                        :disabled="updatingReservation === item.uuid"
-                        @pointerdown.stop
-                        @click.prevent.stop="updateReservationStatus(item, 'no_show')"
-                      >
-                        No-show
-                      </button>
-                    </template>
-                    <template v-if="(item.status === 'pending' || item.status === 'confirmed') && !reservationStarted(item)">
-                      <button
-                        type="button"
-                        class="relative z-10 h-8 cursor-pointer rounded-lg border border-red-200 bg-white px-3 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors disabled:cursor-wait disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-red-300"
-                        :disabled="updatingReservation === item.uuid"
-                        @pointerdown.stop
-                        @click.prevent.stop="updateReservationStatus(item, 'cancelled')"
-                      >
-                        Cancel
-                      </button>
-                    </template>
-                    <Icon v-if="updatingReservation === item.uuid" name="heroicons:arrow-path" class="w-4 h-4 text-[#7D5A50] animate-spin" />
-                  </div>
-                </li>
-              </ul>
-            </template>
-          </div>
 
-          <!-- Details -->
-          <div v-else class="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-            <button
-              type="button"
-              class="mb-3 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 -ml-2 text-sm font-bold text-[#7D5A50] hover:bg-[#FBF2E1] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
-              @click="selectedWaitlistReservation = null"
-            >
-              <Icon name="heroicons:arrow-left" class="w-4 h-4" />
-              Back to waitlist
-            </button>
-            <div class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs">
-              <div class="mb-3.5 flex items-center justify-between gap-2">
-                <div class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
+              <!-- Status: underline tabs with quiet counts -->
+              <div role="tablist" aria-label="Filter by status" class="mt-3 -mb-px flex gap-5 overflow-x-auto">
+                <button
+                  v-for="opt in waitlistStatusOptions"
+                  :key="opt.value"
+                  type="button"
+                  role="tab"
+                  :aria-selected="waitlistStatusFilter === opt.value"
+                  class="inline-flex shrink-0 items-center gap-1.5 border-b-2 pb-2.5 pt-1 text-[13px] font-semibold whitespace-nowrap transition-colors cursor-pointer outline-none focus-visible:text-[#3B1F0E]"
+                  :class="waitlistStatusFilter === opt.value
+                    ? 'border-[#3B1F0E] text-[#3B1F0E]'
+                    : 'border-transparent text-[#9E7060] hover:text-[#3B1F0E] hover:border-[#D8C7B5]'"
+                  @click="waitlistStatusFilter = opt.value"
+                >
+                  {{ opt.value === 'all' ? 'All' : opt.label }}
+                  <span
+                    class="rounded-md px-1.5 py-px text-[11px] font-bold tabular-nums"
+                    :class="waitlistStatusFilter === opt.value ? 'bg-[#3B1F0E] text-[#FFF8EA]' : 'bg-[#F4ECE1] text-[#9E7060]'"
+                  >{{ waitlistCounts[opt.value] ?? 0 }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="flex-1 min-h-0 overflow-y-auto px-6 md:px-8 py-4">
+              <div v-if="waitlistLoading" class="space-y-2" aria-label="Loading saved reservations">
+                <div v-for="i in 3" :key="i" class="h-[68px] rounded-2xl bg-[#FAF4ED] motion-safe:animate-pulse" />
+              </div>
+
+              <div v-else-if="waitlistError" role="alert" class="flex flex-col items-center text-center py-10">
+                <Icon name="heroicons:exclamation-triangle" class="w-8 h-8 text-red-400 mb-2" />
+                <p class="text-sm font-semibold text-[#3B1F0E]">{{ waitlistError }}</p>
+                <button
+                  type="button"
+                  class="mt-3 h-9 px-3.5 rounded-xl border border-[#D8C7B5] bg-white text-sm font-bold text-[#3B1F0E] inline-flex items-center gap-1.5 hover:bg-[#FAF4ED] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                  @click="openWaitlist"
+                >
+                  <Icon name="heroicons:arrow-path" class="w-4 h-4" />
+                  Try again
+                </button>
+              </div>
+
+              <div v-else-if="!reservations.length" class="flex flex-col items-center text-center py-12">
+                <div class="size-14 rounded-2xl bg-[#FAF4ED] border border-[#EEDFC4] flex items-center justify-center text-[#9E7060] mb-3 shadow-2xs">
+                  <Icon name="heroicons:queue-list" class="w-7 h-7" />
+                </div>
+                <p class="font-display font-bold text-[15px] text-[#3B1F0E]">No reservations yet</p>
+                <p class="text-[12px] text-[#8B6656] mt-1 max-w-xs">Book a table on the floor plan and it shows up here, ready to seat when the guest arrives.</p>
+              </div>
+
+              <template v-else>
+                <p v-if="waitlistActionError" role="alert" class="mb-3 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-700">{{ waitlistActionError }}</p>
+
+                <div v-if="!waitlistGroups.length" class="py-10 text-center">
+                  <p class="text-sm font-semibold text-[#3B1F0E]">
+                    {{ waitlistDate && !waitlistDateReservations.length
+                      ? (['Today', 'Tomorrow', 'Yesterday'].includes(waitlistDateLabel) ? `No reservations ${waitlistDateLabel.toLowerCase()}` : `No reservations on ${waitlistDateLabel}`)
+                      : 'No reservations match' }}
+                  </p>
+                  <p class="mt-0.5 text-xs text-[#8A6E64]">{{ waitlistDate ? 'Pick another day or show all dates.' : 'Try another name or status.' }}</p>
+                  <button
+                    v-if="waitlistDate"
+                    type="button"
+                    class="mt-3 h-9 px-3.5 rounded-xl border border-[#D8C7B5] bg-white text-sm font-bold text-[#3B1F0E] inline-flex items-center gap-1.5 hover:bg-[#FAF4ED] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                    @click="waitlistDate = ''"
+                  >
+                    Show all dates
+                  </button>
+                </div>
+
+                <div v-else class="space-y-4">
+                  <section v-for="group in waitlistGroups" :key="group.key" :aria-label="group.label">
+                    <div class="mb-2 flex items-center gap-3">
+                      <h3 class="text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5 whitespace-nowrap">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
+                        {{ group.label }}
+                      </h3>
+                      <span class="h-px flex-1 bg-[#EEDFC4]" aria-hidden="true" />
+                      <span class="text-[11px] font-semibold text-[#A08676] tabular-nums">{{ group.items.length }}</span>
+                    </div>
+
+                    <ul class="space-y-2">
+                      <li
+                        v-for="item in group.items"
+                        :key="item.uuid"
+                        class="flex items-center gap-3 rounded-2xl border bg-white p-2.5 pr-3 shadow-2xs transition-colors"
+                        :class="waitlistIsLate(item) ? 'border-amber-300 bg-amber-50/40' : 'border-[#EADCC7] hover:border-[#D8C7B5]'"
+                      >
+                        <!-- Time block -->
+                        <button
+                          type="button"
+                          class="flex flex-1 min-w-0 items-center gap-3 text-left cursor-pointer rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40 group"
+                          :aria-label="`View reservation for ${item.customer_name}`"
+                          @click="selectedWaitlistReservation = item"
+                        >
+                          <span
+                            class="flex w-[68px] shrink-0 flex-col items-center justify-center rounded-xl py-2 leading-none"
+                            :class="item.status === 'seated' ? 'bg-emerald-50 text-emerald-800' : item.status === 'cancelled' || item.status === 'no_show' ? 'bg-[#F4F1EE] text-[#8B756A]' : 'bg-[#FAF4ED] text-[#3B1F0E]'"
+                          >
+                            <span class="font-display text-[15px] font-bold tabular-nums">{{ formatReservationTime(item.reservation_date).replace(/\s?[AP]M$/i, '') }}</span>
+                            <span class="mt-1 text-[10px] font-bold uppercase tracking-wider opacity-70">{{ formatReservationTime(item.reservation_date).match(/[AP]M$/i)?.[0] ?? '' }}</span>
+                          </span>
+
+                          <span class="min-w-0 flex-1">
+                            <span class="flex items-center gap-2 min-w-0">
+                              <span class="truncate text-sm font-bold text-[#2D201B] group-hover:underline underline-offset-2">{{ item.customer_name }}</span>
+                              <span v-if="waitlistIsLate(item)" class="shrink-0 rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">Late</span>
+                              <span v-else class="shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold" :class="statusChipClass(item.status)">{{ statusLabel(item.status) }}</span>
+                            </span>
+                            <span class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] text-[#8A6E64]">
+                              <span class="inline-flex items-center gap-1"><Icon name="heroicons:square-3-stack-3d" class="size-3.5 text-[#B4846C]" />Table {{ tableNumber(item) }}</span>
+                              <span class="inline-flex items-center gap-1"><Icon name="heroicons:user-group" class="size-3.5 text-[#B4846C]" />{{ item.party_size }}</span>
+                              <span class="inline-flex items-center gap-1 tabular-nums"><Icon name="heroicons:phone" class="size-3.5 text-[#B4846C]" />{{ item.customer_phone }}</span>
+                            </span>
+                          </span>
+                        </button>
+
+                        <!-- Actions: bookings are saved confirmed, so the waitlist only seats, marks no-show, or cancels -->
+                        <div class="flex shrink-0 items-center gap-1.5">
+                          <Icon v-if="updatingReservation === item.uuid" name="heroicons:arrow-path" class="w-4 h-4 text-[#7D5A50] animate-spin" />
+                          <template v-if="item.status === 'confirmed'">
+                            <button
+                              v-if="reservationStarted(item)"
+                              type="button"
+                              class="h-9 px-3 cursor-pointer rounded-xl border border-amber-200 bg-white text-xs font-bold text-amber-800 hover:bg-amber-50 transition-colors disabled:cursor-wait disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                              :disabled="updatingReservation === item.uuid"
+                              @click.stop="updateReservationStatus(item, 'no_show')"
+                            >
+                              No-show
+                            </button>
+                            <button
+                              type="button"
+                              class="h-9 px-3.5 cursor-pointer rounded-xl bg-[#3B1F0E] text-xs font-bold text-[#FFF8EA] hover:bg-[#2A150A] shadow-sm transition-colors inline-flex items-center gap-1 disabled:cursor-wait disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                              :disabled="updatingReservation === item.uuid"
+                              @click.stop="updateReservationStatus(item, 'seated')"
+                            >
+                              <Icon name="heroicons:check" class="size-3.5" />
+                              Arrived
+                            </button>
+                          </template>
+                          <button
+                            v-if="(item.status === 'pending' || item.status === 'confirmed') && !reservationStarted(item)"
+                            type="button"
+                            class="size-9 cursor-pointer rounded-xl border border-[#EADCC7] bg-white text-[#9E7060] hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors flex items-center justify-center disabled:cursor-wait disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                            :disabled="updatingReservation === item.uuid"
+                            :aria-label="`Cancel reservation for ${item.customer_name}`"
+                            title="Cancel reservation"
+                            @click.stop="updateReservationStatus(item, 'cancelled')"
+                          >
+                            <Icon name="heroicons:x-mark" class="size-4" />
+                          </button>
+                          <Icon v-if="item.status !== 'confirmed' && item.status !== 'pending'" name="heroicons:chevron-right" class="size-4 text-[#C2A592]" aria-hidden="true" />
+                        </div>
+                      </li>
+                    </ul>
+                  </section>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <!-- ── Details ──────────────────────────────────────────── -->
+          <template v-else>
+            <div class="flex-1 min-h-0 overflow-y-auto px-6 md:px-8 py-4 space-y-4">
+              <p v-if="waitlistActionError" role="alert" class="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-700">{{ waitlistActionError }}</p>
+
+              <!-- When -->
+              <div
+                class="flex items-center gap-4 rounded-2xl border p-4 shadow-2xs"
+                :class="waitlistIsLate(selectedWaitlistReservation) ? 'border-amber-300 bg-amber-50/50' : 'border-[#EADCC7] bg-[#FCFBF8]'"
+              >
+                <div class="flex w-[78px] shrink-0 flex-col items-center justify-center rounded-xl bg-white border border-[#EADCC7] py-2.5 leading-none shadow-2xs">
+                  <span class="font-display text-lg font-bold tabular-nums text-[#3B1F0E]">{{ formatReservationTime(selectedWaitlistReservation.reservation_date).replace(/\s?[AP]M$/i, '') }}</span>
+                  <span class="mt-1 text-[10px] font-bold uppercase tracking-wider text-[#8A6E64]">{{ formatReservationTime(selectedWaitlistReservation.reservation_date).match(/[AP]M$/i)?.[0] ?? '' }}</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-bold text-[#2D201B]">{{ waitlistDayLabel(reservationDateValue(selectedWaitlistReservation.reservation_date)) }}</p>
+                  <p class="text-xs text-[#8A6E64]">{{ formatReservationDate(selectedWaitlistReservation.reservation_date) }}</p>
+                  <p v-if="waitlistIsLate(selectedWaitlistReservation)" class="mt-1 text-xs font-semibold text-amber-800">Their time has passed and they haven't arrived yet.</p>
+                </div>
+                <span v-if="waitlistIsLate(selectedWaitlistReservation)" class="shrink-0 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-800">Late</span>
+                <span v-else class="shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold" :class="statusChipClass(selectedWaitlistReservation.status)">{{ statusLabel(selectedWaitlistReservation.status) }}</span>
+              </div>
+
+              <!-- ── Booking ───────────────────────────────────────── -->
+              <section class="rounded-2xl border border-[#EADCC7] bg-[#FCFBF8] p-4 sm:p-5 shadow-2xs" aria-labelledby="waitlist-booking-title">
+                <h3 id="waitlist-booking-title" class="mb-3.5 text-[11px] font-extrabold tracking-wider text-[#7D5A50] uppercase flex items-center gap-1.5">
                   <span class="w-1.5 h-1.5 rounded-full bg-[#7D5A50]"></span>
                   <span>Booking</span>
-                </div>
-                <span class="rounded-full border px-2 py-0.5 text-[11px] font-semibold" :class="statusChipClass(selectedWaitlistReservation.status)">{{ statusLabel(selectedWaitlistReservation.status) }}</span>
-              </div>
-              <dl class="grid gap-3.5 sm:grid-cols-2">
-                <div>
-                  <dt class="text-[11px] font-bold text-[#8A6E64]">Reservation date</dt>
-                  <dd class="mt-0.5 text-sm font-semibold text-[#2D201B]">{{ formatReservationDate(selectedWaitlistReservation.reservation_date) }}</dd>
-                </div>
-                <div>
-                  <dt class="text-[11px] font-bold text-[#8A6E64]">Arrival time</dt>
-                  <dd class="mt-0.5 text-sm font-semibold text-[#2D201B]">{{ formatReservationTime(selectedWaitlistReservation.reservation_date) }}</dd>
-                </div>
-                <div>
-                  <dt class="text-[11px] font-bold text-[#8A6E64]">Table</dt>
-                  <dd class="mt-0.5 text-sm font-semibold text-[#2D201B]">Table {{ tableNumber(selectedWaitlistReservation) }}</dd>
-                </div>
-                <div>
-                  <dt class="text-[11px] font-bold text-[#8A6E64]">Phone number</dt>
-                  <dd class="mt-0.5 text-sm font-semibold text-[#2D201B] tabular-nums">{{ selectedWaitlistReservation.customer_phone }}</dd>
-                </div>
-                <div>
-                  <dt class="text-[11px] font-bold text-[#8A6E64]">Party size</dt>
-                  <dd class="mt-0.5 text-sm font-semibold text-[#2D201B]">{{ selectedWaitlistReservation.party_size }} guest{{ selectedWaitlistReservation.party_size === 1 ? '' : 's' }}</dd>
-                </div>
-                <div class="sm:col-span-2">
-                  <dt class="text-[11px] font-bold text-[#8A6E64]">Note</dt>
-                  <dd class="mt-0.5 whitespace-pre-wrap text-sm" :class="selectedWaitlistReservation.notes?.trim() ? 'font-semibold text-[#2D201B]' : 'italic text-[#A8988B]'">{{ selectedWaitlistReservation.notes?.trim() || 'No note added.' }}</dd>
-                </div>
-              </dl>
+                </h3>
+                <dl class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <div class="rounded-xl border border-[#EADCC7] bg-white px-3.5 py-2.5 shadow-2xs">
+                    <dt class="flex items-center gap-1 text-[11px] font-bold text-[#8A6E64]"><Icon name="heroicons:square-3-stack-3d" class="size-3.5 text-[#B4846C]" />Table</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-[#2D201B]">Table {{ tableNumber(selectedWaitlistReservation) }}</dd>
+                  </div>
+                  <div class="rounded-xl border border-[#EADCC7] bg-white px-3.5 py-2.5 shadow-2xs">
+                    <dt class="flex items-center gap-1 text-[11px] font-bold text-[#8A6E64]"><Icon name="heroicons:user-group" class="size-3.5 text-[#B4846C]" />Party size</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-[#2D201B]">{{ selectedWaitlistReservation.party_size }} guest{{ selectedWaitlistReservation.party_size === 1 ? '' : 's' }}</dd>
+                  </div>
+                  <div class="col-span-2 sm:col-span-1 rounded-xl border border-[#EADCC7] bg-white px-3.5 py-2.5 shadow-2xs">
+                    <dt class="flex items-center gap-1 text-[11px] font-bold text-[#8A6E64]"><Icon name="heroicons:phone" class="size-3.5 text-[#B4846C]" />Phone</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-[#2D201B] tabular-nums">
+                      <a :href="`tel:${selectedWaitlistReservation.customer_phone}`" class="hover:underline underline-offset-2">{{ selectedWaitlistReservation.customer_phone }}</a>
+                    </dd>
+                  </div>
+                  <div class="col-span-2 sm:col-span-3 rounded-xl border border-[#EADCC7] bg-white px-3.5 py-2.5 shadow-2xs">
+                    <dt class="flex items-center gap-1 text-[11px] font-bold text-[#8A6E64]"><Icon name="heroicons:chat-bubble-bottom-center-text" class="size-3.5 text-[#B4846C]" />Note</dt>
+                    <dd class="mt-0.5 whitespace-pre-wrap text-sm" :class="selectedWaitlistReservation.notes?.trim() ? 'font-semibold text-[#2D201B]' : 'italic text-[#A8988B]'">{{ selectedWaitlistReservation.notes?.trim() || 'No note added.' }}</dd>
+                  </div>
+                </dl>
+              </section>
             </div>
-          </div>
+
+            <!-- Footer: back on the left, the status actions on the right -->
+            <div class="flex items-center justify-between gap-3 px-6 md:px-8 py-3.5 border-t border-[#EEDFC4] bg-[#FAF8F5] rounded-b-3xl shrink-0">
+              <button
+                type="button"
+                class="px-5 py-2 rounded-xl border border-[#D8C7B5] bg-white text-[#5C4037] text-xs sm:text-sm font-bold hover:bg-[#FAF4ED] active:scale-95 transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                @click="selectedWaitlistReservation = null"
+              >
+                Back
+              </button>
+              <div class="flex flex-wrap items-center justify-end gap-2">
+                <Icon v-if="updatingReservation === selectedWaitlistReservation.uuid" name="heroicons:arrow-path" class="w-4 h-4 text-[#7D5A50] animate-spin" />
+                <button
+                  v-if="(selectedWaitlistReservation.status === 'pending' || selectedWaitlistReservation.status === 'confirmed') && !reservationStarted(selectedWaitlistReservation)"
+                  type="button"
+                  :disabled="!!updatingReservation"
+                  class="px-4 py-2 rounded-xl border border-red-200 bg-white text-red-600 text-xs sm:text-sm font-bold hover:bg-red-50 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-wait outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                  @click="updateReservationStatus(selectedWaitlistReservation, 'cancelled')"
+                >
+                  Cancel booking
+                </button>
+                <template v-if="selectedWaitlistReservation.status === 'confirmed'">
+                  <button
+                    v-if="reservationStarted(selectedWaitlistReservation)"
+                    type="button"
+                    :disabled="!!updatingReservation"
+                    class="px-4 py-2 rounded-xl border border-amber-200 bg-white text-amber-800 text-xs sm:text-sm font-bold hover:bg-amber-50 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-wait outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                    @click="updateReservationStatus(selectedWaitlistReservation, 'no_show')"
+                  >
+                    No-show
+                  </button>
+                  <button
+                    type="button"
+                    :disabled="!!updatingReservation"
+                    class="px-6 py-2 rounded-xl bg-[#3B1F0E] hover:bg-[#2A150A] text-[#FFF8EA] text-xs sm:text-sm font-bold active:scale-95 transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-wait outline-none focus-visible:ring-2 focus-visible:ring-[#7D5A50]/40"
+                    @click="updateReservationStatus(selectedWaitlistReservation, 'seated')"
+                  >
+                    <Icon name="heroicons:check" class="w-4 h-4" />
+                    Mark arrived
+                  </button>
+                </template>
+              </div>
+            </div>
+          </template>
         </section>
       </div>
 
