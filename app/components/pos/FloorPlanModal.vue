@@ -511,7 +511,7 @@ const tableActions = computed<TableAction[]>(() => {
     const active = activeBooking(t)
     const seated = active?.status === 'seated' ? active : null
     const next = upcomingBooking(t, seated?.uuid)
-    // A booked guest who has arrived while the table still reads Occupied: seat them and start the order.
+    // the booked guest who has arrived while the table still reads Occupied: seat them and start the order.
     const arriving = !seated && active && OPEN.includes(active.status) ? active : null
     const actions: TableAction[] = []
     if (arriving) {
