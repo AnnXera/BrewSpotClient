@@ -535,25 +535,31 @@ async function assignToOrder(table: TableData, booking?: Booking | null) {
   if (updatingTable.value) return
   updatingTable.value = true
   try {
-    const res = await devicePosService.updateTableStatus(table.uuid, 'occupied')
-    if (res.success && res.table) {
-      table.status = res.table.status
+    // Seat the booked guest first: the server refuses to seat a reservation on a table that is
+    // already occupied, and it marks the table occupied itself once the reservation is seated.
+    // A pending booking has to be confirmed before it can be seated.
+    const b = activeBooking(table)
+    const booked = b && OPEN.includes(b.status) ? b : null
+    if (booked) {
+      if (booked.status === 'pending') {
+        await devicePosService.updateReservationStatus(booked.uuid, 'confirmed')
+      }
+      await devicePosService.updateReservationStatus(booked.uuid, 'seated')
+    }
+
+    // Walk-ins (and shared tables, which the server never marks as a whole) set the table directly.
+    if (!booked || table.shared) {
+      const res = await devicePosService.updateTableStatus(table.uuid, 'occupied')
+      table.status = res.success && res.table ? res.table.status : 'occupied'
     } else {
       table.status = 'occupied'
     }
 
-    const b = booking === undefined ? activeBooking(table) : booking
-    if (b && (b.status === 'confirmed' || b.status === 'pending')) {
-      try {
-        await devicePosService.updateReservationStatus(b.uuid, 'seated')
-      } catch (err) {
-        console.warn('Could not mark reservation seated:', err)
-      }
-    }
-
     await refreshAll(false)
-    showToast(`Assigned ${table.table_name} to order (Occupied)`)
-    emit('selectTable', { ...table, status: 'occupied', guest_name: b?.customer_name ?? null })
+    showToast(booked
+      ? `${booked.customer_name} seated at ${table.table_name}`
+      : `Assigned ${table.table_name} to order (Occupied)`)
+    emit('selectTable', { ...table, status: 'occupied' })
     emit('close')
   } catch (e: any) {
     showToast(e?.data?.message || 'Could not update table to occupied', 'error')
